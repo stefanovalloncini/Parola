@@ -1,9 +1,9 @@
 import Foundation
 import os
 
-/// The short file a language probe listens to, cut under a deadline and deleted once the probe is done.
+/// The short files a language probe listens to, one per window, cut under a deadline and deleted after.
 enum LanguageProbeScratch {
-    typealias Extract = @Sendable (_ source: URL, _ scratch: URL) -> Bool
+    typealias Extract = @Sendable (_ source: URL, _ directory: URL) -> [URL]
 
     private enum Phase { case extracting, finished, abandoned }
 
@@ -11,17 +11,18 @@ enum LanguageProbeScratch {
         from source: URL,
         deadline: Duration? = nil,
         clock: any Clock<Duration> = ContinuousClock(),
-        extract: @escaping Extract = { source, scratch in
-            (try? ProbeAudioExtractor.extract(from: source, to: scratch))?.isEmpty == false
+        extract: @escaping Extract = { source, directory in
+            (try? ProbeAudioExtractor.extractWindows(from: source, into: directory)) ?? []
         },
-        _ body: (URL) async throws -> Value
+        _ body: ([URL]) async throws -> Value
     ) async throws -> Value? {
         let scratch = FileManager.default.temporaryDirectory
-            .appendingPathComponent("parola-language-probe-\(UUID().uuidString).caf")
+            .appendingPathComponent("parola-language-probe-\(UUID().uuidString)", isDirectory: true)
+        try? FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: scratch) }
         let phase = OSAllocatedUnfairLock(initialState: Phase.extracting)
         let read = await BoundedFileRead.run(deadline: deadline ?? FileReadDeadline.forReading(source), clock: clock) {
-            let extracted = extract(source, scratch)
+            let windows = extract(source, scratch)
             // A read that resumes after the deadline writes the scratch after the defer above has run.
             let abandoned = phase.withLock { phase -> Bool in
                 if phase == .abandoned { return true }
@@ -29,13 +30,13 @@ enum LanguageProbeScratch {
                 return false
             }
             if abandoned { try? FileManager.default.removeItem(at: scratch) }
-            return extracted
+            return windows
         }
-        guard case .done(let extracted) = read else {
+        guard case .done(let windows) = read else {
             phase.withLock { $0 = .abandoned }
             throw ParolaError.fileReadTimedOut(name: source.lastPathComponent)
         }
-        guard extracted else { return nil }
-        return try await body(scratch)
+        guard !windows.isEmpty else { return nil }
+        return try await body(windows)
     }
 }

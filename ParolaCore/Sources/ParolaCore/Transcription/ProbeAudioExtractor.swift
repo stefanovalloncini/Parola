@@ -62,29 +62,31 @@ enum ProbeAudioExtractor {
         }
     }
 
-    static func extract(
+    /// The loudest windows, each copied to its own mono file in `directory`, loudest first.
+    static func extractWindows(
         from source: URL,
-        to destination: URL,
+        into directory: URL,
         windowSeconds: Double = ProbeWindowPlanner.windowSeconds,
         windowLimit: Int = ProbeWindowPlanner.windowLimit,
         candidateLimit: Int = ProbeWindowPlanner.candidateLimit
-    ) throws -> [AudioProbeWindow] {
+    ) throws -> [URL] {
         let file = try AVAudioFile(forReading: source)
         let measured = try measure(file, windowSeconds: windowSeconds, candidateLimit: candidateLimit)
-        let windows = ProbeWindowPlanner.pick(from: measured, limit: windowLimit)
+        let windows = ProbeWindowPlanner.ranked(from: measured, limit: windowLimit)
         guard !windows.isEmpty,
               let mono = AVAudioFormat(standardFormatWithSampleRate: file.processingFormat.sampleRate, channels: 1)
         else { return [] }
-        let out = try AVAudioFile(
-            forWriting: destination,
-            settings: mono.settings,
-            commonFormat: .pcmFormatFloat32,
-            interleaved: false
-        )
-        for window in windows {
+        return try windows.enumerated().map { index, window in
+            let destination = directory.appendingPathComponent("window-\(index).caf")
+            let out = try AVAudioFile(
+                forWriting: destination,
+                settings: mono.settings,
+                commonFormat: .pcmFormatFloat32,
+                interleaved: false
+            )
             try copy(window: window, from: file, to: out, as: mono)
+            return destination
         }
-        return windows
     }
 
     /// Loudest slice, not the window's mean: a memo of a quiet room with one sentence in it should

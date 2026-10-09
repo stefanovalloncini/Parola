@@ -76,6 +76,11 @@ enum ProbeWindowPlanner {
     }
 
     static func pick(from measured: [ProbeWindowEnergy], limit: Int = windowLimit) -> [AudioProbeWindow] {
+        ranked(from: measured, limit: limit).sorted { $0.start < $1.start }
+    }
+
+    /// `pick`, loudest first.
+    static func ranked(from measured: [ProbeWindowEnergy], limit: Int = windowLimit) -> [AudioProbeWindow] {
         guard let loudest = measured.map(\.energy).max(), loudest > 0 else {
             return measured.prefix(limit).map(\.window)
         }
@@ -89,17 +94,32 @@ enum ProbeWindowPlanner {
             }
             .prefix(limit)
             .map(\.window)
-            .sorted { $0.start < $1.start }
     }
 }
 
 struct LanguageProbeOutcome: Hashable, Sendable {
     var text: String
     var confidence: Double?
+    /// How much text the confidence averages over, so outcomes from several windows can be pooled.
+    var confidenceWeight: Double
 
-    init(text: String, confidence: Double? = nil) {
+    init(text: String, confidence: Double? = nil, confidenceWeight: Double? = nil) {
         self.text = text
         self.confidence = confidence
+        self.confidenceWeight = confidenceWeight ?? Double(text.count)
+    }
+
+    /// One outcome for several windows of the same language, as if they had been probed back to back.
+    static func pooled(_ outcomes: [LanguageProbeOutcome]) -> LanguageProbeOutcome {
+        let scored = outcomes.compactMap { outcome in
+            outcome.confidence.map { (confidence: $0, weight: outcome.confidenceWeight) }
+        }.filter { $0.weight > 0 }
+        let weight = scored.reduce(0) { $0 + $1.weight }
+        return LanguageProbeOutcome(
+            text: outcomes.map(\.text).filter { !$0.isEmpty }.joined(separator: " "),
+            confidence: weight > 0 ? scored.reduce(0) { $0 + $1.confidence * $1.weight } / weight : nil,
+            confidenceWeight: weight
+        )
     }
 }
 
@@ -168,6 +188,17 @@ enum AutoLanguage {
         return pick(best.locale, detected: isTrustworthy(best, over: ranked.dropFirst().first))
     }
 
+    /// Two windows that each pick the same language on their own say what the rest would.
+    static func windowsAgree(_ windows: [[LanguageProbe]], fallback: Locale) -> Bool {
+        var detected: [String: Int] = [:]
+        for probes in windows {
+            let pick = decide(probes: probes, fallback: fallback)
+            guard case .detected = pick.detection else { continue }
+            detected[pick.locale.identifier, default: 0] += 1
+        }
+        return detected.values.contains { $0 >= 2 }
+    }
+
     static func code(of locale: Locale) -> String {
         locale.language.languageCode?.identifier ?? locale.identifier
     }
@@ -205,28 +236,93 @@ enum AutoLanguage {
     }
 }
 
-/// Runs one probe transcription per candidate language and picks a winner. The probe closure is the
-/// seam: production hands it a SpeechAnalyzer pass over a few seconds of the audio, tests hand it
-/// canned outcomes.
+/// Probes each candidate language on each window, loudest first, a round of windows at a time, until
+/// two windows agree; failing that, every window is heard and pooled. Tests fill the probe closure.
 struct AutoLanguagePicker: Sendable {
-    let runProbe: @Sendable (Locale) async throws -> LanguageProbeOutcome
+    static let concurrentProbes = 4
+
+    let windowCount: Int
+    let concurrentProbes: Int
+    let runProbe: @Sendable (Locale, Int) async throws -> LanguageProbeOutcome
+
+    init(
+        windowCount: Int,
+        concurrentProbes: Int = AutoLanguagePicker.concurrentProbes,
+        runProbe: @escaping @Sendable (_ locale: Locale, _ window: Int) async throws -> LanguageProbeOutcome
+    ) {
+        self.windowCount = windowCount
+        self.concurrentProbes = max(1, concurrentProbes)
+        self.runProbe = runProbe
+    }
 
     func pick(candidates: [Locale], fallback: Locale) async throws -> LanguagePick {
         try Task.checkCancellation()
-        guard candidates.count > 1 else {
+        guard candidates.count > 1, windowCount > 0 else {
             return LanguagePick(locale: fallback, detection: .assumed(AutoLanguage.code(of: fallback)))
         }
-        var probes: [LanguageProbe] = []
-        for locale in candidates {
-            try Task.checkCancellation()
-            do {
-                probes.append(LanguageProbe(locale: locale, outcome: try await runProbe(locale)))
-            } catch is CancellationError {
-                throw CancellationError()
-            } catch {
-                continue
+        // Whole rounds, never a cancel: a cancelled analyzer changed what the run's own analyzer wrote next.
+        let windowsPerRound = max(1, concurrentProbes / candidates.count)
+        var heard = HeardWindows(candidateCount: candidates.count)
+        var start = 0
+        while start < windowCount {
+            let round = start..<min(windowCount, start + windowsPerRound)
+            try await probe(round, candidates: candidates, into: &heard)
+            start = round.upperBound
+            if AutoLanguage.windowsAgree(heard.completeWindows, fallback: fallback) { break }
+        }
+        try Task.checkCancellation()
+        let pooled = candidates.map { locale in
+            LanguageProbe(
+                locale: locale,
+                outcome: .pooled(heard.completeWindows.flatMap { $0 }.filter { $0.locale == locale }.map(\.outcome))
+            )
+        }
+        return AutoLanguage.decide(probes: pooled, fallback: fallback)
+    }
+
+    private func probe(_ windows: Range<Int>, candidates: [Locale], into heard: inout HeardWindows) async throws {
+        try await withThrowingTaskGroup(of: (window: Int, probe: LanguageProbe?).self) { group in
+            var jobs = windows.flatMap { window in candidates.map { (window, $0) } }.makeIterator()
+            func launchNext() {
+                guard let job = jobs.next() else { return }
+                let (window, locale) = job
+                group.addTask { [runProbe] in
+                    do {
+                        return (window, LanguageProbe(locale: locale, outcome: try await runProbe(locale, window)))
+                    } catch is CancellationError {
+                        throw CancellationError()
+                    } catch {
+                        return (window, nil)
+                    }
+                }
+            }
+            for _ in 0..<concurrentProbes { launchNext() }
+            while let result = try await group.next() {
+                heard.record(result.probe, window: result.window)
+                launchNext()
             }
         }
-        return AutoLanguage.decide(probes: probes, fallback: fallback)
+    }
+}
+
+/// A window counts once every candidate answered on it, so the pool never favours a language heard longer.
+private struct HeardWindows {
+    let candidateCount: Int
+    private var probes: [Int: [LanguageProbe]] = [:]
+    private var answered: [Int: Int] = [:]
+
+    init(candidateCount: Int) {
+        self.candidateCount = candidateCount
+    }
+
+    mutating func record(_ probe: LanguageProbe?, window: Int) {
+        answered[window, default: 0] += 1
+        if let probe { probes[window, default: []].append(probe) }
+    }
+
+    var completeWindows: [[LanguageProbe]] {
+        answered.keys.sorted()
+            .filter { answered[$0] == candidateCount }
+            .map { probes[$0] ?? [] }
     }
 }

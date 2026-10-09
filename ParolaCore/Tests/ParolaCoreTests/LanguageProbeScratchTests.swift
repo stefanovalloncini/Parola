@@ -55,9 +55,11 @@ struct LanguageProbeScratchTests {
                 clock: clock,
                 extract: { _, scratch in
                     resume.wait()
-                    FileManager.default.createFile(atPath: scratch.path, contents: Data("late".utf8))
+                    try? FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+                    let window = scratch.appendingPathComponent("window-0.caf")
+                    FileManager.default.createFile(atPath: window.path, contents: Data("late".utf8))
                     written.update { $0 = scratch }
-                    return true
+                    return [window]
                 }
             ) { _ in }
         }
@@ -90,13 +92,15 @@ struct LanguageProbeScratchTests {
         }
         try AVAudioFile(forWriting: source, settings: format.settings).write(from: buffer)
 
-        let scratch = try await LanguageProbeScratch.withScratch(from: source) { url -> URL in
-            #expect(FileManager.default.fileExists(atPath: url.path))
-            return url
+        let scratch = try await LanguageProbeScratch.withScratch(from: source) { windows in
+            (windows: windows, existed: windows.allSatisfy { FileManager.default.fileExists(atPath: $0.path) })
         }
 
         let used = try #require(scratch)
-        #expect(!FileManager.default.fileExists(atPath: used.path))
+        #expect(!used.windows.isEmpty)
+        #expect(used.existed)
+        #expect(used.windows.allSatisfy { !FileManager.default.fileExists(atPath: $0.path) })
+        #expect(!FileManager.default.fileExists(atPath: used.windows[0].deletingLastPathComponent().path))
     }
 }
 

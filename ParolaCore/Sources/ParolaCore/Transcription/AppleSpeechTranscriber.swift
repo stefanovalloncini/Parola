@@ -254,9 +254,9 @@ actor AppleSpeechTranscriber: Transcriber {
         )
         guard candidates.count > 1 else { return nil }
 
-        return try await LanguageProbeScratch.withScratch(from: url) { probeURL in
-            let picker = AutoLanguagePicker { locale in
-                try await Self.runProbe(url: probeURL, locale: locale, cancellation: cancellation)
+        return try await LanguageProbeScratch.withScratch(from: url) { windows in
+            let picker = AutoLanguagePicker(windowCount: windows.count) { locale, window in
+                try await Self.runProbe(url: windows[window], locale: locale, cancellation: cancellation)
             }
             return try await picker.pick(candidates: candidates, fallback: fallback)
         }
@@ -276,7 +276,6 @@ actor AppleSpeechTranscriber: Transcriber {
         )
         let analyzer = SpeechAnalyzer(modules: [transcriber])
         await cancellation.attach(analyzer: analyzer)
-        let file = try await openBounded(url)
         let collector = Task { () async throws -> LanguageProbeOutcome in
             var parts: [String] = []
             var meter = ConfidenceMeter()
@@ -284,20 +283,29 @@ actor AppleSpeechTranscriber: Transcriber {
                 parts.append(String(result.text.characters))
                 meter.add(result.text)
             }
-            return LanguageProbeOutcome(text: parts.joined(separator: " "), confidence: meter.value)
+            return LanguageProbeOutcome(
+                text: parts.joined(separator: " "),
+                confidence: meter.value,
+                confidenceWeight: meter.weight
+            )
         }
         do {
-            return try await withTaskCancellationHandler {
+            let file = try await openBounded(url)
+            let outcome = try await withTaskCancellationHandler {
                 try Task.checkCancellation()
                 _ = try await analyzer.analyzeSequence(from: file)
                 try await analyzer.finalizeAndFinishThroughEndOfInput()
                 return try await collector.value
             } onCancel: {
                 collector.cancel()
-                Task { await cancellation.cancel() }
+                // analyzeSequence ignores task cancellation and never returns without this.
+                Task { await analyzer.cancelAndFinishNow() }
             }
+            await cancellation.detach(analyzer: analyzer)
+            return outcome
         } catch {
             collector.cancel()
+            await cancellation.detach(analyzer: analyzer)
             throw error
         }
     }
@@ -409,7 +417,7 @@ final class InFlightCancel: Sendable {
 @available(macOS 26.0, iOS 26.0, *)
 private struct ConfidenceMeter {
     private var weighted = 0.0
-    private var weight = 0.0
+    private(set) var weight = 0.0
 
     var value: Double? { weight > 0 ? weighted / weight : nil }
 
@@ -425,7 +433,7 @@ private struct ConfidenceMeter {
 
 @available(macOS 26.0, iOS 26.0, *)
 final actor AnalyzerCancellation {
-    private var analyzer: SpeechAnalyzer?
+    private var analyzers: [ObjectIdentifier: SpeechAnalyzer] = [:]
     private var cancelled = false
 
     func attach(analyzer: SpeechAnalyzer) async {
@@ -433,14 +441,20 @@ final actor AnalyzerCancellation {
             await analyzer.cancelAndFinishNow()
             return
         }
-        self.analyzer = analyzer
+        analyzers[ObjectIdentifier(analyzer)] = analyzer
+    }
+
+    func detach(analyzer: SpeechAnalyzer) {
+        analyzers[ObjectIdentifier(analyzer)] = nil
     }
 
     func cancel() async {
         cancelled = true
-        guard let analyzer else { return }
-        self.analyzer = nil
-        await analyzer.cancelAndFinishNow()
+        let running = analyzers.values
+        analyzers = [:]
+        for analyzer in running {
+            await analyzer.cancelAndFinishNow()
+        }
     }
 }
 #else

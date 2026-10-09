@@ -230,7 +230,7 @@ struct AutoLanguageDetectionTests {
     @Test("a single candidate never runs a probe")
     func pickerSkipsSingleCandidate() async throws {
         let calls = Counter()
-        let picker = AutoLanguagePicker { locale in
+        let picker = AutoLanguagePicker(windowCount: 2) { locale, _ in
             await calls.record(locale.identifier)
             return LanguageProbeOutcome(text: "whatever", confidence: 0.9)
         }
@@ -244,9 +244,9 @@ struct AutoLanguageDetectionTests {
 
     @Test("a failing probe does not sink the other candidates")
     func pickerSurvivesProbeFailure() async throws {
-        let picker = AutoLanguagePicker { locale in
+        let picker = AutoLanguagePicker(windowCount: 2) { locale, _ in
             if locale.identifier == "en_US" { throw ParolaError.transcriptionFailed("no asset") }
-            return LanguageProbeOutcome(text: String(repeating: "parola ", count: 30), confidence: 0.95)
+            return Self.speech
         }
         let pick = try await picker.pick(
             candidates: [Locale(identifier: "en_US"), Locale(identifier: "it_IT")],
@@ -255,32 +255,147 @@ struct AutoLanguageDetectionTests {
         #expect(pick.detection == .detected("it"))
     }
 
-    @Test("picker probes every candidate in order")
+    @Test("picker probes every candidate on a window before the next window")
     func pickerProbesEachCandidate() async throws {
         let calls = Counter()
-        let picker = AutoLanguagePicker { locale in
-            await calls.record(locale.identifier)
-            return locale.identifier == "it_IT"
-                ? LanguageProbeOutcome(text: String(repeating: "parola ", count: 30), confidence: 0.95)
-                : LanguageProbeOutcome(text: "uh uh uh uh uh uh", confidence: 0.3)
+        let picker = AutoLanguagePicker(windowCount: 2, concurrentProbes: 1) { locale, window in
+            await calls.record("\(window) \(locale.identifier)")
+            return locale.identifier == "it_IT" ? Self.speech : Self.mumble
         }
         let pick = try await picker.pick(
             candidates: [Locale(identifier: "en_US"), Locale(identifier: "it_IT")],
             fallback: Locale(identifier: "en_US")
         )
-        #expect(await calls.recorded == ["en_US", "it_IT"])
+        #expect(await calls.recorded == ["0 en_US", "0 it_IT", "1 en_US", "1 it_IT"])
         #expect(pick.detection == .detected("it"))
+    }
+
+    @Test("two windows that agree end the probe")
+    func pickerStopsOnceTwoWindowsAgree() async throws {
+        let calls = Counter()
+        let picker = AutoLanguagePicker(windowCount: 6, concurrentProbes: 1) { locale, window in
+            await calls.record("\(window) \(locale.identifier)")
+            return locale.identifier == "it_IT" ? Self.speech : Self.mumble
+        }
+        let pick = try await picker.pick(
+            candidates: [Locale(identifier: "en_US"), Locale(identifier: "it_IT")],
+            fallback: Locale(identifier: "en_US")
+        )
+        #expect(await calls.recorded.count == 4)
+        #expect(pick.locale.identifier == "it_IT")
+        #expect(pick.detection == .detected("it"))
+    }
+
+    @Test("windows are probed a round at a time and no probe is ever cancelled")
+    func pickerProbesWholeRounds() async throws {
+        let calls = Counter()
+        let cancelled = Counter()
+        let picker = AutoLanguagePicker(windowCount: 6, concurrentProbes: 4) { locale, window in
+            await calls.record("\(window) \(locale.identifier)")
+            for _ in 0..<5 { await Task.yield() }
+            if Task.isCancelled { await cancelled.record(locale.identifier) }
+            return locale.identifier == "it_IT" ? Self.speech : Self.mumble
+        }
+        let pick = try await picker.pick(
+            candidates: [Locale(identifier: "en_US"), Locale(identifier: "it_IT")],
+            fallback: Locale(identifier: "en_US")
+        )
+        #expect(await Set(calls.recorded) == ["0 en_US", "0 it_IT", "1 en_US", "1 it_IT"])
+        #expect(await cancelled.recorded.isEmpty)
+        #expect(pick.detection == .detected("it"))
+    }
+
+    @Test("a window with nothing in it does not count toward agreement")
+    func pickerReadsPastSilentWindows() async throws {
+        let calls = Counter()
+        let picker = AutoLanguagePicker(windowCount: 6, concurrentProbes: 1) { locale, window in
+            await calls.record("\(window) \(locale.identifier)")
+            guard window > 0 else { return LanguageProbeOutcome(text: "") }
+            return locale.identifier == "it_IT" ? Self.speech : Self.mumble
+        }
+        let pick = try await picker.pick(
+            candidates: [Locale(identifier: "en_US"), Locale(identifier: "it_IT")],
+            fallback: Locale(identifier: "en_US")
+        )
+        #expect(await calls.recorded.count == 6)
+        #expect(pick.detection == .detected("it"))
+    }
+
+    @Test("windows that never agree are all heard and judged together")
+    func pickerPoolsEveryWindowWithoutAgreement() async throws {
+        let calls = Counter()
+        let picker = AutoLanguagePicker(windowCount: 4, concurrentProbes: 1) { locale, window in
+            await calls.record("\(window) \(locale.identifier)")
+            switch (window, locale.identifier) {
+            case (0, "it_IT"), (1, "en_US"): return Self.speech
+            case (0, _), (1, _): return LanguageProbeOutcome(text: Self.words(30), confidence: 0.4, confidenceWeight: 10)
+            default: return LanguageProbeOutcome(text: "")
+            }
+        }
+        let pick = try await picker.pick(
+            candidates: [Locale(identifier: "en_US"), Locale(identifier: "it_IT")],
+            fallback: Locale(identifier: "en_US")
+        )
+        #expect(await calls.recorded.count == 8)
+        #expect(pick.detection == .assumed("en"), "an even pool is a coin toss, so it stays assumed")
+    }
+
+    @Test("the picker never runs more probes at once than its bound")
+    func pickerBoundsConcurrency() async throws {
+        let gauge = Gauge()
+        let picker = AutoLanguagePicker(windowCount: 6, concurrentProbes: 3) { _, _ in
+            await gauge.enter()
+            for _ in 0..<5 { await Task.yield() }
+            await gauge.leave()
+            return LanguageProbeOutcome(text: "")
+        }
+        _ = try await picker.pick(
+            candidates: [Locale(identifier: "en_US"), Locale(identifier: "it_IT")],
+            fallback: Locale(identifier: "en_US")
+        )
+        #expect(await gauge.entered == 12)
+        #expect(await gauge.peak <= 3)
     }
 
     @Test("picker propagates cancellation instead of scoring a half-finished set")
     func pickerPropagatesCancellation() async {
-        let picker = AutoLanguagePicker { _ in throw CancellationError() }
+        let picker = AutoLanguagePicker(windowCount: 2) { _, _ in throw CancellationError() }
         await #expect(throws: CancellationError.self) {
             _ = try await picker.pick(
                 candidates: [Locale(identifier: "en_US"), Locale(identifier: "it_IT")],
                 fallback: Locale(identifier: "en_US")
             )
         }
+    }
+
+    @Test("windows agree when two of them pick the same language on their own")
+    func windowsAgree() {
+        let italian = [probe("en_US", words: 30, confidence: 0.3), probe("it_IT", words: 30, confidence: 0.95)]
+        let english = [probe("en_US", words: 30, confidence: 0.95), probe("it_IT", words: 30, confidence: 0.3)]
+        let thin = [probe("en_US", words: 0, confidence: nil), probe("it_IT", words: 3, confidence: 0.95)]
+        let fallback = Locale(identifier: "en_US")
+
+        #expect(AutoLanguage.windowsAgree([italian, italian], fallback: fallback))
+        #expect(AutoLanguage.windowsAgree([english, italian, italian], fallback: fallback))
+        #expect(!AutoLanguage.windowsAgree([english, italian], fallback: fallback))
+        #expect(!AutoLanguage.windowsAgree([thin, italian], fallback: fallback), "a thin window is only an assumption")
+        #expect(!AutoLanguage.windowsAgree([italian], fallback: fallback))
+    }
+
+    @Test("pooled outcomes weigh each window's confidence by how much it heard")
+    func pooledOutcome() {
+        let pooled = LanguageProbeOutcome.pooled([
+            LanguageProbeOutcome(text: "uno due", confidence: 0.9, confidenceWeight: 10),
+            LanguageProbeOutcome(text: "", confidence: nil, confidenceWeight: 0),
+            LanguageProbeOutcome(text: "tre", confidence: 0.5, confidenceWeight: 30),
+        ])
+        #expect(pooled.text == "uno due tre")
+        #expect(abs((pooled.confidence ?? 0) - 0.6) < 1e-9)
+        #expect(pooled.confidenceWeight == 40)
+
+        let silent = LanguageProbeOutcome.pooled([LanguageProbeOutcome(text: ""), LanguageProbeOutcome(text: "")])
+        #expect(silent.text.isEmpty)
+        #expect(silent.confidence == nil)
     }
 
     @Test("a chosen language reports nothing about detection")
@@ -338,49 +453,63 @@ struct AutoLanguageDetectionTests {
 
     @Test("probe extraction keeps the loud stretch and skips the silence")
     func extractionPicksLoudWindow() throws {
-        let sampleRate = 8000.0
-        let url = try Self.writeTone(
-            sampleRate: sampleRate,
-            seconds: 60,
-            loudRange: 30..<40
-        )
+        let url = try Self.writeTone(sampleRate: 8000, seconds: 60, loudRange: 30..<40)
         defer { try? FileManager.default.removeItem(at: url) }
+        let directory = try Self.makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
 
-        let probeURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("parola-probe-\(UUID().uuidString).caf")
-        defer { try? FileManager.default.removeItem(at: probeURL) }
-
-        let windows = try ProbeAudioExtractor.extract(
+        let windows = try ProbeAudioExtractor.extractWindows(
             from: url,
-            to: probeURL,
+            into: directory,
             windowSeconds: 10,
             windowLimit: 1,
             candidateLimit: 6
         )
-        #expect(windows.count == 1)
-        let start = try #require(windows.first?.start)
-        #expect(start >= 25 && start <= 40)
 
-        let written = try AVAudioFile(forReading: probeURL)
-        let duration = Double(written.length) / written.processingFormat.sampleRate
-        #expect(abs(duration - 10) < 0.2)
+        #expect(windows.count == 1)
+        let written = try Self.read(try #require(windows.first))
+        #expect(abs(written.seconds - 10) < 0.2)
+        #expect(written.rms > 0.4, "the copy is the toned stretch, not the silence around it")
     }
 
     @Test("probe windows reach speech that starts long after the opening minutes")
     func extractionReachesLateSpeech() throws {
         let url = try Self.writeTone(sampleRate: 8000, seconds: 500, loudRange: 400..<500)
         defer { try? FileManager.default.removeItem(at: url) }
-        let probeURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("parola-probe-\(UUID().uuidString).caf")
-        defer { try? FileManager.default.removeItem(at: probeURL) }
+        let directory = try Self.makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
 
-        let windows = try ProbeAudioExtractor.extract(from: url, to: probeURL)
+        let windows = try ProbeAudioExtractor.extractWindows(from: url, into: directory)
 
         #expect(!windows.isEmpty)
-        #expect(windows.allSatisfy { $0.start > 300 && $0.end > 400 })
-        let written = try AVAudioFile(forReading: probeURL)
-        let duration = Double(written.length) / written.processingFormat.sampleRate
-        #expect(duration <= 120)
+        let written = try windows.map(Self.read)
+        #expect(written.allSatisfy { $0.rms > 0.2 })
+        #expect(written.reduce(0) { $0 + $1.seconds } <= 120)
+    }
+
+    @Test("windows come out loudest first, each in a file of its own")
+    func extractionOrdersByLoudness() throws {
+        let url = try Self.writeTone(
+            sampleRate: 8000, seconds: 100, loudRange: 0..<100, amplitude: { time in
+                switch time {
+                case 20..<40: 0.2
+                case 60..<80: 0.8
+                default: 0.01
+                }
+            }
+        )
+        defer { try? FileManager.default.removeItem(at: url) }
+        let directory = try Self.makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let windows = try ProbeAudioExtractor.extractWindows(
+            from: url, into: directory, windowSeconds: 20, windowLimit: 2, candidateLimit: 5
+        )
+
+        let loudness = try windows.map { try Self.read($0).rms }
+        #expect(loudness.count == 2)
+        #expect(loudness == loudness.sorted(by: >))
+        #expect(Set(windows).count == 2)
     }
 
     @Test("energies measured in memory match the same audio measured on disk")
@@ -440,6 +569,33 @@ struct AutoLanguageDetectionTests {
         #expect(Self.loudness(of: probe, at: 0) > 0.2)
     }
 
+    @Test("a stereo source with sound on one side only is extracted as audible mono")
+    func extractionDownmixesStereo() throws {
+        let url = try Self.writeTone(sampleRate: 8000, seconds: 6, loudRange: 0..<6, channels: 2, loudChannel: 1)
+        defer { try? FileManager.default.removeItem(at: url) }
+        let directory = try Self.makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let windows = try ProbeAudioExtractor.extractWindows(
+            from: url,
+            into: directory,
+            windowSeconds: 10,
+            windowLimit: 1,
+            candidateLimit: 4
+        )
+
+        #expect(windows.count == 1)
+        let written = try AVAudioFile(forReading: try #require(windows.first))
+        #expect(written.processingFormat.channelCount == 1)
+        #expect(abs(Double(written.length) / written.processingFormat.sampleRate - 6) < 0.01)
+        let buffer = try #require(
+            AVAudioPCMBuffer(pcmFormat: written.processingFormat, frameCapacity: AVAudioFrameCount(written.length))
+        )
+        try written.read(into: buffer)
+        let peak = (0..<Int(buffer.frameLength)).map { abs(buffer.floatChannelData![0][$0]) }.max() ?? 0
+        #expect(peak > 0.2)
+    }
+
     private static let whisperWindow = 30 * 16_000
 
     private static func whisperProbe(_ samples: [Float]) -> [Float] {
@@ -463,49 +619,45 @@ struct AutoLanguageDetectionTests {
         return (window.reduce(Float(0)) { $0 + $1 * $1 } / Float(window.count)).squareRoot()
     }
 
-    @Test("a stereo source with sound on one side only is extracted as audible mono")
-    func extractionDownmixesStereo() throws {
-        let url = try Self.writeTone(sampleRate: 8000, seconds: 6, loudRange: 0..<6, channels: 2, loudChannel: 1)
-        defer { try? FileManager.default.removeItem(at: url) }
-        let probeURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("parola-probe-\(UUID().uuidString).caf")
-        defer { try? FileManager.default.removeItem(at: probeURL) }
+    private static func makeDirectory() throws -> URL {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-probe-windows-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        return directory
+    }
 
-        let windows = try ProbeAudioExtractor.extract(
-            from: url,
-            to: probeURL,
-            windowSeconds: 10,
-            windowLimit: 1,
-            candidateLimit: 4
-        )
-        #expect(windows == [AudioProbeWindow(start: 0, duration: 6)])
-
-        let written = try AVAudioFile(forReading: probeURL)
-        #expect(written.processingFormat.channelCount == 1)
+    private static func read(_ url: URL) throws -> (seconds: Double, rms: Double) {
+        let file = try AVAudioFile(forReading: url)
         let buffer = try #require(
-            AVAudioPCMBuffer(pcmFormat: written.processingFormat, frameCapacity: AVAudioFrameCount(written.length))
+            AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: AVAudioFrameCount(file.length))
         )
-        try written.read(into: buffer)
-        let peak = (0..<Int(buffer.frameLength)).map { abs(buffer.floatChannelData![0][$0]) }.max() ?? 0
-        #expect(peak > 0.2)
+        try file.read(into: buffer)
+        let samples = UnsafeBufferPointer(start: buffer.floatChannelData![0], count: Int(buffer.frameLength))
+        let rms = (samples.reduce(0.0) { $0 + Double($1) * Double($1) } / Double(max(1, samples.count))).squareRoot()
+        return (Double(file.length) / file.processingFormat.sampleRate, rms)
     }
 
     private func probe(_ identifier: String, words: Int, confidence: Double?) -> LanguageProbe {
         LanguageProbe(
             locale: Locale(identifier: identifier),
-            outcome: LanguageProbeOutcome(
-                text: (0..<words).map { "w\($0)" }.joined(separator: " "),
-                confidence: confidence
-            )
+            outcome: LanguageProbeOutcome(text: Self.words(words), confidence: confidence)
         )
     }
+
+    private static func words(_ count: Int) -> String {
+        (0..<count).map { "w\($0)" }.joined(separator: " ")
+    }
+
+    private static let speech = LanguageProbeOutcome(text: words(30), confidence: 0.95, confidenceWeight: 10)
+    private static let mumble = LanguageProbeOutcome(text: "uh uh uh uh uh uh", confidence: 0.3, confidenceWeight: 10)
 
     private static func writeTone(
         sampleRate: Double,
         seconds: Double,
         loudRange: Range<Double>,
         channels: AVAudioChannelCount = 1,
-        loudChannel: Int? = nil
+        loudChannel: Int? = nil,
+        amplitude: (Double) -> Float = { _ in 0.8 }
     ) throws -> URL {
         let format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: channels)!
         let frameCount = AVAudioFrameCount(sampleRate * seconds)
@@ -517,7 +669,7 @@ struct AutoLanguageDetectionTests {
             for frame in 0..<Int(frameCount) {
                 let time = Double(frame) / sampleRate
                 let loud = !silent && loudRange.contains(time)
-                samples[frame] = loud ? Float(sin(2 * .pi * 440 * time)) * 0.8 : 0
+                samples[frame] = loud ? Float(sin(2 * .pi * 440 * time)) * amplitude(time) : 0
             }
         }
         let url = FileManager.default.temporaryDirectory
@@ -538,4 +690,18 @@ struct AutoLanguageDetectionTests {
 private actor Counter {
     private(set) var recorded: [String] = []
     func record(_ value: String) { recorded.append(value) }
+}
+
+private actor Gauge {
+    private(set) var entered = 0
+    private(set) var peak = 0
+    private var inFlight = 0
+
+    func enter() {
+        entered += 1
+        inFlight += 1
+        peak = max(peak, inFlight)
+    }
+
+    func leave() { inFlight -= 1 }
 }
