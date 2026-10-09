@@ -174,54 +174,109 @@ struct WhisperLanguageVoteTests {
         #expect(WhisperLanguageVote.decide([reading("  ", 0.95)]) == nil)
     }
 
-    @Test("two windows that agree settle the vote")
-    func twoAgreeingReadingsSettle() {
+    @Test("a vote the unread windows could still overturn keeps reading")
+    func unreadWindowsKeepTheVoteOpen() {
         let readings = [reading("it", 0.98), reading("it", 0.97)]
 
-        #expect(WhisperLanguageVote.isSettled(readings))
-        #expect(WhisperLanguageVote.decide(readings) == .detected("it"))
+        #expect(!WhisperLanguageVote.isSettled(readings, unread: 2))
+        #expect(WhisperLanguageVote.isSettled(readings, unread: 1))
+        #expect(WhisperLanguageVote.isSettled(readings, unread: 0))
     }
 
-    @Test("one reading never settles the vote, however certain")
+    @Test("one reading never settles while a window is left")
     func oneReadingDoesNotSettle() {
-        #expect(!WhisperLanguageVote.isSettled([reading("it", 0.9999)]))
-        #expect(!WhisperLanguageVote.isSettled([]))
+        #expect(!WhisperLanguageVote.isSettled([reading("it", 0.9999)], unread: 1))
+        #expect(!WhisperLanguageVote.isSettled([], unread: 0))
     }
 
-    @Test("a lone confident reading over a dissent is not agreement")
-    func dissentDoesNotSettle() {
-        #expect(!WhisperLanguageVote.isSettled([reading("cs", 0.11), reading("it", 0.9)]))
-        #expect(!WhisperLanguageVote.isSettled([reading("it", 0.9), reading("en", 0.6)]))
-    }
-
-    @Test("agreement settles once the pair also holds the lead over a dissent")
-    func agreementWithLeadSettles() {
-        #expect(WhisperLanguageVote.isSettled([reading("it", 0.9), reading("en", 0.6), reading("it", 0.95)]))
-    }
-
-    @Test("agreement without the lead keeps reading")
+    @Test("agreement without the lead is not settled")
     func agreementWithoutLeadDoesNotSettle() {
-        let readings = [reading("it", 0.5), reading("en", 0.9), reading("it", 0.55), reading("en", 0.3)]
+        let readings = [reading("it", 0.9), reading("it", 0.9), reading("en", 0.99), reading("en", 0.99)]
 
-        #expect(!WhisperLanguageVote.isSettled(readings))
+        #expect(!WhisperLanguageVote.isSettled(readings, unread: 0))
         #expect(WhisperLanguageVote.decide(readings) == nil)
     }
 
-    @Test("two readings the detector barely believes do not settle")
-    func lowConfidenceAgreementDoesNotSettle() {
-        #expect(!WhisperLanguageVote.isSettled([reading("cs", 0.05), reading("cs", 0.08)]))
+    @Test("a lead the unread window could still erase keeps reading")
+    func thinLeadKeepsReading() async {
+        let readings = [reading("it", 0.99), reading("it", 0.99), reading("en", 0.9)]
+        let probe = await read(readings + [reading("en", 1.0)])
+
+        #expect(!WhisperLanguageVote.isSettled(readings, unread: 1))
+        #expect(probe.asked == [0, 1, 2, 3])
+        #expect(WhisperLanguageVote.decide(probe.readings) == nil)
     }
 
-    @Test("two noise windows that happen to agree keep the probe reading")
-    func uncertainAgreementDoesNotSettle() {
-        // The 159 memo's loudest window is room tone and a bump, and reads English at 0.56.
-        let readings = [reading("en", 0.56), reading("en", 0.5)]
+    @Test("a settled vote stops reading")
+    func settledVoteStopsReading() async {
+        let probe = await read(Array(repeating: reading("it", 0.98), count: 4))
 
-        let speech = [reading("it", 0.99), reading("it", 0.99)]
+        #expect(probe.asked == [0, 1, 2])
+        #expect(WhisperLanguageVote.decide(probe.readings) == .detected("it"))
+    }
 
-        #expect(!WhisperLanguageVote.isSettled(readings))
-        #expect(WhisperLanguageVote.isSettled(readings + speech))
-        #expect(WhisperLanguageVote.decide(readings + speech) == .detected("it"))
+    @Test("the 159 memo settles on its third window")
+    func memoSettlesOnTheThirdWindow() async {
+        let probe = await read([reading("it", 0.981), reading("en", 0.554), reading("it", 0.995), reading("it", 0.993)])
+
+        #expect(probe.asked == [0, 1, 2])
+        #expect(WhisperLanguageVote.decide(probe.readings) == .detected("it"))
+    }
+
+    @Test("a bilingual memo is read to the end and left to per-chunk detection")
+    func bilingualMemoIsNeverPinned() async {
+        let probe = await read([reading("it", 0.97), reading("it", 0.96), reading("en", 0.95), reading("en", 0.90)])
+
+        #expect(probe.asked == [0, 1, 2, 3])
+        #expect(WhisperLanguageVote.decide(probe.readings) == nil)
+    }
+
+    @Test("two confident noise windows ahead of the speech never pin their language")
+    func noiseAheadOfSpeechIsNeverPinned() async {
+        let probe = await read([reading("cs", 0.90), reading("cs", 0.88), reading("it", 0.99), reading("it", 0.99)])
+
+        #expect(probe.asked == [0, 1, 2, 3])
+        #expect(WhisperLanguageVote.decide(probe.readings) == nil)
+    }
+
+    @Test("a window that fails to read still counts as read")
+    func failedReadsAreSkipped() async {
+        let probe = await read([nil, reading("it", 0.7), nil])
+
+        #expect(probe.asked == [0, 1, 2])
+        #expect(WhisperLanguageVote.decide(probe.readings) == .assumed("it"))
+    }
+
+    @Test("stopping early never changes the vote")
+    func earlyStopMatchesTheFullVote() async {
+        let languages = ["it", "en", "cs"]
+        let confidences = [0.05, 0.3, 0.5, 0.56, 0.75, 0.85, 0.9, 0.97, 0.99, 1.0]
+        var seed: UInt64 = 0x2C77_EE98
+        func next(_ bound: Int) -> Int {
+            seed = seed &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
+            return Int((seed >> 33) % UInt64(bound))
+        }
+        var stoppedEarly = 0
+        for _ in 0..<3_000 {
+            let script: [WhisperLanguageReading?] = (0..<(1 + next(5))).map { _ in
+                next(10) == 0 ? nil : reading(languages[next(languages.count)], confidences[next(confidences.count)])
+            }
+            let probe = await read(script)
+            if probe.asked.count < script.count { stoppedEarly += 1 }
+            #expect(WhisperLanguageVote.decide(probe.readings) == WhisperLanguageVote.decide(script.compactMap { $0 }))
+        }
+        #expect(stoppedEarly > 100)
+    }
+
+    private func read(
+        _ script: [WhisperLanguageReading?]
+    ) async -> (readings: [WhisperLanguageReading], asked: [Int]) {
+        var asked: [Int] = []
+        let readings = await WhisperLanguageVote.readings(windowCount: script.count) { index in
+            asked.append(index)
+            return script[index]
+        }
+        return (readings, asked)
     }
 }
 

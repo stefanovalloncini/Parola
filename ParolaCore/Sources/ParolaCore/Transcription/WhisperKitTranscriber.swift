@@ -259,16 +259,13 @@ actor WhisperKitTranscriber: Transcriber {
         let windowSamples = kit.featureExtractor.windowSamples ?? Constants.defaultWindowSamples
         let offsets = Self.probeWindowOffsets(in: probe, windowSamples: windowSamples)
         // Loudest window first, so a probe cut short by cancellation has read the best evidence.
-        var readings: [WhisperLanguageReading] = []
-        for offset in offsets {
-            if Task.isCancelled { break }
-            let window = Array(probe[offset..<min(probe.count, offset + windowSamples)])
-            guard !window.isEmpty, let detected = try? await kit.detectLangauge(audioArray: window) else { continue }
-            readings.append(WhisperLanguageReading(
+        let readings = await WhisperLanguageVote.readings(windowCount: offsets.count) { index in
+            let window = Array(probe[offsets[index]..<min(probe.count, offsets[index] + windowSamples)])
+            guard !window.isEmpty, let detected = try? await kit.detectLangauge(audioArray: window) else { return nil }
+            return WhisperLanguageReading(
                 language: detected.language,
                 confidence: detected.langProbs[detected.language].map { exp(Double($0)) } ?? 0
-            ))
-            if WhisperLanguageVote.isSettled(readings) { break }
+            )
         }
         let decided = WhisperLanguageVote.decide(readings)
         if decided == nil {
@@ -289,8 +286,7 @@ actor WhisperKitTranscriber: Transcriber {
         )
     }
 
-    /// The loudest stretches of the whole recording back to back: a lecture whose speaker starts at
-    /// minute nine used to be probed on its opening room tone.
+    /// The loudest stretches back to back, so a speaker who starts at minute nine is still heard.
     static func probeSamples(
         from samples: [Float],
         energies: [ProbeWindowEnergy],
@@ -335,19 +331,34 @@ enum WhisperLanguageVote {
         return .detected(best.code)
     }
 
-    /// Two near-certain readings for the leader, lead held: room tone never reads near-certain.
-    static func isSettled(_ readings: [WhisperLanguageReading]) -> Bool {
+    /// A detected language that the unread windows, each read at full confidence, could no longer overturn.
+    static func isSettled(_ readings: [WhisperLanguageReading], unread: Int) -> Bool {
         let tally = Tally(readings)
-        guard let best = tally.ranked.first, best.certainVotes >= 2 else { return false }
-        guard let runnerUp = tally.ranked.dropFirst().first else { return true }
-        return best.mass >= runnerUp.mass * lead
+        guard let best = tally.ranked.first else { return false }
+        let second = tally.ranked.dropFirst().first?.mass ?? 0
+        guard best.mass >= lead * (second + Double(unread)) else { return false }
+        return decide(readings) == .detected(best.code)
+    }
+
+    /// Reads windows in order until the vote is settled, so stopping early never changes what `decide` says.
+    static func readings(
+        windowCount: Int,
+        isolation: isolated (any Actor)? = #isolation,
+        read: (Int) async -> WhisperLanguageReading?
+    ) async -> [WhisperLanguageReading] {
+        var readings: [WhisperLanguageReading] = []
+        for index in 0..<windowCount {
+            if Task.isCancelled { break }
+            if let reading = await read(index) { readings.append(reading) }
+            if isSettled(readings, unread: windowCount - index - 1) { break }
+        }
+        return readings
     }
 
     private struct Tally {
         struct Entry {
             var code: String
             var mass = 0.0
-            var certainVotes = 0
         }
 
         var ranked: [Entry] = []
@@ -358,10 +369,7 @@ enum WhisperLanguageVote {
             for reading in readings where reading.confidence >= WhisperLanguageVote.minimumConfidence {
                 let code = reading.language.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !code.isEmpty else { continue }
-                var entry = entries[code] ?? Entry(code: code)
-                entry.mass += reading.confidence
-                if reading.confidence >= WhisperLanguageVote.certainty { entry.certainVotes += 1 }
-                entries[code] = entry
+                entries[code, default: Entry(code: code)].mass += reading.confidence
                 counted += 1
             }
             ranked = entries.values.sorted { $0.mass == $1.mass ? $0.code < $1.code : $0.mass > $1.mass }
