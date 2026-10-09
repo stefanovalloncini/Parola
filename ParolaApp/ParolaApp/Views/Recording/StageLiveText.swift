@@ -199,38 +199,23 @@ struct LiveTail: View {
     let font: Font
     let lineSpacing: CGFloat
     var blinks = true
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var epoch = Date()
 
     var body: some View {
-        if blinks, !reduceMotion {
-            TimelineView(.periodic(from: epoch, by: StreamingReveal.caretBlinkPeriod)) { context in
-                let ticks = Int(context.date.timeIntervalSince(epoch) / StreamingReveal.caretBlinkPeriod)
-                text(caretVisible: ticks.isMultiple(of: 2))
-            }
-        } else {
-            text(caretVisible: true)
-        }
-    }
-
-    private func text(caretVisible: Bool) -> some View {
-        Text(Self.attributed(settled: settled, partial: partial, caretVisible: caretVisible))
+        Text("\(Text(Self.attributed(settled: settled, partial: partial)))\(LiveCaret.placeholder)")
             .font(font)
             .lineSpacing(lineSpacing)
             .contentTransition(.identity)
-            .frame(maxWidth: .infinity, alignment: .leading)
             .accessibilityLabel(settled.isEmpty ? partial : settled + " " + partial)
+            .liveCaret(font: font, blinks: blinks)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    static func attributed(settled: String, partial: String, caretVisible: Bool) -> AttributedString {
+    static func attributed(settled: String, partial: String) -> AttributedString {
         var text = AttributedString(settled.isEmpty || partial.isEmpty ? settled : settled + " ")
         text.foregroundColor = DS.Color.primaryText
         var tail = AttributedString(partial)
         tail.foregroundColor = DS.Color.liveTail
         text.append(tail)
-        var caret = AttributedString("\u{258F}")
-        caret.foregroundColor = DS.Color.accentInk.opacity(caretVisible ? 1 : 0)
-        text.append(caret)
         return text
     }
 }

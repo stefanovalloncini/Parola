@@ -18,6 +18,7 @@ struct TranscribingPane: View {
     @State private var isFinishing = false
     @State private var isPreparing = false
     @State private var streamedTextHeight: CGFloat = 0
+    @State private var isOnScreen = true
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
@@ -181,18 +182,16 @@ struct TranscribingPane: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: DS.Spacing.regular) {
                     if hasText {
-                        TimelineView(.periodic(from: startDate, by: StreamingReveal.caretBlinkPeriod)) { context in
-                            let ticks = Int(context.date.timeIntervalSince(startDate) / StreamingReveal.caretBlinkPeriod)
-                            Text("\(Text(bodyText))\(StreamingReveal.caret(visible: reduceMotion || ticks % 2 == 0))")
-                                .font(DS.Font.transcript)
-                                .lineSpacing(DS.Spacing.transcriptLeading)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .textSelection(.enabled)
-                                .contentTransition(.interpolate)
-                                .accessibilityLabel(partial)
-                        }
-                        .transition(.opacity)
-                        .id(Self.tailID)
+                        Text("\(Text(bodyText))\(LiveCaret.placeholder)")
+                            .font(DS.Font.transcript)
+                            .lineSpacing(DS.Spacing.transcriptLeading)
+                            .textSelection(.enabled)
+                            .contentTransition(.interpolate)
+                            .accessibilityLabel(partial)
+                            .liveCaret(font: DS.Font.transcript, blinks: isOnScreen)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .transition(.opacity)
+                            .id(Self.tailID)
                     } else {
                         SkeletonLines(count: 6)
                             .id(Self.tailID)
@@ -224,6 +223,7 @@ struct TranscribingPane: View {
         )
         .animation(reduceMotion ? nil : DS.Motion.resize, value: streamedTextHeight)
         .cardBackground(radius: DS.Radius.large)
+        .background(WindowShownReader { isOnScreen = $0 })
     }
 
     @ViewBuilder private var topFadeMask: some View {
