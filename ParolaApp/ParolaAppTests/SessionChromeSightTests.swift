@@ -53,9 +53,9 @@ private struct ChromeInSight: View {
 }
 
 @MainActor
-private func meterBars(in hosted: HostedWindow) -> SessionMeter.BarsView? {
-    func views(in view: NSView) -> [SessionMeter.BarsView] {
-        ((view as? SessionMeter.BarsView).map { [$0] } ?? []) + view.subviews.flatMap(views(in:))
+private func meterBars(in hosted: HostedWindow) -> LiveLevelBars.BarsView? {
+    func views(in view: NSView) -> [LiveLevelBars.BarsView] {
+        ((view as? LiveLevelBars.BarsView).map { [$0] } ?? []) + view.subviews.flatMap(views(in:))
     }
     hosted.host.layoutSubtreeIfNeeded()
     return views(in: hosted.host).first
@@ -116,17 +116,13 @@ struct SessionChromeSightTests {
         let hidden = element(surface.meter, in: hosted)?.value
         #expect(hidden == before, "out of sight, the meter still shows \(hidden ?? "nothing") from before the level rose")
         #expect(hidden != AppFormat.percent(0.8))
-        if surface == .capsule {
-            #expect(meterBars(in: hosted)?.levels.last != 0.8, "out of sight, the bars don't follow the take")
-        }
+        #expect(meterBars(in: hosted)?.levels.last != 0.8, "out of sight, the bars don't follow the take")
 
         sight.shown = true
         let caughtUp = await waitUntil { element(surface.meter, in: hosted)?.value == AppFormat.percent(0.8) }
         #expect(caughtUp)
-        if surface == .capsule {
-            let barsCaughtUp = await waitUntil { meterBars(in: hosted)?.levels.last == 0.8 }
-            #expect(barsCaughtUp)
-        }
+        let barsCaughtUp = await waitUntil { meterBars(in: hosted)?.levels.last == 0.8 }
+        #expect(barsCaughtUp)
     }
 
     @Test(
@@ -134,9 +130,21 @@ struct SessionChromeSightTests {
         arguments: [false, true], [false, true]
     )
     func capsuleBarsFollowTheTake(voiceOver: Bool, reduceMotion: Bool) async throws {
-        let audio = try tempWAV("capsule-bars-follow")
+        try await barsFollowTheTake(.capsule, voiceOver: voiceOver, reduceMotion: reduceMotion)
+    }
+
+    @Test(
+        "in sight, the pill's bars follow the take on their own, and SwiftUI reads each level only for VoiceOver",
+        arguments: [false, true], [false, true]
+    )
+    func pillBarsFollowTheTake(voiceOver: Bool, reduceMotion: Bool) async throws {
+        try await barsFollowTheTake(.pill, voiceOver: voiceOver, reduceMotion: reduceMotion)
+    }
+
+    private func barsFollowTheTake(_ surface: ChromeSurface, voiceOver: Bool, reduceMotion: Bool) async throws {
+        let audio = try tempWAV("\(surface.rawValue)-bars-follow")
         defer { try? FileManager.default.removeItem(at: audio) }
-        let model = makeRecordingModel("capsule-bars-follow")
+        let model = makeRecordingModel("\(surface.rawValue)-bars-follow")
         model.useStreaming = false
         model.selectedModel = "openai_whisper-tiny"
         model.voiceOverIsRunning = voiceOver
@@ -153,11 +161,11 @@ struct SessionChromeSightTests {
 
         let sight = Sight()
         sight.shown = true
-        let hosted = host(.capsule, take, model, sight, reduceMotion: reduceMotion)
+        let hosted = host(surface, take, model, sight, reduceMotion: reduceMotion)
         defer { hosted.close() }
-        let drawn = await waitUntil { element(ChromeSurface.capsule.meter, in: hosted)?.value != nil && meterBars(in: hosted) != nil }
+        let drawn = await waitUntil { element(surface.meter, in: hosted)?.value != nil && meterBars(in: hosted) != nil }
         try #require(drawn)
-        let first = element(ChromeSurface.capsule.meter, in: hosted)?.value
+        let first = element(surface.meter, in: hosted)?.value
         let bars = try #require(meterBars(in: hosted))
 
         let loud = Task { @MainActor in
@@ -172,15 +180,54 @@ struct SessionChromeSightTests {
         #expect(bars.bars.path != nil)
 
         if voiceOver {
-            let spoken = await waitUntil { element(ChromeSurface.capsule.meter, in: hosted)?.value == AppFormat.percent(0.8) }
+            let spoken = await waitUntil { element(surface.meter, in: hosted)?.value == AppFormat.percent(0.8) }
             #expect(spoken, "VoiceOver hears the new level")
         } else {
             let tick = model.takeLevelTick
             let movedOn = await waitUntil { model.takeLevelTick >= tick + 3 }
             try #require(movedOn)
-            let held = element(ChromeSurface.capsule.meter, in: hosted)?.value
+            let held = element(surface.meter, in: hosted)?.value
             #expect(held == first, "the stand-in followed a tick SwiftUI never reads: \(held ?? "nothing")")
         }
+    }
+
+    @Test(
+        "with VoiceOver and Reduce Motion the capsule's or the pill's meter says the level as its bars step, four times a second, not with each sample",
+        arguments: ChromeSurface.allCases
+    )
+    func spokenLevelKeepsTheBarsPace(surface: ChromeSurface) async throws {
+        let audio = try tempWAV("\(surface.rawValue)-spoken-pace")
+        defer { try? FileManager.default.removeItem(at: audio) }
+        let model = makeRecordingModel("\(surface.rawValue)-spoken-pace")
+        model.useStreaming = false
+        model.selectedModel = "openai_whisper-tiny"
+        model.voiceOverIsRunning = true
+        let capture = LevelCapture(file: audio)
+        model.takeCaptureOverride = { _ in capture }
+        defer { await model.discardTake() }
+        model.startRecording(source: .microphone)
+        let up = await waitUntil { model.liveSource != nil }
+        try #require(up)
+        capture.levelMeter.record(0.2)
+        let recording = await waitUntil { model.recording?.state == .recording }
+        try #require(recording)
+        let take = try #require(model.recording)
+
+        let sight = Sight()
+        sight.shown = true
+        let hosted = host(surface, take, model, sight, reduceMotion: true)
+        defer { hosted.close() }
+        let drawn = await waitUntil { element(surface.meter, in: hosted)?.value != nil }
+        try #require(drawn)
+
+        let climb = climbingLevels(on: capture.levelMeter)
+        defer { climb.cancel() }
+        let tick = model.takeLevelTick
+        let said = await changes(of: { element(surface.meter, in: hosted)?.value }, over: .milliseconds(2_500))
+        let samples = model.takeLevelTick - tick
+        #expect(samples >= 15, "the take kept only \(samples) samples")
+        #expect(said >= 3, "VoiceOver heard the level change \(said) times")
+        #expect(said <= 12, "VoiceOver heard the level change \(said) times in 2.5 s, with each sample rather than each step")
     }
 
     @Test("while its window is out of sight the capsule's or the pill's clock stands still, and it ticks again once the window shows", arguments: ChromeSurface.allCases)

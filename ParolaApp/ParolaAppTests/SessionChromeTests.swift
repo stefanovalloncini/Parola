@@ -154,10 +154,27 @@ struct SessionCapsuleTests {
 
     @Test("the meter's twenty bars stand on its middle, quiet ones two points tall")
     func meterBarsStandOnTheMiddle() {
-        let quiet = SessionMeter.barsPath(Array(repeating: 0, count: SessionMeter.barCount), height: SessionMeter.height)
-        #expect(quiet.boundingRect == CGRect(x: 0, y: 7, width: SessionMeter.width, height: 2))
-        let loud = SessionMeter.barsPath([1], height: SessionMeter.height)
-        #expect(loud.boundingRect == CGRect(x: 0, y: 0, width: SessionMeter.barWidth, height: SessionMeter.height))
+        let style = LiveLevelBars.Style.capsule
+        #expect(style.width == 59)
+        let quiet = style.path(Array(repeating: 0, count: style.barCount))
+        #expect(quiet.boundingRect == CGRect(x: 0, y: 7, width: style.width, height: 2))
+        let loud = style.path([1])
+        #expect(loud.boundingRect == CGRect(x: 0, y: 0, width: style.barWidth, height: style.height))
+    }
+}
+
+@Suite("Recording pill meter")
+struct RecordingPillMeterTests {
+    @Test("the pill's three bars stand on its foot, quiet ones three points tall, 3 pt wide with 2 pt between")
+    func pillBarsStandOnTheFoot() {
+        let style = LiveLevelBars.Style.pill
+        #expect(style.width == 13)
+        let quiet = style.path(Array(repeating: 0, count: style.barCount))
+        #expect(quiet.boundingRect == CGRect(x: 0, y: 13, width: 13, height: 3))
+        let loud = style.path([0, 0, 1])
+        #expect(loud.boundingRect == CGRect(x: 0, y: 0, width: 13, height: 16))
+        let newest = style.path([1])
+        #expect(newest.boundingRect == CGRect(x: 0, y: 0, width: 3, height: 16))
     }
 }
 

@@ -240,7 +240,14 @@ struct RecordingPillFace: View {
             .accessibilityValue(Text(verbatim: warning?.message ?? ""))
             .accessibilityHint("Show Recording")
             .axLeaf("Button.ShowParola")
-            PillMeter(model: model, paused: take.isPaused, isOnScreen: isOnScreen)
+            LiveLevelBars(
+                model: model,
+                style: .pill,
+                ink: DS.Color.primaryText.opacity(0.55),
+                follows: isOnScreen && !take.isPaused,
+                identifier: "Meter.Level",
+                paused: take.isPaused
+            )
             let cancels = take.isArming
             Button { onStop(cancels) } label: {
                 Image(systemName: cancels ? "xmark" : "stop.fill")
@@ -255,48 +262,6 @@ struct RecordingPillFace: View {
             .help(cancels ? "Cancel the recording before it starts." : "Stop recording and transcribe.")
             .accessibilityLabel(Text(verbatim: TakeRemote.endTitle(for: take)))
             .axLeaf("Button.Stop")
-        }
-    }
-}
-
-/// The take's last three levels as bars, newest on the right, drawn as the band draws its own.
-private struct PillMeter: View {
-    let model: AppModel
-    let paused: Bool
-    let isOnScreen: Bool
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    nonisolated static let barCount = 3
-    nonisolated static let height: CGFloat = 16
-
-    private var follows: Bool { isOnScreen && !paused }
-
-    var body: some View {
-        if reduceMotion {
-            TimelineView(.animation(minimumInterval: 0.25, paused: !follows)) { _ in bars }
-        } else {
-            let _ = follows ? model.takeLevelTick : 0
-            bars
-        }
-    }
-
-    private var bars: some View {
-        let levels = model.takeLevels?.recent(Self.barCount) ?? Array(repeating: 0, count: Self.barCount)
-        let newest = Double(levels.last ?? 0)
-        return HStack(alignment: .bottom, spacing: 2) {
-            ForEach(levels.indices, id: \.self) { index in
-                RoundedRectangle(cornerRadius: 1.5, style: .continuous)
-                    .fill(DS.Color.primaryText.opacity(0.55))
-                    .frame(width: 3, height: LevelBars.height(for: levels[index], idle: 3, max: Self.height))
-            }
-        }
-        .frame(height: Self.height, alignment: .bottom)
-        .accessibilityRepresentation {
-            Text(verbatim: AppFormat.percent(newest))
-                .accessibilityLabel("Input level")
-                .accessibilityValue(paused ? Text("Paused") : Text(verbatim: AppFormat.percent(newest)))
-                .accessibilityAddTraits(.updatesFrequently)
-                .axLeaf("Meter.Level")
         }
     }
 }
