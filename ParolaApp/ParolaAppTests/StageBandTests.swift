@@ -94,9 +94,17 @@ struct StageBandTests {
 
     @Test("only for VoiceOver does the band's body read each new sample of a live take; its layer view follows them alone")
     func swiftUIFollowsOnlyForVoiceOver() {
-        #expect(StageBand.swiftUIFollowsSamples(live: true, voiceOver: true))
-        #expect(!StageBand.swiftUIFollowsSamples(live: true, voiceOver: false))
-        #expect(!StageBand.swiftUIFollowsSamples(live: false, voiceOver: true))
+        #expect(StageBand.swiftUIFollowsSamples(live: true, voiceOver: true, cadence: .glides) == .eachSample)
+        #expect(StageBand.swiftUIFollowsSamples(live: true, voiceOver: false, cadence: .glides) == .never)
+        #expect(StageBand.swiftUIFollowsSamples(live: false, voiceOver: true, cadence: .glides) == .never)
+    }
+
+    @Test("under Reduce Motion VoiceOver's reading follows the bars' steps, four times a second, and never without VoiceOver")
+    func swiftUIFollowsTheStepsUnderReduceMotion() {
+        let steps = StageBand.cadence(reduceMotion: true)
+        #expect(StageBand.swiftUIFollowsSamples(live: true, voiceOver: true, cadence: steps) == .every(0.25))
+        #expect(StageBand.swiftUIFollowsSamples(live: true, voiceOver: false, cadence: steps) == .never)
+        #expect(StageBand.swiftUIFollowsSamples(live: false, voiceOver: true, cadence: steps) == .never)
     }
 
     @Test("the bars are built again when a sample, a marker or a pause comes in, and only then")
@@ -608,6 +616,42 @@ struct StageBandVoiceOverTests {
         defer { loud.cancel() }
         let said = await waitUntil { spokenLevel(in: hosted) == AppFormat.percent(0.8) }
         #expect(said, "the band still says \(spokenLevel(in: hosted) ?? "nothing")")
+    }
+
+    @Test("with VoiceOver and Reduce Motion the band says the level as its bars step, four times a second, not with each sample")
+    func saysTheLevelAtTheBarsPace() async throws {
+        let audio = try tempWAV("band-voiceover-pace")
+        defer { try? FileManager.default.removeItem(at: audio) }
+        let model = makeRecordingModel("band-voiceover-pace")
+        model.useStreaming = false
+        model.selectedModel = "openai_whisper-tiny"
+        model.voiceOverIsRunning = true
+        let capture = BandLevelCapture(file: audio)
+        model.takeCaptureOverride = { _ in capture }
+        defer { await model.discardTake() }
+        model.startRecording(source: .microphone)
+        let up = await waitUntil { model.liveSource != nil }
+        try #require(up)
+        capture.levelMeter.record(0.2)
+        let recording = await waitUntil { model.recording?.state == .recording }
+        try #require(recording)
+
+        let sight = BandSight()
+        sight.shown = true
+        let content = BandInSight(model: model, sight: sight, reduceMotion: true).environment(model)
+        let hosted = HostedWindow(content, width: 1180, height: StageBand.height)
+        defer { hosted.close() }
+        let drawn = await waitUntil { spokenLevel(in: hosted) != nil }
+        try #require(drawn)
+
+        let climb = climbingLevels(on: capture.levelMeter)
+        defer { climb.cancel() }
+        let tick = model.takeLevelTick
+        let said = await changes(of: { spokenLevel(in: hosted) }, over: .milliseconds(2_500))
+        let samples = model.takeLevelTick - tick
+        #expect(samples >= 15, "the take kept only \(samples) samples")
+        #expect(said >= 3, "VoiceOver heard the level change \(said) times")
+        #expect(said <= 12, "VoiceOver heard the level change \(said) times in 2.5 s, with each sample rather than each step")
     }
 
     @Test("with VoiceOver off the stand-in holds its first level while the band's layer view keeps following")

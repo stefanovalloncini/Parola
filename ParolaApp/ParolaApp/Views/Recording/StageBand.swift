@@ -22,10 +22,14 @@ struct StageBand: View {
     enum Cadence: Equatable {
         case glides
         case steps(every: TimeInterval)
+
+        var step: TimeInterval? {
+            if case .steps(let every) = self { every } else { nil }
+        }
     }
 
     nonisolated static func cadence(reduceMotion: Bool) -> Cadence {
-        reduceMotion ? .steps(every: 0.25) : .glides
+        reduceMotion ? .steps(every: LiveLevelBars.reduceMotionStep) : .glides
     }
 
     /// Where the bars stand between samples.
@@ -90,16 +94,16 @@ struct StageBand: View {
         }
     }
 
-    @ViewBuilder
     private var bars: some View {
-        let _ = Self.swiftUIFollowsSamples(live: drawsLive, voiceOver: model.voiceOverIsRunning) ? model.takeLevelTick : 0
         let cadence = Self.cadence(reduceMotion: reduceMotion)
-        tape.drawn(cadence == .glides ? .held : .still, following: drawsLive ? feed(cadence) : nil)
+        return SpokenLevelFollow(model: model, reads: Self.swiftUIFollowsSamples(live: drawsLive, voiceOver: model.voiceOverIsRunning, cadence: cadence)) {
+            tape.drawn(cadence == .glides ? .held : .still, following: drawsLive ? feed(cadence) : nil)
+        }
     }
 
-    /// Whether the band's body reads each new sample: only while VoiceOver reads the stand-in's level, since the layer view follows a live take by itself.
-    nonisolated static func swiftUIFollowsSamples(live: Bool, voiceOver: Bool) -> Bool {
-        live && voiceOver
+    /// How often the band's body reads a live take's samples: only while VoiceOver reads the stand-in's level, and then as often as the bars move, since the layer view follows the take by itself.
+    nonisolated static func swiftUIFollowsSamples(live: Bool, voiceOver: Bool, cadence: Cadence) -> SpokenLevelReads {
+        .forVoiceOver(live: live, voiceOver: voiceOver, step: cadence.step)
     }
 
     private var tape: StageTape {
