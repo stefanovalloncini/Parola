@@ -94,7 +94,15 @@ actor WhisperKitTranscriber: Transcriber {
         let interval = signposter.beginInterval("transcribe", "model=\(modelName, privacy: .public)")
         defer { signposter.endInterval("transcribe", interval) }
         handlers.onStage?(.preparingAudio)
-        let probed = options.language == nil ? try await probeLanguage(kit: kit, url: url) : nil
+        let samples = try await Self.loadSamples(
+            url: url,
+            channelMode: kit.audioInputConfig.channelMode,
+            deadline: FileReadDeadline.forReading(url)
+        )
+        try Task.checkCancellation()
+        let probed = options.language == nil
+            ? await probeLanguage(kit: kit, samples: samples)
+            : nil
         try Task.checkCancellation()
         let pin = WhisperLanguagePin.resolve(requested: options.language, probed: probed)
         var decoding = Self.decodingOptions(for: options, pin: pin)
@@ -136,12 +144,6 @@ actor WhisperKitTranscriber: Transcriber {
         }
         defer { kit.segmentDiscoveryCallback = nil }
 
-        let samples = try await Self.loadSamples(
-            url: url,
-            channelMode: kit.audioInputConfig.channelMode,
-            deadline: FileReadDeadline.forReading(url)
-        )
-        try Task.checkCancellation()
         let results = await kit.transcribe(
             audioArrays: [samples],
             decodeOptions: decoding,
@@ -244,31 +246,22 @@ actor WhisperKitTranscriber: Transcriber {
 
     private static let languageProbeWindows = 5
 
-    private func probeLanguage(kit: WhisperKit, url: URL) async throws -> LanguageDetection? {
+    private func probeLanguage(kit: WhisperKit, samples: [Float]) async -> LanguageDetection? {
         guard kit.textDecoder.isModelMultilingual else { return nil }
-        let scratch = FileManager.default.temporaryDirectory
-            .appendingPathComponent("parola-whisper-language-probe-\(UUID().uuidString).caf")
-        defer { try? FileManager.default.removeItem(at: scratch) }
-        // Off the actor and on a deadline: the extractor seeks across the whole file to pick its
-        // windows, and a read that parks there would park the engine with it.
-        let read = await BoundedFileRead.run(deadline: FileReadDeadline.forReading(url)) {
-            Self.probeSamples(url: url, scratch: scratch)
-        }
-        guard case .done(let extracted) = read else {
-            throw ParolaError.fileReadTimedOut(name: url.lastPathComponent)
-        }
-        guard let samples = extracted, !samples.isEmpty else { return nil }
+        let energies = ProbeAudioExtractor.measure(samples: samples, sampleRate: Double(WhisperKit.sampleRate))
+        let probe = Self.probeSamples(from: samples, energies: energies)
+        guard !probe.isEmpty else { return nil }
         let windowSamples = kit.featureExtractor.windowSamples ?? Constants.defaultWindowSamples
-        let offsets = Self.probeWindowOffsets(in: samples, windowSamples: windowSamples)
+        let offsets = Self.probeWindowOffsets(in: probe, windowSamples: windowSamples)
         // Loudest window first, so a probe cut short by cancellation has read the best evidence.
         var readings: [WhisperLanguageReading] = []
         for offset in offsets {
             if Task.isCancelled { break }
-            let window = Array(samples[offset..<min(samples.count, offset + windowSamples)])
-            guard !window.isEmpty, let probe = try? await kit.detectLangauge(audioArray: window) else { continue }
+            let window = Array(probe[offset..<min(probe.count, offset + windowSamples)])
+            guard !window.isEmpty, let detected = try? await kit.detectLangauge(audioArray: window) else { continue }
             readings.append(WhisperLanguageReading(
-                language: probe.language,
-                confidence: probe.langProbs[probe.language].map { exp(Double($0)) } ?? 0
+                language: detected.language,
+                confidence: detected.langProbs[detected.language].map { exp(Double($0)) } ?? 0
             ))
         }
         let decided = WhisperLanguageVote.decide(readings)
@@ -280,7 +273,7 @@ actor WhisperKitTranscriber: Transcriber {
         return decided
     }
 
-    /// Windows tiling the scratch file, or overlapping halves when it is too short to tile twice —
+    /// Windows tiling the probe, or overlapping halves when it is too short to tile twice —
     /// one reading has nothing to check itself against.
     static func probeWindowOffsets(in samples: [Float], windowSamples: Int) -> [Int] {
         let spacing = samples.count >= 2 * windowSamples ? windowSamples : windowSamples / 2
@@ -290,13 +283,21 @@ actor WhisperKitTranscriber: Transcriber {
         )
     }
 
-    /// The loudest stretches of the whole recording, written to `scratch`, which the caller deletes:
-    /// a lecture whose speaker starts at minute nine used to be probed on its opening room tone.
-    static func probeSamples(url: URL, scratch: URL) -> [Float]? {
-        guard let windows = try? ProbeAudioExtractor.extract(from: url, to: scratch),
-              !windows.isEmpty else { return nil }
-        guard let buffer = try? AudioProcessor.loadAudio(fromPath: scratch.path) else { return nil }
-        return AudioProcessor.convertBufferToArray(buffer: buffer)
+    /// The loudest stretches of the whole recording back to back: a lecture whose speaker starts at
+    /// minute nine used to be probed on its opening room tone.
+    static func probeSamples(
+        from samples: [Float],
+        energies: [ProbeWindowEnergy],
+        sampleRate: Double = Double(WhisperKit.sampleRate)
+    ) -> [Float] {
+        let ranges = ProbeWindowPlanner.pick(from: energies).map { window in
+            let start = min(samples.count, Int(window.start * sampleRate))
+            return start..<min(samples.count, start + Int(window.duration * sampleRate))
+        }
+        var probe: [Float] = []
+        probe.reserveCapacity(ranges.reduce(0) { $0 + $1.count })
+        for range in ranges { probe.append(contentsOf: samples[range]) }
+        return probe
     }
 }
 

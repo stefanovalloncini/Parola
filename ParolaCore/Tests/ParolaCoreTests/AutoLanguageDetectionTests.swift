@@ -383,67 +383,80 @@ struct AutoLanguageDetectionTests {
         #expect(duration <= 120)
     }
 
-    @Test("the Whisper probe reads samples from past the first five minutes")
-    func whisperProbeSamplesReachLateSpeech() throws {
-        let url = try Self.writeTone(sampleRate: 8000, seconds: 500, loudRange: 400..<500)
+    @Test("energies measured in memory match the same audio measured on disk")
+    func memoryEnergiesMatchDisk() throws {
+        let url = try Self.writeTone(sampleRate: 16_000, seconds: 120, loudRange: 40..<80)
         defer { try? FileManager.default.removeItem(at: url) }
-        let probeURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("parola-probe-\(UUID().uuidString).caf")
-        defer { try? FileManager.default.removeItem(at: probeURL) }
+        let file = try AVAudioFile(forReading: url)
+        let buffer = try #require(AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: AVAudioFrameCount(file.length)))
+        try file.read(into: buffer)
+        let samples = Array(UnsafeBufferPointer(start: buffer.floatChannelData![0], count: Int(buffer.frameLength)))
 
-        let samples = try #require(WhisperKitTranscriber.probeSamples(url: url, scratch: probeURL))
+        let onDisk = try ProbeAudioExtractor.measure(AVAudioFile(forReading: url))
+        let inMemory = ProbeAudioExtractor.measure(samples: samples, sampleRate: 16_000)
 
-        let offsets = WhisperKitTranscriber.probeWindowOffsets(in: samples, windowSamples: Self.whisperWindow)
+        #expect(onDisk.map(\.window) == inMemory.map(\.window))
+        for (disk, memory) in zip(onDisk, inMemory) {
+            #expect(abs(disk.energy - memory.energy) < 1e-4)
+        }
+        #expect(ProbeWindowPlanner.pick(from: onDisk) == ProbeWindowPlanner.pick(from: inMemory))
+    }
+
+    @Test("the Whisper probe reads samples from past the first five minutes")
+    func whisperProbeSamplesReachLateSpeech() {
+        let samples = Self.samples(seconds: 500, loudRange: 400..<500)
+
+        let probe = Self.whisperProbe(samples)
+
+        let offsets = WhisperKitTranscriber.probeWindowOffsets(in: probe, windowSamples: Self.whisperWindow)
         #expect(offsets.count == 3)
-        #expect(offsets.allSatisfy { Self.loudness(of: samples, at: $0) > 0.2 })
+        #expect(offsets.allSatisfy { Self.loudness(of: probe, at: $0) > 0.2 })
     }
 
     @Test("a recording too short to tile twice is still read as two windows")
-    func shortRecordingIsReadTwice() throws {
-        let url = try Self.writeTone(sampleRate: 16_000, seconds: 45, loudRange: 0..<45)
-        defer { try? FileManager.default.removeItem(at: url) }
-        let probeURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("parola-probe-\(UUID().uuidString).caf")
-        defer { try? FileManager.default.removeItem(at: probeURL) }
+    func shortRecordingIsReadTwice() {
+        let probe = Self.whisperProbe(Self.samples(seconds: 45, loudRange: 0..<45))
 
-        let samples = try #require(WhisperKitTranscriber.probeSamples(url: url, scratch: probeURL))
-
-        let offsets = WhisperKitTranscriber.probeWindowOffsets(in: samples, windowSamples: Self.whisperWindow)
+        let offsets = WhisperKitTranscriber.probeWindowOffsets(in: probe, windowSamples: Self.whisperWindow)
         #expect(offsets.count == 2)
-        #expect(offsets.allSatisfy { Self.loudness(of: samples, at: $0) > 0.2 })
+        #expect(offsets.allSatisfy { Self.loudness(of: probe, at: $0) > 0.2 })
     }
 
     @Test("a recording shorter than one window is read once, all the way to its end")
-    func veryShortRecordingIsReadOnce() throws {
-        let url = try Self.writeTone(sampleRate: 16_000, seconds: 25, loudRange: 0..<25)
-        defer { try? FileManager.default.removeItem(at: url) }
-        let probeURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("parola-probe-\(UUID().uuidString).caf")
-        defer { try? FileManager.default.removeItem(at: probeURL) }
+    func veryShortRecordingIsReadOnce() {
+        let probe = Self.whisperProbe(Self.samples(seconds: 25, loudRange: 0..<25))
 
-        let samples = try #require(WhisperKitTranscriber.probeSamples(url: url, scratch: probeURL))
-
-        #expect(samples.count > 24 * 16_000, "the scratch used to stop at the first 20 seconds")
-        #expect(WhisperKitTranscriber.probeWindowOffsets(in: samples, windowSamples: Self.whisperWindow) == [0])
+        #expect(probe.count > 24 * 16_000, "the probe used to stop at the first 20 seconds")
+        #expect(WhisperKitTranscriber.probeWindowOffsets(in: probe, windowSamples: Self.whisperWindow) == [0])
     }
 
     @Test("a 30-second recording whose speech starts late is probed on that speech")
-    func lateSpeechInAShortRecordingIsHeard() throws {
-        let url = try Self.writeTone(sampleRate: 16_000, seconds: 30, loudRange: 22..<30)
-        defer { try? FileManager.default.removeItem(at: url) }
-        let probeURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("parola-probe-\(UUID().uuidString).caf")
-        defer { try? FileManager.default.removeItem(at: probeURL) }
+    func lateSpeechInAShortRecordingIsHeard() {
+        let probe = Self.whisperProbe(Self.samples(seconds: 30, loudRange: 22..<30))
 
-        let samples = try #require(WhisperKitTranscriber.probeSamples(url: url, scratch: probeURL))
-
-        #expect(samples.count > 29 * 16_000)
-        let offsets = WhisperKitTranscriber.probeWindowOffsets(in: samples, windowSamples: Self.whisperWindow)
+        #expect(probe.count > 29 * 16_000)
+        let offsets = WhisperKitTranscriber.probeWindowOffsets(in: probe, windowSamples: Self.whisperWindow)
         #expect(offsets == [0])
-        #expect(Self.loudness(of: samples, at: 0) > 0.2)
+        #expect(Self.loudness(of: probe, at: 0) > 0.2)
     }
 
     private static let whisperWindow = 30 * 16_000
+
+    private static func whisperProbe(_ samples: [Float]) -> [Float] {
+        WhisperKitTranscriber.probeSamples(
+            from: samples,
+            energies: ProbeAudioExtractor.measure(samples: samples, sampleRate: 16_000),
+            sampleRate: 16_000
+        )
+    }
+
+    /// A square wave at 0.8 inside `loudRange`, digital silence outside it, at 16 kHz.
+    private static func samples(seconds: Double, loudRange: Range<Double>) -> [Float] {
+        var samples = [Float](repeating: 0, count: Int(seconds * 16_000))
+        let loud = Int(loudRange.lowerBound * 16_000)..<min(samples.count, Int(loudRange.upperBound * 16_000))
+        for index in loud { samples[index] = index.isMultiple(of: 2) ? 0.8 : -0.8 }
+        return samples
+    }
 
     private static func loudness(of samples: [Float], at offset: Int) -> Float {
         let window = samples[offset..<min(samples.count, offset + whisperWindow)]
