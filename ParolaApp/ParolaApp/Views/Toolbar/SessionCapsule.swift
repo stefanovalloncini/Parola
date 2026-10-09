@@ -153,7 +153,7 @@ private struct SessionCapsuleButtonStyle: ButtonStyle {
 }
 
 /// The take's last two seconds of level, on the Stage band's curve.
-private struct SessionMeter: View {
+struct SessionMeter: View {
     let isOnScreen: Bool
     @Environment(AppModel.self) private var model
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -163,35 +163,19 @@ private struct SessionMeter: View {
     nonisolated static let barWidth: CGFloat = 2
     nonisolated static let gap: CGFloat = 1
     nonisolated static let height: CGFloat = 16
+    nonisolated static let width = CGFloat(barCount) * (barWidth + gap) - gap
 
     var body: some View {
-        if reduceMotion {
-            TimelineView(.animation(minimumInterval: 0.25, paused: !isOnScreen)) { _ in bars }
-        } else {
-            let _ = isOnScreen ? model.takeLevelTick : 0
-            bars
-        }
-    }
-
-    private var bars: some View {
-        let levels = model.takeLevels?.recent(Self.barCount) ?? Array(repeating: 0, count: Self.barCount)
+        // Only VoiceOver needs each sample in SwiftUI, to say the level; the bars' layer follows the take by itself.
+        let _ = isOnScreen && model.voiceOverIsRunning ? model.takeLevelTick : 0
+        let levels = Self.levels(of: model)
         let newest = Double(levels.last ?? 0)
-        let width = CGFloat(Self.barCount) * (Self.barWidth + Self.gap) - Self.gap
-        return Canvas { context, size in
-            var path = Path()
-            for (index, level) in levels.enumerated() {
-                let barHeight = LevelBars.height(for: level, idle: 2, max: size.height)
-                let rect = CGRect(
-                    x: CGFloat(index) * (Self.barWidth + Self.gap),
-                    y: (size.height - barHeight) / 2,
-                    width: Self.barWidth,
-                    height: barHeight
-                )
-                path.addRoundedRect(in: rect, cornerSize: CGSize(width: 1, height: 1), style: .continuous)
-            }
-            context.fill(path, with: .color(.primary.opacity(contrast == .increased ? 0.85 : 0.5)))
-        }
-        .frame(width: width, height: Self.height)
+        MeterLayer(
+            levels: levels,
+            ink: .primary.opacity(contrast == .increased ? 0.85 : 0.5),
+            feed: isOnScreen ? MeterFeed(model: model, interval: reduceMotion ? 0.25 : nil) : nil
+        )
+        .frame(width: Self.width, height: Self.height)
         .accessibilityRepresentation {
             Text(verbatim: AppFormat.percent(newest))
                 .accessibilityLabel("Input level")
@@ -199,6 +183,156 @@ private struct SessionMeter: View {
                 .accessibilityAddTraits(.updatesFrequently)
                 .axLeaf("Toolbar.Meter.SessionLevel")
         }
+    }
+
+    static func levels(of model: AppModel) -> [Float] {
+        model.takeLevels?.recent(barCount) ?? Array(repeating: 0, count: barCount)
+    }
+
+    /// One bar per level, newest on the right, each standing on the box's middle.
+    nonisolated static func barsPath(_ levels: [Float], height: CGFloat) -> Path {
+        var path = Path()
+        for (index, level) in levels.enumerated() {
+            let barHeight = LevelBars.height(for: level, idle: 2, max: height)
+            let rect = CGRect(x: CGFloat(index) * (barWidth + gap), y: (height - barHeight) / 2, width: barWidth, height: barHeight)
+            path.addRoundedRect(in: rect, cornerSize: CGSize(width: 1, height: 1), style: .continuous)
+        }
+        return path
+    }
+
+    /// The bars on a shape layer that follows a live take on its own, so a new sample costs no SwiftUI update.
+    final class BarsView: NSView {
+        let bars = CAShapeLayer()
+        private(set) var levels: [Float] = []
+        private var ink: CGColor?
+        private var feed: MeterFeed?
+        private var following: Task<Void, Never>?
+
+        init() {
+            super.init(frame: .zero)
+            layer = CALayer()
+            wantsLayer = true
+            layer?.addSublayer(bars)
+        }
+
+        @available(*, unavailable)
+        required init?(coder: NSCoder) { fatalError("not used") }
+
+        isolated deinit {
+            following?.cancel()
+        }
+
+        override func hitTest(_ point: NSPoint) -> NSView? {
+            nil
+        }
+
+        override func setFrameSize(_ newSize: NSSize) {
+            super.setFrameSize(newSize)
+            withoutActions(build)
+        }
+
+        override func viewDidChangeBackingProperties() {
+            super.viewDidChangeBackingProperties()
+            withoutActions(build)
+        }
+
+        func show(_ levels: [Float], ink: CGColor) {
+            guard levels != self.levels || ink != self.ink else { return }
+            self.levels = levels
+            self.ink = ink
+            withoutActions(build)
+        }
+
+        /// Each new sample, or under Reduce Motion four times a second, the bars take the take's levels without a SwiftUI update.
+        func follow(_ feed: MeterFeed, ink: CGColor) {
+            let restarts = feed != self.feed || following == nil
+            self.feed = feed
+            show(feed.levels(), ink: ink)
+            guard restarts else { return }
+            following?.cancel()
+            let model = feed.model
+            if let interval = feed.interval {
+                following = Task { [weak self] in
+                    while !Task.isCancelled {
+                        try? await Task.sleep(for: .seconds(interval))
+                        guard !Task.isCancelled, let self else { return }
+                        self.showFeed()
+                    }
+                }
+            } else {
+                following = Task { [weak self] in
+                    for await _ in Observations({ @MainActor in model.takeLevelTick }) {
+                        guard !Task.isCancelled, let self else { return }
+                        self.showFeed()
+                    }
+                }
+            }
+        }
+
+        func stopFollowing() {
+            following?.cancel()
+            following = nil
+            feed = nil
+        }
+
+        private func showFeed() {
+            guard let feed, let ink else { return }
+            show(feed.levels(), ink: ink)
+        }
+
+        private func withoutActions(_ change: () -> Void) {
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            change()
+            CATransaction.commit()
+        }
+
+        private func build() {
+            bars.frame = bounds
+            bars.contentsScale = window?.backingScaleFactor ?? 2
+            bars.fillColor = ink
+            bars.path = SessionMeter.barsPath(levels, height: bounds.height).cgPath
+        }
+    }
+}
+
+/// What the meter's layer reads from a live take between SwiftUI's updates.
+struct MeterFeed: Equatable {
+    let model: AppModel
+    /// Under Reduce Motion the bars step this often instead of following each sample.
+    let interval: TimeInterval?
+
+    @MainActor
+    func levels() -> [Float] {
+        SessionMeter.levels(of: model)
+    }
+
+    nonisolated static func == (lhs: MeterFeed, rhs: MeterFeed) -> Bool {
+        lhs.model === rhs.model && lhs.interval == rhs.interval
+    }
+}
+
+private struct MeterLayer: NSViewRepresentable {
+    let levels: [Float]
+    let ink: Color
+    let feed: MeterFeed?
+
+    func makeNSView(context: Context) -> SessionMeter.BarsView {
+        SessionMeter.BarsView()
+    }
+
+    func updateNSView(_ view: SessionMeter.BarsView, context: Context) {
+        let ink = ink.resolve(in: context.environment).cgColor
+        if let feed {
+            view.follow(feed, ink: ink)
+        } else {
+            view.stopFollowing()
+            view.show(levels, ink: ink)
+        }
+    }
+
+    static func dismantleNSView(_ view: SessionMeter.BarsView, coordinator: ()) {
+        view.stopFollowing()
     }
 }
 

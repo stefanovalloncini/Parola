@@ -151,6 +151,14 @@ struct SessionCapsuleTests {
         #expect(SessionCapsule.showsMeter(windowWidth: 1000))
         #expect(SessionCapsule.showsMeter(windowWidth: 1180))
     }
+
+    @Test("the meter's twenty bars stand on its middle, quiet ones two points tall")
+    func meterBarsStandOnTheMiddle() {
+        let quiet = SessionMeter.barsPath(Array(repeating: 0, count: SessionMeter.barCount), height: SessionMeter.height)
+        #expect(quiet.boundingRect == CGRect(x: 0, y: 7, width: SessionMeter.width, height: 2))
+        let loud = SessionMeter.barsPath([1], height: SessionMeter.height)
+        #expect(loud.boundingRect == CGRect(x: 0, y: 0, width: SessionMeter.barWidth, height: SessionMeter.height))
+    }
 }
 
 @MainActor

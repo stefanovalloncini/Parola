@@ -53,6 +53,15 @@ private struct ChromeInSight: View {
 }
 
 @MainActor
+private func meterBars(in hosted: HostedWindow) -> SessionMeter.BarsView? {
+    func views(in view: NSView) -> [SessionMeter.BarsView] {
+        ((view as? SessionMeter.BarsView).map { [$0] } ?? []) + view.subviews.flatMap(views(in:))
+    }
+    hosted.host.layoutSubtreeIfNeeded()
+    return views(in: hosted.host).first
+}
+
+@MainActor
 @Suite("Session chrome out of sight", .serialized)
 struct SessionChromeSightTests {
     private func element(_ suffix: String, in hosted: HostedWindow) -> HostedAccessibility.Element? {
@@ -107,10 +116,71 @@ struct SessionChromeSightTests {
         let hidden = element(surface.meter, in: hosted)?.value
         #expect(hidden == before, "out of sight, the meter still shows \(hidden ?? "nothing") from before the level rose")
         #expect(hidden != AppFormat.percent(0.8))
+        if surface == .capsule {
+            #expect(meterBars(in: hosted)?.levels.last != 0.8, "out of sight, the bars don't follow the take")
+        }
 
         sight.shown = true
         let caughtUp = await waitUntil { element(surface.meter, in: hosted)?.value == AppFormat.percent(0.8) }
         #expect(caughtUp)
+        if surface == .capsule {
+            let barsCaughtUp = await waitUntil { meterBars(in: hosted)?.levels.last == 0.8 }
+            #expect(barsCaughtUp)
+        }
+    }
+
+    @Test(
+        "in sight, the capsule's bars follow the take on their own, and SwiftUI reads each level only for VoiceOver",
+        arguments: [false, true], [false, true]
+    )
+    func capsuleBarsFollowTheTake(voiceOver: Bool, reduceMotion: Bool) async throws {
+        let audio = try tempWAV("capsule-bars-follow")
+        defer { try? FileManager.default.removeItem(at: audio) }
+        let model = makeRecordingModel("capsule-bars-follow")
+        model.useStreaming = false
+        model.selectedModel = "openai_whisper-tiny"
+        model.voiceOverIsRunning = voiceOver
+        let capture = LevelCapture(file: audio)
+        model.takeCaptureOverride = { _ in capture }
+        defer { await model.discardTake() }
+        model.startRecording(source: .microphone)
+        let up = await waitUntil { model.liveSource != nil }
+        try #require(up)
+        capture.levelMeter.record(0.2)
+        let recording = await waitUntil { model.recording?.state == .recording }
+        try #require(recording)
+        let take = try #require(model.recording)
+
+        let sight = Sight()
+        sight.shown = true
+        let hosted = host(.capsule, take, model, sight, reduceMotion: reduceMotion)
+        defer { hosted.close() }
+        let drawn = await waitUntil { element(ChromeSurface.capsule.meter, in: hosted)?.value != nil && meterBars(in: hosted) != nil }
+        try #require(drawn)
+        let first = element(ChromeSurface.capsule.meter, in: hosted)?.value
+        let bars = try #require(meterBars(in: hosted))
+
+        let loud = Task { @MainActor in
+            while !Task.isCancelled {
+                capture.levelMeter.record(0.8)
+                try? await Task.sleep(for: .milliseconds(20))
+            }
+        }
+        defer { loud.cancel() }
+        let followed = await waitUntil { bars.levels.last == 0.8 }
+        #expect(followed, "the bars keep up with the take")
+        #expect(bars.bars.path != nil)
+
+        if voiceOver {
+            let spoken = await waitUntil { element(ChromeSurface.capsule.meter, in: hosted)?.value == AppFormat.percent(0.8) }
+            #expect(spoken, "VoiceOver hears the new level")
+        } else {
+            let tick = model.takeLevelTick
+            let movedOn = await waitUntil { model.takeLevelTick >= tick + 3 }
+            try #require(movedOn)
+            let held = element(ChromeSurface.capsule.meter, in: hosted)?.value
+            #expect(held == first, "the stand-in followed a tick SwiftUI never reads: \(held ?? "nothing")")
+        }
     }
 
     @Test("while its window is out of sight the capsule's or the pill's clock stands still, and it ticks again once the window shows", arguments: ChromeSurface.allCases)
