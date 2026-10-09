@@ -252,7 +252,68 @@ struct StageStateTests {
         let grown = StageClock.places("10:00").last
         #expect(units?.place == 0)
         #expect(grown?.place == 0, "the seconds keep their place as the clock grows a digit")
-        #expect(StageClock.roll == .easeOut(duration: 0.2))
+        #expect(StageClock.rollDuration == 0.2)
+    }
+
+    @MainActor
+    @Test("a digit rolls in from 18 pt below as it fades in, and the old one climbs 18 pt out as it fades, eased out over 0.2 s in six held frames at thirty a second")
+    func clockRollSteps() throws {
+        let progress = StageClock.rollProgress
+        #expect(progress.count == 6)
+        #expect(zip(progress, progress.dropFirst()).allSatisfy { $0 < $1 })
+        #expect(abs(progress[0] - UnitCurve.easeOut.value(at: 1.0 / 12)) < 0.000_001)
+        #expect(progress[0] > 1.0 / 12, "eased out: quick at first")
+        #expect(progress[5] < 1 && progress[5] > 0.95)
+
+        for entering in [true, false] {
+            let roll = StageClock.rollAnimation(entering: entering, scale: 2)
+            #expect(roll.duration == 0.2)
+            #expect(roll.preferredFrameRateRange == CAFrameRateRange(minimum: 30, maximum: 30, preferred: 30))
+            let parts = try #require(roll.animations as? [CAKeyframeAnimation])
+            let rise = try #require(parts.first { $0.keyPath == "transform.translation.y" })
+            let fade = try #require(parts.first { $0.keyPath == "opacity" })
+            for part in [rise, fade] {
+                #expect(part.calculationMode == .discrete)
+                #expect(part.duration == 0.2)
+                #expect(part.keyTimes?.map(\.doubleValue) == (0...6).map { Double($0) / 6 })
+                #expect(part.preferredFrameRateRange == CAFrameRateRange(minimum: 30, maximum: 30, preferred: 30))
+            }
+            let offsets = (rise.values as? [NSNumber])?.map { CGFloat($0.doubleValue) } ?? []
+            let strengths = (fade.values as? [NSNumber])?.map(\.doubleValue) ?? []
+            #expect(offsets.count == 6 && strengths.count == 6)
+            #expect(offsets.allSatisfy { ($0 * 2).rounded() == $0 * 2 }, "each frame on a whole 2x pixel: \(offsets)")
+            if entering {
+                #expect(offsets.first.map { $0 > 12 && $0 < 18 } == true, "starts most of the way below: \(offsets)")
+                #expect(zip(offsets, offsets.dropFirst()).allSatisfy { $0 >= $1 } && offsets.allSatisfy { $0 >= 0 })
+                #expect(strengths == progress)
+            } else {
+                #expect(offsets.last.map { $0 < -17 && $0 >= -18 } == true, "ends nearly 18 pt up: \(offsets)")
+                #expect(zip(offsets, offsets.dropFirst()).allSatisfy { $0 >= $1 } && offsets.allSatisfy { $0 <= 0 })
+                #expect(strengths == progress.map { 1 - $0 })
+            }
+        }
+    }
+
+    @MainActor
+    @Test("a clock character is measured on the pixels of the screen it is drawn for, as SwiftUI lays text out there")
+    func clockGlyphsMeasureOnTheScreensPixels() throws {
+        let ink = Color.black.resolve(in: EnvironmentValues())
+        let retina = try #require(ClockGlyphs.glyph(":", font: DS.Font.takeTimerStage, ink: ink, scale: 2))
+        let plain = try #require(ClockGlyphs.glyph(":", font: DS.Font.takeTimerStage, ink: ink, scale: 1))
+        #expect((retina.size.width * 2).rounded() == retina.size.width * 2)
+        #expect(plain.size.width.rounded() == plain.size.width)
+        #expect(retina.size.width < plain.size.width, "a 2x screen rounds the colon up to its half points, not whole ones")
+        #expect(retina.image.width == Int(((retina.size.width + 2 * ClockGlyphs.bleed) * 2).rounded(.up)))
+    }
+
+    @Test("the digits roll on layers unless Reduce Motion is on, the clock doesn't roll, or a landing may shrink it")
+    func clockRollsOnLayers() {
+        let live: [RecordingSession.State] = [.arming(.startingCapture), .recording, .paused(since: Date()), .failed(message: "x")]
+        let landing: [RecordingSession.State] = [.finishing, .transcribing(progress: 0.5), .done(entryID: "E")]
+        #expect(live.allSatisfy { StageClock.rollsOnLayers(rolls: true, reduceMotion: false, state: $0) })
+        #expect(!live.contains { StageClock.rollsOnLayers(rolls: true, reduceMotion: true, state: $0) })
+        #expect(!live.contains { StageClock.rollsOnLayers(rolls: false, reduceMotion: false, state: $0) })
+        #expect(!landing.contains { StageClock.rollsOnLayers(rolls: true, reduceMotion: false, state: $0) })
     }
 
     @Test("a running, starting or paused clock never shrinks to fit; only one a landing can carry into the media bar does")
@@ -724,6 +785,117 @@ struct StageStateTests {
 }
 
 // Closures inside #expect/#require arguments can share a symbol with a later closure in the same test (Swift 6.4); bind waits first.
+/// The clock's layer view a hosted clock put up, as AppKit holds it.
+@MainActor
+private func clockDigits(in hosted: HostedWindow) -> StageClock.DigitsView? {
+    func views(in view: NSView) -> [StageClock.DigitsView] {
+        ((view as? StageClock.DigitsView).map { [$0] } ?? []) + view.subviews.flatMap(views(in:))
+    }
+    hosted.host.layoutSubtreeIfNeeded()
+    return views(in: hosted.host).first
+}
+
+@MainActor
+@Suite("Stage clock on layers", .serialized)
+struct StageClockLayerTests {
+    private func host(_ take: RecordingSession, reduceMotion: Bool = false) -> HostedWindow {
+        // In a container, so the clock is an element of its own and not the hosting view's.
+        let clock = VStack { StageClock(take: take, font: DS.Font.takeTimerStage, rolls: true) }
+            .accessibilityElement(children: .contain)
+            .environment(\._accessibilityReduceMotion, reduceMotion)
+        return HostedWindow(clock, width: 400, height: 160)
+    }
+
+    private func clockElement(in hosted: HostedWindow) -> HostedAccessibility.Element? {
+        HostedAccessibility.elements(in: hosted.host).first { $0.label == "Recording time" }
+    }
+
+    @Test("as a second turns over only the digits that changed roll, on layers over the clock's own frame, which VoiceOver still finds")
+    func onlyChangedDigitsRoll() async throws {
+        let audio = try tempWAV("clock-roll")
+        defer { try? FileManager.default.removeItem(at: audio) }
+        let model = makeRecordingModel("clock-roll")
+        model.installTestTake(source: .microphone, liveSource: StubSource(url: audio), startedAt: Date(timeIntervalSinceNow: -30.3))
+        defer { model.endTestTake() }
+        let take = try #require(model.recording)
+        let hosted = host(take)
+        defer { hosted.close() }
+
+        let drawn = await waitUntil { clockDigits(in: hosted)?.text.isEmpty == false }
+        try #require(drawn)
+        let view = try #require(clockDigits(in: hosted))
+        let first = view.text
+        let turned = await waitUntil(timeoutMs: 3_000) { view.text != first }
+        try #require(turned)
+        let before = Dictionary(uniqueKeysWithValues: StageClock.places(first).map { ($0.place, $0.character) })
+        let changed = Set(StageClock.places(view.text).filter { before[$0.place] != $0.character }.map(\.place))
+        #expect(!changed.isEmpty)
+        #expect(changed.count < view.places.count, "\(first) → \(view.text) leaves some digits standing")
+        for (index, place) in view.places {
+            let rolls = changed.contains(index)
+            #expect((place.shown.animation(forKey: StageClock.rollKey) != nil) == rolls, "place \(index) of \(view.text)")
+            #expect((place.leaving.animation(forKey: StageClock.rollKey) != nil) == rolls, "place \(index) of \(view.text)")
+            #expect(place.shown.contents != nil)
+            #expect(place.leaving.opacity == 0, "a character rolling out ends gone")
+        }
+        // SwiftUI sets a layer view's frame on whole device pixels, so it can be half a pixel short of the text's own width.
+        #expect(abs(view.charactersWidth - view.bounds.width) <= 0.5, "the characters span the clock's own frame: \(view.charactersWidth) in \(view.bounds.width)")
+        let lefts = view.places.sorted { $0.key > $1.key }.map(\.value.shown.frame.minX)
+        #expect(lefts == lefts.sorted() && Set(lefts).count == lefts.count, "the characters stand left to right: \(lefts)")
+
+        let element = try #require(clockElement(in: hosted))
+        let window = try #require(view.window)
+        let drawnAt = window.convertToScreen(view.convert(view.bounds, to: nil))
+        #expect(abs(drawnAt.minX - element.frame.minX) < 0.5 && abs(drawnAt.width - element.frame.width) < 0.5, "\(drawnAt) over \(element.frame)")
+        #expect(abs(drawnAt.minY - element.frame.minY) < 0.5 && abs(drawnAt.height - element.frame.height) < 0.5, "\(drawnAt) over \(element.frame)")
+    }
+
+    @Test("as the clock grows a digit at 10:00 the digits that changed roll, the new one just appears, and every character keeps to its place")
+    func growingClockRollsOnlyItsChangedDigits() throws {
+        let window = OffscreenWindow(width: 300, height: 120, styleMask: [.borderless])
+        defer { window.orderOut(nil) }
+        let view = StageClock.DigitsView()
+        view.frame = CGRect(x: 0, y: 0, width: 200, height: 66)
+        window.contentView?.addSubview(view)
+        window.orderFront(nil)
+        let ink = Color.black.resolve(in: EnvironmentValues())
+        view.show("9:59", font: DS.Font.takeTimerStage, ink: ink)
+        let colonBefore = try #require(view.places[2]).shown.frame.minX
+        #expect(view.places.values.allSatisfy { $0.shown.animation(forKey: StageClock.rollKey) == nil }, "the first time shown stands still")
+
+        view.show("10:00", font: DS.Font.takeTimerStage, ink: ink)
+        let rolling = Set(view.places.filter { $0.value.shown.animation(forKey: StageClock.rollKey) != nil }.keys)
+        #expect(rolling == [0, 1, 3])
+        #expect(view.places[4]?.character == "1")
+        #expect(view.places[2]?.character == ":")
+        let colonAfter = try #require(view.places[2]).shown.frame.minX
+        #expect(colonAfter > colonBefore, "the colon moves right as a digit joins on its left")
+        let lefts = view.places.sorted { $0.key > $1.key }.map(\.value.shown.frame.minX)
+        #expect(lefts == lefts.sorted())
+
+        view.show("10:00", font: DS.Font.takeTimerStage, ink: Color.white.resolve(in: EnvironmentValues()))
+        #expect(view.places.values.allSatisfy { $0.shown.animation(forKey: StageClock.rollKey) == nil }, "a new ink redraws the digits in place")
+    }
+
+    @Test("under Reduce Motion SwiftUI draws the digits and they swap without rolling, as they tick")
+    func reduceMotionSwaps() async throws {
+        let audio = try tempWAV("clock-still")
+        defer { try? FileManager.default.removeItem(at: audio) }
+        let model = makeRecordingModel("clock-still")
+        model.installTestTake(source: .microphone, liveSource: StubSource(url: audio), startedAt: Date(timeIntervalSinceNow: -30.3))
+        defer { model.endTestTake() }
+        let take = try #require(model.recording)
+        let hosted = host(take, reduceMotion: true)
+        defer { hosted.close() }
+
+        let drawn = await waitUntil { clockElement(in: hosted) != nil }
+        try #require(drawn)
+        #expect(clockDigits(in: hosted) == nil)
+        await settle(for: .milliseconds(1_200))
+        #expect(clockDigits(in: hosted) == nil)
+    }
+}
+
 extension TranscriberMockSuites {
     @MainActor
     @Suite("Stage state flows", .serialized)

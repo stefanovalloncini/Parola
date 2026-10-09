@@ -14,12 +14,12 @@ struct StageClock: View {
         AppFormat.elapsed(TimeInterval(seconds))
     }
 
-    static let roll = Animation.easeOut(duration: 0.2)
-    /// A short climb, as `numericText` rolls: the new digit rises into place as the old one rises out.
-    static let rollTransition = AnyTransition.asymmetric(
-        insertion: .offset(y: 18).combined(with: .opacity),
-        removal: .offset(y: -18).combined(with: .opacity)
-    )
+    nonisolated static let rollDuration: TimeInterval = 0.2
+    /// How far a digit climbs into place, and out of it: a short climb, as `numericText` rolls.
+    nonisolated static let rollClimb: CGFloat = 18
+    /// The roll's frames: about thirty a second, like the band's slide.
+    nonisolated static let rollFrames = 6
+    nonisolated static let rollKey = "roll"
 
     /// Each character with its place counted from the right, so a digit keeps its identity as the clock grows and only the ones that change roll.
     nonisolated static func places(_ text: String) -> [(place: Int, character: Character)] {
@@ -29,6 +29,40 @@ struct StageClock: View {
     /// Only a clock a landing can carry into the media bar's duration shrinks with its frame; a running one keeps its size.
     nonisolated static func minimumScale(_ state: RecordingSession.State) -> CGFloat {
         StageLanding.stageOffers(state) ? 0.1 : 1
+    }
+
+    /// The digits roll on layers while the clock keeps its size; under Reduce Motion, or once a landing may shrink it, SwiftUI draws them and they swap.
+    nonisolated static func rollsOnLayers(rolls: Bool, reduceMotion: Bool, state: RecordingSession.State) -> Bool {
+        rolls && !reduceMotion && minimumScale(state) == 1
+    }
+
+    /// How far through the roll each frame shows the digits, eased out, each frame at the middle of its time.
+    nonisolated static var rollProgress: [Double] {
+        (0..<rollFrames).map { UnitCurve.easeOut.value(at: (Double($0) + 0.5) / Double(rollFrames)) }
+    }
+
+    /// A digit rising into place from below as it fades in, or out of it upwards as it fades out, in held frames, each on a whole device pixel.
+    static func rollAnimation(entering: Bool, scale: CGFloat) -> CAAnimationGroup {
+        let progress = rollProgress
+        let rise = CAKeyframeAnimation(keyPath: "transform.translation.y")
+        rise.values = progress.map { done in
+            let offset = entering ? rollClimb * (1 - done) : -rollClimb * done
+            return (offset * scale).rounded() / scale
+        }
+        let fade = CAKeyframeAnimation(keyPath: "opacity")
+        fade.values = progress.map { entering ? $0 : 1 - $0 }
+        let group = CAAnimationGroup()
+        for animation in [rise, fade] {
+            // Held values, so the render server draws the roll at its own frame rate rather than the display's.
+            animation.calculationMode = .discrete
+            animation.keyTimes = (0...rollFrames).map { NSNumber(value: Double($0) / Double(rollFrames)) }
+            animation.duration = rollDuration
+            animation.preferredFrameRateRange = .roll
+        }
+        group.animations = [rise, fade]
+        group.duration = rollDuration
+        group.preferredFrameRateRange = .roll
+        return group
     }
 
     var body: some View {
@@ -43,16 +77,17 @@ struct StageClock: View {
 
     private func face(at date: Date) -> some View {
         let seconds = Int(take.elapsed(at: date))
-        let rolling = rolls && !reduceMotion
+        let text = Self.text(seconds: seconds)
+        let layered = Self.rollsOnLayers(rolls: rolls, reduceMotion: reduceMotion, state: take.state)
         return HStack(spacing: 0) {
-            ForEach(Self.places(Self.text(seconds: seconds)), id: \.place) { place in
-                // Slid and faded rather than numericText, whose blur is drawn on the CPU every frame at many times the cost.
-                ZStack {
-                    Text(verbatim: String(place.character))
-                        .id(place.character)
-                        .transition(rolling ? Self.rollTransition : .identity)
-                }
-                .animation(rolling ? Self.roll : nil, value: place.character)
+            ForEach(Self.places(text), id: \.place) { place in
+                Text(verbatim: String(place.character))
+            }
+        }
+        .opacity(layered ? 0 : 1)
+        .overlay {
+            if layered {
+                RollingDigits(text: text, font: font)
             }
         }
         .font(font)
@@ -62,6 +97,199 @@ struct StageClock: View {
         .accessibilityLabel("Recording time")
         .accessibilityValue(AppFormat.spokenDuration(seconds: seconds))
         .accessibilityAddTraits(.updatesFrequently)
+    }
+
+    /// The clock's characters on layers the render server rolls, so a turning second costs SwiftUI one update rather than one a frame.
+    final class DigitsView: NSView {
+        /// One place's character, and the one rolling out of it.
+        final class Place {
+            let shown = CALayer()
+            let leaving = CALayer()
+            fileprivate(set) var character: Character?
+        }
+
+        private let row = CALayer()
+        private(set) var places: [Int: Place] = [:]
+        private(set) var text = ""
+        /// How wide the characters stand side by side, as SwiftUI lays them out.
+        private(set) var charactersWidth: CGFloat = 0
+        private var font: Font?
+        private var ink: Color.Resolved?
+        private var builtScale: CGFloat?
+
+        init() {
+            super.init(frame: .zero)
+            layer = CALayer()
+            wantsLayer = true
+            // Top down, the way SwiftUI lays the characters out.
+            row.isGeometryFlipped = true
+            row.anchorPoint = .zero
+            layer?.addSublayer(row)
+        }
+
+        @available(*, unavailable)
+        required init?(coder: NSCoder) { fatalError("not used") }
+
+        override func hitTest(_ point: NSPoint) -> NSView? {
+            nil
+        }
+
+        override func setFrameSize(_ newSize: NSSize) {
+            let resized = newSize != frame.size
+            super.setFrameSize(newSize)
+            if resized { redraw() }
+        }
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            redraw()
+        }
+
+        override func viewDidChangeBackingProperties() {
+            super.viewDidChangeBackingProperties()
+            redraw()
+        }
+
+        private var scale: CGFloat {
+            window?.backingScaleFactor ?? 2
+        }
+
+        /// The characters of `text`: one that changed since the last shown rolls, unless the font or the ink changed with it.
+        func show(_ text: String, font: Font, ink: Color.Resolved) {
+            let restyled = font != self.font || ink != self.ink
+            self.text = text
+            self.font = font
+            self.ink = ink
+            withoutActions { build(restyled: restyled) }
+        }
+
+        private func redraw() {
+            withoutActions { build(restyled: false) }
+        }
+
+        private func withoutActions(_ change: () -> Void) {
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            change()
+            CATransaction.commit()
+        }
+
+        private func build(restyled: Bool) {
+            guard let font, let ink else { return }
+            let scale = scale
+            let redrawn = restyled || scale != builtScale
+            builtScale = scale
+            row.frame = bounds
+            var x: CGFloat = 0
+            var kept = Set<Int>()
+            for (index, character) in StageClock.places(text) {
+                guard let glyph = ClockGlyphs.glyph(character, font: font, ink: ink, scale: scale) else { continue }
+                let place = places[index] ?? makePlace(index)
+                kept.insert(index)
+                let origin = CGPoint(x: ((x - ClockGlyphs.bleed) * scale).rounded() / scale, y: -ClockGlyphs.bleed)
+                x += glyph.size.width
+                let old = place.character
+                if redrawn || old != character {
+                    place.character = character
+                    put(glyph, in: place.shown, at: origin, scale: scale)
+                    if !redrawn, window != nil, let old, let out = ClockGlyphs.glyph(old, font: font, ink: ink, scale: scale) {
+                        put(out, in: place.leaving, at: origin, scale: scale)
+                        place.leaving.add(StageClock.rollAnimation(entering: false, scale: scale), forKey: StageClock.rollKey)
+                        place.shown.add(StageClock.rollAnimation(entering: true, scale: scale), forKey: StageClock.rollKey)
+                    } else {
+                        place.shown.removeAnimation(forKey: StageClock.rollKey)
+                        place.leaving.removeAnimation(forKey: StageClock.rollKey)
+                    }
+                } else if place.shown.frame.origin != origin {
+                    place.shown.frame.origin = origin
+                    place.leaving.frame.origin = origin
+                }
+            }
+            charactersWidth = x
+            for index in places.keys where !kept.contains(index) {
+                places[index]?.shown.removeFromSuperlayer()
+                places[index]?.leaving.removeFromSuperlayer()
+                places[index] = nil
+            }
+        }
+
+        private func makePlace(_ index: Int) -> Place {
+            let place = Place()
+            place.leaving.opacity = 0
+            row.addSublayer(place.leaving)
+            row.addSublayer(place.shown)
+            places[index] = place
+            return place
+        }
+
+        private func put(_ glyph: ClockGlyph, in layer: CALayer, at origin: CGPoint, scale: CGFloat) {
+            layer.contents = glyph.image
+            layer.contentsScale = scale
+            layer.frame = CGRect(origin: origin, size: CGSize(width: CGFloat(glyph.image.width) / scale, height: CGFloat(glyph.image.height) / scale))
+        }
+    }
+}
+
+/// A clock character as SwiftUI draws it, for the rolling layers to show.
+struct ClockGlyph {
+    let image: CGImage
+    /// The character's own frame, as SwiftUI lays it out, without the bleed around it.
+    let size: CGSize
+}
+
+/// The clock's characters, each drawn once per font, ink and screen scale.
+@MainActor
+enum ClockGlyphs {
+    /// Room around a character for ink that reaches past its frame.
+    static let bleed: CGFloat = 8
+
+    private struct Key: Hashable {
+        let character: Character
+        let font: Font
+        let ink: Color.Resolved
+        let scale: CGFloat
+    }
+
+    private static var drawn: [Key: ClockGlyph] = [:]
+
+    static func glyph(_ character: Character, font: Font, ink: Color.Resolved, scale: CGFloat) -> ClockGlyph? {
+        let key = Key(character: character, font: font, ink: ink, scale: scale)
+        if let glyph = drawn[key] { return glyph }
+        if drawn.count > 64 { drawn = [:] }
+        let renderer = ImageRenderer(content: Text(verbatim: String(character)).font(font).foregroundStyle(Color(ink)).padding(bleed))
+        // Text sizes round up to the screen's pixels, so a character measured at another scale would sit a pixel off.
+        renderer.scale = scale
+        var glyph: ClockGlyph?
+        renderer.render { size, draw in
+            let width = Int((size.width * scale).rounded(.up))
+            let height = Int((size.height * scale).rounded(.up))
+            guard width > 0, height > 0, let space = CGColorSpace(name: CGColorSpace.sRGB), let context = CGContext(
+                data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0, space: space,
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            ) else { return }
+            context.scaleBy(x: scale, y: scale)
+            // The view draws from the bottom of the box it is given; the rounding up goes above it, so lift the view to the image's top.
+            context.translateBy(x: 0, y: CGFloat(height) / scale - size.height)
+            draw(context)
+            guard let image = context.makeImage() else { return }
+            glyph = ClockGlyph(image: image, size: CGSize(width: size.width - 2 * bleed, height: size.height - 2 * bleed))
+        }
+        drawn[key] = glyph
+        return glyph
+    }
+}
+
+/// The clock's characters on their layers; the ink is the Stage's text colour, read from the environment on each update so it follows a switch to dark.
+private struct RollingDigits: NSViewRepresentable {
+    let text: String
+    let font: Font
+
+    func makeNSView(context: Context) -> StageClock.DigitsView {
+        StageClock.DigitsView()
+    }
+
+    func updateNSView(_ view: StageClock.DigitsView, context: Context) {
+        view.show(text, font: font, ink: DS.Color.primaryText.resolve(in: context.environment))
     }
 }
 
@@ -198,6 +426,8 @@ extension CAFrameRateRange {
     static let stage = CAFrameRateRange(minimum: 15, maximum: 60, preferred: 30)
     /// What the recording light's pulse runs at: its own fifteen steps a second, never more.
     static let pulse = CAFrameRateRange(minimum: 15, maximum: 15, preferred: 15)
+    /// What the clock's digit roll runs at: its own thirty frames a second.
+    static let roll = CAFrameRateRange(minimum: 30, maximum: 30, preferred: 30)
 }
 
 private struct PulsingLight: NSViewRepresentable {
