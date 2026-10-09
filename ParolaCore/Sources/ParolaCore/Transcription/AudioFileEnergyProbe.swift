@@ -8,7 +8,8 @@ final class AudioFileEnergyProbe: SegmentEnergyProbe {
     private let duration: Double
     private var windows: [Double]?
 
-    init?(url: URL) {
+    /// `windowEnergies` is the engine's own measurement of the planner's windows, when it has one.
+    init?(url: URL, windowEnergies: [Double]? = nil) {
         guard let file = try? AVAudioFile(forReading: url),
               file.processingFormat.sampleRate > 0,
               file.length > 0 else {
@@ -17,6 +18,7 @@ final class AudioFileEnergyProbe: SegmentEnergyProbe {
         }
         self.file = file
         duration = Double(file.length) / file.processingFormat.sampleRate
+        windows = windowEnergies.flatMap { $0.isEmpty ? nil : $0 }
     }
 
     /// Measured over windows spread across the whole recording rather than over the segments in

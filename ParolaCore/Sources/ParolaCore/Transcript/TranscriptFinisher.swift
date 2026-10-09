@@ -11,7 +11,7 @@ enum TranscriptFinisher {
     ) async -> Transcript {
         let tidied = await tidied(
             transcript, engine: engine, options: options, audioURL: audioURL,
-            readDeadline: readDeadline, readClock: ContinuousClock()
+            windowEnergies: nil, readDeadline: readDeadline, readClock: ContinuousClock()
         )
         return merged(tidied, engine: engine)
     }
@@ -22,13 +22,14 @@ enum TranscriptFinisher {
         engine: EngineID,
         options: TranscriptionOptions,
         audioURL: URL?,
+        windowEnergies: [Double]? = nil,
         readDeadline: Duration = FileReadDeadline.header,
         readClock: any Clock<Duration> = ContinuousClock(),
         labelSpeakers: @Sendable (Transcript) async throws -> Transcript
     ) async throws -> Transcript {
         let tidied = await tidied(
             transcript, engine: engine, options: options, audioURL: audioURL,
-            readDeadline: readDeadline, readClock: readClock
+            windowEnergies: windowEnergies, readDeadline: readDeadline, readClock: readClock
         )
         return merged(try await labelSpeakers(tidied), engine: engine)
     }
@@ -45,6 +46,7 @@ enum TranscriptFinisher {
         engine: EngineID,
         options: TranscriptionOptions,
         audioURL: URL?,
+        windowEnergies: [Double]?,
         readDeadline: Duration,
         readClock: any Clock<Duration>
     ) async -> Transcript {
@@ -65,7 +67,8 @@ enum TranscriptFinisher {
             transcript.segments = kept
         }
         var cleaned = await cleanedWithEnergy(
-            transcript, at: audioURL, options: cleanup, deadline: readDeadline, clock: readClock
+            transcript, at: audioURL, windowEnergies: windowEnergies,
+            options: cleanup, deadline: readDeadline, clock: readClock
         )
         // After the energy pass: clamped spans would point its reads at the engine's padding.
         cleaned.segments = PaddedSegmentSpan.clamped(cleaned.segments)
@@ -76,6 +79,7 @@ enum TranscriptFinisher {
     private static func cleanedWithEnergy(
         _ transcript: Transcript,
         at audioURL: URL?,
+        windowEnergies: [Double]?,
         options: TranscriptCleanupOptions,
         deadline: Duration,
         clock: any Clock<Duration>
@@ -85,7 +89,9 @@ enum TranscriptFinisher {
         }
         let read = await BoundedFileRead.run(deadline: deadline, clock: clock) {
             TranscriptCleanup.apply(
-                to: transcript, options: options, energy: AudioFileEnergyProbe(url: audioURL)
+                to: transcript,
+                options: options,
+                energy: AudioFileEnergyProbe(url: audioURL, windowEnergies: windowEnergies)
             )
         }
         guard case .done(let cleaned) = read else {

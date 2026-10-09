@@ -54,6 +54,18 @@ struct SilentRepetitionsTests {
         #expect(out == overSpeech)
     }
 
+    @Test("window energies the engine already measured stand in for a sweep of the file")
+    func seededWindowEnergies() throws {
+        let url = try LeadInSilenceFixture.write()
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let seeded = try #require(AudioFileEnergyProbe(url: url, windowEnergies: [0.25, 0.5]))
+        let swept = try #require(AudioFileEnergyProbe(url: url, windowEnergies: []))
+
+        #expect(seeded.windowEnergies() == [0.25, 0.5])
+        #expect(swept.windowEnergies().count == ProbeWindowPlanner.candidates(duration: 200).count)
+    }
+
     @Test("two copies are never enough")
     func keepsAPair() throws {
         let url = try LeadInSilenceFixture.write()
@@ -359,6 +371,25 @@ private struct TableEnergyProbe: SegmentEnergyProbe {
     }
 }
 
+private struct EnergyReportingTranscriber: Transcriber {
+    static let engineID = EngineID.whisperKit
+    static let capabilities = EngineCapabilities.whisperKitDefaults
+
+    let inner: any Transcriber
+    let energies: [Double]
+
+    func load(model: String) async throws { try await inner.load(model: model) }
+
+    func transcribe(url: URL, options: TranscriptionOptions, handlers: TranscribeHandlers) async throws -> Transcript {
+        handlers.onWindowEnergies?(energies)
+        return try await inner.transcribe(url: url, options: options, handlers: handlers)
+    }
+
+    func unload() async { await inner.unload() }
+
+    func loadedModelName() async -> String? { await inner.loadedModelName() }
+}
+
 private struct StubEnergyProbe: SegmentEnergyProbe {
     var windows: [Double] = [0.5]
     var quietBefore: Double = .infinity
@@ -395,6 +426,23 @@ struct SessionSilentRepetitionsTests {
         #expect(transcript.segments.map(\.text) == ["Ecco, ci siamo."])
     }
 
+    @Test("the floor comes from the window energies the engine reported")
+    func engineEnergiesReachTheFloor() async throws {
+        let (session, audioURL, modelsDirectory) = try await makeSession(
+            engineID: .whisperKit, model: "openai_whisper-tiny", reportingEnergies: [0, 0, 0]
+        )
+        defer { try? FileManager.default.removeItem(at: audioURL) }
+        defer { try? FileManager.default.removeItem(at: modelsDirectory) }
+
+        let transcript = try await session.transcribe(
+            source: FileAudioSource(url: audioURL),
+            options: TranscriptionOptions(model: "openai_whisper-tiny")
+        )
+        await session.unloadModel()
+
+        #expect(transcript.segments.count == 4, "silent windows give no floor, so nothing is dropped")
+    }
+
     @Test("another engine's repetitions are left as the engine made them")
     func otherEnginesKeepTheirRepetitions() async throws {
         let (session, audioURL, modelsDirectory) = try await makeSession(
@@ -414,14 +462,19 @@ struct SessionSilentRepetitionsTests {
 
     private func makeSession(
         engineID: EngineID,
-        model: String
+        model: String,
+        reportingEnergies energies: [Double]? = nil
     ) async throws -> (session: TranscriptionSession, audioURL: URL, modelsDirectory: URL) {
         let registry = EngineRegistry()
         let response = MockTranscriberResponse(segments: seeds, language: "it", modelName: "mock")
         await registry.register(
             engineID: engineID,
             capabilities: .whisperKitDefaults,
-            factory: { _ in MockTranscriber.make(response: response, clock: ImmediateClock()) }
+            factory: { _ in
+                let mock = MockTranscriber.make(response: response, clock: ImmediateClock())
+                guard let energies else { return mock }
+                return EnergyReportingTranscriber(inner: mock, energies: energies)
+            }
         )
 
         let dir = FileManager.default.temporaryDirectory

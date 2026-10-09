@@ -100,8 +100,10 @@ actor WhisperKitTranscriber: Transcriber {
             deadline: FileReadDeadline.forReading(url)
         )
         try Task.checkCancellation()
+        let energies = ProbeAudioExtractor.measure(samples: samples, sampleRate: Double(WhisperKit.sampleRate))
+        handlers.onWindowEnergies?(energies.map(\.energy))
         let probed = options.language == nil
-            ? await probeLanguage(kit: kit, samples: samples)
+            ? await probeLanguage(kit: kit, samples: samples, energies: energies)
             : nil
         try Task.checkCancellation()
         let pin = WhisperLanguagePin.resolve(requested: options.language, probed: probed)
@@ -246,9 +248,12 @@ actor WhisperKitTranscriber: Transcriber {
 
     private static let languageProbeWindows = 5
 
-    private func probeLanguage(kit: WhisperKit, samples: [Float]) async -> LanguageDetection? {
+    private func probeLanguage(
+        kit: WhisperKit,
+        samples: [Float],
+        energies: [ProbeWindowEnergy]
+    ) async -> LanguageDetection? {
         guard kit.textDecoder.isModelMultilingual else { return nil }
-        let energies = ProbeAudioExtractor.measure(samples: samples, sampleRate: Double(WhisperKit.sampleRate))
         let probe = Self.probeSamples(from: samples, energies: energies)
         guard !probe.isEmpty else { return nil }
         let windowSamples = kit.featureExtractor.windowSamples ?? Constants.defaultWindowSamples

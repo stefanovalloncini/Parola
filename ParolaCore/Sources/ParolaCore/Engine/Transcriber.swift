@@ -14,6 +14,8 @@ public struct TranscribeHandlers: Sendable {
     public var onPartial: (@Sendable (String) -> Void)?
     public var onProgress: (@Sendable (Double) -> Void)?
     public var onStage: (@Sendable (TranscribeStage) -> Void)?
+    /// Window loudness from an engine that already decoded the audio, so the energy pass skips its sweep.
+    var onWindowEnergies: (@Sendable ([Double]) -> Void)?
 
     public init(
         onPartial: (@Sendable (String) -> Void)? = nil,

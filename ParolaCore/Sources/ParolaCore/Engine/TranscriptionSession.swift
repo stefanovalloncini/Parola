@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// Top-level orchestrator. Resolves the right `Transcriber` for the selected model via the
 /// shared `EngineRegistry`, manages model loading, and emits transcription events.
@@ -162,17 +163,12 @@ public actor TranscriptionSession {
         // Abort engine work when the caller cancels: a hung engine (e.g. a stalled finalize)
         // would otherwise hold the transcribe slot and block every queued run until relaunch.
         var transcript: Transcript
+        let windowEnergies = OSAllocatedUnfairLock<[Double]?>(initialState: nil)
+        var handlers = TranscribeHandlers(onPartial: partialHandler, onProgress: progressHandler, onStage: stageHandler)
+        handlers.onWindowEnergies = { energies in windowEnergies.withLock { $0 = energies } }
         do {
-            transcript = try await withTaskCancellationHandler {
-                try await activeTranscriber.transcribe(
-                    url: audioURL,
-                    options: options,
-                    handlers: TranscribeHandlers(
-                        onPartial: partialHandler,
-                        onProgress: progressHandler,
-                        onStage: stageHandler
-                    )
-                )
+            transcript = try await withTaskCancellationHandler { [handlers] in
+                try await activeTranscriber.transcribe(url: audioURL, options: options, handlers: handlers)
             } onCancel: {
                 Task { await self.abandonIfCancelledRunStalls(runID) }
             }
@@ -211,6 +207,7 @@ public actor TranscriptionSession {
             engine: engineID,
             options: options,
             audioURL: audioURL,
+            windowEnergies: windowEnergies.withLock { $0 },
             readDeadline: fileReadDeadline,
             readClock: fileReadClock
         ) { [options] tidied in
