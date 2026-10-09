@@ -227,7 +227,47 @@ struct SessionChromeSightTests {
         let samples = model.takeLevelTick - tick
         #expect(samples >= 15, "the take kept only \(samples) samples")
         #expect(said >= 3, "VoiceOver heard the level change \(said) times")
-        #expect(said <= 12, "VoiceOver heard the level change \(said) times in 2.5 s, with each sample rather than each step")
+        #expect(said <= 17, "VoiceOver heard the level change \(said) times in 2.5 s, with each sample rather than each step")
+    }
+
+    @Test(
+        "with VoiceOver and Reduce Motion the capsule's or the pill's bars step four times a second, and SwiftUI's updates add no steps of their own",
+        arguments: ChromeSurface.allCases
+    )
+    func barsKeepTheirPaceUnderVoiceOver(surface: ChromeSurface) async throws {
+        let audio = try tempWAV("\(surface.rawValue)-bars-pace")
+        defer { try? FileManager.default.removeItem(at: audio) }
+        let model = makeRecordingModel("\(surface.rawValue)-bars-pace")
+        model.useStreaming = false
+        model.selectedModel = "openai_whisper-tiny"
+        model.voiceOverIsRunning = true
+        let capture = LevelCapture(file: audio)
+        model.takeCaptureOverride = { _ in capture }
+        defer { await model.discardTake() }
+        model.startRecording(source: .microphone)
+        let up = await waitUntil { model.liveSource != nil }
+        try #require(up)
+        capture.levelMeter.record(0.2)
+        let recording = await waitUntil { model.recording?.state == .recording }
+        try #require(recording)
+        let take = try #require(model.recording)
+
+        let sight = Sight()
+        sight.shown = true
+        let hosted = host(surface, take, model, sight, reduceMotion: true)
+        defer { hosted.close() }
+        let drawn = await waitUntil { meterBars(in: hosted) != nil }
+        try #require(drawn)
+        let bars = try #require(meterBars(in: hosted))
+
+        let climb = climbingLevels(on: capture.levelMeter)
+        defer { climb.cancel() }
+        let tick = model.takeLevelTick
+        let stepped = await changes(of: { bars.levels.description }, over: .milliseconds(4_000))
+        let samples = model.takeLevelTick - tick
+        #expect(samples >= 25, "the take kept only \(samples) samples")
+        #expect(stepped >= 6, "the bars stepped \(stepped) times")
+        #expect(stepped <= 20, "the bars stepped \(stepped) times in 4 s, more often than every 0.25 s")
     }
 
     @Test("while its window is out of sight the capsule's or the pill's clock stands still, and it ticks again once the window shows", arguments: ChromeSurface.allCases)

@@ -66,7 +66,7 @@ struct LiveLevelBars: View {
                 levels: levels,
                 style: style,
                 ink: ink,
-                feed: follows ? LevelFeed(model: model, barCount: style.barCount, step: step) : nil
+                feed: follows ? LevelFeed(model: model, style: style, step: step) : nil
             )
             .frame(width: style.width, height: style.height)
             .accessibilityRepresentation {
@@ -130,10 +130,11 @@ struct LiveLevelBars: View {
         }
 
         /// Each new sample, or under Reduce Motion four times a second, the bars take the take's levels without a SwiftUI update.
-        func follow(_ feed: LevelFeed, style: Style, ink: CGColor) {
+        func follow(_ feed: LevelFeed, ink: CGColor) {
             let restarts = feed != self.feed || following == nil
             self.feed = feed
-            show(feed.levels(), style: style, ink: ink)
+            // Between restarts the levels are the loop's to move; a SwiftUI update only brings a new ink.
+            show(restarts ? feed.levels() : levels, style: feed.style, ink: ink)
             guard restarts else { return }
             following?.cancel()
             let model = feed.model
@@ -163,7 +164,7 @@ struct LiveLevelBars: View {
 
         private func showFeed() {
             guard let feed, let ink else { return }
-            show(feed.levels(), style: style, ink: ink)
+            show(feed.levels(), style: feed.style, ink: ink)
         }
 
         private func withoutActions(_ change: () -> Void) {
@@ -186,17 +187,16 @@ struct LiveLevelBars: View {
 /// What the bars' layer reads from a live take between SwiftUI's updates.
 struct LevelFeed: Equatable {
     let model: AppModel
-    let barCount: Int
-    /// Under Reduce Motion the bars step this often instead of following each sample.
+    let style: LiveLevelBars.Style
     let step: TimeInterval?
 
     @MainActor
     func levels() -> [Float] {
-        model.takeLevels?.recent(barCount) ?? Array(repeating: 0, count: barCount)
+        style.levels(of: model)
     }
 
     nonisolated static func == (lhs: LevelFeed, rhs: LevelFeed) -> Bool {
-        lhs.model === rhs.model && lhs.barCount == rhs.barCount && lhs.step == rhs.step
+        lhs.model === rhs.model && lhs.style == rhs.style && lhs.step == rhs.step
     }
 }
 
@@ -213,7 +213,7 @@ private struct BarsLayer: NSViewRepresentable {
     func updateNSView(_ view: LiveLevelBars.BarsView, context: Context) {
         let ink = ink.resolve(in: context.environment).cgColor
         if let feed {
-            view.follow(feed, style: style, ink: ink)
+            view.follow(feed, ink: ink)
         } else {
             view.stopFollowing()
             view.show(levels, style: style, ink: ink)

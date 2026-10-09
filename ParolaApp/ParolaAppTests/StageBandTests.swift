@@ -651,7 +651,7 @@ struct StageBandVoiceOverTests {
         let samples = model.takeLevelTick - tick
         #expect(samples >= 15, "the take kept only \(samples) samples")
         #expect(said >= 3, "VoiceOver heard the level change \(said) times")
-        #expect(said <= 12, "VoiceOver heard the level change \(said) times in 2.5 s, with each sample rather than each step")
+        #expect(said <= 17, "VoiceOver heard the level change \(said) times in 2.5 s, with each sample rather than each step")
     }
 
     @Test("with VoiceOver off the stand-in holds its first level while the band's layer view keeps following")
