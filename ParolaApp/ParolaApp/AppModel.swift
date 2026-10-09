@@ -5300,7 +5300,7 @@ final class AppModel {
         return take
     }
 
-    /// Pauses a take that is capturing: its file stops growing, its clock and auto-stop hold, and its silence watch rests.
+    /// Pauses a take that is capturing: its file stops growing, its clock and auto-stop hold, and its silence watch and sampler rest.
     @discardableResult
     func pauseTake() -> Bool {
         guard let take = controlledTake else { return false }
@@ -5310,6 +5310,7 @@ final class AppModel {
         setCapturePaused(true)
         stopSilenceWatch()
         holdRecordingAutoStop()
+        restTakeSampler(take)
         return true
     }
 
@@ -5322,7 +5323,23 @@ final class AppModel {
         setCapturePaused(false)
         startSilenceWatch()
         runRecordingAutoStop()
+        resumeTakeSampler(take)
         return true
+    }
+
+    /// One last tick, as the sampler would have taken, then none until the take resumes.
+    private func restTakeSampler(_ take: TakeContext) {
+        stopTakeSampler()
+        guard takeReadoutsOwner == take.id, let meter = recordingLevelMeter else { return }
+        sampleTake(meter, take: take)
+    }
+
+    /// Drops what the meters heard while the take paused, so the first level after it is the take's again.
+    private func resumeTakeSampler(_ take: TakeContext) {
+        guard takeReadoutsOwner == take.id, let meter = recordingLevelMeter else { return }
+        _ = meter.takePeak()
+        if micTrack?.takeID == take.id { _ = micTrack?.capture?.levelMeter.takePeak() }
+        startTakeSampler(meter: meter, take: take)
     }
 
     /// One change after another, so a quick pause and resume reach the capture in the order they were made.

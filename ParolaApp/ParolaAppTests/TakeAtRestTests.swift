@@ -185,6 +185,44 @@ struct WindowClockTests {
     }
 }
 
+@MainActor
+@Suite("The sampler rests with a paused take", .serialized)
+struct PausedSamplerTests {
+    @Test("nothing reads the take's meter while it pauses, and what came in then never shows after it")
+    func samplerRestsWhilePaused() async throws {
+        let audio = try tempWAV("sampler-rest")
+        defer { try? FileManager.default.removeItem(at: audio) }
+        let model = makeRecordingModel("sampler-rest")
+        model.useStreaming = false
+        model.selectedModel = "openai_whisper-tiny"
+        let capture = DeletingCapture(file: audio)
+        model.takeCaptureOverride = { _ in capture }
+        model.startRecording(source: .microphone)
+        let recording = await waitUntil { model.recording?.state == .recording }
+        try #require(recording)
+        let levels = try #require(model.takeLevels)
+        let sampled = await waitUntil { levels.sampleCount >= 3 }
+        #expect(sampled)
+
+        #expect(model.pauseTake())
+        let atPause = levels.sampleCount
+        capture.levelMeter.record(0.9)
+        capture.levelMeter.record(0.1)
+        await settle(for: .milliseconds(400))
+        #expect(levels.sampleCount == atPause, "no level is kept while the take pauses")
+        #expect(capture.levelMeter.takePeak() == 0.9, "something read the meter during the pause")
+
+        capture.levelMeter.record(0.9)
+        capture.levelMeter.record(0.1)
+        #expect(model.resumeTake())
+        let resumed = await waitUntil { levels.sampleCount >= atPause + 2 }
+        #expect(resumed, "the sampler picks up again on resume")
+        let afterPause = levels.recent(levels.sampleCount - atPause)
+        #expect(!afterPause.contains(0.9), "a peak from the pause showed after it: \(afterPause)")
+        await model.discardTake()
+    }
+}
+
 /// The Dock's labels, in order.
 @MainActor
 private final class BadgeLabels {
