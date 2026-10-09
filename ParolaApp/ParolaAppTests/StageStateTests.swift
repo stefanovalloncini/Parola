@@ -784,7 +784,6 @@ struct StageStateTests {
     }
 }
 
-// Closures inside #expect/#require arguments can share a symbol with a later closure in the same test (Swift 6.4); bind waits first.
 /// The clock's layer view a hosted clock put up, as AppKit holds it.
 @MainActor
 private func clockDigits(in hosted: HostedWindow) -> StageClock.DigitsView? {
@@ -824,6 +823,8 @@ struct StageClockLayerTests {
         let drawn = await waitUntil { clockDigits(in: hosted)?.text.isEmpty == false }
         try #require(drawn)
         let view = try #require(clockDigits(in: hosted))
+        // Held still, so the rolls the turn adds are still on the layers however late this test looks.
+        view.layer?.speed = 0
         let first = view.text
         let turned = await waitUntil(timeoutMs: 3_000) { view.text != first }
         try #require(turned)
@@ -836,7 +837,7 @@ struct StageClockLayerTests {
             #expect((place.shown.animation(forKey: StageClock.rollKey) != nil) == rolls, "place \(index) of \(view.text)")
             #expect((place.leaving.animation(forKey: StageClock.rollKey) != nil) == rolls, "place \(index) of \(view.text)")
             #expect(place.shown.contents != nil)
-            #expect(place.leaving.opacity == 0, "a character rolling out ends gone")
+            #expect((place.leaving.contents != nil) == rolls, "only a rolling place has a character leaving it")
         }
         let right = try #require(view.places.values.map(\.shown.frame.maxX).max()) - ClockGlyphs.bleed
         #expect(abs(right - view.bounds.width) <= 1, "the characters span the clock's own frame: \(right) in \(view.bounds.width)")
@@ -905,6 +906,7 @@ struct StageClockLayerTests {
     }
 }
 
+// Closures inside #expect/#require arguments can share a symbol with a later closure in the same test (Swift 6.4); bind waits first.
 extension TranscriberMockSuites {
     @MainActor
     @Suite("Stage state flows", .serialized)
