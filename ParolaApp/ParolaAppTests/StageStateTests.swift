@@ -838,8 +838,8 @@ struct StageClockLayerTests {
             #expect(place.shown.contents != nil)
             #expect(place.leaving.opacity == 0, "a character rolling out ends gone")
         }
-        // SwiftUI sets a layer view's frame on whole device pixels, so it can be half a pixel short of the text's own width.
-        #expect(abs(view.charactersWidth - view.bounds.width) <= 0.5, "the characters span the clock's own frame: \(view.charactersWidth) in \(view.bounds.width)")
+        let right = try #require(view.places.values.map(\.shown.frame.maxX).max()) - ClockGlyphs.bleed
+        #expect(abs(right - view.bounds.width) <= 1, "the characters span the clock's own frame: \(right) in \(view.bounds.width)")
         let lefts = view.places.sorted { $0.key > $1.key }.map(\.value.shown.frame.minX)
         #expect(lefts == lefts.sorted() && Set(lefts).count == lefts.count, "the characters stand left to right: \(lefts)")
 

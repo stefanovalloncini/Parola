@@ -111,8 +111,6 @@ struct StageClock: View {
         private let row = CALayer()
         private(set) var places: [Int: Place] = [:]
         private(set) var text = ""
-        /// How wide the characters stand side by side, as SwiftUI lays them out.
-        private(set) var charactersWidth: CGFloat = 0
         private var font: Font?
         private var ink: Color.Resolved?
         private var builtScale: CGFloat?
@@ -206,7 +204,7 @@ struct StageClock: View {
                     place.leaving.frame.origin = origin
                 }
             }
-            charactersWidth = x
+            ClockGlyphs.warm(font: font, ink: ink, scale: scale)
             for index in places.keys where !kept.contains(index) {
                 places[index]?.shown.removeFromSuperlayer()
                 places[index]?.leaving.removeFromSuperlayer()
@@ -243,21 +241,42 @@ struct ClockGlyph {
 enum ClockGlyphs {
     /// Room around a character for ink that reaches past its frame.
     static let bleed: CGFloat = 8
+    static let characters = "0123456789:"
 
-    private struct Key: Hashable {
-        let character: Character
+    private struct Style: Hashable {
         let font: Font
         let ink: Color.Resolved
         let scale: CGFloat
     }
 
-    private static var drawn: [Key: ClockGlyph] = [:]
+    private static var drawn: [Style: [Character: ClockGlyph]] = [:]
+    private static var warmed: Set<Style> = []
 
     static func glyph(_ character: Character, font: Font, ink: Color.Resolved, scale: CGFloat) -> ClockGlyph? {
-        let key = Key(character: character, font: font, ink: ink, scale: scale)
-        if let glyph = drawn[key] { return glyph }
-        if drawn.count > 64 { drawn = [:] }
-        let renderer = ImageRenderer(content: Text(verbatim: String(character)).font(font).foregroundStyle(Color(ink)).padding(bleed))
+        let style = Style(font: font, ink: ink, scale: scale)
+        if let glyph = drawn[style]?[character] { return glyph }
+        if drawn[style] == nil, drawn.count >= 6 {
+            drawn = [:]
+            warmed = []
+        }
+        let glyph = draw(character, style: style)
+        drawn[style, default: [:]][character] = glyph
+        return glyph
+    }
+
+    /// Draws the rest of the clock's characters just after the update that needed the first ones, so no later second draws one inside SwiftUI's update.
+    static func warm(font: Font, ink: Color.Resolved, scale: CGFloat) {
+        guard warmed.insert(Style(font: font, ink: ink, scale: scale)).inserted else { return }
+        DispatchQueue.main.async {
+            for character in characters {
+                _ = glyph(character, font: font, ink: ink, scale: scale)
+            }
+        }
+    }
+
+    private static func draw(_ character: Character, style: Style) -> ClockGlyph? {
+        let scale = style.scale
+        let renderer = ImageRenderer(content: Text(verbatim: String(character)).font(style.font).foregroundStyle(Color(style.ink)).padding(bleed))
         // Text sizes round up to the screen's pixels, so a character measured at another scale would sit a pixel off.
         renderer.scale = scale
         var glyph: ClockGlyph?
@@ -275,7 +294,6 @@ enum ClockGlyphs {
             guard let image = context.makeImage() else { return }
             glyph = ClockGlyph(image: image, size: CGSize(width: size.width - 2 * bleed, height: size.height - 2 * bleed))
         }
-        drawn[key] = glyph
         return glyph
     }
 }
