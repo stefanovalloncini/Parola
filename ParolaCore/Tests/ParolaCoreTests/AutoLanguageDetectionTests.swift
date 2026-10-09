@@ -270,24 +270,8 @@ struct AutoLanguageDetectionTests {
         #expect(pick.detection == .detected("it"))
     }
 
-    @Test("two windows that agree end the probe")
-    func pickerStopsOnceTwoWindowsAgree() async throws {
-        let calls = Counter()
-        let picker = AutoLanguagePicker(windowCount: 6, concurrentProbes: 1) { locale, window in
-            await calls.record("\(window) \(locale.identifier)")
-            return locale.identifier == "it_IT" ? Self.speech : Self.mumble
-        }
-        let pick = try await picker.pick(
-            candidates: [Locale(identifier: "en_US"), Locale(identifier: "it_IT")],
-            fallback: Locale(identifier: "en_US")
-        )
-        #expect(await calls.recorded.count == 4)
-        #expect(pick.locale.identifier == "it_IT")
-        #expect(pick.detection == .detected("it"))
-    }
-
-    @Test("windows are probed a round at a time and no probe is ever cancelled")
-    func pickerProbesWholeRounds() async throws {
+    @Test("every window is heard, and no probe is cancelled, even when the first two agree")
+    func pickerHearsEveryWindow() async throws {
         let calls = Counter()
         let cancelled = Counter()
         let picker = AutoLanguagePicker(windowCount: 6, concurrentProbes: 4) { locale, window in
@@ -300,16 +284,30 @@ struct AutoLanguageDetectionTests {
             candidates: [Locale(identifier: "en_US"), Locale(identifier: "it_IT")],
             fallback: Locale(identifier: "en_US")
         )
-        #expect(await Set(calls.recorded) == ["0 en_US", "0 it_IT", "1 en_US", "1 it_IT"])
+        #expect(await calls.recorded.count == 12)
         #expect(await cancelled.recorded.isEmpty)
+        #expect(pick.locale.identifier == "it_IT")
         #expect(pick.detection == .detected("it"))
     }
 
-    @Test("a window with nothing in it does not count toward agreement")
+    @Test("the pick is the pool of every window, not the first two that agree")
+    func pickerDecidesOnTheWholePool() async throws {
+        let picker = AutoLanguagePicker(windowCount: 6, concurrentProbes: 2) { locale, window in
+            (locale.identifier == "it_IT") == (window < 2)
+                ? Self.speech
+                : LanguageProbeOutcome(text: Self.words(30), confidence: 0.3, confidenceWeight: 10)
+        }
+        let pick = try await picker.pick(
+            candidates: [Locale(identifier: "en_US"), Locale(identifier: "it_IT")],
+            fallback: Locale(identifier: "it_IT")
+        )
+        #expect(pick.locale.identifier == "en_US")
+        #expect(pick.detection == .detected("en"))
+    }
+
+    @Test("a silent window adds nothing to the pool")
     func pickerReadsPastSilentWindows() async throws {
-        let calls = Counter()
-        let picker = AutoLanguagePicker(windowCount: 6, concurrentProbes: 1) { locale, window in
-            await calls.record("\(window) \(locale.identifier)")
+        let picker = AutoLanguagePicker(windowCount: 3, concurrentProbes: 1) { locale, window in
             guard window > 0 else { return LanguageProbeOutcome(text: "") }
             return locale.identifier == "it_IT" ? Self.speech : Self.mumble
         }
@@ -317,7 +315,6 @@ struct AutoLanguageDetectionTests {
             candidates: [Locale(identifier: "en_US"), Locale(identifier: "it_IT")],
             fallback: Locale(identifier: "en_US")
         )
-        #expect(await calls.recorded.count == 6)
         #expect(pick.detection == .detected("it"))
     }
 
@@ -366,20 +363,6 @@ struct AutoLanguageDetectionTests {
                 fallback: Locale(identifier: "en_US")
             )
         }
-    }
-
-    @Test("windows agree when two of them pick the same language on their own")
-    func windowsAgree() {
-        let italian = [probe("en_US", words: 30, confidence: 0.3), probe("it_IT", words: 30, confidence: 0.95)]
-        let english = [probe("en_US", words: 30, confidence: 0.95), probe("it_IT", words: 30, confidence: 0.3)]
-        let thin = [probe("en_US", words: 0, confidence: nil), probe("it_IT", words: 3, confidence: 0.95)]
-        let fallback = Locale(identifier: "en_US")
-
-        #expect(AutoLanguage.windowsAgree([italian, italian], fallback: fallback))
-        #expect(AutoLanguage.windowsAgree([english, italian, italian], fallback: fallback))
-        #expect(!AutoLanguage.windowsAgree([english, italian], fallback: fallback))
-        #expect(!AutoLanguage.windowsAgree([thin, italian], fallback: fallback), "a thin window is only an assumption")
-        #expect(!AutoLanguage.windowsAgree([italian], fallback: fallback))
     }
 
     @Test("pooled outcomes weigh each window's confidence by how much it heard")
