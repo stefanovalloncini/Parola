@@ -57,7 +57,7 @@ struct LiveCaret: View {
     }
 }
 
-/// The caret glyph in a small box set on whole pixels, drawn inside it where the text's own glyph would fall: a view lands on whole pixels, the text's glyphs don't.
+/// The caret glyph in a whole-pixel box, drawn where the text's own glyph would fall.
 struct CaretGlyph: View, Equatable {
     let font: Font
     let place: CaretPlace

@@ -85,7 +85,7 @@ struct StageLiveTextTests {
         zip(a, b).count { abs(Int($0) - Int($1)) > 16 }
     }
 
-    /// The Stage's text as it was drawn before the caret had a view of its own: the caret a character at its end.
+    /// Reference Stage text with the caret inline, a character at its end.
     private func inlineStage(_ settled: String, _ partial: String, caretVisible: Bool) -> some View {
         var text = LiveTail.attributed(settled: settled, partial: partial)
         var caret = AttributedString(StreamingReveal.caretGlyph)
@@ -98,7 +98,7 @@ struct StageLiveTextTests {
             .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    /// The file pane's text as it was drawn before, caret and all.
+    /// Reference pane text with the caret inline.
     private func inlinePane(_ text: AttributedString, caretVisible: Bool) -> some View {
         Text("\(Text(text))\(StreamingReveal.caret(visible: caretVisible))")
             .font(DS.Font.transcript)
