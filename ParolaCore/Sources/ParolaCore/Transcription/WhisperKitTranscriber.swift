@@ -263,6 +263,7 @@ actor WhisperKitTranscriber: Transcriber {
                 language: detected.language,
                 confidence: detected.langProbs[detected.language].map { exp(Double($0)) } ?? 0
             ))
+            if WhisperLanguageVote.isSettled(readings) { break }
         }
         let decided = WhisperLanguageVote.decide(readings)
         if decided == nil {
@@ -319,22 +320,47 @@ enum WhisperLanguageVote {
     static let certainty = 0.85
 
     static func decide(_ readings: [WhisperLanguageReading]) -> LanguageDetection? {
-        var mass: [String: Double] = [:]
+        let tally = Tally(readings)
+        guard let best = tally.ranked.first else { return nil }
+        guard let runnerUp = tally.ranked.dropFirst().first else {
+            if tally.counted > 1 || best.mass >= certainty { return .detected(best.code) }
+            return .assumed(best.code)
+        }
+        guard best.mass >= runnerUp.mass * lead else { return nil }
+        return .detected(best.code)
+    }
+
+    /// Two near-certain readings for the leader, lead held: room tone never reads near-certain.
+    static func isSettled(_ readings: [WhisperLanguageReading]) -> Bool {
+        let tally = Tally(readings)
+        guard let best = tally.ranked.first, best.certainVotes >= 2 else { return false }
+        guard let runnerUp = tally.ranked.dropFirst().first else { return true }
+        return best.mass >= runnerUp.mass * lead
+    }
+
+    private struct Tally {
+        struct Entry {
+            var code: String
+            var mass = 0.0
+            var certainVotes = 0
+        }
+
+        var ranked: [Entry] = []
         var counted = 0
-        for reading in readings where reading.confidence >= minimumConfidence {
-            let code = reading.language.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !code.isEmpty else { continue }
-            mass[code, default: 0] += reading.confidence
-            counted += 1
+
+        init(_ readings: [WhisperLanguageReading]) {
+            var entries: [String: Entry] = [:]
+            for reading in readings where reading.confidence >= WhisperLanguageVote.minimumConfidence {
+                let code = reading.language.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !code.isEmpty else { continue }
+                var entry = entries[code] ?? Entry(code: code)
+                entry.mass += reading.confidence
+                if reading.confidence >= WhisperLanguageVote.certainty { entry.certainVotes += 1 }
+                entries[code] = entry
+                counted += 1
+            }
+            ranked = entries.values.sorted { $0.mass == $1.mass ? $0.code < $1.code : $0.mass > $1.mass }
         }
-        let ranked = mass.sorted { $0.value == $1.value ? $0.key < $1.key : $0.value > $1.value }
-        guard let best = ranked.first else { return nil }
-        guard let runnerUp = ranked.dropFirst().first else {
-            if counted > 1 || best.value >= certainty { return .detected(best.key) }
-            return .assumed(best.key)
-        }
-        guard best.value >= runnerUp.value * lead else { return nil }
-        return .detected(best.key)
     }
 }
 

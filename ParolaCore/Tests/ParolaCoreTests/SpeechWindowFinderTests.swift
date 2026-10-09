@@ -173,6 +173,56 @@ struct WhisperLanguageVoteTests {
     func blankCode() {
         #expect(WhisperLanguageVote.decide([reading("  ", 0.95)]) == nil)
     }
+
+    @Test("two windows that agree settle the vote")
+    func twoAgreeingReadingsSettle() {
+        let readings = [reading("it", 0.98), reading("it", 0.97)]
+
+        #expect(WhisperLanguageVote.isSettled(readings))
+        #expect(WhisperLanguageVote.decide(readings) == .detected("it"))
+    }
+
+    @Test("one reading never settles the vote, however certain")
+    func oneReadingDoesNotSettle() {
+        #expect(!WhisperLanguageVote.isSettled([reading("it", 0.9999)]))
+        #expect(!WhisperLanguageVote.isSettled([]))
+    }
+
+    @Test("a lone confident reading over a dissent is not agreement")
+    func dissentDoesNotSettle() {
+        #expect(!WhisperLanguageVote.isSettled([reading("cs", 0.11), reading("it", 0.9)]))
+        #expect(!WhisperLanguageVote.isSettled([reading("it", 0.9), reading("en", 0.6)]))
+    }
+
+    @Test("agreement settles once the pair also holds the lead over a dissent")
+    func agreementWithLeadSettles() {
+        #expect(WhisperLanguageVote.isSettled([reading("it", 0.9), reading("en", 0.6), reading("it", 0.95)]))
+    }
+
+    @Test("agreement without the lead keeps reading")
+    func agreementWithoutLeadDoesNotSettle() {
+        let readings = [reading("it", 0.5), reading("en", 0.9), reading("it", 0.55), reading("en", 0.3)]
+
+        #expect(!WhisperLanguageVote.isSettled(readings))
+        #expect(WhisperLanguageVote.decide(readings) == nil)
+    }
+
+    @Test("two readings the detector barely believes do not settle")
+    func lowConfidenceAgreementDoesNotSettle() {
+        #expect(!WhisperLanguageVote.isSettled([reading("cs", 0.05), reading("cs", 0.08)]))
+    }
+
+    @Test("two noise windows that happen to agree keep the probe reading")
+    func uncertainAgreementDoesNotSettle() {
+        // The 159 memo's loudest window is room tone and a bump, and reads English at 0.56.
+        let readings = [reading("en", 0.56), reading("en", 0.5)]
+
+        let speech = [reading("it", 0.99), reading("it", 0.99)]
+
+        #expect(!WhisperLanguageVote.isSettled(readings))
+        #expect(WhisperLanguageVote.isSettled(readings + speech))
+        #expect(WhisperLanguageVote.decide(readings + speech) == .detected("it"))
+    }
 }
 
 @Suite("Whisper language pinning")
