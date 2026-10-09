@@ -110,6 +110,81 @@ struct TakeClockTickTests {
     }
 }
 
+/// The window's three clocks for whatever take is running, each told its window is in sight.
+private struct RunningClocks: View {
+    let model: AppModel
+
+    var body: some View {
+        if let take = model.recording {
+            VStack {
+                SessionCapsuleFace(take: take, showsMeter: false, isOnScreen: true, showStage: {}, stop: { _ in })
+                SidebarRecordingRowFace(take: take, isSelected: false, ticks: take.state == .recording, open: {})
+                    .frame(width: 240)
+                StageClock(take: take, font: DS.Font.takeTimerStage, rolls: true)
+            }
+            .accessibilityElement(children: .contain)
+        }
+    }
+}
+
+@MainActor
+@Suite("The window's clocks read the take's seconds", .serialized)
+struct WindowClockTests {
+    @Test("the toolbar capsule, the sidebar row and the Stage clock turn over with the take's seconds and hold while it pauses")
+    func clocksReadTheTakesSeconds() async throws {
+        let audio = try tempWAV("window-clocks")
+        defer { try? FileManager.default.removeItem(at: audio) }
+        let model = makeRecordingModel("window-clocks")
+        model.useStreaming = false
+        model.selectedModel = "openai_whisper-tiny"
+        let capture = DeletingCapture(file: audio)
+        model.takeCaptureOverride = { _ in capture }
+        model.startRecording(source: .microphone)
+        let recording = await waitUntil { model.recording?.state == .recording }
+        try #require(recording)
+        let hosted = HostedWindow(RunningClocks(model: model).environment(model), width: 600, height: 400)
+        defer { hosted.close() }
+        @MainActor func digits(in view: NSView) -> StageClock.DigitsView? {
+            view as? StageClock.DigitsView ?? view.subviews.lazy.compactMap(digits(in:)).first
+        }
+        /// What the capsule and the sidebar row say to VoiceOver, and what the Stage clock's digits show.
+        @MainActor func spoken() -> [String?] {
+            let elements = HostedAccessibility.elements(in: hosted.host)
+            return [
+                elements.first { $0.identifier?.hasSuffix("Toolbar.Button.SessionTime") == true }?.label,
+                elements.first { $0.label == "Recording" }?.value,
+                digits(in: hosted.host)?.text,
+            ]
+        }
+        @MainActor func readSecond(_ seconds: Int) -> Bool {
+            let time = AppFormat.spokenDuration(seconds: seconds)
+            return spoken() == ["Recording, \(time)", time, StageClock.text(seconds: seconds)]
+        }
+
+        for _ in 0..<2 {
+            let second = model.takeClockSeconds
+            let turned = await waitUntil(timeoutMs: 3_000) { model.takeClockSeconds > second }
+            #expect(turned)
+            let read = await waitUntil { readSecond(model.takeClockSeconds) }
+            #expect(read, "at \(model.takeClockSeconds) s the clocks say \(spoken())")
+        }
+
+        #expect(model.pauseTake())
+        await settle()
+        let atPause = spoken()
+        await settle(for: .milliseconds(1_300))
+        #expect(spoken() == atPause, "a clock moved during the pause: \(atPause) → \(spoken())")
+
+        #expect(model.resumeTake())
+        let held = model.takeClockSeconds
+        let again = await waitUntil(timeoutMs: 3_000) { model.takeClockSeconds > held }
+        #expect(again)
+        let readAgain = await waitUntil { readSecond(model.takeClockSeconds) }
+        #expect(readAgain, "after the pause the clocks say \(spoken())")
+        await model.discardTake()
+    }
+}
+
 /// The Dock's labels, in order.
 @MainActor
 private final class BadgeLabels {

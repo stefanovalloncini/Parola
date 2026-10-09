@@ -8,6 +8,7 @@ struct StageClock: View {
     var rolls = false
     /// Off while the Stage is out of sight, so the clock stops ticking.
     var ticks = true
+    @Environment(AppModel.self) private var model: AppModel?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     nonisolated static func text(seconds: Int) -> String {
@@ -66,17 +67,7 @@ struct StageClock: View {
     }
 
     var body: some View {
-        if ticks, take.state == .recording, let origin = take.clockOrigin {
-            TimelineView(.periodic(from: origin, by: 1)) { context in
-                face(at: context.date)
-            }
-        } else {
-            face(at: Date())
-        }
-    }
-
-    private func face(at date: Date) -> some View {
-        let seconds = Int(take.elapsed(at: date))
+        let seconds = Int(take.elapsed(at: model?.takeClockNow(following: ticks && take.state == .recording) ?? Date()))
         let text = Self.text(seconds: seconds)
         let layered = Self.rollsOnLayers(rolls: rolls, reduceMotion: reduceMotion, state: take.state)
         return HStack(spacing: 0) {

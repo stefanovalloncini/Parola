@@ -32,26 +32,18 @@ struct SidebarRecordingRow: View {
     }
 }
 
-/// Ticks each second while the take records where it can be seen; paused, starting, finishing or out of sight, it holds still.
-private struct SidebarRecordingRowFace: View {
+/// Ticks with the take's seconds while it records where it can be seen; paused, starting, finishing or out of sight, it holds still.
+struct SidebarRecordingRowFace: View {
     let take: RecordingSession
     let isSelected: Bool
     let ticks: Bool
     let open: () -> Void
+    @Environment(AppModel.self) private var model: AppModel?
 
     nonisolated static let washInset: CGFloat = 6
 
     var body: some View {
-        if ticks, let origin = take.clockOrigin {
-            TimelineView(.periodic(from: origin, by: 1)) { context in
-                row(at: context.date)
-            }
-        } else {
-            row(at: Date())
-        }
-    }
-
-    private func row(at now: Date) -> some View {
+        let now = model?.takeClockNow(following: ticks) ?? Date()
         Button(action: open) {
             Label {
                 HStack(spacing: DS.Spacing.small) {

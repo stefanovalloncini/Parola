@@ -797,11 +797,12 @@ private func clockDigits(in hosted: HostedWindow) -> StageClock.DigitsView? {
 @MainActor
 @Suite("Stage clock on layers", .serialized)
 struct StageClockLayerTests {
-    private func host(_ take: RecordingSession, reduceMotion: Bool = false) -> HostedWindow {
+    private func host(_ take: RecordingSession, model: AppModel, reduceMotion: Bool = false) -> HostedWindow {
         // In a container, so the clock is an element of its own and not the hosting view's.
         let clock = VStack { StageClock(take: take, font: DS.Font.takeTimerStage, rolls: true) }
             .accessibilityElement(children: .contain)
             .environment(\._accessibilityReduceMotion, reduceMotion)
+            .environment(model)
         return HostedWindow(clock, width: 400, height: 160)
     }
 
@@ -811,13 +812,11 @@ struct StageClockLayerTests {
 
     @Test("as a second turns over only the digits that changed roll, on layers over the clock's own frame, which VoiceOver still finds")
     func onlyChangedDigitsRoll() async throws {
-        let audio = try tempWAV("clock-roll")
-        defer { try? FileManager.default.removeItem(at: audio) }
         let model = makeRecordingModel("clock-roll")
-        model.installTestTake(source: .microphone, liveSource: StubSource(url: audio), startedAt: Date(timeIntervalSinceNow: -30.3))
-        defer { model.endTestTake() }
+        let audio = try await startMeteredTake(model)
+        defer { try? FileManager.default.removeItem(at: audio) }
         let take = try #require(model.recording)
-        let hosted = host(take)
+        let hosted = host(take, model: model)
         defer { hosted.close() }
 
         let drawn = await waitUntil { clockDigits(in: hosted)?.text.isEmpty == false }
@@ -849,6 +848,7 @@ struct StageClockLayerTests {
         let drawnAt = window.convertToScreen(view.convert(view.bounds, to: nil))
         #expect(abs(drawnAt.minX - element.frame.minX) < 0.5 && abs(drawnAt.width - element.frame.width) < 0.5, "\(drawnAt) over \(element.frame)")
         #expect(abs(drawnAt.minY - element.frame.minY) < 0.5 && abs(drawnAt.height - element.frame.height) < 0.5, "\(drawnAt) over \(element.frame)")
+        await model.discardTake()
     }
 
     @Test(
@@ -889,20 +889,22 @@ struct StageClockLayerTests {
 
     @Test("under Reduce Motion SwiftUI draws the digits and they swap without rolling, as they tick")
     func reduceMotionSwaps() async throws {
-        let audio = try tempWAV("clock-still")
-        defer { try? FileManager.default.removeItem(at: audio) }
         let model = makeRecordingModel("clock-still")
-        model.installTestTake(source: .microphone, liveSource: StubSource(url: audio), startedAt: Date(timeIntervalSinceNow: -30.3))
-        defer { model.endTestTake() }
+        let audio = try await startMeteredTake(model)
+        defer { try? FileManager.default.removeItem(at: audio) }
         let take = try #require(model.recording)
-        let hosted = host(take, reduceMotion: true)
+        let hosted = host(take, model: model, reduceMotion: true)
         defer { hosted.close() }
 
         let drawn = await waitUntil { clockElement(in: hosted) != nil }
         try #require(drawn)
         #expect(clockDigits(in: hosted) == nil)
-        await settle(for: .milliseconds(1_200))
+        let second = model.takeClockSeconds
+        let ticked = await waitUntil(timeoutMs: 3_000) { model.takeClockSeconds > second }
+        #expect(ticked)
+        await settle()
         #expect(clockDigits(in: hosted) == nil)
+        await model.discardTake()
     }
 }
 
