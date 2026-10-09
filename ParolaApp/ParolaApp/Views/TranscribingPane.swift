@@ -179,27 +179,29 @@ struct TranscribingPane: View {
 
     private var transcriptBox: some View {
         ScrollViewReader { proxy in
-            ScrollView {
-                VStack(alignment: .leading, spacing: DS.Spacing.regular) {
-                    if hasText {
-                        TranscribingText(text: bodyText, spoken: partial, blinks: isOnScreen)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .transition(.opacity)
-                            .id(Self.tailID)
-                    } else {
-                        SkeletonLines(count: 6)
-                            .id(Self.tailID)
+            OfferedSize {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: DS.Spacing.regular) {
+                        if hasText {
+                            TranscribingText(text: bodyText, spoken: partial, blinks: isOnScreen)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .transition(.opacity)
+                                .id(Self.tailID)
+                        } else {
+                            SkeletonLines(count: 6)
+                                .id(Self.tailID)
+                        }
                     }
+                    .padding(DS.Spacing.large)
+                    .animation(.easeOut(duration: 0.28), value: hasText)
+                    .background(
+                        GeometryReader { geometry in
+                            Color.clear.preference(key: StreamedTextHeight.self, value: geometry.size.height)
+                        }
+                    )
                 }
-                .padding(DS.Spacing.large)
-                .animation(.easeOut(duration: 0.28), value: hasText)
-                .background(
-                    GeometryReader { geometry in
-                        Color.clear.preference(key: StreamedTextHeight.self, value: geometry.size.height)
-                    }
-                )
+                .scrollBounceBehavior(.basedOnSize)
             }
-            .scrollBounceBehavior(.basedOnSize)
             .onChange(of: partial) { _, newValue in
                 updateBodyText(for: newValue)
                 withAnimation(.easeOut(duration: 0.3)) {
@@ -247,6 +249,33 @@ struct TranscribingText: View {
             .contentTransition(.interpolate)
             .accessibilityLabel(spoken)
             .liveCaret(font: DS.Font.transcript, blinks: blinks)
+    }
+}
+
+/// Takes a size it is offered without measuring its child, so the window's size checks don't lay out the run's text again.
+struct OfferedSize: Layout {
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        guard let width = proposal.width, let height = proposal.height else {
+            return subviews.first?.sizeThatFits(proposal) ?? .zero
+        }
+        return CGSize(width: width, height: height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        subviews.first?.place(at: bounds.origin, proposal: ProposedViewSize(bounds.size))
+    }
+
+    // The default asks the child for its guides, which measures it.
+    func explicitAlignment(
+        of guide: HorizontalAlignment, in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()
+    ) -> CGFloat? {
+        nil
+    }
+
+    func explicitAlignment(
+        of guide: VerticalAlignment, in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()
+    ) -> CGFloat? {
+        nil
     }
 }
 
