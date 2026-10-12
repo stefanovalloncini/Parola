@@ -268,7 +268,6 @@ private struct TranscriptScrollView: View {
     let query: String
     let matchingSet: Set<TranscriptSegment.ID>
     let targetMatchID: TranscriptSegment.ID?
-    @Environment(PlaybackController.self) private var playback
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -278,8 +277,6 @@ private struct TranscriptScrollView: View {
                         SegmentView(
                             segment: segment,
                             showSpeaker: showSpeaker,
-                            activeSegmentID: playback.currentSegmentID,
-                            activeWordID: playback.currentWordID,
                             query: query,
                             isDimmed: !query.isEmpty && !matchingSet.contains(segment.id)
                         )
@@ -288,12 +285,7 @@ private struct TranscriptScrollView: View {
                 }
                 .padding()
             }
-            .onChange(of: playback.currentSegmentID) { _, id in
-                guard let id else { return }
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    proxy.scrollTo(id, anchor: .center)
-                }
-            }
+            .background { PlaybackScrollFollower(proxy: proxy) }
             .onChange(of: targetMatchID) { _, id in
                 guard let id else { return }
                 withAnimation(.easeInOut(duration: 0.2)) {
@@ -304,16 +296,27 @@ private struct TranscriptScrollView: View {
     }
 }
 
+private struct PlaybackScrollFollower: View {
+    let proxy: ScrollViewProxy
+    @Environment(PlaybackController.self) private var playback
+
+    var body: some View {
+        Color.clear
+            .onChange(of: playback.currentSegmentID) { _, id in
+                guard let id else { return }
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    proxy.scrollTo(id, anchor: .center)
+                }
+            }
+    }
+}
+
 private struct SegmentView: View {
     let segment: TranscriptSegment
     let showSpeaker: Bool
-    let activeSegmentID: TranscriptSegment.ID?
-    let activeWordID: WordTiming.ID?
     let query: String
     let isDimmed: Bool
     @Environment(PlaybackController.self) private var playback
-
-    private var isActive: Bool { activeSegmentID == segment.id }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -329,36 +332,57 @@ private struct SegmentView: View {
                 }
                 Spacer(minLength: 0)
                 if playback.hasAudio {
-                    Button {
-                        playback.seek(to: segment.start)
-                    } label: {
-                        Image(systemName: "play.circle")
-                            .font(.body)
-                            .contentShape(Circle())
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(isActive ? Color.accentColor : .secondary)
-                    .accessibilityLabel(Text("Play from \(TranscriptDetailView.segmentTimecode(segment.start))"))
+                    PlayFromButton(segment: segment)
                 }
             }
             if let words = segment.words, !words.isEmpty {
-                WordsView(words: words, activeWordID: activeWordID, query: query)
+                ActiveWordsView(segmentID: segment.id, words: words, query: query)
             } else {
-                SegmentTextView(text: segment.text, start: segment.start, isActive: isActive, query: query)
+                SegmentTextView(segmentID: segment.id, text: segment.text, start: segment.start, query: query)
             }
         }
         .opacity(isDimmed ? 0.4 : 1)
     }
 }
 
-private struct SegmentTextView: View {
-    let text: String
-    let start: Double
-    let isActive: Bool
+private struct PlayFromButton: View {
+    let segment: TranscriptSegment
+    @Environment(PlaybackController.self) private var playback
+
+    var body: some View {
+        Button {
+            playback.seek(to: segment.start)
+        } label: {
+            Image(systemName: "play.circle")
+                .font(.body)
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(playback.isActive(segment: segment.id) ? Color.accentColor : .secondary)
+        .accessibilityLabel(Text("Play from \(TranscriptDetailView.segmentTimecode(segment.start))"))
+    }
+}
+
+private struct ActiveWordsView: View {
+    let segmentID: TranscriptSegment.ID
+    let words: [WordTiming]
     let query: String
     @Environment(PlaybackController.self) private var playback
 
     var body: some View {
+        WordsView(words: words, activeWordID: playback.activeWordID(inSegment: segmentID), query: query)
+    }
+}
+
+private struct SegmentTextView: View {
+    let segmentID: TranscriptSegment.ID
+    let text: String
+    let start: Double
+    let query: String
+    @Environment(PlaybackController.self) private var playback
+
+    var body: some View {
+        let isActive = playback.isActive(segment: segmentID)
         let label = Text(highlighted(text: TranscriptDetailView.displayText(text), query: query))
             .textSelection(.enabled)
             .padding(6)
@@ -387,6 +411,7 @@ struct WordsView: View {
                     isActive: activeWordID.map(word.wordIDs.contains) ?? false,
                     isMatch: TranscriptFind.contains(word.text, query: query)
                 )
+                .equatable()
             }
         }
     }
@@ -426,7 +451,7 @@ private struct WordChip: View, Equatable {
     @Environment(PlaybackController.self) private var playback
 
     nonisolated static func == (lhs: WordChip, rhs: WordChip) -> Bool {
-        lhs.word.id == rhs.word.id && lhs.isActive == rhs.isActive && lhs.isMatch == rhs.isMatch
+        lhs.word == rhs.word && lhs.isActive == rhs.isActive && lhs.isMatch == rhs.isMatch
     }
 
     var body: some View {

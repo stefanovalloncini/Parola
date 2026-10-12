@@ -22,6 +22,13 @@ final class PlaybackController {
 
     var hasAudio: Bool { player != nil }
 
+    func isActive(segment id: TranscriptSegment.ID) -> Bool { currentSegmentID == id }
+
+    /// Reads the word only for the active segment, so a word change invalidates no other row.
+    func activeWordID(inSegment id: TranscriptSegment.ID) -> WordTiming.ID? {
+        currentSegmentID == id ? currentWordID : nil
+    }
+
     isolated deinit {
         tearDown()
     }
