@@ -175,16 +175,27 @@ struct PeopleDirectoryList: View {
     }
 
     private var addRow: some View {
-        HStack(spacing: DS.Spacing.small) {
-            addField
-                .onSubmit { add() }
-                .axLeaf("People.TextField.Add")
-            Button("Add") { add() }
-                .sheetButton()
-                .disabled(newName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                .axLeaf("People.Button.Add")
+        VStack(alignment: .leading, spacing: DS.Spacing.hair) {
+            HStack(spacing: DS.Spacing.small) {
+                addField
+                    .onSubmit { add() }
+                    .axLeaf("People.TextField.Add")
+                Button("Add") { add() }
+                    .sheetButton()
+                    .disabled(draftIsEmpty || draftIsKnown)
+                    .axLeaf("People.Button.Add")
+            }
+            if draftIsKnown {
+                Text("Already in People")
+                    .font(DS.Font.secondary)
+                    .foregroundStyle(DS.Color.secondaryText)
+            }
         }
     }
+
+    private var draftIsEmpty: Bool { newName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+
+    private var draftIsKnown: Bool { !draftIsEmpty && model.person(named: newName) != nil }
 
     @ViewBuilder private var addField: some View {
         if inForm {
@@ -228,7 +239,7 @@ struct PeopleDirectoryList: View {
 
     private func add() {
         let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
+        guard !trimmed.isEmpty, !draftIsKnown else { return }
         Task { await model.addPerson(named: trimmed) }
         newName = ""
     }

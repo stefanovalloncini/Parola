@@ -1943,6 +1943,23 @@
         }
       }
     },
+    "Already in People": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Already in People"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Già nelle persone"
+          }
+        }
+      }
+    },
     "Already in your library": {
       "extractionState": "manual",
       "localizations": {
