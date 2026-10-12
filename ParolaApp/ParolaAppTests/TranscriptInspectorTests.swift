@@ -237,6 +237,31 @@ struct TranscriptInspectorTests {
         }
     }
 
+    @Test("opening another entry leaves none of the last entry's outline behind")
+    func outlineDoesNotSurviveAnEntrySwitch() async throws {
+        try await withIsolatedDefaults { defaults in
+            let model = makeModel(defaults)
+            _ = try await open(Self.longTalk(), in: model)
+            let hosted = host(model)
+            defer { hosted.close() }
+            let filled = await waitUntil { model.inspectorOutline.count == 10 }
+            #expect(filled)
+
+            var other = Self.longTalk()
+            other.segments = other.segments.prefix(3).map { segment in
+                var moved = segment
+                moved.id += 100
+                return moved
+            }
+            model.installStoredTranscript(other)
+
+            let stale = model.inspectorOutline.filter { entry in Int(entry.id.dropFirst(4)).map { $0 < 100 } ?? false }
+            #expect(stale.isEmpty, "\(model.inspectorOutline.map(\.id))")
+            let settled = await waitUntil { model.inspectorOutline.map(\.id) == ["seg-100", "seg-101", "seg-102"] }
+            #expect(settled)
+        }
+    }
+
     @Test("a speaker who isn't anyone yet is the only row that asks, and every count reads as segments")
     func peopleAskOnlyWhereNeeded() async throws {
         try await withIsolatedDefaults { defaults in

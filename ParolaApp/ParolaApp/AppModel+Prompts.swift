@@ -157,6 +157,7 @@ extension AppModel {
         if promptOutput != nil { promptOutput = nil }
         if !actionItems.isEmpty { actionItems = [] }
         if !smartChapters.isEmpty { smartChapters = [] }
+        if !inspectorOutline.isEmpty { inspectorOutline = [] }
         if actionItemsError != nil { actionItemsError = nil }
         if chaptersError != nil { chaptersError = nil }
     }

@@ -1006,7 +1006,7 @@ final class AppModel {
     var actionItems: [ActionItem] = []
     var actionItemsError: String?
     var smartChapters: [Chapter] = []
-    /// Written by the open inspector, off the main actor; read by its Chapters section.
+    /// The open inspector's outline of the transcript on screen, cleared when another loads.
     var inspectorOutline: [TranscriptOutline.Entry] = []
     var chaptersError: String?
     var entrySpeakerFilters: [String: String] = [:]

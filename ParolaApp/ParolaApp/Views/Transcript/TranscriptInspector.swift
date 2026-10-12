@@ -5,6 +5,7 @@ import ParolaCore
 struct TranscriptInspector: View {
     @Environment(AppModel.self) private var model
     @State private var facts = TranscriptFacts()
+    @State private var factsTask: Task<Void, Never>?
     @AppStorage(InspectorVisibility.detailsExpandedKey, store: DefaultsStore.current) private var detailsExpanded = false
     @AppStorage(InspectorVisibility.insightsExpandedKey, store: DefaultsStore.current) private var insightsExpanded = false
 
@@ -23,7 +24,8 @@ struct TranscriptInspector: View {
             .task(id: model.inspectorReveal) { await reveal(with: proxy) }
         }
         .chromeSurface()
-        .task(id: model.transcriptVersion) { await recomputeFacts() }
+        .onChange(of: model.transcriptVersion, initial: true) { recomputeFacts() }
+        .onDisappear { factsTask?.cancel() }
     }
 
     private var referenceRows: some View {
@@ -56,27 +58,38 @@ struct TranscriptInspector: View {
         model.inspectorReveal = nil
     }
 
-    private func recomputeFacts() async {
+    private func recomputeFacts() {
+        factsTask?.cancel()
         guard let transcript = model.transcript else {
             facts = TranscriptFacts()
             return
         }
         let textVersion = model.transcriptTextVersion
+        let version = model.transcriptVersion
         let knownText = facts.textVersion == textVersion ? facts.text : nil
-        let work = Task.detached(priority: .userInitiated) {
-            (
-                try TranscriptFacts.derive(transcript: transcript, textVersion: textVersion, knownText: knownText),
-                TranscriptOutline.entries(for: transcript, chapters: [])
-            )
+        guard transcript.segments.count > TranscriptDerive.synchronousCap else {
+            if let computed = try? TranscriptFacts.derive(transcript: transcript, textVersion: textVersion, knownText: knownText) {
+                facts = computed
+            }
+            model.inspectorOutline = TranscriptOutline.entries(for: transcript, chapters: [])
+            return
         }
-        let computed = try? await withTaskCancellationHandler {
-            try await work.value
-        } onCancel: {
-            work.cancel()
+        factsTask = Task {
+            let work = Task.detached(priority: .userInitiated) {
+                (
+                    try TranscriptFacts.derive(transcript: transcript, textVersion: textVersion, knownText: knownText),
+                    TranscriptOutline.entries(for: transcript, chapters: [])
+                )
+            }
+            let computed = try? await withTaskCancellationHandler {
+                try await work.value
+            } onCancel: {
+                work.cancel()
+            }
+            guard let computed, !Task.isCancelled, model.transcriptVersion == version else { return }
+            facts = computed.0
+            model.inspectorOutline = computed.1
         }
-        guard let computed, !Task.isCancelled else { return }
-        facts = computed.0
-        model.inspectorOutline = computed.1
     }
 }
 
