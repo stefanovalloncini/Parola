@@ -40,7 +40,7 @@ struct ActivityChart: View {
                     }
             }
         }
-        .chartXSelection(value: $hovered)
+        .chartXSelection(value: snappedSelection)
         // Room for half of the last label, which is centred on the last bucket.
         .chartXScale(domain: domain, range: .plotDimension(endPadding: DS.Spacing.medium))
         .chartYScale(domain: 0...axis.top)
@@ -71,8 +71,21 @@ struct ActivityChart: View {
     }
 
     private var hoveredBucket: Bucket? {
-        guard let hovered else { return nil }
-        return buckets.last { $0.start <= hovered }
+        hovered.flatMap(bucket(at:))
+    }
+
+    private func bucket(at date: Date) -> Bucket? {
+        buckets.last { $0.start <= date }
+    }
+
+    private var snappedSelection: Binding<Date?> {
+        Binding(
+            get: { hovered },
+            set: { raw in
+                let snapped = raw.flatMap(bucket(at:))?.start
+                if snapped != hovered { hovered = snapped }
+            }
+        )
     }
 
     private func opacity(of bucket: Bucket, hovered: Bucket?) -> Double {
