@@ -17,6 +17,7 @@ actor MicDictationRecorder: DictationRecorder {
     private let fallbackSession: TranscriptionSession
     private let clock: any Clock<Duration>
     private let makeStreamingSession: @Sendable () -> any StreamingTranscriber
+    private let warmFallbackModel: @Sendable (String) async -> Void
 
     private var streamingSession: (any StreamingTranscriber)?
     private var streamingConsumer: Task<Void, Never>?
@@ -34,7 +35,8 @@ actor MicDictationRecorder: DictationRecorder {
         workflowResolver: (@Sendable () async -> DictationWorkflow?)? = nil,
         downloadProgress: (@Sendable (Double) -> Void)? = nil,
         clock: any Clock<Duration> = ContinuousClock(),
-        makeStreamingSession: (@Sendable () -> any StreamingTranscriber)? = nil
+        makeStreamingSession: (@Sendable () -> any StreamingTranscriber)? = nil,
+        warmFallbackModel: (@Sendable (String) async -> Void)? = nil
     ) {
         self.model = model
         self.defaultLanguage = language
@@ -42,7 +44,9 @@ actor MicDictationRecorder: DictationRecorder {
         self.initialPrompt = initialPrompt
         self.deviceUID = deviceUID
         self.streamingEnabled = streamingEnabled
-        self.fallbackSession = session ?? TranscriptionSession()
+        let fallbackSession = session ?? TranscriptionSession()
+        self.fallbackSession = fallbackSession
+        self.warmFallbackModel = warmFallbackModel ?? { await fallbackSession.prewarm(modelName: $0) }
         self.workflowResolver = workflowResolver
         self.downloadProgress = downloadProgress
         self.clock = clock
@@ -189,6 +193,10 @@ actor MicDictationRecorder: DictationRecorder {
 
     private func startFallback() async throws {
         guard fallbackSource == nil else { return }
+        if let model {
+            let warm = warmFallbackModel
+            Task { await warm(model) }
+        }
         let mic = await LiveAudioSourceFactory.makeMicrophone(
             deviceUID: deviceUID, clock: clock, filePrefix: RecordingScratch.dictationPrefix
         )

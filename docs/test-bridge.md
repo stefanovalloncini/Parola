@@ -67,6 +67,7 @@ Every `parola_app_*` tool fails with a clean error when the bridge isn't reachab
 | `resumeRecording` | — | Test mode: resume a paused take. Replies `{resumed, recording}`. |
 | `addRecordingMarker` | — | Test mode: mark this moment of the take, the way ⌘B on the Stage does. Replies `{marker, recording}`; `marker` is the take's time in seconds, or `null` while nothing records or when the last mark is under a second old. |
 | `feedTakeLevels` | **fixturePath** | Test mode: play a WAV fixture's loudness into the running take's level meter, in real time, until that take's meter goes away. For a take whose capture meters nothing, like a streaming take on `installMockStreamingTranscriber`, so its Stage band and silence warning behave as they would with a microphone. Replies `{feeding}`; `PRECONDITION` while no take meters. |
+| `setStreamingIdleTimeout` | **seconds** | Test mode: shorten how long the streaming cache keeps a model nothing holds (the app's own wait is 600 s), so an unload can be watched live. A model already waiting out the longer wait takes the new one. Replies `{seconds}`; `INVALID_ARGS` unless positive. Read the effect in `getState.models.resident`. |
 | `releaseMockStreamingStart` | — | Test mode: let a live take go on loading its model. `installMockStreamingTranscriber` with `holdStart: true` keeps the next live take arming on its model load ("Preparing … · 42 %" when the response carries `downloadFractions`) until this, a new install or `clearMocks` releases it. Replies `{released}`. |
 | `discardRecording` | — | Test mode: the Stage's confirmed Discard. The take's audio and checkpoint are deleted and nothing is saved; a take still arming ends the way Cancel ends it, and a stopped take is left alone. Replies `{discarded, recording}`. |
 | `parola_app_set_translate` | **on** | Toggle translate-to-English. |
@@ -169,6 +170,7 @@ or failed out of sight, `{title, state, origin, entryID, reason, actions}` with 
 `segmentCount` as the segments sent so far and `inProgress: true`, so a script can wait on a first translation.
 `getState.translationSideBySide` is the two-column preference.
 `getState.favoriteSegments` lists the starred segment ids of the open entry and `getState.favoritesOnly` says whether the transcript is filtered to them.
+`getState.models.resident` lists the model names held in memory: the streaming cache's loaded models and the model the file and dictation sessions have loaded. Sorted, empty when nothing is loaded.
 `getState.transcriptPaneMode` is which of `transcript` / `summary` / `chat` the column is showing.
 `getState.summaryOptions` is the saved summary options as `setSummaryOptions` takes them, and `getState.autostartSummary` whether a finished transcription summarises itself.
 `getState.aiServices` lists the configured AI services (`id`, `kind`, `name`, `model`, `endpoint`, `hasKey`) — the API key itself is never returned by any command, and never reaches the diagnostics export.

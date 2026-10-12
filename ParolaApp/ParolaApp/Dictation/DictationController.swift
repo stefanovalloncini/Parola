@@ -57,6 +57,7 @@ final class DictationController {
     @ObservationIgnored var recorderFactory: ((Configuration) -> any DictationRecorder)?
     @ObservationIgnored var inserterFactory: (() -> any TextInserter)?
     @ObservationIgnored private var pasteGate = PasteGate()
+    @ObservationIgnored let fallbackSession = TranscriptionSession()
     private(set) var currentAnchor: FieldAnchor?
 
     var configuration: Configuration?
@@ -120,6 +121,10 @@ final class DictationController {
         stopWatchingEscape()
     }
 
+    func afterTeardown(_ work: @escaping @Sendable () async -> Void) {
+        enqueueMonitorWork(work)
+    }
+
     func start(configuration: Configuration) {
         guard coordinator == nil else { return }
         self.configuration = configuration
@@ -135,7 +140,7 @@ final class DictationController {
             initialPrompt: configuration.initialPrompt,
             deviceUID: configuration.deviceUID,
             streamingEnabled: configuration.streamingEnabled,
-            session: nil,
+            session: fallbackSession,
             workflowResolver: { @Sendable in
                 await Self.resolveWorkflow(in: workflows)
             },
@@ -379,6 +384,7 @@ final class DictationController {
         modelDownloadProgress = nil
         switch state {
         case .idle:
+            appModel?.modelResidency.sessionRunEnded()
             stopWatchingEscape()
             hideHUD()
         case .listening:

@@ -465,7 +465,7 @@ final class ParolaAutomationServer {
         ])
     }
 
-    func snapshotState() -> AutomationValue {
+    func snapshotState(residentModels: [String] = []) -> AutomationValue {
         guard let model else { return .null }
         let defaults = model.defaults
         let selectedModel = defaults.string(forKey: "selectedModel") ?? ModelCatalog.defaultModelID()
@@ -538,6 +538,7 @@ final class ParolaAutomationServer {
             "retranscribing": .bool(model.retranscribeRequest != nil),
             "appVisibilityMode": .string(model.appVisibilityMode.rawValue),
             "playSoundWhenFinished": .bool(model.playSoundWhenFinished),
+            "models": .object(["resident": .array(residentModels.map { .string($0) })]),
         ])
     }
 

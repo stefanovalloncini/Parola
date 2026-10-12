@@ -1898,6 +1898,7 @@ final class AppModel {
     // MARK: - Engine
 
     @ObservationIgnored let session = TranscriptionSession()
+    @ObservationIgnored var modelResidency = ModelResidencyCoordinator(streaming: LiveStreamingModelResidency())
     @ObservationIgnored private let store = ModelStore.shared
     @ObservationIgnored let mediaSession = MediaSession()
 
@@ -2401,6 +2402,7 @@ final class AppModel {
         loadPendingRecovery()
         sweepInflightRecordings()
         if bootstrap.mode != .test { startTakeFileHeartbeat() }
+        modelResidency.attach(fileSession: session, dictationSession: dictationController.fallbackSession)
         if features.isEnabled(.dictation) {
             wireDictationController()
         }
@@ -2597,11 +2599,13 @@ final class AppModel {
         }
     }
 
-    func deleteModel(_ name: String) {
-        guard !isDeletingModel(name) else { return }
+    @discardableResult
+    func deleteModel(_ name: String, in store: ModelStore? = nil) -> Task<Void, Never>? {
+        guard !isDeletingModel(name) else { return nil }
         modelsBeingDeleted.insert(name)
-        let store = self.store
-        Task { [weak self] in
+        let store = store ?? self.store
+        return Task { [weak self] in
+            await self?.modelResidency.free(name)
             let failure: (any Error)?
             do {
                 // Delete frees everything the model owns, earlier downloads included; the dialog counts them.
@@ -2634,11 +2638,7 @@ final class AppModel {
     }
 
     func prewarmSelectedModel() {
-        let name = selectedModel
-        guard store.isInstalled(name) else { return }
-        Task.detached { [session] in
-            await session.prewarm(modelName: name)
-        }
+        modelResidency.warmFileSession(selectedModel)
     }
 
     /// Non-nil when a download would take over UI that another job is using. Downloads render
@@ -2934,6 +2934,7 @@ final class AppModel {
                         ? .loadingModel(name: selectedModel)
                         : .downloadingModel(name: selectedModel, progress: 0)
                 }
+                defer { modelResidency.sessionRunEnded() }
                 let result = try await session.transcribe(
                     source: FileAudioSource(url: fileURL),
                     options: makeOptions(task: task, model: selectedModel, language: selectedLanguage),
@@ -5052,6 +5053,7 @@ final class AppModel {
             if !meeting { meeting = await isMeetingStereo(url, source: source) }
             if meeting, engineFile == nil, engineNeedsMonoMix() { engineFile = try await meetingEngineInput(for: url) }
             let handlers = take.map { makeTakeHandlers(run: run, takeID: $0) } ?? TranscribeHandlers()
+            defer { modelResidency.sessionRunEnded() }
             let result = try await session.transcribe(
                 source: FileAudioSource(url: engineFile ?? url),
                 options: meeting ? meetingOptions(currentOptions, stereo: url) : currentOptions,

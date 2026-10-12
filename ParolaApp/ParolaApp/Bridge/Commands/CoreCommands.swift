@@ -36,7 +36,7 @@ extension ParolaAutomationServer {
                 summary: "Hand-curated snapshot of AppModel state. While transcribing, phaseDetail carries progress, stage and hasPartialText.",
                 kind: .sync,
                 handler: { _, ctx in
-                    ctx.server.snapshotState()
+                    ctx.server.snapshotState(residentModels: await ctx.model.modelResidency.residentModelNames())
                 }
             ),
 

@@ -261,6 +261,23 @@ extension ParolaAutomationServer {
             ),
 
             AutomationCommand(
+                name: "setStreamingIdleTimeout",
+                area: .test,
+                summary: "Sets how long a streaming model nothing holds stays loaded. Test-mode only.",
+                kind: .mutating,
+                args: [
+                    .init(name: "seconds", kind: .double, required: true, summary: "Seconds; the app's own value is 600"),
+                ],
+                handler: { args, ctx in
+                    try requireTestMode(ctx)
+                    let seconds = try args.double("seconds")
+                    guard seconds > 0 else { throw AutomationError.invalidArgs(field: "seconds", reason: "must be positive") }
+                    await ctx.model.modelResidency.setStreamingIdleTimeout(.seconds(seconds))
+                    return .object(["seconds": .double(seconds)])
+                }
+            ),
+
+            AutomationCommand(
                 name: "getLastInsertedText",
                 area: .test,
                 summary: "Returns the captured-insertion buffer. Test-mode only.",
