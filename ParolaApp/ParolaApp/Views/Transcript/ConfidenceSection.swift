@@ -4,9 +4,13 @@ import ParolaCore
 struct ConfidenceSection: View {
     let overall: Double?
     let lows: [TranscriptSegment]
+    let averages: [TranscriptSegment.ID: Double]
+
+    static let rowLimit = 50
 
     @Environment(AppModel.self) private var model
     @State private var expanded = false
+    @State private var showsAll = false
 
     var body: some View {
         if let overall {
@@ -14,9 +18,16 @@ struct ConfidenceSection: View {
                 summaryRow(overall: overall)
                 if !lows.isEmpty {
                     DisclosureGroup(isExpanded: $expanded) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            ForEach(lows) { seg in
+                        LazyVStack(alignment: .leading, spacing: 4) {
+                            ForEach(showsAll ? lows : Array(lows.prefix(Self.rowLimit))) { seg in
                                 lowRow(seg)
+                            }
+                            if lows.count > Self.rowLimit {
+                                Button(showsAll ? "Show Less" : "Show All") { showsAll.toggle() }
+                                    .buttonStyle(.plain)
+                                    .font(DS.Font.secondary)
+                                    .foregroundStyle(DS.Color.accentInk)
+                                    .axLeaf("Confidence.Button.ShowAll")
                             }
                         }
                         .padding(.top, DS.Spacing.tight)
@@ -65,7 +76,7 @@ struct ConfidenceSection: View {
                     .lineLimit(1)
                     .truncationMode(.tail)
                 Spacer(minLength: 0)
-                if let value = SegmentConfidence.average(for: seg) {
+                if let value = averages[seg.id] {
                     Text(percentLabel(value))
                         .font(DS.Font.mono)
                         .foregroundStyle(DS.Color.secondaryText)

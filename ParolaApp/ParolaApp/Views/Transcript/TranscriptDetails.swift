@@ -9,6 +9,7 @@ struct TranscriptFacts {
     var speakers: [SpeakerStats] = []
     var confidenceAverage: Double?
     var lowConfidence: [TranscriptSegment] = []
+    var lowConfidenceAverages: [TranscriptSegment.ID: Double] = [:]
     var speechRate: [SpeechRateBin] = []
 
     /// Mirrors what each Insights section draws, so an empty disclosure never shows.
@@ -29,12 +30,17 @@ struct TranscriptFacts {
             )
         }
         try Task.checkCancellation()
+        let lows = SegmentConfidence.lowConfidence(segments: transcript.segments)
         return TranscriptFacts(
             text: text,
             textVersion: textVersion,
             speakers: SpeakerStats.compute(for: transcript),
             confidenceAverage: SegmentConfidence.transcriptAverage(for: transcript),
-            lowConfidence: SegmentConfidence.lowConfidence(segments: transcript.segments),
+            lowConfidence: lows,
+            lowConfidenceAverages: Dictionary(
+                lows.compactMap { segment in SegmentConfidence.average(for: segment).map { (segment.id, $0) } },
+                uniquingKeysWith: { first, _ in first }
+            ),
             speechRate: SpeechRateSeries.compute(segments: transcript.segments, wordCounts: text.segmentWordCounts, binSeconds: 30)
         )
     }
@@ -191,7 +197,7 @@ struct TranscriptInsights: View {
     var body: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.large) {
             SpeakerStatsSection(stats: facts.speakers)
-            ConfidenceSection(overall: facts.confidenceAverage, lows: facts.lowConfidence)
+            ConfidenceSection(overall: facts.confidenceAverage, lows: facts.lowConfidence, averages: facts.lowConfidenceAverages)
             SpeechRateSection(bins: facts.speechRate)
             WordFrequencySection(entries: facts.text.topWords)
         }

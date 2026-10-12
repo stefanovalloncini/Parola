@@ -47,6 +47,8 @@ struct TranscriptFactsTests {
         #expect(derived.speakers.map(\.speaker) == ["Speaker 1", "Speaker 2"])
         #expect(abs((derived.confidenceAverage ?? 0) - 0.75) < 0.001)
         #expect(derived.lowConfidence.map(\.id) == [2])
+        #expect(derived.lowConfidenceAverages.keys.sorted() == [2])
+        #expect(abs((derived.lowConfidenceAverages[2] ?? 0) - 0.4) < 0.001)
         #expect(derived.speechRate == SpeechRateSeries.compute(segments: transcript.segments, binSeconds: 30))
         #expect(derived.textVersion == 1)
         #expect(derived.text.charCount == transcript.text.count)
