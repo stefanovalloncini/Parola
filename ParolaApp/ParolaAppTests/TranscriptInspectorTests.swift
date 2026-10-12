@@ -211,6 +211,32 @@ struct TranscriptInspectorTests {
         }
     }
 
+    @Test("the outline is stored by the open inspector, follows a timing nudge and goes with the transcript")
+    func outlineIsStoredOffTheBody() async throws {
+        try await withIsolatedDefaults { defaults in
+            let model = makeModel(defaults)
+            _ = try await open(Self.longTalk(), in: model)
+            let hosted = host(model)
+            defer { hosted.close() }
+
+            let filled = await waitUntil { model.inspectorOutline.count == 10 }
+            #expect(filled)
+            let fourth = model.inspectorOutline.first { $0.id == "seg-4" }
+            let before = try #require(fourth)
+            #expect(before.start == 40)
+
+            model.nudgeSegmentStart(id: 4, frames: 12)
+            let moved = await waitUntil { model.inspectorOutline.first { $0.id == "seg-4" }?.start != 40 }
+            #expect(moved)
+            let expected = TranscriptOutline.entries(for: try #require(model.transcript), chapters: [])
+            #expect(model.inspectorOutline == expected)
+
+            model.closeTranscript()
+            await model.awaitTranscriptClose()
+            #expect(model.inspectorOutline.isEmpty)
+        }
+    }
+
     @Test("a speaker who isn't anyone yet is the only row that asks, and every count reads as segments")
     func peopleAskOnlyWhereNeeded() async throws {
         try await withIsolatedDefaults { defaults in

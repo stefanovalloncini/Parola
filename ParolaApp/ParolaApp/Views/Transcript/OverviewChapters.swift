@@ -16,8 +16,7 @@ struct OverviewChapters: View {
     }
 
     static func outline(for model: AppModel) -> [TranscriptOutline.Entry] {
-        guard let transcript = model.transcript else { return [] }
-        return TranscriptOutline.entries(for: transcript, chapters: [])
+        model.inspectorOutline
     }
 
     var body: some View {

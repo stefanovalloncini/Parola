@@ -64,7 +64,10 @@ struct TranscriptInspector: View {
         let textVersion = model.transcriptTextVersion
         let knownText = facts.textVersion == textVersion ? facts.text : nil
         let work = Task.detached(priority: .userInitiated) {
-            try TranscriptFacts.derive(transcript: transcript, textVersion: textVersion, knownText: knownText)
+            (
+                try TranscriptFacts.derive(transcript: transcript, textVersion: textVersion, knownText: knownText),
+                TranscriptOutline.entries(for: transcript, chapters: [])
+            )
         }
         let computed = try? await withTaskCancellationHandler {
             try await work.value
@@ -72,7 +75,8 @@ struct TranscriptInspector: View {
             work.cancel()
         }
         guard let computed, !Task.isCancelled else { return }
-        facts = computed
+        facts = computed.0
+        model.inspectorOutline = computed.1
     }
 }
 

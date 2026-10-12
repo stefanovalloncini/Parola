@@ -165,6 +165,7 @@ final class AppModel {
         didSet {
             transcriptMatchesLoadedMedia = false
             if transcript == nil, promptOutput != nil { promptOutput = nil }
+            if transcript == nil, !inspectorOutline.isEmpty { inspectorOutline = [] }
             currentSegmentIndex = nil
             if !Self.sameText(oldValue, transcript) {
                 cachedTranscriptText = nil
@@ -983,6 +984,8 @@ final class AppModel {
     var actionItems: [ActionItem] = []
     var actionItemsError: String?
     var smartChapters: [Chapter] = []
+    /// Written by the open inspector, off the main actor; read by its Chapters section.
+    var inspectorOutline: [TranscriptOutline.Entry] = []
     var chaptersError: String?
     var entrySpeakerFilters: [String: String] = [:]
     var favoritesOnly: Bool = false
