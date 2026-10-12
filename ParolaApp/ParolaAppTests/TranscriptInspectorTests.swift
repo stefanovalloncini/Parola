@@ -635,7 +635,7 @@ struct TranslationStripTests {
             #expect((strip?.frame.maxX ?? .infinity) <= inspectorLeft, "the strip belongs to the text column")
 
             await gate.open()
-            await run.value
+            _ = await run.value
             let gone = await waitUntil { !has(Self.strip, hosted) }
             #expect(gone)
             #expect(model.transcript?.translation?.targetLanguage == "en")

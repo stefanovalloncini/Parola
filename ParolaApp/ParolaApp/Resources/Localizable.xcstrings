@@ -3167,6 +3167,23 @@
         }
       }
     },
+    "Cancelling…": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancelling…"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Annullamento…"
+          }
+        }
+      }
+    },
     "Caption Size": {
       "extractionState": "manual",
       "localizations": {

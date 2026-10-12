@@ -55,6 +55,56 @@ private struct GatedTranslator: TranscriptTranslating {
     }
 }
 
+/// Waits on a gate like `GatedTranslator`, and counts the times it is asked to stop its call.
+private struct StubbornTranslator: TranscriptTranslating {
+    let providerName = "stub"
+    let gate: TranslationGate
+    let stops = CallCounter()
+
+    func translate(
+        _ texts: [(id: Int, text: String)], from source: String?, to target: String
+    ) async throws -> [Int: String] {
+        await gate.wait()
+        return Dictionary(uniqueKeysWithValues: texts.map { ($0.id, "T\($0.id)") })
+    }
+
+    func cancel() {
+        _ = stops.next()
+    }
+}
+
+/// Waits on a gate, then answers with its own text, so a test can tell whose answer landed.
+private struct GatedTextTranslator: TranscriptTranslating {
+    let providerName = "stub"
+    let gate: TranslationGate
+    let prefix: String
+
+    func translate(
+        _ texts: [(id: Int, text: String)], from source: String?, to target: String
+    ) async throws -> [Int: String] {
+        await gate.wait()
+        return Dictionary(uniqueKeysWithValues: texts.map { ($0.id, "\(prefix)\($0.id)") })
+    }
+}
+
+/// Sleeps far longer than any test unless its task is cancelled, and records that it was.
+private struct SleepingTranslator: TranscriptTranslating {
+    let providerName = "stub"
+    let cancelled = OSAllocatedUnfairLock<Bool>(initialState: false)
+
+    func translate(
+        _ texts: [(id: Int, text: String)], from source: String?, to target: String
+    ) async throws -> [Int: String] {
+        do {
+            try await Task.sleep(for: .seconds(60))
+        } catch {
+            cancelled.withLock { $0 = true }
+            throw error
+        }
+        return Dictionary(uniqueKeysWithValues: texts.map { ($0.id, "T\($0.id)") })
+    }
+}
+
 /// Translates a batch, then runs `afterBatch` — the test uses it to cancel mid-run.
 private struct InterruptingTranslator: TranscriptTranslating {
     let providerName = "stub"
@@ -213,8 +263,98 @@ struct TranslationCoordinatorTests {
         }
     }
 
-    @Test("cancelling keeps the batches that already completed")
+    @Test("cancelling keeps the batches that already came back")
     func cancelKeepsCompletedBatches() async {
+        let coordinator = TranslationCoordinator()
+        let calls = CallCounter()
+        coordinator.translatorOverride = InterruptingTranslator {
+            if calls.next() == 1 { await MainActor.run { coordinator.cancel() } }
+        }
+
+        let outcome = await coordinator.translate(entryID: "e1", transcript: transcript(segments: 130), to: "en")
+
+        #expect(outcome?.segments.count == 60)
+        #expect(outcome?.cancelled == true)
+        #expect(coordinator.state == .idle)
+    }
+
+    @Test("the snapshot shows the segments that came back while the run is cancelling")
+    func snapshotCountsWhileCancelling() async {
+        let coordinator = TranslationCoordinator()
+        let calls = CallCounter()
+        let seen = OSAllocatedUnfairLock<Int?>(initialState: nil)
+        coordinator.translatorOverride = InterruptingTranslator {
+            guard calls.next() == 1 else { return }
+            await MainActor.run {
+                coordinator.cancel()
+                let count = coordinator.runInProgress?.segmentCount
+                seen.withLock { $0 = count }
+            }
+        }
+
+        _ = await coordinator.translate(entryID: "e1", transcript: transcript(segments: 130), to: "en")
+
+        #expect(seen.withLock { $0 } == 60)
+    }
+
+    @Test("a provider that never answers the cancel is let go after the grace")
+    func cancelGraceLetsGoOfAStuckCall() async {
+        let coordinator = TranslationCoordinator()
+        coordinator.cancelGrace = .milliseconds(50)
+        let gate = TranslationGate()
+        coordinator.translatorOverride = StubbornTranslator(gate: gate)
+
+        async let outcome = coordinator.translate(entryID: "e1", transcript: transcript(segments: 5), to: "en")
+        #expect(await waitUntil { coordinator.state == .translating(completed: 0, total: 5) })
+        coordinator.cancel()
+
+        #expect(await outcome == nil)
+        #expect(coordinator.state == .idle)
+        await gate.open()
+    }
+
+    @Test("a call let go after the grace can't answer for the next run")
+    func lateAnswerDoesNotFeedTheNextRun() async {
+        let coordinator = TranslationCoordinator()
+        coordinator.cancelGrace = .milliseconds(50)
+        let oldGate = TranslationGate()
+        let newGate = TranslationGate()
+        coordinator.translatorOverride = GatedTextTranslator(gate: oldGate, prefix: "OLD")
+
+        async let first = coordinator.translate(entryID: "e1", transcript: transcript(segments: 5), to: "en")
+        #expect(await waitUntil { coordinator.state == .translating(completed: 0, total: 5) })
+        coordinator.cancel()
+        #expect(await first == nil)
+
+        coordinator.translatorOverride = GatedTextTranslator(gate: newGate, prefix: "NEW")
+        async let second = coordinator.translate(entryID: "e2", transcript: transcript(segments: 5), to: "fr")
+        #expect(await waitUntil { coordinator.state == .translating(completed: 0, total: 5) })
+        await oldGate.open()
+        await settle()
+        #expect(coordinator.state == .translating(completed: 0, total: 5))
+        await newGate.open()
+
+        let outcome = await second
+        #expect(outcome?.segments.count == 5)
+        #expect(outcome?.segments.values.allSatisfy { $0.hasPrefix("NEW") } == true)
+    }
+
+    @Test("removing the entry's translation mid-run discards the whole run")
+    func removeDiscardsTheRun() async {
+        let coordinator = TranslationCoordinator()
+        let calls = CallCounter()
+        coordinator.translatorOverride = InterruptingTranslator {
+            if calls.next() == 1 { await MainActor.run { coordinator.remove(entryID: "e1") } }
+        }
+
+        let outcome = await coordinator.translate(entryID: "e1", transcript: transcript(segments: 130), to: "en")
+
+        #expect(outcome == nil)
+        #expect(coordinator.state == .idle)
+    }
+
+    @Test("a call that finishes after the cancel lands nothing")
+    func cancelDropsTheCallInFlight() async {
         let coordinator = TranslationCoordinator()
         coordinator.translatorOverride = InterruptingTranslator {
             await MainActor.run { coordinator.cancel() }
@@ -222,7 +362,44 @@ struct TranslationCoordinatorTests {
 
         let outcome = await coordinator.translate(entryID: "e1", transcript: transcript(segments: 70), to: "en")
 
-        #expect(outcome?.segments.count == 60)
+        #expect(outcome == nil)
+        #expect(coordinator.state == .idle)
+    }
+
+    @Test("cancel stops the call in flight")
+    func cancelStopsTheCallInFlight() async {
+        let coordinator = TranslationCoordinator()
+        let translator = SleepingTranslator()
+        coordinator.translatorOverride = translator
+
+        async let outcome = coordinator.translate(entryID: "e1", transcript: transcript(segments: 22), to: "en")
+        #expect(await waitUntil { coordinator.state == .translating(completed: 0, total: 22) })
+        coordinator.cancel()
+        #expect(coordinator.state == .cancelling)
+
+        #expect(await outcome == nil)
+        #expect(translator.cancelled.withLock { $0 })
+        #expect(coordinator.state == .idle)
+    }
+
+    @Test("a call that outlasts the cancel lands nothing, and no run starts before it stops")
+    func cancelOutlastsAStubbornCall() async {
+        let coordinator = TranslationCoordinator()
+        let gate = TranslationGate()
+        let translator = StubbornTranslator(gate: gate)
+        coordinator.translatorOverride = translator
+
+        async let outcome = coordinator.translate(entryID: "e1", transcript: transcript(segments: 5), to: "en")
+        #expect(await waitUntil { coordinator.state == .translating(completed: 0, total: 5) })
+        coordinator.cancel()
+
+        #expect(translator.stops.count == 1)
+        #expect(coordinator.state == .cancelling)
+        #expect(await coordinator.translate(entryID: "e1", transcript: transcript(segments: 5), to: "fr") == nil)
+        #expect(coordinator.activeTarget == "en")
+
+        await gate.open()
+        #expect(await outcome == nil)
         #expect(coordinator.state == .idle)
     }
 
@@ -332,15 +509,18 @@ struct AppModelTranslationTests {
         AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("translate"))
     }
 
-    private func loadedModel() async throws -> (AppModel, LibraryEntry.ID) {
+    private func loadedModel(extraSegments: Int = 0) async throws -> (AppModel, LibraryEntry.ID) {
         let model = makeModel()
         let seedStore = LibraryStore(libraryURL: model.library.libraryURL, extraIndexer: nil)
+        let extra = (0..<extraSegments).map {
+            TranscriptSegment(id: 2 + $0, start: Double(2 + $0), end: Double(3 + $0), text: "riga \($0)")
+        }
         let seeded = try await seedStore.add(
             transcript: Transcript(
                 segments: [
                     TranscriptSegment(id: 0, start: 0, end: 1, text: "ciao mondo"),
                     TranscriptSegment(id: 1, start: 1, end: 2, text: "come stai"),
-                ],
+                ] + extra,
                 language: "it",
                 modelName: "stub"
             ),
@@ -431,6 +611,125 @@ struct AppModelTranslationTests {
         let stored = try await store.load(entryID).document.transcript
         #expect(stored.translation?.segments == [0: "T0", 1: "T1"])
         #expect(stored.translation?.targetLanguage == "en")
+    }
+
+    @Test("a cancelled run leaves the transcript and the bundle untranslated")
+    func cancelledRunSavesNothing() async throws {
+        let (model, entryID) = try await loadedModel()
+        model.translationCoordinator.translatorOverride = SleepingTranslator()
+
+        let run = Task { await model.translateTranscript(to: "de") }
+        #expect(await waitUntil { model.translationState == .translating(completed: 0, total: 2) })
+        model.cancelTranslation()
+        let result = await run.value
+
+        #expect(result == .cancelled)
+        #expect(model.transcript?.translation == nil)
+        #expect(model.translationState == .idle)
+        let store = LibraryStore(libraryURL: model.library.libraryURL, extraIndexer: nil)
+        #expect(try await store.load(entryID).document.transcript.translation == nil)
+    }
+
+    @Test("a cancelled run on an entry with no translation keeps the batches that came back")
+    func cancelledFirstRunKeepsEarlierBatches() async throws {
+        let (model, entryID) = try await loadedModel(extraSegments: 70)
+        let calls = CallCounter()
+        model.translationCoordinator.translatorOverride = InterruptingTranslator {
+            if calls.next() == 1 { await MainActor.run { model.cancelTranslation() } }
+        }
+
+        let result = await model.translateTranscript(to: "de")
+
+        #expect(result.landedCancelled == true)
+        #expect(model.transcript?.translation?.segments.count == 60)
+        let store = LibraryStore(libraryURL: model.library.libraryURL, extraIndexer: nil)
+        #expect(try await store.load(entryID).document.transcript.translation?.segments.count == 60)
+    }
+
+    @Test("a cancelled re-translation leaves the translation the entry already had")
+    func cancelledRetranslationKeepsTheOldOne() async throws {
+        let (model, entryID) = try await loadedModel(extraSegments: 70)
+        model.translationCoordinator.translatorOverride = MockTranslator(mode: .reverseWords)
+        await model.translateTranscript(to: "en")
+        let first = try #require(model.transcript?.translation)
+        let calls = CallCounter()
+        model.translationCoordinator.translatorOverride = InterruptingTranslator {
+            if calls.next() == 1 { await MainActor.run { model.cancelTranslation() } }
+        }
+
+        let result = await model.translateTranscript(to: "de")
+
+        #expect(result == .cancelled)
+        #expect(model.transcript?.translation == first)
+        let store = LibraryStore(libraryURL: model.library.libraryURL, extraIndexer: nil)
+        #expect(try await store.load(entryID).document.transcript.translation?.segments == first.segments)
+    }
+
+    @Test("removing the translation during a run leaves nothing behind")
+    func removeDuringARunLandsNothing() async throws {
+        let (model, entryID) = try await loadedModel(extraSegments: 70)
+        model.translationCoordinator.translatorOverride = MockTranslator(mode: .reverseWords)
+        await model.translateTranscript(to: "en")
+        let calls = CallCounter()
+        let removal = OSAllocatedUnfairLock<Task<Void, Never>?>(initialState: nil)
+        model.translationCoordinator.translatorOverride = InterruptingTranslator {
+            guard calls.next() == 1 else { return }
+            await MainActor.run {
+                let task = Task { await model.removeTranslation() }
+                removal.withLock { $0 = task }
+            }
+        }
+
+        await model.translateTranscript(to: "de")
+        await removal.withLock { $0 }?.value
+        let store = LibraryStore(libraryURL: model.library.libraryURL, extraIndexer: nil)
+
+        #expect(model.transcript?.translation == nil)
+        #expect(try await store.load(entryID).document.transcript.translation == nil)
+    }
+
+    @Test("a re-translation that fails part way leaves the translation the entry already had")
+    func failedRetranslationKeepsTheOldOne() async throws {
+        let (model, entryID) = try await loadedModel(extraSegments: 70)
+        model.translationCoordinator.translatorOverride = MockTranslator(mode: .reverseWords)
+        await model.translateTranscript(to: "en")
+        let first = try #require(model.transcript?.translation)
+        model.translationCoordinator.translatorOverride = FlakyTranslator(failAfter: 1)
+
+        let result = await model.translateTranscript(to: "de")
+
+        guard case .failed = result else {
+            Issue.record("expected a failure, got \(result)")
+            return
+        }
+        #expect(model.transcript?.translation == first)
+        let store = LibraryStore(libraryURL: model.library.libraryURL, extraIndexer: nil)
+        #expect(try await store.load(entryID).document.transcript.translation?.segments == first.segments)
+    }
+
+    @Test("a first run that fails part way keeps the batches that came back")
+    func failedFirstRunKeepsEarlierBatches() async throws {
+        let (model, _) = try await loadedModel(extraSegments: 70)
+        model.translationCoordinator.translatorOverride = FlakyTranslator(failAfter: 1)
+
+        let result = await model.translateTranscript(to: "de")
+
+        #expect(result.landedCancelled == false)
+        #expect(model.transcript?.translation?.segments.count == 60)
+    }
+
+    @Test("each run reports its own end, so an old cancel doesn't colour the next refusal")
+    func resultIsPerRun() async throws {
+        let (model, _) = try await loadedModel()
+        model.translationCoordinator.translatorOverride = SleepingTranslator()
+        let run = Task { await model.translateTranscript(to: "de") }
+        #expect(await waitUntil { model.translationState == .translating(completed: 0, total: 2) })
+        #expect(await model.translateTranscript(to: "fr") == .refused("another translation is already running"))
+        model.cancelTranslation()
+        #expect(await run.value == .cancelled)
+
+        model.translationCoordinator.translatorOverride = MockTranslator(mode: .reverseWords)
+        #expect(await model.translateTranscript(to: "de").landedCancelled == false)
     }
 
     @Test("an installed mock translator is what a run uses")

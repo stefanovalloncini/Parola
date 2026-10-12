@@ -6,6 +6,7 @@ enum TranslationState: Equatable, Sendable {
     case idle
     case preparing
     case translating(completed: Int, total: Int)
+    case cancelling
     case failed(String)
 }
 
@@ -22,6 +23,10 @@ final class TranslationCoordinator {
     struct Outcome: Sendable {
         var segments: [Int: String]
         var provider: String
+        /// The run was cancelled, so `segments` holds only the batches that came back before.
+        var cancelled = false
+        /// A batch failed, so `segments` holds only the batches that came back before it.
+        var failed = false
     }
 
     private struct PendingRun {
@@ -50,9 +55,19 @@ final class TranslationCoordinator {
     /// How long a run waits for ``TranslationHostView`` to hand back a live session.
     @ObservationIgnored var sessionWaitBudget: Duration = .seconds(10)
 
+    /// How long a cancelled run waits for the provider to give up its call before it lets go of it.
+    @ObservationIgnored var cancelGrace: Duration = .seconds(10)
+
     @ObservationIgnored private var pending: PendingRun?
-    @ObservationIgnored private var cancelRequested = false
+    @ObservationIgnored private(set) var cancelRequested = false
     @ObservationIgnored private var sessionWaitTask: Task<Void, Never>?
+    @ObservationIgnored private var discardRequested = false
+    @ObservationIgnored private var callWaiter: (id: Int, continuation: CheckedContinuation<Result<[Int: String], any Error>?, Never>)?
+    @ObservationIgnored private var callSerial = 0
+    @ObservationIgnored private var graceTask: Task<Void, Never>?
+    @ObservationIgnored private(set) var completedSegments = 0
+    @ObservationIgnored private var inFlightCall: Task<[Int: String], any Error>?
+    @ObservationIgnored private var activeTranslator: (any TranscriptTranslating)?
 
     /// The state to show for an entry: a run belongs to the entry that started it, so switching
     /// entries mid-run leaves the other transcript's section idle.
@@ -63,7 +78,7 @@ final class TranslationCoordinator {
 
     var isRunning: Bool {
         switch state {
-        case .preparing, .translating: return true
+        case .preparing, .translating, .cancelling: return true
         case .idle, .failed: return false
         }
     }
@@ -78,9 +93,7 @@ final class TranslationCoordinator {
 
     var runInProgress: RunSnapshot? {
         guard isRunning, let activeTarget, let activeProvider else { return nil }
-        var completed = 0
-        if case .translating(let done, _) = state { completed = done }
-        return RunSnapshot(targetLanguage: activeTarget, segmentCount: completed, provider: activeProvider)
+        return RunSnapshot(targetLanguage: activeTarget, segmentCount: completedSegments, provider: activeProvider)
     }
 
     /// Whether this Mac can translate the pair. A transcript with no language of its own answers
@@ -123,9 +136,11 @@ final class TranslationCoordinator {
         // One run at a time: a second `perform` loop would race the first for `state` and for the
         // outcome the caller writes to the entry.
         guard !isRunning else { return nil }
+        cancelRequested = false
+        discardRequested = false
+        completedSegments = 0
         let units = TranslationBatcher.units(from: transcript.segments)
         guard !units.isEmpty else { return nil }
-        cancelRequested = false
         activeEntryID = entryID
         activeTarget = target
         state = .preparing
@@ -136,7 +151,12 @@ final class TranslationCoordinator {
             return await perform(units: units, source: source, target: target, using: stub)
         }
         activeProvider = AppleTranslator.provider
-        guard await availability(source: source, target: target) != .unsupported else {
+        let status = await availability(source: source, target: target)
+        guard !cancelRequested else {
+            state = .idle
+            return nil
+        }
+        guard status != .unsupported else {
             state = .failed(String(localized: "This Mac can't translate into that language."))
             return nil
         }
@@ -183,24 +203,64 @@ final class TranslationCoordinator {
         sessionConfiguration = nil
     }
 
-    /// Stops after the batch in flight, keeping everything that already came back.
+    /// Stops the call in flight and lands nothing from it; batches that already came back stay in the outcome.
     func cancel() {
+        guard isRunning else { return }
         cancelRequested = true
         sessionWaitTask?.cancel()
         sessionWaitTask = nil
-        guard let run = pending else { return }
-        pending = nil
-        sessionConfiguration = nil
-        state = .idle
-        run.continuation.resume(returning: nil)
+        if let run = pending {
+            pending = nil
+            sessionConfiguration = nil
+            state = .idle
+            run.continuation.resume(returning: nil)
+            return
+        }
+        inFlightCall?.cancel()
+        activeTranslator?.cancel()
+        state = .cancelling
+        graceTask?.cancel()
+        graceTask = nil
+        guard let id = callWaiter?.id else { return }
+        let grace = cancelGrace
+        graceTask = Task { [weak self] in
+            try? await Task.sleep(for: grace)
+            guard !Task.isCancelled else { return }
+            self?.finishWait(id: id, with: nil)
+        }
+    }
+
+    /// Resumes the wait on call `id` only; a late result or a stale timer from an earlier call finds another waiter and does nothing.
+    private func finishWait(id: Int, with result: Result<[Int: String], any Error>?) {
+        guard let waiter = callWaiter, waiter.id == id else { return }
+        callWaiter = nil
+        graceTask?.cancel()
+        graceTask = nil
+        waiter.continuation.resume(returning: result)
+    }
+
+    private func waitForCall(_ call: Task<[Int: String], any Error>) async -> Result<[Int: String], any Error>? {
+        await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                callSerial += 1
+                let id = callSerial
+                callWaiter = (id, continuation)
+                Task { [weak self] in
+                    let result = await call.result
+                    self?.finishWait(id: id, with: result)
+                }
+            }
+        } onCancel: { call.cancel() }
     }
 
     /// Clears the section for an entry whose translation is being removed. Another entry's run is
     /// left alone: its progress row, its Cancel and its claim on the coordinator all stay put.
     func remove(entryID: LibraryEntry.ID) {
         guard activeEntryID == entryID else { return }
+        if isRunning { discardRequested = true }
         cancel()
-        state = .idle
+        if let id = callWaiter?.id { finishWait(id: id, with: nil) }
+        if state != .cancelling { state = .idle }
         activeEntryID = nil
         activeTarget = nil
         activeProvider = nil
@@ -212,22 +272,36 @@ final class TranslationCoordinator {
         let total = units.count
         var translated: [Int: String] = [:]
         var sent = 0
+        completedSegments = 0
         state = .translating(completed: 0, total: total)
+        activeTranslator = translator
+        defer {
+            activeTranslator = nil
+            graceTask?.cancel()
+            graceTask = nil
+        }
         for batch in TranslationBatcher.batches(units) {
+            let call = Task { try await translator.translate(batch, from: source, to: target) }
+            inFlightCall = call
+            let result = await waitForCall(call)
+            inFlightCall = nil
             if cancelRequested { break }
             do {
-                let part = try await translator.translate(batch, from: source, to: target)
-                translated.merge(part) { _, new in new }
+                translated.merge(try result?.get() ?? [:]) { _, new in new }
             } catch {
                 // Earlier batches are already good text; a later failure keeps them.
                 state = .failed(Self.message(for: error))
-                return translated.isEmpty ? nil : Outcome(segments: translated, provider: translator.providerName)
+                return translated.isEmpty || discardRequested
+                    ? nil
+                    : Outcome(segments: translated, provider: translator.providerName, failed: true)
             }
             sent += batch.count
+            completedSegments = sent
             state = .translating(completed: sent, total: total)
         }
         state = .idle
-        return translated.isEmpty ? nil : Outcome(segments: translated, provider: translator.providerName)
+        if discardRequested { return nil }
+        return translated.isEmpty ? nil : Outcome(segments: translated, provider: translator.providerName, cancelled: cancelRequested)
     }
 
     private func stubTranslator() -> (any TranscriptTranslating)? {

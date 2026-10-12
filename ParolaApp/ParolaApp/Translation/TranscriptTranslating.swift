@@ -14,6 +14,13 @@ protocol TranscriptTranslating: Sendable {
     func translate(
         _ texts: [(id: Int, text: String)], from source: String?, to target: String
     ) async throws -> [Int: String]
+
+    /// Stops the call in flight for a provider that doesn't answer task cancellation.
+    func cancel()
+}
+
+extension TranscriptTranslating {
+    func cancel() {}
 }
 
 /// Drives one `TranslationSession`. The session is bound to the `.translationTask` that produced it,
@@ -23,7 +30,7 @@ final class AppleTranslator: TranscriptTranslating {
 
     let providerName = AppleTranslator.provider
 
-    // Non-Sendable session handed from the main actor to `session.translations`; one translator per run, calls awaited in sequence, never shared.
+    // Non-Sendable session handed from the main actor to `session.translations`; one translator per run, calls awaited in sequence, and `cancel()` is the framework's own way to stop one mid-call.
     nonisolated(unsafe) private let session: TranslationSession
 
     init(session: TranslationSession) {
@@ -35,6 +42,10 @@ final class AppleTranslator: TranscriptTranslating {
     ) async throws -> [Int: String] {
         let responses = try await session.translations(from: TranslationBatcher.requests(for: texts))
         return TranslationBatcher.reassemble(responses)
+    }
+
+    func cancel() {
+        session.cancel()
     }
 }
 

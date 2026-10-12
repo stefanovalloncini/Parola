@@ -17,6 +17,8 @@ struct TranslationStrip: View {
                 progressRow(completed: nil, total: nil)
             case .translating(let completed, let total):
                 progressRow(completed: completed, total: total)
+            case .cancelling:
+                progressRow(completed: nil, total: nil, cancelling: true)
             case .failed(let message):
                 failureRow(message)
             case .idle:
@@ -32,11 +34,11 @@ struct TranslationStrip: View {
     }
 
     @ViewBuilder
-    private func progressRow(completed: Int?, total: Int?) -> some View {
+    private func progressRow(completed: Int?, total: Int?, cancelling: Bool = false) -> some View {
         Image(systemName: "translate")
             .foregroundStyle(DS.Color.secondaryText)
             .accessibilityHidden(true)
-        Text(progressLabel(completed: completed, total: total))
+        Text(cancelling ? String(localized: "Cancelling…") : progressLabel(completed: completed, total: total))
             .font(DS.Font.secondary)
             .monospacedDigit()
             .foregroundStyle(DS.Color.secondaryText)
@@ -44,6 +46,7 @@ struct TranslationStrip: View {
             .frame(maxWidth: 160)
         Spacer()
         Button("Cancel") { model.cancelTranslation() }
+            .disabled(cancelling)
             .axLeaf("Translation.Button.Cancel")
     }
 

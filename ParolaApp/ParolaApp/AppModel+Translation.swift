@@ -10,15 +10,43 @@ extension AppModel {
         transcript != nil && selectedEntryID != nil && !translationCoordinator.isRunning
     }
 
+    /// How a translation request ended, so a caller reports this run and not whatever state the coordinator holds.
+    enum TranslationRunResult: Equatable {
+        case landed(cancelled: Bool, translation: TranscriptTranslation)
+        case refused(String)
+        case cancelled
+        case failed(String)
+
+        /// Whether the run landed, and if so whether it was cut short; nil when it landed nothing.
+        var landedCancelled: Bool? {
+            if case .landed(let cancelled, _) = self { return cancelled }
+            return nil
+        }
+    }
+
     /// The one entry point for translating the open transcript: the inspector menu, the View menu
     /// and the bridge all call this.
-    func translateTranscript(to language: String) async {
-        guard canTranslateTranscript, let transcript, let entryID = selectedEntryID else { return }
+    @discardableResult
+    func translateTranscript(to language: String) async -> TranslationRunResult {
+        if translationCoordinator.isRunning { return .refused("another translation is already running") }
+        guard let transcript, let entryID = selectedEntryID else {
+            return .refused(selectedEntryID == nil ? "the transcript is not a library entry" : "no transcript is open")
+        }
         let target = language.trimmingCharacters(in: .whitespaces).lowercased()
-        guard !target.isEmpty else { return }
+        guard !target.isEmpty else { return .refused("the language is empty") }
+        let hadTranslation = transcript.translation != nil
         guard let outcome = await translationCoordinator.translate(
             entryID: entryID, transcript: transcript, to: target
-        ) else { return }
+        ) else {
+            if translationCoordinator.cancelRequested { return .cancelled }
+            if case .failed(let message) = translationCoordinator.state { return .failed(message) }
+            return .refused("the transcript has no text to translate")
+        }
+        // A cancelled or failed re-translation would swap a whole translation for a partial one.
+        if hadTranslation {
+            if outcome.cancelled { return .cancelled }
+            if outcome.failed, case .failed(let message) = translationCoordinator.state { return .failed(message) }
+        }
         let translation = TranscriptTranslation(
             targetLanguage: target,
             segments: outcome.segments,
@@ -29,6 +57,7 @@ extension AppModel {
         // user moved on still lands; only the transcript on screen is left alone.
         if selectedEntryID == entryID { self.transcript?.translation = translation }
         await persistTranslation(translation, for: entryID)
+        return .landed(cancelled: outcome.cancelled, translation: translation)
     }
 
     /// The one entry point for dropping a translation.
