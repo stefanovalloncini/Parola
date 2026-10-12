@@ -282,9 +282,9 @@ struct LibraryRowMenu: View {
     private var ids: [LibraryEntry.ID] { entries.map(\.id) }
 
     /// A category every row already sits in isn't somewhere to move them.
-    static func moveTargets(for entries: [LibraryEntry]) -> [EntryCategory] {
+    static func moveTargets(for entries: [LibraryEntry], features: FeatureSet) -> [EntryCategory] {
         let shared = Set(entries.map(\.category))
-        return EntryCategory.allCases.filter { shared != [$0] }
+        return EntryCategory.shown(by: features).filter { shared != [$0] }
     }
 
     var body: some View {
@@ -376,7 +376,7 @@ struct LibraryRowMenu: View {
 
     private var move: some View {
         Menu("Move to") {
-            ForEach(Self.moveTargets(for: entries), id: \.self) { target in
+            ForEach(Self.moveTargets(for: entries, features: model.features), id: \.self) { target in
                 Button(LocalizedStringKey(libraryCategoryName(target))) {
                     model.moveEntries(ids, to: target)
                 }

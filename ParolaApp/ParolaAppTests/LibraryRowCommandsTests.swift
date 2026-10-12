@@ -109,9 +109,15 @@ struct LibraryRowCommandsTests {
             return LibraryEntry(id: id, bundleURL: URL(fileURLWithPath: "/tmp/LibraryRowCommandsTests/\(id).parola"), manifest: manifest)
         }
 
-        #expect(LibraryRowMenu.moveTargets(for: [entry("a", .meeting)]) == [.transcription, .dictation])
-        #expect(LibraryRowMenu.moveTargets(for: [entry("a", .meeting), entry("b", .meeting)]) == [.transcription, .dictation])
-        #expect(LibraryRowMenu.moveTargets(for: [entry("a", .meeting), entry("b", .dictation)]) == EntryCategory.allCases)
+        let all = FeatureSet.all
+        #expect(LibraryRowMenu.moveTargets(for: [entry("a", .meeting)], features: all) == [.transcription, .dictation])
+        #expect(LibraryRowMenu.moveTargets(for: [entry("a", .meeting), entry("b", .meeting)], features: all) == [.transcription, .dictation])
+        #expect(LibraryRowMenu.moveTargets(for: [entry("a", .meeting), entry("b", .dictation)], features: all) == EntryCategory.allCases)
+
+        let gated = FeatureSet(enabled: [.meetings])
+        #expect(LibraryRowMenu.moveTargets(for: [entry("a", .transcription)], features: gated) == [.meeting])
+        #expect(LibraryRowMenu.moveTargets(for: [entry("a", .meeting)], features: gated) == [.transcription])
+        #expect(LibraryRowMenu.moveTargets(for: [entry("a", .transcription)], features: FeatureSet(enabled: [])) == [])
     }
 
     @Test("a row's Export… opens it with the export sheet over it", .timeLimit(.minutes(1)))

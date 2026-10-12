@@ -101,17 +101,22 @@ struct LibrarySidebar: View {
         }
     }
 
-    private var categories: [EntryCategory] {
-        var rows: [EntryCategory] = [.transcription]
-        if model.features.isEnabled(.meetings) { rows.append(.meeting) }
-        if model.features.isEnabled(.dictation) { rows.append(.dictation) }
-        return rows
-    }
+    private var categories: [EntryCategory] { EntryCategory.shown(by: model.features) }
 
     private var sidebarPeople: [Person] {
         guard PeopleSidebarSection.isVisible(showMostUsed: model.showMostUsedPeople, people: model.people) else {
             return []
         }
         return model.mostUsedPeople(limit: PeopleSidebarSection.rowLimit)
+    }
+}
+
+extension EntryCategory {
+    /// The categories this build shows, in sidebar order; the sidebar and the Move to menu list the same ones.
+    static func shown(by features: FeatureSet) -> [EntryCategory] {
+        var rows: [EntryCategory] = [.transcription]
+        if features.isEnabled(.meetings) { rows.append(.meeting) }
+        if features.isEnabled(.dictation) { rows.append(.dictation) }
+        return rows
     }
 }
