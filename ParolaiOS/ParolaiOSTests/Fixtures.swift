@@ -20,4 +20,23 @@ enum Fixtures {
             modelName: "test"
         )
     }
+
+    static func makeLongTranscript(segments count: Int = 3000, wordsPerSegment: Int = 20) -> Transcript {
+        let vocabulary = ["alpha", "beta", "gamma", "delta", "Parola", "meeting", "budget", "review", "lunedì", "l'altro"]
+        let segments = (0..<count).map { s -> TranscriptSegment in
+            let start = Double(s) * 4
+            let step = 3.8 / Double(wordsPerSegment)
+            let words = (0..<wordsPerSegment).map { w in
+                WordTiming(
+                    id: "\(s)_\(w)",
+                    word: vocabulary[(s * 7 + w * 3) % vocabulary.count],
+                    start: start + Double(w) * step,
+                    end: start + Double(w + 1) * step,
+                    probability: 1
+                )
+            }
+            return TranscriptSegment(id: s, start: start, end: start + 3.8, text: words.map(\.word).joined(separator: " "), words: words)
+        }
+        return Transcript(segments: segments, language: "en", modelName: "test")
+    }
 }

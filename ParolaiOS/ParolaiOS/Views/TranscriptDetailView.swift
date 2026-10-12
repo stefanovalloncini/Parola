@@ -15,6 +15,7 @@ struct TranscriptDetailView: View {
     @State private var speakers: [String] = []
     @State private var filtered: [TranscriptSegment] = []
     @State private var matchIDs: [TranscriptSegment.ID] = []
+    @State private var matchSet: Set<TranscriptSegment.ID> = []
 
     var body: some View {
         @Bindable var model = model
@@ -39,7 +40,7 @@ struct TranscriptDetailView: View {
                             segments: filtered,
                             showSpeaker: Self.showsSpeakerLabels(speakerCount: speakers.count),
                             query: trimmedQuery,
-                            matchingIDs: matchIDs,
+                            matchingSet: matchSet,
                             targetMatchID: targetMatchID(in: matchIDs)
                         )
                     }
@@ -93,8 +94,14 @@ struct TranscriptDetailView: View {
                     }
                 }
                 .searchable(text: $query, prompt: "Search transcript")
-                .onChange(of: query) { _, _ in
+                .task(id: query) {
                     currentMatchIndex = 0
+                    guard !trimmedQuery.isEmpty else {
+                        applyMatches([])
+                        return
+                    }
+                    try? await Task.sleep(for: TranscriptFind.debounce)
+                    guard !Task.isCancelled else { return }
                     recomputeMatches()
                 }
                 .onChange(of: selectedSpeaker) { _, _ in
@@ -151,7 +158,7 @@ struct TranscriptDetailView: View {
         guard let transcript = loaded?.document.transcript else {
             speakers = []
             filtered = []
-            matchIDs = []
+            applyMatches([])
             return
         }
         speakers = transcript.uniqueSpeakers
@@ -160,14 +167,12 @@ struct TranscriptDetailView: View {
     }
 
     private func recomputeMatches() {
-        let q = trimmedQuery
-        guard !q.isEmpty else {
-            matchIDs = []
-            return
-        }
-        matchIDs = filtered
-            .filter { $0.text.range(of: q, options: .caseInsensitive) != nil }
-            .map(\.id)
+        applyMatches(TranscriptFind.matchingIDs(in: filtered, query: trimmedQuery))
+    }
+
+    private func applyMatches(_ ids: [TranscriptSegment.ID]) {
+        matchIDs = ids
+        matchSet = Set(ids)
     }
 
     private var trimmedQuery: String {
@@ -258,11 +263,9 @@ private struct TranscriptScrollView: View {
     let segments: [TranscriptSegment]
     let showSpeaker: Bool
     let query: String
-    let matchingIDs: [TranscriptSegment.ID]
+    let matchingSet: Set<TranscriptSegment.ID>
     let targetMatchID: TranscriptSegment.ID?
     @Environment(PlaybackController.self) private var playback
-
-    private var matchSet: Set<TranscriptSegment.ID> { Set(matchingIDs) }
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -275,7 +278,7 @@ private struct TranscriptScrollView: View {
                             activeSegmentID: playback.currentSegmentID,
                             activeWordID: playback.currentWordID,
                             query: query,
-                            isDimmed: !query.isEmpty && !matchSet.contains(segment.id)
+                            isDimmed: !query.isEmpty && !matchingSet.contains(segment.id)
                         )
                         .id(segment.id)
                     }
@@ -379,7 +382,7 @@ struct WordsView: View {
                 WordChip(
                     word: word,
                     isActive: activeWordID.map(word.wordIDs.contains) ?? false,
-                    isMatch: !query.isEmpty && word.text.range(of: query, options: .caseInsensitive) != nil
+                    isMatch: TranscriptFind.contains(word.text, query: query)
                 )
             }
         }
