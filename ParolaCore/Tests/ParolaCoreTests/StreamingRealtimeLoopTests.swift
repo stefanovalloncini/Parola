@@ -96,6 +96,45 @@ private final class EventRecorder: Sendable {
     var batches: [ConfirmedAudioBatch] { state.withLock { $0.batches } }
 }
 
+private final class SlowDecoder: Sendable {
+    private struct State {
+        var stepsPerCall: [Int] = []
+        var sampleCounts: [Int] = []
+        var started = 0
+    }
+
+    static let fullSteps = 100
+    private let state = OSAllocatedUnfairLock(initialState: State())
+    private let responses: [[TranscriptionSegment]]
+
+    init(responses: [[TranscriptionSegment]]) {
+        self.responses = responses
+    }
+
+    var stepsPerCall: [Int] { state.withLock { $0.stepsPerCall } }
+    var sampleCounts: [Int] { state.withLock { $0.sampleCounts } }
+    var started: Int { state.withLock { $0.started } }
+
+    func decode(_ samples: [Float], _ callback: TranscriptionCallback) async throws -> TranscriptionResult {
+        let index = state.withLock { state -> Int in
+            state.sampleCounts.append(samples.count)
+            state.started += 1
+            return state.sampleCounts.count - 1
+        }
+        var steps = 0
+        for _ in 0..<Self.fullSteps {
+            try await Task.sleep(for: .milliseconds(5))
+            steps += 1
+            let progress = TranscriptionProgress(timings: TranscriptionTimings(), text: "", tokens: [])
+            if callback(progress) == false { break }
+        }
+        let finished = steps
+        state.withLock { $0.stepsPerCall.append(finished) }
+        let segments = index < responses.count ? responses[index] : []
+        return TranscriptionResult(text: "", segments: segments, language: "en", timings: TranscriptionTimings())
+    }
+}
+
 private struct ScriptError: Error {}
 
 /// A first-run microphone prompt that stays up until the test answers it.
@@ -651,6 +690,52 @@ struct StreamingRealtimeLoopTests {
         #expect(flushCall.sampleCount == Int(3.5 * Double(sampleRate)))
         #expect(recorder.batches.count == 2)
         #expect(recorder.batches.last?.segments.map(\.text) == ["b", "c", "tail"], "the flush confirms everything it decodes")
+    }
+
+    @Test("stop interrupts the in-flight decode so the final flush is the only full decode")
+    func stopInterruptsInFlightDecode() async throws {
+        let decoder = SlowDecoder(responses: [
+            [segment(0, 1, "stale")],
+            [segment(0, 1, "a"), segment(1, 2, "b"), segment(2, 3, "c")],
+        ])
+        let capture = FakeCapture()
+        let recorder = EventRecorder()
+        var config = StreamingRealtimeLoop.Configuration()
+        config.useVAD = false
+        let loop = StreamingRealtimeLoop(
+            configuration: config,
+            decodingOptions: DecodingOptions(),
+            dependencies: .init(
+                requestPermission: { true },
+                startCapture: { capture.install($0) },
+                stopCapture: { capture.markStopped() },
+                transcribe: { samples, _, callback in try await decoder.decode(samples, callback) },
+                tick: { try await Task.sleep(nanoseconds: 1_000_000) }
+            ),
+            onPartial: { recorder.recordPartial($0) },
+            onEnergy: { _ in },
+            onConfirmed: { recorder.recordBatch($0) }
+        )
+        let runTask = LoopRun(loop)
+        let installedWait = await eventually { capture.installed }
+        #expect(installedWait)
+
+        capture.push(seconds: 3, value: 0.5)
+        let firstDecodeStarted = await eventually { decoder.started == 1 }
+        #expect(firstDecodeStarted)
+        await loop.stop()
+        let outcome = await runTask.outcome()
+        guard case .stopped = outcome else {
+            Issue.record("expected .stopped, got \(String(describing: outcome))")
+            return
+        }
+
+        let steps = decoder.stepsPerCall
+        #expect(steps.count == 2)
+        #expect(steps.first.map { $0 < SlowDecoder.fullSteps / 2 } == true, "the in-flight decode ends early")
+        #expect(steps.last == SlowDecoder.fullSteps, "the final flush runs to the end")
+        #expect(decoder.sampleCounts == [3 * sampleRate, 3 * sampleRate])
+        #expect(recorder.batches.flatMap(\.segments).map(\.text) == ["a", "b", "c"], "the interrupted result is dropped")
     }
 
     @Test("stop after a silent tail skips the flush decode but keeps the last hypothesis")

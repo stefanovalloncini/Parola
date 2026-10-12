@@ -93,6 +93,11 @@ actor StreamingRealtimeLoop {
         var trimAbove: Int
     }
 
+    private struct StopSignal: Sendable {
+        var requested = false
+        var interruptedDecode = false
+    }
+
     private struct Inbox: Sendable {
         var pending: [Float] = []
         var energies: [(rel: Float, avg: Float)] = []
@@ -116,6 +121,7 @@ actor StreamingRealtimeLoop {
     private let levelMeter: LevelMeter
     private let inbox: OSAllocatedUnfairLock<Inbox>
     private let paused = OSAllocatedUnfairLock(initialState: false)
+    private let stopSignal = OSAllocatedUnfairLock(initialState: StopSignal())
     private let decoderReadySignal: AsyncStream<Void>.Continuation
     private let clock: any Clock<Duration>
 
@@ -133,6 +139,7 @@ actor StreamingRealtimeLoop {
     private var modelLoad: Task<Decoder, any Error>?
     private var modelWaitLimit: Task<Void, Never>?
     private var gaveUpOnModel = false
+    private var interruptedDecode = false
 
     /// `decodingOptions` go with a ready `transcribe`; a model that loads brings its own.
     init(
@@ -294,7 +301,7 @@ actor StreamingRealtimeLoop {
         enforceWindowCap()
         let totalSamples = windowStartSample + window.count
         let newSeconds = Float(totalSamples - lastTranscribedTotal) / Float(config.sampleRate)
-        if newSeconds > 0.05, voiceDetectedInTail(newSeconds) {
+        if newSeconds > 0.05, interruptedDecode || voiceDetectedInTail(newSeconds) {
             lastTranscribedTotal = totalSamples
             try? await transcribeWindow(with: decoder, confirmAll: true)
         }
@@ -327,6 +334,7 @@ actor StreamingRealtimeLoop {
     func stop() {
         stopRequested = true
         isRunning = false
+        if flushesOnStop { stopSignal.withLock { $0.requested = true } }
         if flushesOnStop && config.waitsForModelOnStop {
             limitModelWait()
         } else {
@@ -411,8 +419,10 @@ actor StreamingRealtimeLoop {
             markWaitingForSpeech()
             return try await deps.tick()
         }
+        let previousTotal = lastTranscribedTotal
         lastTranscribedTotal = totalSamples
-        try await transcribeWindow(with: decoder)
+        try await transcribeWindow(with: decoder, yieldsToFinalFlush: true)
+        if interruptedDecode { lastTranscribedTotal = previousTotal }
     }
 
     private func drainInbox() {
@@ -439,7 +449,11 @@ actor StreamingRealtimeLoop {
         return min(Double(lastConfirmedEndSeconds), retainedStart)
     }
 
-    private func transcribeWindow(with decoder: Decoder, confirmAll: Bool = false) async throws {
+    private func transcribeWindow(
+        with decoder: Decoder,
+        confirmAll: Bool = false,
+        yieldsToFinalFlush: Bool = false
+    ) async throws {
         let offsetSeconds = Double(windowStartSample) / Double(config.sampleRate)
         let decodedEndSeconds = Float(offsetSeconds + Double(window.count) / Double(config.sampleRate))
         var options = decoder.options
@@ -448,7 +462,14 @@ actor StreamingRealtimeLoop {
         let emitProgressPartials = unconfirmedSegments.isEmpty
         let onPartial = self.onPartial
         let compressionCheckWindow = config.compressionCheckWindow
+        let stopSignal = self.stopSignal
         let result = try await decoder.transcribe(window, options) { [options] progress in
+            if yieldsToFinalFlush, stopSignal.withLock({ signal in
+                if signal.requested { signal.interruptedDecode = true }
+                return signal.requested
+            }) {
+                return false
+            }
             if emitProgressPartials {
                 onPartial(progress.text.trimmingCharacters(in: .whitespaces))
             }
@@ -457,6 +478,10 @@ actor StreamingRealtimeLoop {
                 options: options,
                 compressionCheckWindow: compressionCheckWindow
             )
+        }
+        if yieldsToFinalFlush, stopSignal.withLock({ $0.interruptedDecode }) {
+            interruptedDecode = true
+            return
         }
         currentText = ""
         let offset = Float(offsetSeconds)
