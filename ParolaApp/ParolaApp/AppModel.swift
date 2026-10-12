@@ -443,6 +443,7 @@ final class AppModel {
     var showAITitles: Bool = true {
         didSet {
             defaults.set(showAITitles, forKey: "showAITitles")
+            if librarySortOrder == .titleAZ || librarySortOrder == .titleZA { reapplyLibrarySort() }
             libraryVersion &+= 1
         }
     }

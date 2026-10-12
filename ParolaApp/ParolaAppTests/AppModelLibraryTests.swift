@@ -461,6 +461,25 @@ struct AppModelLibraryTests {
         #expect(LibraryEntryDisplay.title(for: generic) != "audio")
     }
 
+    @Test("flipping Show AI titles re-sorts a title-sorted library")
+    func aiTitleToggleResorts() {
+        let model = makeModel()
+        var manifest = ParolaDocument.Manifest(
+            createdAt: Self.baseDate, originalAudioName: "Mango.m4a", modelName: "stub", language: "en", category: .transcription
+        )
+        manifest.aiTitle = "Zebra talk"
+        let aiTitled = LibraryEntry(id: "ai", bundleURL: URL(fileURLWithPath: "/lib/ai.parola"), manifest: manifest)
+        let plain = Self.entry(id: "plain", title: "Nectar", createdAt: Self.baseDate)
+        model.librarySortOrder = .titleAZ
+        model.showAITitles = true
+        model.libraryEntries = model.sortedLibraryEntries([aiTitled, plain])
+        #expect(model.libraryEntries.map(\.id) == ["plain", "ai"])
+
+        model.showAITitles = false
+
+        #expect(model.libraryEntries.map(\.id) == ["ai", "plain"])
+    }
+
     @Test("titleZA sort is reverse of A→Z")
     func sortTitleZA() {
         let model = makeModel()
