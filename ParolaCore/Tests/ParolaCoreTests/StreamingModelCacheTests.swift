@@ -334,8 +334,7 @@ struct StreamingModelCacheTests {
         #expect(probe.unloads.value == 0)
 
         await lease.release()
-        #expect(await cache.unloadUnleased() == [Self.tiny])
-        await probe.unloads.wait(atLeast: 1, "the pressure unload")
+        await probe.unloads.wait(atLeast: 1, "the pressure unload the lease was holding up")
         #expect(await cache.residentModelNames().isEmpty)
 
         let again = try await cache.borrow(Self.tiny, store: store)
@@ -418,6 +417,58 @@ struct StreamingModelCacheTests {
         await probe.unloads.wait(atLeast: 1, "the unload five seconds in")
         let afterTheNewTimeout = await cache.residentModelNames()
         #expect(afterTheNewTimeout.isEmpty)
+    }
+
+    @Test("an unload that found the model leased happens when its last lease comes back")
+    func unloadUnleasedWaitsForTheLease() async throws {
+        let probe = CacheProbe()
+        let cache = StreamingModelCache.probing(probe)
+        let store = Self.makeStore()
+
+        let lease = try await cache.borrow(Self.tiny, store: store)
+        let unloadedNow = await cache.unloadUnleased()
+        #expect(unloadedNow.isEmpty)
+        let whileLeased = await cache.residentModelNames()
+        #expect(whileLeased == [Self.tiny])
+
+        await lease.release()
+        let afterRelease = await cache.residentModelNames()
+        #expect(afterRelease.isEmpty)
+        await probe.unloads.wait(atLeast: 1, "the unload the lease was holding up")
+    }
+
+    @Test("a borrow after an unload request cancels it")
+    func borrowClearsThePendingUnload() async throws {
+        let probe = CacheProbe()
+        let cache = StreamingModelCache.probing(probe)
+        let store = Self.makeStore()
+
+        let first = try await cache.borrow(Self.tiny, store: store)
+        await cache.unloadUnleased()
+        let second = try await cache.borrow(Self.tiny, store: store)
+        await first.release()
+        await second.release()
+
+        let resident = await cache.residentModelNames()
+        #expect(resident == [Self.tiny])
+        #expect(probe.unloads.value == 0)
+    }
+
+    @Test("unloadAll forgets an evict that was waiting for a lease")
+    func unloadAllClearsAWaitingEvict() async throws {
+        let probe = CacheProbe()
+        let cache = StreamingModelCache.probing(probe)
+        let store = Self.makeStore()
+
+        let old = try await cache.borrow(Self.tiny, store: store)
+        await cache.evictWhenReleased(Self.tiny)
+        await cache.unloadAll()
+        let fresh = try await cache.borrow(Self.tiny, store: store)
+        await old.release()
+        await fresh.release()
+
+        let resident = await cache.residentModelNames()
+        #expect(resident == [Self.tiny])
     }
 
     @Test("an evict during an unborrowed load drops it when it lands")

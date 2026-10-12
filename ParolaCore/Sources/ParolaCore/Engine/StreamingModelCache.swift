@@ -72,6 +72,7 @@ actor StreamingModelCache {
     private var inFlight: [String: Load] = [:]
     private var leases: [String: Int] = [:]
     private var evictOnRelease: Set<String> = []
+    private var unloadOnRelease: Set<String> = []
     private var currentModelName: String?
     private var lastLoadID = 0
     private(set) var droppedLeases = 0
@@ -97,6 +98,7 @@ actor StreamingModelCache {
         idleUnload.disarm()
         // Counted before the await, so an evict or pressure unload during the load sees this borrower.
         leases[modelName, default: 0] += 1
+        unloadOnRelease.remove(modelName)
         do {
             let shared = try await residentKit(modelName, store: store)
             return StreamingModelLease(shared: shared, modelName: modelName, cache: self)
@@ -109,6 +111,7 @@ actor StreamingModelCache {
     /// Loads the model without holding it: it idles out unless a borrow comes first.
     func warm(_ modelName: String, store: ModelStore) async {
         installPressureSourceIfNeeded()
+        unloadOnRelease.remove(modelName)
         _ = try? await residentKit(modelName, store: store)
         armIdleUnloadIfUnleased()
     }
@@ -121,7 +124,11 @@ actor StreamingModelCache {
         }
         leases[modelName] = held == 1 ? nil : held - 1
         guard held == 1 else { return }
-        if evictOnRelease.remove(modelName) != nil { evict(modelName) }
+        if evictOnRelease.remove(modelName) != nil {
+            evict(modelName)
+        } else if unloadOnRelease.remove(modelName) != nil {
+            unloadModels(of: modelName)
+        }
         armIdleUnloadIfUnleased()
     }
 
@@ -139,12 +146,13 @@ actor StreamingModelCache {
         entries.filter(\.value.isResident).keys.sorted()
     }
 
-    /// Unloads every model no lease holds; a load nobody has borrowed is dropped when it lands.
+    /// Unloads every model no lease holds, and each leased one when its last lease comes back; a load nobody has borrowed is dropped when it lands.
     @discardableResult
     func unloadUnleased() -> [String] {
         for name in inFlight.keys where leaseCount(for: name) == 0 {
             inFlight[name]?.dropUnlessLeased = true
         }
+        unloadOnRelease.formUnion(residentModelNames().filter { leaseCount(for: $0) > 0 })
         return unloadIdleModels()
     }
 
@@ -172,6 +180,8 @@ actor StreamingModelCache {
         for load in inFlight.values { load.task.cancel() }
         entries.removeAll()
         inFlight.removeAll()
+        evictOnRelease.removeAll()
+        unloadOnRelease.removeAll()
     }
 
     private func residentKit(_ modelName: String, store: ModelStore) async throws -> SharedWhisperKit {
