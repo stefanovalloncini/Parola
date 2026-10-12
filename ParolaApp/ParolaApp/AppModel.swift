@@ -4498,7 +4498,7 @@ final class AppModel {
         options: TranscriptionOptions,
         downloadProgress: @escaping @Sendable (Double) -> Void
     ) async {
-        let labeler = await streamingSpeakerLabeler()
+        let labeler = streamingSpeakerLabeler()
         do {
             let events = try await s.start(options: options, speakerLabeler: labeler, downloadProgress: downloadProgress)
             guard takeIsCurrent(take) else {
@@ -4552,10 +4552,10 @@ final class AppModel {
     /// Session-local speaker labels for streaming mic recordings. When the diarizer models
     /// aren't downloaded yet, this recording stays unlabeled and the fetch runs in the
     /// background so the next one can label.
-    private func streamingSpeakerLabeler() async -> (any StreamingSpeakerLabeler)? {
+    private func streamingSpeakerLabeler() -> (any StreamingSpeakerLabeler)? {
         guard diarize else { return nil }
         if IncrementalSpeakerLabeler.modelsInstalled() {
-            return try? await IncrementalSpeakerLabeler.loadInstalled()
+            return IncrementalSpeakerLabeler.sharedInstalled()
         }
         if mode == .normal {
             Task.detached { try? await IncrementalSpeakerLabeler.downloadModels() }

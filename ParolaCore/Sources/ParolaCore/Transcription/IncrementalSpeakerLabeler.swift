@@ -8,12 +8,12 @@ public actor IncrementalSpeakerLabeler: StreamingSpeakerLabeler {
     static let minWindowSeconds: Double = 0.5
     static let maxWindowSamples = 160_000
 
-    private let embedWindow: (ArraySlice<Float>) throws -> [Float]
+    private let embedWindow: (ArraySlice<Float>) async throws -> [Float]
     private var tracker: SpeakerCentroidTracker
 
     init(
         maxAssignmentDistance: Float = SpeakerCentroidTracker.defaultMaxAssignmentDistance,
-        embedWindow: sending @escaping (ArraySlice<Float>) throws -> [Float]
+        embedWindow: sending @escaping (ArraySlice<Float>) async throws -> [Float]
     ) {
         self.embedWindow = embedWindow
         self.tracker = SpeakerCentroidTracker(maxAssignmentDistance: maxAssignmentDistance)
@@ -29,7 +29,7 @@ public actor IncrementalSpeakerLabeler: StreamingSpeakerLabeler {
         guard Double(audioWindow.count) >= Self.minWindowSeconds * sampleRate else { return nil }
         // FluidAudio's extractor buffer holds 10 s; longer input overruns it (see EmbeddingExtractor.fillWaveformBuffer).
         let window = audioWindow.prefix(Self.maxWindowSamples)
-        guard let embedding = try? embedWindow(window) else { return nil }
+        guard let embedding = try? await embedWindow(window) else { return nil }
         return tracker.label(for: embedding)
     }
 }
@@ -48,18 +48,12 @@ extension IncrementalSpeakerLabeler {
         _ = try await DiarizerModels.download(to: modelsDirectory(store: store))
     }
 
-    /// Builds a labeler from the models already on disk. Never downloads.
-    public static func loadInstalled(store: ModelStore = .shared) async throws -> IncrementalSpeakerLabeler {
-        let dir = modelsDirectory(store: store)
-        let models = try DiarizerModels.load(
-            localSegmentationModel: dir.appendingPathComponent(ModelNames.Diarizer.segmentationFile),
-            localEmbeddingModel: dir.appendingPathComponent(ModelNames.Diarizer.embeddingFile)
-        )
-        let manager = DiarizerManager()
-        manager.initialize(models: models)
-        return IncrementalSpeakerLabeler { window in
-            try manager.extractSpeakerEmbedding(from: window)
-        }
+    /// A labeler for one take that embeds with the process-wide models. The load starts now and the first label waits for it,
+    /// so a take opens its microphone without the load and keeps the models for the next one.
+    public static func sharedInstalled(store: ModelStore = .shared) -> IncrementalSpeakerLabeler {
+        let models = SpeakerLabelerModels.shared
+        Task { await models.prepare(store: store) }
+        return IncrementalSpeakerLabeler { window in try await models.embed(window, store: store) }
     }
 
     // DiarizerModels.download resolves its target as parent-of-the-passed-directory + Repo.folderName,
