@@ -258,6 +258,7 @@ extension AppModel {
     /// A mic track whose take is in the library now waits in a record of its own, which the next launch folds into that entry; false when the record didn't reach the disk.
     @discardableResult
     func keepMicTrack(_ mic: StoppedMicTrack, forEntry entryID: LibraryEntry.ID) async -> Bool {
+        armTakeFileHeartbeat()
         recoveryGeneration += 1
         let generation = recoveryGeneration
         recoveryFileIDs[generation] = UUID()
@@ -799,16 +800,45 @@ extension AppModel {
         inflightFilesInUse.contains(file.resolvingSymlinksInPath().path)
     }
 
-    /// Once a minute, marks the working files in use as just written, so no instance's sweep, this one's or another's, takes them.
+    /// While a take, a start or a working file is held, marks the files just written once a minute so no instance's sweep takes them; idle, no timer runs.
     func startTakeFileHeartbeat() {
-        takeFileHeartbeat?.cancel()
+        takeFileScratchObserver = NotificationCenter.default.addObserver(
+            forName: RecordingScratch.didHandOutFile, object: nil, queue: nil
+        ) { [weak self] _ in
+            Task { @MainActor in self?.armTakeFileHeartbeat() }
+        }
+        if holdsInflightFile { armTakeFileHeartbeat() }
+    }
+
+    var holdsInflightFile: Bool {
+        inflightFilesInUse.contains { isInflightFile(URL(fileURLWithPath: $0)) }
+    }
+
+    /// Safe to call whenever a hold appears: it restarts the quiet count and starts the timer only if none is running.
+    func armTakeFileHeartbeat() {
+        takeFileQuietTicks = 0
+        guard takeFileHeartbeat == nil else { return }
         let clock = clock
+        let id = UUID()
+        takeFileHeartbeatID = id
         takeFileHeartbeat = Task { @MainActor [weak self] in
-            while !Task.isCancelled, self != nil {
-                self?.touchTakeFilesInUse()
+            while !Task.isCancelled, self?.takeFileHeartbeatTick() == true {
                 try? await Task.sleep(for: .seconds(60), clock: clock)
             }
+            self?.endTakeFileHeartbeat(id)
         }
+    }
+
+    private func takeFileHeartbeatTick() -> Bool {
+        takeFileHeartbeatTicks += 1
+        touchTakeFilesInUse()
+        takeFileQuietTicks = takeFileIsHeld ? 0 : takeFileQuietTicks + 1
+        return takeFileQuietTicks < 2
+    }
+
+    private func endTakeFileHeartbeat(_ id: UUID) {
+        guard takeFileHeartbeatID == id else { return }
+        takeFileHeartbeat = nil
     }
 
     func touchTakeFilesInUse() {

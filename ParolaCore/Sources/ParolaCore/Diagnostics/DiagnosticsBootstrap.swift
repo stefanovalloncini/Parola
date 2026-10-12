@@ -20,55 +20,33 @@ public final class DiagnosticsBootstrap: Sendable {
     }
 
     private let sink: FileDiagnosticsSink
-    private let flushTask: Task<Void, Never>?
 
     /// `periodicFlush` bounds what a hard kill costs: without it only errors, a full buffer and the
-    /// exit drain reach the file, so a long-running process would lose its breadcrumbs.
-    public convenience init(
+    /// exit drain reach the file, so a long-running process would lose its breadcrumbs. The flush is
+    /// armed by the first record into an empty buffer, so an idle process runs no timer at all.
+    public init(
         directory: URL = DiagnosticsBootstrap.defaultDirectory,
         environment: [String: String] = ProcessInfo.processInfo.environment,
         periodicFlush: Bool,
         flushInterval: Duration = .seconds(2)
     ) {
-        self.init(
-            directory: directory, environment: environment, periodicFlush: periodicFlush,
-            flushInterval: flushInterval, clock: ContinuousClock()
-        )
-    }
-
-    /// Test seam: the periodic flush sleeps on `clock`.
-    init(
-        directory: URL,
-        environment: [String: String],
-        periodicFlush: Bool,
-        flushInterval: Duration,
-        clock: any Clock<Duration>
-    ) {
         let sink = FileDiagnosticsSink(
             directory: directory,
-            minimumLevel: Self.minimumLevel(environment: environment)
+            minimumLevel: Self.minimumLevel(environment: environment),
+            flushDelay: periodicFlush ? flushInterval : nil
         )
         self.sink = sink
         // Best effort: the sweep starts inside init, so this only usually catches its own notice.
         ParolaLog.install(sink)
         ParolaLog.info(.diagnostics, "diagnostics sink installed")
-        flushTask = periodicFlush
-            ? Task { [sink] in
-                while !Task.isCancelled {
-                    try? await clock.sleep(for: flushInterval, tolerance: nil)
-                    guard !Task.isCancelled else { return }
-                    await sink.flush()
-                }
-            }
-            : nil
         // Exit is the only hook a CLI has left once its command returns, and it cannot await.
         atexit { ParolaLog.flushSynchronously() }
     }
 
-    var hasPeriodicFlush: Bool { flushTask != nil }
+    var hasPeriodicFlush: Bool { sink.hasDeferredFlush }
 
     public func stopPeriodicFlush() {
-        flushTask?.cancel()
+        sink.stopDeferredFlush()
     }
 
     public func flush() async {

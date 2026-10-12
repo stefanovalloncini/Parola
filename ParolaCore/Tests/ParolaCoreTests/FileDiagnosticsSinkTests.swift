@@ -39,6 +39,26 @@ struct FileDiagnosticsSinkTests {
         #expect(try String(contentsOf: sink.currentFileURL, encoding: .utf8).contains("boom"))
     }
 
+    @Test("an idle sink arms nothing until a record arrives, then flushes on its own")
+    func deferredFlushArmsOnTheFirstRecord() async throws {
+        let dir = tempDirectory()
+        let sink = FileDiagnosticsSink(directory: dir, flushDelay: .milliseconds(30))
+        try await Task.sleep(for: .milliseconds(150))
+        await sink.waitForFileQueue()
+        #expect(!FileManager.default.fileExists(atPath: sink.currentFileURL.path))
+
+        sink.enqueue(record(.info, "armed by the first record"))
+        let deadline = ContinuousClock.now + .seconds(5)
+        var text = ""
+        while ContinuousClock.now < deadline {
+            await sink.waitForFileQueue()
+            text = (try? String(contentsOf: sink.currentFileURL, encoding: .utf8)) ?? ""
+            if text.contains("armed by the first record") { break }
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(text.contains("armed by the first record"))
+    }
+
     @Test("info records buffer until flushed")
     func infoBuffersUntilFlush() async throws {
         let dir = tempDirectory()

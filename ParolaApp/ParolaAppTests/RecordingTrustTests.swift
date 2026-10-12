@@ -1144,6 +1144,49 @@ extension TranscriberMockSuites {
             #expect(try modified(idle) < Date().addingTimeInterval(-3_000))
         }
 
+        @Test("the heartbeat starts on a new take file")
+        func heartbeatStartsOnANewFile() async throws {
+            let model = makeModel()
+            model.startTakeFileHeartbeat()
+            #expect(model.takeFileHeartbeat == nil, "no working file, no timer")
+            NotificationCenter.default.post(name: RecordingScratch.didHandOutFile, object: nil)
+            #expect(await waitUntil { model.takeFileHeartbeat != nil })
+            model.takeFileHeartbeat?.cancel()
+            model.takeFileHeartbeat = nil
+        }
+
+        @Test("with nothing held the heartbeat stops after two quiet ticks")
+        func heartbeatStopsWhenQuiet() async throws {
+            let model = makeModel(clock: InstantClock())
+            model.armTakeFileHeartbeat()
+            #expect(await waitUntil { model.takeFileHeartbeat == nil })
+            #expect(model.takeFileHeartbeatTicks == 2)
+        }
+
+        @Test("a held take file keeps the heartbeat running across many ticks")
+        func heartbeatSurvivesWhileHeld() async throws {
+            let library = makeTempLibraryURL("heartbeat-held")
+            let inflight = library.appendingPathComponent("inflight", isDirectory: true)
+            try FileManager.default.createDirectory(at: inflight, withIntermediateDirectories: true)
+            let model = makeModel(libraryURL: library, clock: InstantClock())
+            model.liveRecordingAudioURL = try makeTakeWAV("heartbeat-held", in: inflight, prefix: "parola-mic")
+
+            model.armTakeFileHeartbeat()
+            #expect(await waitUntil { model.takeFileHeartbeatTicks >= 6 })
+            #expect(model.takeFileHeartbeat != nil)
+            model.takeFileHeartbeat?.cancel()
+        }
+
+        @Test("a take starting counts as held before any file is named")
+        func heartbeatHeldWhileATakeRuns() async throws {
+            let model = makeModel(clock: InstantClock())
+            model.installTestTake(source: .microphone)
+            model.armTakeFileHeartbeat()
+            #expect(await waitUntil { model.takeFileHeartbeatTicks >= 6 })
+            #expect(model.takeFileHeartbeat != nil)
+            model.takeFileHeartbeat?.cancel()
+        }
+
         @Test("dictation throws away only its own scratch, never a file with another name")
         func dictationDiscardsOnlyItsScratch() throws {
             let folder = FileManager.default.temporaryDirectory.appendingPathComponent("dictation-scratch-\(UUID().uuidString)")

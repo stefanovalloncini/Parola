@@ -664,6 +664,10 @@ final class AppModel {
     /// Working files whose take is on its way to the library.
     @ObservationIgnored var takeFilesBeingSaved: [URL: Int] = [:]
     @ObservationIgnored var takeFileHeartbeat: Task<Void, Never>?
+    @ObservationIgnored var takeFileScratchObserver: NSObjectProtocol?
+    @ObservationIgnored var takeFileQuietTicks = 0
+    @ObservationIgnored var takeFileHeartbeatTicks = 0
+    @ObservationIgnored var takeFileHeartbeatID: UUID?
     @ObservationIgnored var recordingRecoveryStartedAt: Date?
     @ObservationIgnored var liveRecordingAudioURL: URL?
     /// A meeting's microphone track while it records beside the take, and how far into the take's audio it starts.
@@ -1975,6 +1979,11 @@ final class AppModel {
     @ObservationIgnored private(set) var youtubeSubsTask: Task<Void, Never>? {
         didSet { if oldValue != nil, youtubeSubsTask == nil { foregroundLetGo() } }
     }
+    /// A take recording, starting or finishing keeps its working files in use even before anything names them.
+    var takeFileIsHeld: Bool {
+        takeIsRunning || recordingStartInFlight || takeRun != nil || holdsInflightFile
+    }
+
     /// Observed, so a view reading `recordingActive` hears a start that ends after its take's session did.
     private var recordingStartInFlight = false {
         didSet {
@@ -5236,6 +5245,7 @@ final class AppModel {
     private func armTakeRetry(_ retry: RecordingSession.Failure) {
         failureKind = .transcription
         failedTakeRetry = retry
+        armTakeFileHeartbeat()
     }
 
     /// A model download from Settings keeps the phase for its bar; the transcript page shows past it.

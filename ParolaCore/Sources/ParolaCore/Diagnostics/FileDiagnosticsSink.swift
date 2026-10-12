@@ -8,6 +8,8 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
         var buffer: [LogRecord] = []
         var dropped: Int = 0
         var disabled: Bool = false
+        var flushArmed: Bool = false
+        var flushDelay: Duration?
     }
 
     private struct FileState {
@@ -44,7 +46,8 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
         maxFileBytes: Int = 5_000_000,
         retentionDays: Int = 7,
         totalBudgetBytes: Int = 10_000_000,
-        maxBufferedRecords: Int = 4_096
+        maxBufferedRecords: Int = 4_096,
+        flushDelay: Duration? = nil
     ) {
         self.init(
             directory: directory,
@@ -53,6 +56,7 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
             retentionDays: retentionDays,
             totalBudgetBytes: totalBudgetBytes,
             maxBufferedRecords: maxBufferedRecords,
+            flushDelay: flushDelay,
             write: { try $0.write(contentsOf: $1) }
         )
     }
@@ -66,6 +70,7 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
         retentionDays: Int = 7,
         totalBudgetBytes: Int = 10_000_000,
         maxBufferedRecords: Int = 4_096,
+        flushDelay: Duration? = nil,
         write: @escaping @Sendable (FileHandle, Data) throws -> Void
     ) {
         self.write = write
@@ -75,6 +80,7 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
         self.retentionDays = retentionDays
         self.totalBudgetBytes = totalBudgetBytes
         self.maxBufferedRecords = maxBufferedRecords
+        bufferState.withLock { $0.flushDelay = flushDelay }
         let pid = ProcessInfo.processInfo.processIdentifier
         let epoch = Int(Date().timeIntervalSince1970)
         // Keeps two sinks built in the same second from sharing a base name and trimming each other's file.
@@ -120,17 +126,41 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
 
     public func enqueue(_ record: LogRecord) {
         guard record.level >= minimumLevel else { return }
-        let shouldDrainNow: Bool = bufferState.withLock { current in
-            guard !current.disabled else { return false }
+        let (shouldDrainNow, armDelay): (Bool, Duration?) = bufferState.withLock { current in
+            guard !current.disabled else { return (false, nil) }
             guard current.buffer.count < maxBufferedRecords else {
                 current.dropped += 1
-                return true
+                return (true, nil)
             }
             current.buffer.append(record)
-            return record.level >= .error || current.buffer.count >= 64
+            if record.level >= .error || current.buffer.count >= 64 { return (true, nil) }
+            guard !current.flushArmed, let delay = current.flushDelay else { return (false, nil) }
+            current.flushArmed = true
+            return (false, delay)
         }
+        if let armDelay { armFlush(after: armDelay) }
         guard shouldDrainNow else { return }
         fileQueue.async { self.drainOnQueue() }
+    }
+
+    /// Stops arming new deferred flushes; one already armed still fires.
+    func stopDeferredFlush() {
+        bufferState.withLock { $0.flushDelay = nil }
+    }
+
+    var hasDeferredFlush: Bool { bufferState.withLock { $0.flushDelay != nil } }
+
+    private func armFlush(after delay: Duration) {
+        let timer = DispatchSource.makeTimerSource(queue: fileQueue)
+        let components = delay.components
+        let seconds = Double(components.seconds) + Double(components.attoseconds) / 1e18
+        timer.schedule(deadline: .now() + seconds, leeway: .nanoseconds(Int(seconds * 0.5 * 1e9)))
+        timer.setEventHandler {
+            self.bufferState.withLock { $0.flushArmed = false }
+            self.drainOnQueue()
+            timer.cancel()
+        }
+        timer.resume()
     }
 
     /// Test seam: resolves once the file queue has run everything enqueued before the call.

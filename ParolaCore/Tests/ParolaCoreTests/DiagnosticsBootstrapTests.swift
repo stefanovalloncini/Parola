@@ -40,17 +40,15 @@ struct DiagnosticsBootstrapTests {
         #expect(try sinkText(in: directory).contains("bootstrap probe"))
     }
 
-    @Test("the periodic flush writes breadcrumbs nothing else would drain")
+    @Test("the deferred flush writes breadcrumbs nothing else would drain")
     func periodicFlushDrainsOnItsOwn() async throws {
         let directory = scratchDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
-        let clock = TestClock()
         let bootstrap = DiagnosticsBootstrap(
             directory: directory,
             environment: [:],
             periodicFlush: true,
-            flushInterval: .seconds(2),
-            clock: clock
+            flushInterval: .milliseconds(40)
         )
         defer {
             bootstrap.stopPeriodicFlush()
@@ -58,11 +56,23 @@ struct DiagnosticsBootstrapTests {
         }
         #expect(bootstrap.hasPeriodicFlush)
 
-        await clock.waitForSleeper()
-        clock.advance(by: .seconds(2))
-        // The loop sleeps again only once its flush has returned.
-        await clock.waitForSleeper()
-        #expect(try sinkText(in: directory).contains("diagnostics sink installed"))
+        let deadline = ContinuousClock.now + .seconds(5)
+        var text = ""
+        while ContinuousClock.now < deadline {
+            text = (try? sinkText(in: directory)) ?? ""
+            if text.contains("diagnostics sink installed") { break }
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(text.contains("diagnostics sink installed"))
+
+        ParolaLog.info(.cli, "second breadcrumb")
+        let again = ContinuousClock.now + .seconds(5)
+        while ContinuousClock.now < again {
+            text = (try? sinkText(in: directory)) ?? ""
+            if text.contains("second breadcrumb") { break }
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(text.contains("second breadcrumb"))
     }
 
     @Test("without the periodic flush no flush task runs and flush() drains the notice")
