@@ -1,3 +1,4 @@
+import os
 import SwiftUI
 import ParolaCore
 
@@ -78,7 +79,7 @@ struct FindReplacePane: View {
     static func isEffectivelyEnabled(_ rule: FindReplaceRule) -> Bool {
         let trimmed = rule.find.trimmingCharacters(in: .whitespacesAndNewlines)
         guard rule.enabled, !trimmed.isEmpty else { return false }
-        if rule.regex, (try? NSRegularExpression(pattern: trimmed)) == nil { return false }
+        if rule.regex, !CompiledPatterns.shared.compiles(trimmed) { return false }
         return true
     }
 
@@ -163,5 +164,26 @@ private struct FindReplaceRuleRow: View {
         .onChange(of: rule.find) { cachedRegexError = GlobalFindReplace.validate(rule) }
         .onChange(of: rule.caseSensitive) { cachedRegexError = GlobalFindReplace.validate(rule) }
         .onChange(of: rule.regex) { cachedRegexError = GlobalFindReplace.validate(rule) }
+    }
+}
+
+/// Whether a pattern compiles, remembered so the rule list doesn't compile every regex again on each pass.
+final class CompiledPatterns: Sendable {
+    static let shared = CompiledPatterns()
+    private static let limit = 256
+    private let verdicts = OSAllocatedUnfairLock(initialState: [String: Bool]())
+    private let compiled = OSAllocatedUnfairLock(initialState: 0)
+
+    var compilations: Int { compiled.withLock { $0 } }
+
+    func compiles(_ pattern: String) -> Bool {
+        if let known = verdicts.withLock({ $0[pattern] }) { return known }
+        compiled.withLock { $0 += 1 }
+        let verdict = (try? NSRegularExpression(pattern: pattern)) != nil
+        verdicts.withLock { table in
+            if table.count >= Self.limit { table.removeAll() }
+            table[pattern] = verdict
+        }
+        return verdict
     }
 }
