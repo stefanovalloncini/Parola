@@ -40,12 +40,6 @@ struct SystemCapturePermissionsTests {
         )
     }
 
-    private func waitUntil(_ condition: () -> Bool) async {
-        for _ in 0..<200 where !condition() {
-            await Task.yield()
-        }
-    }
-
     @Test("initial state mirrors the checks")
     func initialState() {
         let box = Box()
