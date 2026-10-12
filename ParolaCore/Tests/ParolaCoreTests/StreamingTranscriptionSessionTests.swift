@@ -86,13 +86,16 @@ private func launchTake(
     harness: TakeHarness,
     useVAD: Bool = false,
     modelLease: StreamingModelLease? = nil,
-    decodeGate: UninterruptibleGate? = nil
+    decodeGate: UninterruptibleGate? = nil,
+    speakerLabeler: (any StreamingSpeakerLabeler)? = nil,
+    segmentsPerDecode: Int = 1
 ) async -> AsyncStream<StreamingEvent> {
     var configuration = StreamingRealtimeLoop.Configuration()
     configuration.useVAD = useVAD
+    configuration.wantsConfirmedAudio = speakerLabeler != nil
     let loopConfiguration = configuration
     return await session.launch(
-        options: TranscriptionOptions(), speakerLabeler: nil, persister: persister, modelLease: modelLease
+        options: TranscriptionOptions(), speakerLabeler: speakerLabeler, persister: persister, modelLease: modelLease
     ) { sink, confirmed in
         StreamingRealtimeLoop(
             configuration: loopConfiguration,
@@ -112,7 +115,9 @@ private func launchTake(
                     harness.recordDecode(sampleCount: samples.count)
                     return TranscriptionResult(
                         text: " last words",
-                        segments: [TranscriptionSegment(start: 0, end: 0.5, text: " last words")],
+                        segments: (0..<segmentsPerDecode).map {
+                            TranscriptionSegment(start: Float($0), end: Float($0) + 0.5, text: " last words")
+                        },
                         language: "en",
                         timings: TranscriptionTimings()
                     )
@@ -414,6 +419,33 @@ struct StreamingTakeEndingTests {
         #expect(transcript.segments.isEmpty)
         #expect(transcript.language == "it")
         #expect(transcript.sourceURL == nil)
+    }
+
+    @Test("cancelling a take returns while its speaker labeler is still embedding")
+    func cancelDoesNotWaitForTheLabeler() async throws {
+        let embedding = TestSignal()
+        let gate = TestSignal()
+        let labeler = IncrementalSpeakerLabeler { _ in
+            embedding.fire()
+            await gate.wait("the test to release the embedding")
+            return [1, 0]
+        }
+        let session = StreamingTranscriptionSession(persistAudio: false)
+        let persister = try #require(StreamingAudioPersister(sampleRate: 16_000))
+        let harness = TakeHarness()
+        let events = await launchTake(
+            on: session, persister: persister, harness: harness, speakerLabeler: labeler, segmentsPerDecode: 3
+        )
+        let installedWait = await eventually { harness.installed }
+        #expect(installedWait)
+        harness.push([Float](repeating: 0.5, count: 48_000))
+        await embedding.wait("the labeler to start embedding")
+
+        let cancelling = GuardedTask { await session.cancel() }
+        _ = try await cancelling.value("the cancel to return while the embedding is held")
+        #expect(!gate.fired)
+        gate.fire()
+        for await _ in events {}
     }
 
     @Test("cancelling a take skips its final decode, deletes its audio and sends no finished transcript")

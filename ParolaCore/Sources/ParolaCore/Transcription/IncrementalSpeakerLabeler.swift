@@ -41,7 +41,7 @@ public actor IncrementalSpeakerLabeler: StreamingSpeakerLabeler {
 }
 
 extension IncrementalSpeakerLabeler {
-    /// Gives up on the embedding when the caller is cancelled, so a Cancel doesn't wait behind a cold model load.
+    /// Returns nil as soon as the caller is cancelled; the embedding finishes in the background, so a Cancel doesn't wait on a cold model load.
     private func embedUnlessCancelled(_ window: ArraySlice<Float>) async -> [Float]? {
         guard !Task.isCancelled else { return nil }
         let outcome = EmbeddingOutcome()

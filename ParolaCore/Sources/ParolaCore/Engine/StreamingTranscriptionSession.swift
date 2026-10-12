@@ -453,6 +453,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         streamerTask?.cancel()
         _ = await streamerTask?.value
         segmentContinuation?.finish()
+        consumerTask?.cancel()
         await consumerTask?.value
         await persister?.discard()
         continuation?.finish()
@@ -463,6 +464,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
     private func cancelWaitingStop(of stopping: StreamingRealtimeLoop) async {
         await stopping.cancel()
         streamerTask?.cancel()
+        consumerTask?.cancel()
         await withCheckedContinuation { (waiter: CheckedContinuation<Void, Never>) in
             if stoppingLoop === stopping {
                 stopWaiters.append(waiter)

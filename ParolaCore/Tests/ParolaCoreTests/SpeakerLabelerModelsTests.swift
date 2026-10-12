@@ -146,7 +146,6 @@ struct SpeakerLabelerModelsTests {
         let segment = TranscriptSegment(id: 0, start: 0, end: 1, text: "hi")
         let window = [Float](repeating: 0.1, count: 16_000)
         let task = Task { await labeler.labelSpeaker(for: segment, audioWindow: window[...], windowStartTime: 0, sampleRate: 16_000) }
-        try await Task.sleep(for: .milliseconds(20))
         task.cancel()
         #expect(await task.value == nil)
         gate.fire()

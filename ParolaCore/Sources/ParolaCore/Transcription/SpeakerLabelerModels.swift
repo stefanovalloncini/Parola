@@ -104,6 +104,9 @@ actor SpeakerLabelerModels {
     private func unloadUnderPressure() {
         guard resident != nil else { return }
         guard takes == 0 else {
+            if !unloadsWhenIdle {
+                ParolaLog.notice(.streaming, "speaker labeler models will unload when the take ends (memory pressure)")
+            }
             unloadsWhenIdle = true
             return
         }
