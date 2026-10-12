@@ -197,6 +197,13 @@ struct MainWindowTests {
         #expect(try source("Views/Transcript/TranscriptTitle").contains(#"Button("Rename") { model.renameOpenTranscript(to: renameDraft) } "# + guardText))
     }
 
+    @Test("a row's tooltip covers the badge and text, not the trailing actions")
+    func rowTooltipLeavesTheActionsAlone() throws {
+        let row = try source("Views/Components/EntryRow")
+        #expect(row.contains("chromedRow .onHover"))
+        #expect(row.components(separatedBy: ".help(rowHelp)").count - 1 == 2)
+    }
+
     @Test("the chat sender filter names have Italian")
     func chatSenderFilterHasItalian() throws {
         let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))

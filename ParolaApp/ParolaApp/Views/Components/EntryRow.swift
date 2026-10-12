@@ -157,20 +157,24 @@ struct EntryRow<Accessory: View, Actions: View>: View {
 
     var body: some View {
         chromedRow
-            .help(help ?? display.tooltip)
             .onHover { isHovering = $0 }
     }
+
+    /// Not on the whole row, or it would cover the trailing actions' own tooltips.
+    private var rowHelp: String { help ?? display.tooltip }
 
     /// The row pads itself inside its hover wash, so the wash spans what the system selection spans.
     @ViewBuilder
     private var chromedRow: some View {
         let row = HStack(spacing: DS.Spacing.regular) {
             EntryBadge(kind: display.sourceKind, onAccent: onAccent)
+                .help(rowHelp)
             VStack(alignment: .leading, spacing: DS.Spacing.hair) {
                 titleLine
                 detailLine
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            .help(rowHelp)
             trailingActions
         }
         .frame(minHeight: EntryRowMetrics.height)
