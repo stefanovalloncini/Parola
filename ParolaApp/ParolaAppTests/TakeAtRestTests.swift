@@ -128,10 +128,10 @@ private struct RunningClocks: View {
 }
 
 @MainActor
-@Suite("The window's clocks read the take's seconds", .serialized)
+@Suite("The window's clocks agree on the take's second", .serialized)
 struct WindowClockTests {
-    @Test("the toolbar capsule, the sidebar row and the Stage clock turn over with the take's seconds and hold while it pauses")
-    func clocksReadTheTakesSeconds() async throws {
+    @Test("the toolbar capsule, the sidebar row and the Stage clock agree on the take's second and hold while it pauses")
+    func clocksAgreeOnTheTakesSecond() async throws {
         let audio = try tempWAV("window-clocks")
         defer { try? FileManager.default.removeItem(at: audio) }
         let model = makeRecordingModel("window-clocks")
@@ -156,9 +156,10 @@ struct WindowClockTests {
                 digits(in: hosted.host)?.text,
             ]
         }
-        @MainActor func readSecond(_ seconds: Int) -> Bool {
+        @MainActor func readSecond(_ seconds: Int, paused: Bool = false) -> Bool {
             let time = AppFormat.spokenDuration(seconds: seconds)
-            return spoken() == ["Recording, \(time)", time, StageClock.text(seconds: seconds)]
+            let status = paused ? "Paused, \(time)" : "Recording, \(time)"
+            return spoken() == [status, paused ? status : time, StageClock.text(seconds: seconds)]
         }
 
         for _ in 0..<2 {
@@ -170,7 +171,9 @@ struct WindowClockTests {
         }
 
         #expect(model.pauseTake())
-        await settle()
+        let pausedAt = Int(try #require(model.recording).elapsed(at: Date()))
+        let caughtUp = await waitUntil { readSecond(pausedAt, paused: true) }
+        #expect(caughtUp, "paused at \(pausedAt) s the clocks say \(spoken())")
         let atPause = spoken()
         await settle(for: .milliseconds(1_300))
         #expect(spoken() == atPause, "a clock moved during the pause: \(atPause) → \(spoken())")

@@ -278,7 +278,7 @@ final class AppModel {
     var takeStopReason: String?
     var takeStoppedOnItsOwn: Bool { takeStopReason != nil }
     private(set) var takeLevelTick = 0
-    /// The running take's clock in whole seconds, pauses left out, turned over by the sampler's tick; every clock that shows the take reads its seconds off it.
+    /// The running take's clock in whole seconds, pauses left out, turned over by the sampler's tick; the Dock badge, the menu bar item, the pill, the Stage clock and the sidebar row read their seconds off it.
     private(set) var takeClockSeconds = 0
     /// When the newest of the take's levels came in; the Stage's band slides from here until the next one.
     @ObservationIgnored private(set) var takeLevelTickAt = Date.distantPast
