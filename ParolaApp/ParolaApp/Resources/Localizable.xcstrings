@@ -1161,6 +1161,23 @@
         }
       }
     },
+    "A preset with this name already exists.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A preset with this name already exists."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esiste già un preset con questo nome."
+          }
+        }
+      }
+    },
     "A recording is in progress": {
       "extractionState": "manual",
       "localizations": {
@@ -9454,6 +9471,23 @@
         }
       }
     },
+    "My preset": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "My preset"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il mio preset"
+          }
+        }
+      }
+    },
     "NVIDIA Parakeet via FluidAudio. Transcribes an hour of audio in seconds; v3 is multilingual.": {
       "extractionState": "manual",
       "localizations": {
@@ -9494,6 +9528,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "Nome Z→A"
+          }
+        }
+      }
+    },
+    "Name in use": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Name in use"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nome già usato"
           }
         }
       }

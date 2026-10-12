@@ -21,15 +21,20 @@ struct ExportSheet: View {
         .alert("Save as Preset", isPresented: $namingPreset) {
             TextField("Preset name", text: $presetName)
                 .axLeaf("Export.TextField.PresetName")
-            Button("Save") {
+            Button(nameProblem == .duplicate ? LocalizedStringKey("Name in use") : LocalizedStringKey("Save")) {
                 model.saveExportSheetSpecAsPreset(name: presetName)
                 presetName = ""
             }
+            .disabled(nameProblem != nil)
             .axLeaf("Export.Button.SavePresetConfirm")
             Button("Cancel", role: .cancel) { presetName = "" }
         } message: {
             Text("The preset keeps this style, format and options.")
         }
+    }
+
+    private var nameProblem: ExportPresetNameProblem? {
+        model.exportPresetNameProblem(presetName)
     }
 
     private var spec: ExportSpec { model.exportSheetSpec }
@@ -176,7 +181,7 @@ struct ExportSheet: View {
 
     private var savePresetButton: some View {
         Button("Save as Preset…") {
-            presetName = ""
+            presetName = model.defaultExportPresetName()
             namingPreset = true
         }
         .sheetButton()

@@ -21,7 +21,10 @@ struct ExportFormatsPane: View {
                             draftName = preset.name
                             renaming = preset.id
                         },
+                        nameTaken: renaming == preset.id
+                            && model.exportPresetNameProblem(draftName, excluding: preset.id) == .duplicate,
                         onCommitRename: {
+                            if model.exportPresetNameProblem(draftName, excluding: preset.id) == .duplicate { return }
                             model.renameExportPreset(id: preset.id, to: draftName)
                             renaming = nil
                         },
@@ -131,6 +134,7 @@ private struct ExportPresetRow: View {
     let isRenaming: Bool
     @Binding var draftName: String
     let onStartRename: () -> Void
+    let nameTaken: Bool
     let onCommitRename: () -> Void
     let canMoveUp: Bool
     let canMoveDown: Bool
@@ -153,9 +157,9 @@ private struct ExportPresetRow: View {
                             .font(DS.Font.body)
                             .foregroundStyle(DS.Color.primaryText)
                     }
-                    Text(ExportFormatsPane.blurb(for: preset.spec.format))
+                    Text(nameTaken ? LocalizedStringKey("A preset with this name already exists.") : ExportFormatsPane.blurb(for: preset.spec.format))
                         .font(DS.Font.secondary)
-                        .foregroundStyle(DS.Color.secondaryText)
+                        .foregroundStyle(nameTaken ? DS.Color.dangerText : DS.Color.secondaryText)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: DS.Spacing.small)

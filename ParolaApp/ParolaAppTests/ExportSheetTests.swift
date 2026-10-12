@@ -406,6 +406,52 @@ struct ExportSheetTests {
             #expect(format.optionFields.contains(.grouping), "\(format.rawValue) should offer grouping")
         }
     }
+
+    @Test("Save as Preset opens with a free name, and a taken name turns Save off and says why on the button")
+    func presetAlertChecksTheName() async throws {
+        let model = makeModel()
+        model.transcript = Self.transcript()
+        let hosted = HostedWindow(ExportSheet().environment(model), width: 900, height: 640)
+        defer { hosted.close() }
+        let drawn = await waitUntil {
+            HostedAccessibility.elements(in: hosted.host).contains { $0.identifier?.hasSuffix("Export.Button.SavePreset") == true }
+        }
+        #expect(drawn)
+        #expect(HostedAccessibility.press(endingWith: "Export.Button.SavePreset", in: hosted.host))
+        #expect(await waitUntil { hosted.window.attachedSheet != nil })
+        let alert = try #require(hosted.window.attachedSheet)
+
+        func confirm() -> HostedAccessibility.Element? {
+            HostedAccessibility.elements(in: alert).first { $0.identifier?.hasSuffix("Export.Button.SavePresetConfirm") == true }
+        }
+        func type(_ text: String) throws {
+            let field = try #require(Self.editableField(in: alert.contentView))
+            #expect(alert.makeFirstResponder(field))
+            let editor = try #require(field.currentEditor() as? NSTextView)
+            editor.selectAll(nil)
+            editor.insertText(text, replacementRange: editor.selectedRange())
+        }
+        let note = "Name in use"
+
+        #expect(confirm()?.isEnabled == true)
+
+        try type("transcript (.TXT)")
+        #expect(await waitUntil { confirm()?.isEnabled == false })
+        #expect(HostedAccessibility.words(in: alert).contains { $0.contains(note) })
+
+        try type("")
+        #expect(await waitUntil { confirm()?.isEnabled == false })
+
+        try type("Fresh preset")
+        #expect(await waitUntil { confirm()?.isEnabled == true })
+        #expect(!HostedAccessibility.words(in: alert).contains { $0.contains(note) })
+    }
+
+    private static func editableField(in view: NSView?) -> NSTextField? {
+        guard let view else { return nil }
+        if let field = view as? NSTextField, field.isEditable { return field }
+        return view.subviews.lazy.compactMap { editableField(in: $0) }.first
+    }
 }
 
 /// Counts what the preview asks an exporter to render.

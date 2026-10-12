@@ -94,6 +94,47 @@ struct ExportPresetsTests {
         #expect(model.exportPreset(id: added.id)?.name == ExportFormat.srt.displayName)
     }
 
+    @Test("a preset name is refused when empty or taken, ignoring case and spacing")
+    func nameProblems() {
+        let model = makeModel()
+        model.addExportPreset(name: "Reels", spec: .standard(for: .srt))
+
+        #expect(model.exportPresetNameProblem("") == .empty)
+        #expect(model.exportPresetNameProblem("   ") == .empty)
+        #expect(model.exportPresetNameProblem("Reels") == .duplicate)
+        #expect(model.exportPresetNameProblem("  reels ") == .duplicate)
+        #expect(model.exportPresetNameProblem("Shorts") == nil)
+    }
+
+    @Test("a rename is checked like a new name, except against the preset itself")
+    func renameChecksTheName() {
+        let model = makeModel()
+        let reels = model.addExportPreset(name: "Reels", spec: .standard(for: .srt))
+        let other = model.addExportPreset(name: "Café", spec: .standard(for: .md))
+        let builtIn = "transcript (.TXT)"
+
+        #expect(model.exportPresetNameProblem("Reels", excluding: reels.id) == nil)
+        #expect(model.exportPresetNameProblem("cafe", excluding: reels.id) == .duplicate)
+        #expect(model.exportPresetNameProblem(builtIn, excluding: reels.id) == .duplicate)
+        #expect(model.exportPresetNameProblem("Reels", excluding: other.id) == .duplicate)
+
+        model.renameExportPreset(id: reels.id, to: "CAFE")
+        #expect(model.exportPreset(id: reels.id)?.name == "Reels")
+        model.renameExportPreset(id: reels.id, to: "Shorts")
+        #expect(model.exportPreset(id: reels.id)?.name == "Shorts")
+    }
+
+    @Test("the default name for Save as Preset is free, and stays free as presets pile up")
+    func defaultNameIsFree() {
+        let model = makeModel()
+        let first = model.defaultExportPresetName()
+        #expect(model.exportPresetNameProblem(first) == nil)
+        model.addExportPreset(name: first, spec: .standard(for: .srt))
+        let second = model.defaultExportPresetName()
+        #expect(second != first)
+        #expect(model.exportPresetNameProblem(second) == nil)
+    }
+
     @Test("a built-in preset cannot be deleted")
     func builtInsSurviveDelete() {
         let model = makeModel()

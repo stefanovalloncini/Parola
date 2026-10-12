@@ -80,6 +80,14 @@ extension AppModel {
         exportPresets.first { $0.id == id }
     }
 
+    /// `excluding` is the preset being renamed, so it doesn't clash with its own name.
+    func exportPresetNameProblem(_ name: String, excluding id: UUID? = nil) -> ExportPresetNameProblem? {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty { return .empty }
+        let taken = exportPresets.contains { $0.id != id && $0.name.compare(trimmed, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame }
+        return taken ? .duplicate : nil
+    }
+
     @discardableResult
     func addExportPreset(name: String, spec: ExportSpec) -> ExportPreset {
         let preset = ExportPreset(name: name, spec: spec)
@@ -88,10 +96,23 @@ extension AppModel {
     }
 
     func renameExportPreset(id: UUID, to name: String) {
+        guard exportPresetNameProblem(name, excluding: id) != .duplicate else { return }
         guard let index = exportPresets.firstIndex(where: { $0.id == id }) else { return }
         var presets = exportPresets
         presets[index].name = name
         setExportPresets(presets)
+    }
+
+    /// A name for the Save as Preset alert that no preset has yet, so Save starts enabled.
+    func defaultExportPresetName() -> String {
+        let base = String(localized: "My preset")
+        var name = base
+        var number = 2
+        while exportPresetNameProblem(name) != nil {
+            name = "\(base) \(number)"
+            number += 1
+        }
+        return name
     }
 
     func exportPresetUse(id: UUID) -> ExportPresetUse {
@@ -222,4 +243,9 @@ extension AppModel {
         // read the same JSON differently.
         return decoded.changing(format: decoded.format)
     }
+}
+
+enum ExportPresetNameProblem: Equatable {
+    case empty
+    case duplicate
 }
