@@ -20,6 +20,7 @@ struct ParolaiOSApp: App {
                 .environment(model.playback)
                 .onChange(of: scenePhase) { _, phase in
                     if phase == .active { model.refreshLibraryIfChangedElsewhere() }
+                    if phase == .background { Task { await model.coordinator.releaseModelsInBackground() } }
                 }
         }
     }

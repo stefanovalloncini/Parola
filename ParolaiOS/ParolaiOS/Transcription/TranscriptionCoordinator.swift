@@ -25,7 +25,7 @@ final class TranscriptionCoordinator {
 
     @ObservationIgnored private let library: LibraryStore
     @ObservationIgnored private let settings: UserSettings
-    @ObservationIgnored private let session = TranscriptionSession()
+    @ObservationIgnored private let session = TranscriptionSession(idleTimeout: ModelResidencyPolicy.idleTimeoutSeconds)
     @ObservationIgnored private var streamingSession: StreamingTranscriptionSession?
     @ObservationIgnored private var streamingTask: Task<Void, Never>?
     @ObservationIgnored private var transcribeTask: Task<Void, Never>?
@@ -35,6 +35,12 @@ final class TranscriptionCoordinator {
     init(library: LibraryStore, settings: UserSettings) {
         self.library = library
         self.settings = settings
+    }
+
+    func releaseModelsInBackground() async {
+        guard ModelResidencyPolicy.releasesOnBackground(phase: phase) else { return }
+        await session.unloadModel()
+        await StreamingTranscriberFactory.releaseIdleModels()
     }
 
     func reset() {
