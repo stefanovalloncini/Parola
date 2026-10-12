@@ -849,6 +849,33 @@ final class LibrarySearchIndexTests {
         #expect(raw.contains("\"excerpt\""))
     }
 
+    @Test("an index call that is still tokenizing yields to a later one for the same entry")
+    func laterIndexCallWins() async throws {
+        let (index, _) = makeTempIndex()
+        _ = await index.search("warm")
+        let huge = String(repeating: "alpha bravo charlie delta echo ", count: 400_000)
+        let slow = Task { await index.index(id: "e1", title: "Slow", text: huge, createdAt: Date()) }
+        try await Task.sleep(for: .milliseconds(30))
+        await index.index(id: "e1", title: "Fast", text: "foxtrot golf", createdAt: Date())
+        await slow.value
+
+        #expect(await index.search("alpha").isEmpty)
+        #expect(await index.search("foxtrot").map(\.entryID) == ["e1"])
+    }
+
+    @Test("an entry removed while its index call is tokenizing stays out")
+    func removeDuringIndexCall() async throws {
+        let (index, _) = makeTempIndex()
+        _ = await index.search("warm")
+        let huge = String(repeating: "alpha bravo charlie delta echo ", count: 400_000)
+        let slow = Task { await index.index(id: "e1", title: "Slow", text: huge, createdAt: Date()) }
+        try await Task.sleep(for: .milliseconds(30))
+        await index.remove("e1")
+        await slow.value
+
+        #expect(await index.search("alpha").isEmpty)
+    }
+
     @Test("a manifest row whose entry file is gone makes the snapshot stale")
     func missingEntryFileIsStale() async throws {
         let (index1, url) = makeTempIndex()
