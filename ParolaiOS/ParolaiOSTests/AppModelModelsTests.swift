@@ -15,9 +15,10 @@ struct AppModelModelsTests {
     }
 
     @Test("refreshModelList mirrors the catalog as every picker lists it")
-    func mirrorsListedCatalog() throws {
+    func mirrorsListedCatalog() async throws {
         let model = try makeModel()
         model.refreshModelList()
+        await model.modelListTask?.value
         #expect(model.availableModels.isEmpty == false)
         #expect(model.availableModels == ModelStore.shared.listedCatalog())
         #expect(
@@ -27,20 +28,31 @@ struct AppModelModelsTests {
     }
 
     @Test("an unknown selected model falls back to the default")
-    func coercesUnknownSelection() throws {
+    func coercesUnknownSelection() async throws {
         let model = try makeModel()
         model.settings.modelName = "not-a-real-model"
         model.refreshModelList()
+        await model.modelListTask?.value
         #expect(model.availableModels.contains { $0.name == model.settings.modelName })
         #expect(model.settings.modelName == UserSettings.defaultModelID())
     }
 
     @Test("a selected model that exists in the catalog is left unchanged")
-    func keepsKnownSelection() throws {
+    func keepsKnownSelection() async throws {
         let model = try makeModel()
         let known = try #require(ModelStore.shared.catalog().first?.name)
         model.settings.modelName = known
         model.refreshModelList()
+        await model.modelListTask?.value
         #expect(model.settings.modelName == known)
+    }
+
+    @Test("a refresh superseded by a newer one never installs its list")
+    func supersededRefreshDropped() async throws {
+        let model = try makeModel()
+        model.refreshModelList()
+        model.refreshModelList()
+        await model.modelListTask?.value
+        #expect(model.availableModels == ModelStore.shared.listedCatalog())
     }
 }

@@ -32,6 +32,7 @@ final class AppModel {
 
     @ObservationIgnored var searchTask: Task<Void, Never>?
     @ObservationIgnored var refreshTask: Task<Void, Never>?
+    @ObservationIgnored var modelListTask: Task<Void, Never>?
 
     static let trashRetentionDays = 30
 
