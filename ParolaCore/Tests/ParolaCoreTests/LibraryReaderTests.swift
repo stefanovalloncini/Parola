@@ -78,7 +78,7 @@ struct LibraryReaderTests {
         await store.warmSearchIndex()
         await store.flush()
 
-        #expect(snapshotFiles(in: dir).keys.sorted() == ["manifest.json", "seeded.json"])
+        #expect(snapshotFiles(in: dir).keys.sorted() == ["manifest.json", "seeded.json", "seeded.txt"])
     }
 
     @Test("a reader searches a library with no snapshot and writes none")

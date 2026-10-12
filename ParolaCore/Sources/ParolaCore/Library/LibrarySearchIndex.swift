@@ -116,8 +116,6 @@ public actor LibrarySearchIndex {
 
     private struct IndexedEntry: Sendable {
         let title: String
-        /// The full body text, kept in memory so a snippet never needs a disk read at query time.
-        let text: String
         let tokens: [String]
         let counts: [Int]
         /// Parallel to `tokens`: where the token first occurs in the body, `noOffset` for title-only tokens.
@@ -125,14 +123,16 @@ public actor LibrarySearchIndex {
         let boundaryOffsets: [Int]
         let boundaryCentiseconds: [Int]
         let fingerprint: String
-        /// Cut from `text` when the entry is indexed or loaded; nil when the body has nothing to quote.
+        /// Cut from the body when the entry is indexed; nil when the body has nothing to quote.
         let excerpt: String?
+        /// Names this installed state, so a snippet built across a suspension can tell the entry moved.
+        var revision = 0
     }
 
     private struct SnapshotEntry: Codable, Sendable {
         let id: String
         let title: String
-        let text: String
+        let excerpt: String?
         let tokens: [String]
         let counts: [Int]
         let offsets: [Int]
@@ -150,6 +150,19 @@ public actor LibrarySearchIndex {
     private struct PreparedEntry: Sendable {
         let id: String
         let entry: IndexedEntry
+        let body: String
+    }
+
+    /// A body the index holds until its file has landed; a reader never writes, so it keeps what it is given.
+    private struct PendingBody: Sendable {
+        let text: String
+        let sequence: Int
+    }
+
+    private struct BodyWrite: Sendable {
+        let id: String
+        let text: String
+        let sequence: Int
     }
 
     private struct LoadedState: Sendable {
@@ -176,6 +189,7 @@ public actor LibrarySearchIndex {
 
     private struct SnapshotWrite: Sendable {
         let entries: [SnapshotEntry]
+        let bodies: [BodyWrite]
         let manifest: Manifest
         let generation: Int
         let removesLegacySnapshot: Bool
@@ -192,8 +206,8 @@ public actor LibrarySearchIndex {
         let outcome: WriteOutcome
     }
 
-    // v11: one file per entry under `entries/`, listed by `manifest.json`; older snapshots are discarded and rebuilt.
-    private static let snapshotVersion = 11
+    // v12: one file per entry under `entries/` and its body under `bodies/`, listed by `manifest.json`; older snapshots are discarded and rebuilt.
+    private static let snapshotVersion = 12
     private static let noOffset = -1
     /// The length a library row quotes; excerpts are cut once, at index time, to this.
     public static let excerptLength = 240
@@ -203,6 +217,12 @@ public actor LibrarySearchIndex {
     private var excerptsByEntry: [String: String] = [:]
     private var excerptsGeneration = 0
     private var dirtyEntryIDs: Set<String> = []
+    private var dirtyBodyIDs: Set<String> = []
+    private var pendingBodies: [String: PendingBody] = [:]
+    private var bodySequence = 0
+    private var revisionCounter = 0
+    private var indexTickets: [String: Int] = [:]
+    private var ticketCounter = 0
     private var sortedTokens: [String]?
     private var isLoaded = false
     private var isDirty = false
@@ -286,11 +306,17 @@ public actor LibrarySearchIndex {
         createdAt: Date
     ) async {
         await ensureLoaded()
-        removeFromIndex(id)
-        addToIndex(
+        ticketCounter &+= 1
+        let ticket = ticketCounter
+        indexTickets[id] = ticket
+        let prepared = await Self.tokenizeOffActor([RebuildEntry(
             id: id, title: title, text: text, auxiliaryText: auxiliaryText,
             boundaries: boundaries, fingerprint: fingerprint
-        )
+        )])
+        guard indexTickets[id] == ticket, let prepared = prepared.first else { return }
+        indexTickets[id] = nil
+        removeFromIndex(id)
+        install(prepared.entry, body: prepared.body, for: id)
         scheduleSave()
     }
 
@@ -313,7 +339,6 @@ public actor LibrarySearchIndex {
         let tokens = tallies.keys.sorted()
         let replaced = IndexedEntry(
             title: entry.title,
-            text: entry.text,
             tokens: tokens,
             counts: tokens.map { max(1, tallies[$0]?.count ?? 1) },
             offsets: tokens.map { tallies[$0]?.offset ?? Self.noOffset },
@@ -323,14 +348,16 @@ public actor LibrarySearchIndex {
             excerpt: entry.excerpt
         )
         removeFromIndex(id)
-        install(replaced, for: id)
+        install(replaced, body: nil, for: id)
         scheduleSave()
         return true
     }
 
     public func remove(_ id: String) async {
         await ensureLoaded()
+        indexTickets[id] = nil
         removeFromIndex(id)
+        discardBody(of: id)
         if excerptsByEntry.removeValue(forKey: id) != nil { excerptsGeneration &+= 1 }
         scheduleSave()
     }
@@ -370,20 +397,18 @@ public actor LibrarySearchIndex {
 
         var results: [Match] = []
         results.reserveCapacity(scores.count)
-        let queryTokenSet = Set(queryTokens)
         for (id, score) in scores.sorted(by: { $0.value > $1.value }) {
             guard let entry = entries[id] else { continue }
-            let snippet = snippets ? Self.snippet(for: queryTokenSet, in: entry) : nil
             results.append(Match(
                 entryID: id,
                 score: score,
                 matchCount: hits[id] ?? 0,
-                snippet: snippet?.text ?? "",
-                highlights: snippet?.highlights ?? [],
+                snippet: "",
+                highlights: [],
                 firstHit: earliest[id].flatMap { Self.firstHit(atOffset: $0.offset, in: entry) }
             ))
         }
-        return results
+        return snippets ? await withSnippets(results, query: query) : results
     }
 
     /// The matches with their snippets built, as `search` builds them; one whose entry has left the index comes back as it was.
@@ -391,9 +416,15 @@ public actor LibrarySearchIndex {
         let queryTokens = Set(Self.tokenize(query))
         guard !queryTokens.isEmpty, !matches.isEmpty else { return matches }
         await ensureLoaded()
+        var captured: [String: IndexedEntry] = [:]
+        for match in matches {
+            if let entry = entries[match.entryID] { captured[match.entryID] = entry }
+        }
+        let bodies = await bodies(of: Array(captured.keys))
         return matches.map { match in
-            guard let entry = entries[match.entryID] else { return match }
-            let snippet = Self.snippet(for: queryTokens, in: entry)
+            guard let entry = captured[match.entryID], entries[match.entryID]?.revision == entry.revision,
+                  let body = bodies[match.entryID] else { return match }
+            let snippet = Self.snippet(for: queryTokens, body: body, in: entry)
             return Match(
                 entryID: match.entryID,
                 score: match.score,
@@ -488,14 +519,14 @@ public actor LibrarySearchIndex {
         guard let existing = entries[id], existing.fingerprint != fingerprint else { return }
         let updated = IndexedEntry(
             title: existing.title,
-            text: existing.text,
             tokens: existing.tokens,
             counts: existing.counts,
             offsets: existing.offsets,
             boundaryOffsets: existing.boundaryOffsets,
             boundaryCentiseconds: existing.boundaryCentiseconds,
             fingerprint: fingerprint,
-            excerpt: existing.excerpt
+            excerpt: existing.excerpt,
+            revision: existing.revision
         )
         entries[id] = updated
         dirtyEntryIDs.insert(id)
@@ -511,9 +542,12 @@ public actor LibrarySearchIndex {
         entries.removeAll()
         inverted.removeAll()
         dirtyEntryIDs.removeAll()
+        dirtyBodyIDs.removeAll()
+        pendingBodies.removeAll()
+        indexTickets.removeAll()
         sortedTokens = nil
         for entry in prepared {
-            install(entry.entry, for: entry.id)
+            install(entry.entry, body: entry.body, for: entry.id)
         }
         let kept = Set(prepared.map(\.id))
         let dropped = excerptsByEntry.keys.filter { !kept.contains($0) }
@@ -535,11 +569,12 @@ public actor LibrarySearchIndex {
         let prepared = await Self.tokenizeOffActor(changed)
         for id in removed {
             removeFromIndex(id)
+            discardBody(of: id)
             if excerptsByEntry.removeValue(forKey: id) != nil { excerptsGeneration &+= 1 }
         }
         for entry in prepared {
             removeFromIndex(entry.id)
-            install(entry.entry, for: entry.id)
+            install(entry.entry, body: entry.body, for: entry.id)
         }
         scheduleSave()
     }
@@ -559,16 +594,52 @@ public actor LibrarySearchIndex {
         guard let changes = read else { return false }
         for id in snapshotListed.subtracting(changes.listed) {
             removeFromIndex(id)
+            discardBody(of: id)
             if excerptsByEntry.removeValue(forKey: id) != nil { excerptsGeneration &+= 1 }
         }
         for entry in changes.decoded {
             removeFromIndex(entry.id)
-            install(entry.entry, for: entry.id)
+            install(entry.entry, body: nil, for: entry.id)
         }
         entriesDecoded &+= changes.decoded.count
         snapshotStamp = stamp
         snapshotListed = changes.listed
         return true
+    }
+
+    /// An id with no body anywhere comes back empty, as a body with nothing to quote does.
+    private func bodies(of ids: [String]) async -> [String: String] {
+        var found: [String: String] = [:]
+        var onDisk: [String] = []
+        for id in ids {
+            if let pending = pendingBodies[id] { found[id] = pending.text } else { onDisk.append(id) }
+        }
+        guard !onDisk.isEmpty else { return found }
+        let directory = Self.bodiesDirectory(in: indexDirectory)
+        let read = await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                continuation.resume(returning: Self.readBodies(onDisk, in: directory))
+            }
+        }
+        return found.merging(read) { memory, _ in memory }
+    }
+
+    private static func readBodies(_ ids: [String], in directory: URL) -> [String: String] {
+        var texts = [String](repeating: "", count: ids.count)
+        texts.withUnsafeMutableBufferPointer { buffer in
+            // Each iteration owns its slot, so the shared buffer never races.
+            nonisolated(unsafe) let slots = buffer
+            DispatchQueue.concurrentPerform(iterations: ids.count) { position in
+                guard let data = try? Data(contentsOf: bodyURL(ids[position], in: directory)) else { return }
+                slots[position] = String(decoding: data, as: UTF8.self)
+            }
+        }
+        return Dictionary(uniqueKeysWithValues: zip(ids, texts))
+    }
+
+    private func discardBody(of id: String) {
+        pendingBodies.removeValue(forKey: id)
+        dirtyBodyIDs.remove(id)
     }
 
     private func ensureLoaded() async {
@@ -617,6 +688,14 @@ public actor LibrarySearchIndex {
 
     private static func entryURL(_ id: String, in entriesDirectory: URL) -> URL {
         entriesDirectory.appendingPathComponent("\(id).json")
+    }
+
+    private static func bodiesDirectory(in directory: URL) -> URL {
+        directory.appendingPathComponent("bodies", isDirectory: true)
+    }
+
+    private static func bodyURL(_ id: String, in bodiesDirectory: URL) -> URL {
+        bodiesDirectory.appendingPathComponent("\(id).txt")
     }
 
     /// The single file v10 and earlier wrote, beside the directory that replaced it.
@@ -668,14 +747,13 @@ public actor LibrarySearchIndex {
     private static func indexedEntry(from entry: SnapshotEntry) -> IndexedEntry {
         IndexedEntry(
             title: entry.title,
-            text: entry.text,
             tokens: entry.tokens,
             counts: entry.counts,
             offsets: entry.offsets,
             boundaryOffsets: entry.boundaryOffsets,
             boundaryCentiseconds: entry.boundaryCentiseconds,
             fingerprint: entry.fingerprint,
-            excerpt: excerpt(from: entry.text, maxLength: excerptLength)
+            excerpt: entry.excerpt
         )
     }
 
@@ -699,7 +777,7 @@ public actor LibrarySearchIndex {
         var prepared: [PreparedEntry] = []
         for (id, entry) in zip(ids, decoded) {
             guard entry.id == id, manifest.entries[id] == entry.fingerprint else { return nil }
-            prepared.append(PreparedEntry(id: id, entry: indexedEntry(from: entry)))
+            prepared.append(PreparedEntry(id: id, entry: indexedEntry(from: entry), body: ""))
         }
         return SnapshotChanges(listed: Set(manifest.entries.keys), decoded: prepared)
     }
@@ -729,23 +807,6 @@ public actor LibrarySearchIndex {
         return entries
     }
 
-    private func addToIndex(
-        id: String,
-        title: String,
-        text: String,
-        auxiliaryText: String,
-        boundaries: [SegmentBoundary],
-        fingerprint: String
-    ) {
-        install(
-            Self.makeIndexedEntry(
-                title: title, text: text, auxiliaryText: auxiliaryText,
-                boundaries: boundaries, fingerprint: fingerprint
-            ),
-            for: id
-        )
-    }
-
     private static func tokenizeOffActor(_ rebuilt: [RebuildEntry]) async -> [PreparedEntry] {
         await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .utility).async {
@@ -771,7 +832,8 @@ public actor LibrarySearchIndex {
                         auxiliaryText: source.auxiliaryText,
                         boundaries: source.boundaries,
                         fingerprint: source.fingerprint
-                    )
+                    ),
+                    body: source.text
                 )
             }
         }
@@ -792,7 +854,6 @@ public actor LibrarySearchIndex {
         let tokens = tallies.keys.sorted()
         return IndexedEntry(
             title: title,
-            text: text,
             tokens: tokens,
             counts: tokens.map { tallies[$0]?.count ?? 0 },
             offsets: tokens.map { tallies[$0]?.offset ?? noOffset },
@@ -803,8 +864,17 @@ public actor LibrarySearchIndex {
         )
     }
 
-    private func install(_ entry: IndexedEntry, for id: String) {
+    /// A nil `body` leaves the one already held or on disk as it is.
+    private func install(_ entry: IndexedEntry, body: String?, for id: String) {
+        var entry = entry
+        revisionCounter &+= 1
+        entry.revision = revisionCounter
         entries[id] = entry
+        if let body {
+            bodySequence &+= 1
+            pendingBodies[id] = PendingBody(text: body, sequence: bodySequence)
+            dirtyBodyIDs.insert(id)
+        }
         if excerptsByEntry[id] != entry.excerpt {
             excerptsByEntry[id] = entry.excerpt
             excerptsGeneration &+= 1
@@ -841,7 +911,7 @@ public actor LibrarySearchIndex {
         SnapshotEntry(
             id: id,
             title: entry.title,
-            text: entry.text,
+            excerpt: entry.excerpt,
             tokens: entry.tokens,
             counts: entry.counts,
             offsets: entry.offsets,
@@ -929,8 +999,8 @@ public actor LibrarySearchIndex {
         return Int(exactly: (seconds * 100).rounded()) ?? 0
     }
 
-    private static func snippet(for queryTokens: Set<String>, in entry: IndexedEntry) -> (text: String, highlights: [Highlight]) {
-        makeSnippet(text: entry.text, tokens: queryTokens, hit: earliestHit(of: queryTokens, in: entry))
+    private static func snippet(for queryTokens: Set<String>, body: String, in entry: IndexedEntry) -> (text: String, highlights: [Highlight]) {
+        makeSnippet(text: body, tokens: queryTokens, hit: earliestHit(of: queryTokens, in: entry))
     }
 
     /// Where the body first holds a word some query token starts; at a tie the longer token wins, never set order.
@@ -1060,12 +1130,17 @@ public actor LibrarySearchIndex {
         guard persists, canPersistSnapshot, isDirty else { return }
         isDirty = false
         let pending = dirtyEntryIDs
+        let pendingBodyIDs = dirtyBodyIDs
         dirtyEntryIDs.removeAll()
+        dirtyBodyIDs.removeAll()
         snapshotGeneration &+= 1
         let generation = snapshotGeneration
         latestGeneration.withLock { $0 = generation }
         let write = SnapshotWrite(
             entries: pending.compactMap { id in entries[id].map { Self.snapshotEntry(id: id, entry: $0) } },
+            bodies: pendingBodyIDs.compactMap { id in
+                pendingBodies[id].map { BodyWrite(id: id, text: $0.text, sequence: $0.sequence) }
+            },
             manifest: Manifest(version: Self.snapshotVersion, entries: entries.mapValues(\.fingerprint)),
             generation: generation,
             removesLegacySnapshot: legacySnapshotPresent
@@ -1076,9 +1151,10 @@ public actor LibrarySearchIndex {
         case .written:
             snapshotWriteFailing = false
             legacySnapshotPresent = false
+            releaseBodies(write.bodies)
         case .superseded:
             // The entry files landed; the newer generation writes the manifest that lists them.
-            break
+            releaseBodies(write.bodies)
         case .failed(let error):
             // The retry runs on the debounce until the write lands, so only the first of a run is logged.
             if !snapshotWriteFailing {
@@ -1089,8 +1165,16 @@ public actor LibrarySearchIndex {
                 )
             }
             dirtyEntryIDs.formUnion(pending)
+            dirtyBodyIDs.formUnion(pendingBodyIDs.filter { pendingBodies[$0] != nil })
             isDirty = true
             scheduleSave()
+        }
+    }
+
+    private func releaseBodies(_ written: [BodyWrite]) {
+        guard persists else { return }
+        for body in written where pendingBodies[body.id]?.sequence == body.sequence {
+            pendingBodies.removeValue(forKey: body.id)
         }
     }
 
@@ -1120,14 +1204,21 @@ public actor LibrarySearchIndex {
         let entriesDirectory = entriesDirectory(in: directory)
         var encoded = 0
         do {
+            let bodiesDirectory = bodiesDirectory(in: directory)
             try FileManager.default.createDirectory(at: entriesDirectory, withIntermediateDirectories: true)
+            try FileManager.default.createDirectory(at: bodiesDirectory, withIntermediateDirectories: true)
+            for body in write.bodies {
+                try writeData(Data(body.text.utf8), bodyURL(body.id, in: bodiesDirectory))
+            }
             let encoder = JSONEncoder()
             for entry in write.entries {
                 let data = try encoder.encode(entry)
                 encoded += 1
                 try writeData(data, entryURL(entry.id, in: entriesDirectory))
             }
-            for url in unlistedEntryFiles(in: entriesDirectory, keeping: Set(write.manifest.entries.keys)) {
+            let listed = Set(write.manifest.entries.keys)
+            for url in unlistedEntryFiles(in: entriesDirectory, keeping: listed)
+                + unlistedBodyFiles(in: bodiesDirectory, keeping: listed) {
                 try? removeFile(url)
             }
             // A snapshot that lost the race must not list an older set than the newer one it queued behind.
@@ -1150,6 +1241,13 @@ public actor LibrarySearchIndex {
         return contents.filter { url in
             guard (try? url.resourceValues(forKeys: [.isRegularFileKey]))?.isRegularFile == true else { return false }
             return !ids.contains(url.deletingPathExtension().lastPathComponent)
+        }
+    }
+
+    private static func unlistedBodyFiles(in bodiesDirectory: URL, keeping ids: Set<String>) -> [URL] {
+        let contents = (try? FileManager.default.contentsOfDirectory(at: bodiesDirectory, includingPropertiesForKeys: nil)) ?? []
+        return contents.filter { url in
+            url.pathExtension != "txt" || !ids.contains(url.deletingPathExtension().lastPathComponent)
         }
     }
 

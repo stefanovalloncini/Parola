@@ -76,6 +76,10 @@ final class LibrarySearchIndexTests {
         directory.appendingPathComponent("entries", isDirectory: true).appendingPathComponent("\(id).json")
     }
 
+    private func bodyURL(_ id: String, in directory: URL) -> URL {
+        directory.appendingPathComponent("bodies", isDirectory: true).appendingPathComponent("\(id).txt")
+    }
+
     private func legacySnapshotURL(for directory: URL) -> URL {
         directory.appendingPathExtension("json")
     }
@@ -83,7 +87,7 @@ final class LibrarySearchIndexTests {
     private func manifestEntries(in directory: URL) throws -> [String: String] {
         let data = try Data(contentsOf: manifestURL(in: directory))
         let object = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
-        #expect(object["version"] as? Int == 11)
+        #expect(object["version"] as? Int == 12)
         return try #require(object["entries"] as? [String: String])
     }
 
@@ -582,8 +586,10 @@ final class LibrarySearchIndexTests {
         await index.index(id: "e1", title: "Notes", text: text, createdAt: Date())
         await index.flush()
 
-        let raw = try #require(String(data: Data(contentsOf: entryURL("e1", in: url)), encoding: .utf8))
-        #expect(raw.contains("ZzyzxMarker"))
+        let raw = try #require(String(data: Data(contentsOf: bodyURL("e1", in: url)), encoding: .utf8))
+        #expect(raw == text)
+        let entryFile = try #require(String(data: Data(contentsOf: entryURL("e1", in: url)), encoding: .utf8))
+        #expect(!entryFile.contains("ZzyzxMarker"))
 
         let matches = await index.search("zzyzxmarker")
         #expect(matches.contains(where: { $0.entryID == "e1" }))
@@ -783,6 +789,64 @@ final class LibrarySearchIndexTests {
         #expect(await index.search("sprint").map(\.entryID) == ["e1"])
         #expect(try manifestEntries(in: url) == ["e1": "f1"])
         #expect(FileManager.default.fileExists(atPath: legacySnapshotURL(for: url).path) == false)
+    }
+
+    @Test("a v11 snapshot that holds the body in the entry file is discarded and rebuilt")
+    func v11SnapshotIsReplaced() async throws {
+        let url = makeTempDirectory()
+        let entries = url.appendingPathComponent("entries", isDirectory: true)
+        try FileManager.default.createDirectory(at: entries, withIntermediateDirectories: true)
+        try Data(#"{"version":11,"entries":{"e1":"f1"}}"#.utf8).write(to: manifestURL(in: url))
+        let v11 = #"{"id":"e1","title":"Notes","text":"sprint planning","tokens":["notes","planning","sprint"],"#
+            + #""counts":[1,1,1],"offsets":[-1,7,0],"boundaryOffsets":[],"boundaryCentiseconds":[],"fingerprint":"f1"}"#
+        try Data(v11.utf8).write(to: entryURL("e1", in: url))
+
+        let index = LibrarySearchIndex(indexDirectory: url)
+        #expect(await index.needsRebuild(matching: ["e1": "f1"]))
+        await index.rebuild(entries: [.init(id: "e1", title: "Notes", text: "sprint planning", fingerprint: "f1")])
+        await index.flush()
+
+        let reloaded = LibrarySearchIndex(indexDirectory: url)
+        #expect(await reloaded.search("sprint").first?.snippet == "sprint planning")
+        #expect(try manifestEntries(in: url) == ["e1": "f1"])
+    }
+
+    @Test("a fingerprint refresh rewrites the entry file and leaves the body alone")
+    func fingerprintRefreshSkipsTheBody() async throws {
+        let url = makeTempDirectory()
+        let (index, log) = makeObservedIndex(at: url)
+        await index.index(id: "e1", title: "One", text: "sprint planning", fingerprint: "f1", createdAt: Date())
+        await index.flush()
+
+        log.withLock { $0 = SnapshotWrites() }
+        await index.refreshFingerprint("f2", for: "e1")
+        await index.flush()
+        #expect(log.withLock { $0.writtenNames } == ["e1.json", "manifest.json"])
+        #expect(await index.search("sprint").first?.snippet == "sprint planning")
+    }
+
+    @Test("a body whose write failed still answers snippets until it lands")
+    func unwrittenBodyAnswersSnippets() async throws {
+        let url = makeTempDirectory()
+        let index = LibrarySearchIndex(
+            indexDirectory: url,
+            saveDebounce: .seconds(60),
+            clock: ContinuousClock(),
+            writeSnapshotData: { _, _ in throw CocoaError(.fileWriteNoPermission) }
+        )
+        await index.index(id: "e1", title: "One", text: "sprint planning", createdAt: Date())
+        await index.flush()
+        #expect(await index.search("sprint").first?.snippet == "sprint planning")
+    }
+
+    @Test("a snapshot entry file leaves the body out")
+    func entryFileHoldsNoBody() async throws {
+        let (index, url) = makeTempIndex()
+        await index.index(id: "e1", title: "One", text: "sprint planning", createdAt: Date())
+        await index.flush()
+        let raw = try #require(String(data: Data(contentsOf: entryURL("e1", in: url)), encoding: .utf8))
+        #expect(!raw.contains("\"text\""))
+        #expect(raw.contains("\"excerpt\""))
     }
 
     @Test("a manifest row whose entry file is gone makes the snapshot stale")
@@ -1072,13 +1136,13 @@ final class LibrarySearchIndexTests {
 
         await index.index(id: "e1", title: "One", text: "sprint planning", createdAt: Date())
         await index.flush()
-        #expect(log.withLock { $0.writtenNames } == ["e1.json", "manifest.json"])
+        #expect(log.withLock { $0.writtenNames } == ["e1.txt", "e1.json", "manifest.json"])
         #expect(log.withLock { $0.removedNames }.isEmpty)
 
         log.withLock { $0 = SnapshotWrites() }
         await index.index(id: "e2", title: "Two", text: "retro feedback", createdAt: Date())
         await index.flush()
-        #expect(log.withLock { $0.writtenNames } == ["e2.json", "manifest.json"])
+        #expect(log.withLock { $0.writtenNames } == ["e2.txt", "e2.json", "manifest.json"])
         #expect(log.withLock { $0.removedNames }.isEmpty)
         #expect(try manifestEntries(in: url).keys.sorted() == ["e1", "e2"])
     }
@@ -1095,7 +1159,7 @@ final class LibrarySearchIndexTests {
         await index.remove("e2")
         await index.flush()
 
-        #expect(log.withLock { $0.removedNames } == ["e2.json"])
+        #expect(log.withLock { $0.removedNames } == ["e2.json", "e2.txt"])
         #expect(log.withLock { $0.writtenNames } == ["manifest.json"])
         #expect(FileManager.default.fileExists(atPath: entryURL("e2", in: url).path) == false)
         #expect(try manifestEntries(in: url).keys.sorted() == ["e1"])
@@ -1107,11 +1171,11 @@ final class LibrarySearchIndexTests {
         let (index, log) = makeObservedIndex(at: url)
         await index.index(id: "e1", title: "One", text: "sprint planning", createdAt: Date())
         await index.flush()
-        #expect(log.withLock { $0.written.count } == 2)
+        #expect(log.withLock { $0.written.count } == 3)
 
         await index.flush()
         await index.flush()
-        #expect(log.withLock { $0.written.count } == 2)
+        #expect(log.withLock { $0.written.count } == 3)
     }
 
     @Test("a superseded snapshot write leaves the manifest to the newer generation")
@@ -1185,7 +1249,7 @@ final class LibrarySearchIndexTests {
         #expect(FileManager.default.fileExists(atPath: manifestURL(in: url).path) == false)
 
         await index.flush()
-        #expect(attempts.withLock { $0 } == 3, "the entry file and the manifest")
+        #expect(attempts.withLock { $0 } == 4, "the body, the entry file and the manifest")
         #expect(try manifestEntries(in: url).keys.sorted() == ["e1"])
         let raw = try #require(String(data: Data(contentsOf: entryURL("e1", in: url)), encoding: .utf8))
         #expect(raw.contains("\"e1\""))
