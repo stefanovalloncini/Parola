@@ -192,3 +192,23 @@ struct LibrarySearchPostingsTests {
         #expect(Set(await index.search("alpha", snippets: false).map(\.entryID)) == ["three", "five", "six"])
     }
 }
+
+@Suite("LibrarySearchIndex narrow numbers")
+struct LibrarySearchNarrowNumberTests {
+    @Test("a timestamp beyond the narrow range indexes without trapping and survives a reload")
+    func outOfRangeSecondsDoNotTrap() async throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("parola-narrow-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let index = LibrarySearchIndex(indexDirectory: url)
+        await index.index(
+            id: "a", title: "t", text: "alpha beta",
+            boundaries: [.init(textOffset: 0, seconds: 1e12), .init(textOffset: 6, seconds: -4), .init(textOffset: 7, seconds: .nan)],
+            createdAt: Date()
+        )
+        let live = await index.search("beta", snippets: false)
+        await index.flush()
+        let reloaded = await LibrarySearchIndex(indexDirectory: url).search("beta", snippets: false)
+        #expect(live.first?.firstHit?.textOffset == 6)
+        #expect(reloaded == live)
+    }
+}

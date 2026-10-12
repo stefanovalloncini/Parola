@@ -117,11 +117,11 @@ public actor LibrarySearchIndex {
     private struct IndexedEntry: Sendable {
         let title: String
         let tokens: [String]
-        let counts: [Int]
+        let counts: [UInt32]
         /// Parallel to `tokens`: where the token first occurs in the body, `noOffset` for title-only tokens.
-        let offsets: [Int]
-        let boundaryOffsets: [Int]
-        let boundaryCentiseconds: [Int]
+        let offsets: [Int32]
+        let boundaryOffsets: [Int32]
+        let boundaryCentiseconds: [UInt32]
         let fingerprint: String
         /// Cut from the body when the entry is indexed; nil when the body has nothing to quote.
         let excerpt: String?
@@ -139,10 +139,10 @@ public actor LibrarySearchIndex {
         let bodyBytes: Int
         let bodyHash: UInt64
         let tokens: [String]
-        let counts: [Int]
-        let offsets: [Int]
-        let boundaryOffsets: [Int]
-        let boundaryCentiseconds: [Int]
+        let counts: [UInt32]
+        let offsets: [Int32]
+        let boundaryOffsets: [Int32]
+        let boundaryCentiseconds: [UInt32]
         let fingerprint: String
     }
 
@@ -469,8 +469,8 @@ public actor LibrarySearchIndex {
         var tallies: [String: Tally] = [:]
         for (position, token) in entry.tokens.enumerated() {
             tallies[token] = Tally(
-                count: position < entry.counts.count ? entry.counts[position] : 1,
-                offset: position < entry.offsets.count ? entry.offsets[position] : Self.noOffset
+                count: position < entry.counts.count ? Int(entry.counts[position]) : 1,
+                offset: position < entry.offsets.count ? Int(entry.offsets[position]) : Self.noOffset
             )
         }
         Self.enumerateTokens(in: old) { token, _ in tallies[token]?.count -= 1 }
@@ -481,8 +481,8 @@ public actor LibrarySearchIndex {
         let replaced = IndexedEntry(
             title: entry.title,
             tokens: tokens,
-            counts: tokens.map { max(1, tallies[$0]?.count ?? 1) },
-            offsets: tokens.map { tallies[$0]?.offset ?? Self.noOffset },
+            counts: tokens.map { UInt32(clamping: max(1, tallies[$0]?.count ?? 1)) },
+            offsets: tokens.map { Int32(clamping: tallies[$0]?.offset ?? Self.noOffset) },
             boundaryOffsets: entry.boundaryOffsets,
             boundaryCentiseconds: entry.boundaryCentiseconds,
             fingerprint: entry.fingerprint,
@@ -1097,9 +1097,9 @@ public actor LibrarySearchIndex {
         return IndexedEntry(
             title: title,
             tokens: tokens,
-            counts: tokens.map { tallies[$0]?.count ?? 0 },
-            offsets: tokens.map { tallies[$0]?.offset ?? noOffset },
-            boundaryOffsets: boundaries.map(\.textOffset),
+            counts: tokens.map { UInt32(clamping: tallies[$0]?.count ?? 0) },
+            offsets: tokens.map { Int32(clamping: tallies[$0]?.offset ?? noOffset) },
+            boundaryOffsets: boundaries.map { Int32(clamping: $0.textOffset) },
             boundaryCentiseconds: boundaries.map { centiseconds($0.seconds) },
             fingerprint: fingerprint,
             excerpt: excerpt(from: text, maxLength: excerptLength),
@@ -1185,14 +1185,14 @@ public actor LibrarySearchIndex {
     /// An entry whose counts went missing still proves the token is in it, so the floor is 1.
     private static func occurrences(at position: Int?, in entry: IndexedEntry) -> Int {
         guard let position, position < entry.counts.count else { return 1 }
-        return max(1, entry.counts[position])
+        return max(1, Int(entry.counts[position]))
     }
 
     /// nil for a token that only occurs in the title or the auxiliary text, which have no position.
     private static func bodyOffset(at position: Int?, in entry: IndexedEntry) -> Int? {
         guard let position, position < entry.offsets.count else { return nil }
         let offset = entry.offsets[position]
-        return offset >= 0 ? offset : nil
+        return offset >= 0 ? Int(offset) : nil
     }
 
     private static func firstHit(atOffset offset: Int, in entry: IndexedEntry) -> Match.FirstHit? {
@@ -1203,7 +1203,7 @@ public actor LibrarySearchIndex {
         var high = entry.boundaryOffsets.count
         while low < high {
             let mid = (low + high) / 2
-            if entry.boundaryOffsets[mid] <= offset { low = mid + 1 } else { high = mid }
+            if Int(entry.boundaryOffsets[mid]) <= offset { low = mid + 1 } else { high = mid }
         }
         let index = max(0, low - 1)
         return Match.FirstHit(
@@ -1239,9 +1239,9 @@ public actor LibrarySearchIndex {
 
     /// Engine timings are Float32 widened to Double, which JSON writes as `12.399999618530273`;
     /// hundredths keep the snapshot small and still land on the right second.
-    private static func centiseconds(_ seconds: Double) -> Int {
+    private static func centiseconds(_ seconds: Double) -> UInt32 {
         guard seconds.isFinite, seconds > 0 else { return 0 }
-        return Int(exactly: (seconds * 100).rounded()) ?? 0
+        return UInt32(exactly: (seconds * 100).rounded()) ?? 0
     }
 
     private static func snippet(for queryTokens: Set<String>, body: String, in entry: IndexedEntry) -> (text: String, highlights: [Highlight]) {
