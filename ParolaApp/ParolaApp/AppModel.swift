@@ -1090,6 +1090,7 @@ final class AppModel {
     @ObservationIgnored var offerWatchedFileAgain: (@MainActor (URL) -> Void)?
     @ObservationIgnored var watchedLaneTask: Task<Void, Never>?
     @ObservationIgnored var backgroundArrivalID: WatchedArrival.ID?
+    @ObservationIgnored var laneOwesRing = false
     /// Set when a failure that isn't the file's own stopped the lane: the number of foreground claims at that moment.
     @ObservationIgnored var watchedLanePausedAt: Int?
     @ObservationIgnored var foregroundClaims = 0

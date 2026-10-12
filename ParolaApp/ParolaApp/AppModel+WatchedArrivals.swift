@@ -499,7 +499,11 @@ extension AppModel {
                 _ = try await saving.value
                 guard let self else { return }
                 watchedArrivals.removeAll { $0.id == arrival.id }
-                if ringsWhenDry, watchedArrivals.isEmpty { playCompletionSound() }
+                if ringsWhenDry { laneOwesRing = true }
+                if laneOwesRing, watchedArrivals.isEmpty {
+                    laneOwesRing = false
+                    playCompletionSound()
+                }
                 pumpWatchedLane()
             } catch {
                 guard let self else { return }
