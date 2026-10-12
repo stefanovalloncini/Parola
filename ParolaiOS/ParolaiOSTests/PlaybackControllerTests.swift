@@ -10,6 +10,28 @@ struct PlaybackControllerTests {
         Bundle(for: BundleAnchor.self).url(forResource: "sample", withExtension: "wav")!
     }
 
+    @Test("before the index lands the segment still follows time, and the word arrives with the index")
+    func segmentLevelUntilIndexLands() async {
+        let controller = PlaybackController()
+        controller.load(audioURL: sampleAudioURL, transcript: Fixtures.makeTranscript())
+        controller._setCurrentTimeForTest(0.6)
+        #expect(controller.index == nil)
+        #expect(controller.currentSegmentID == 0)
+        #expect(controller.currentWordID == nil)
+        await controller._indexReadyForTest()
+        #expect(controller.index != nil)
+        #expect(controller.currentWordID == "0_1")
+    }
+
+    @Test("a stale index from the previous entry never lands")
+    func staleIndexDropped() async {
+        let controller = PlaybackController()
+        controller.load(audioURL: nil, transcript: Fixtures.makeLongTranscript(segments: 2000))
+        controller.load(audioURL: nil, transcript: Fixtures.makeTranscript())
+        await controller._indexReadyForTest()
+        #expect(controller.index?.segments.count == 2)
+    }
+
     @Test("currentSegmentID follows currentTime")
     func segmentFollowsTime() {
         let controller = PlaybackController()
@@ -21,9 +43,10 @@ struct PlaybackControllerTests {
     }
 
     @Test("currentWordID follows currentTime")
-    func wordFollowsTime() {
+    func wordFollowsTime() async {
         let controller = PlaybackController()
         controller.load(audioURL: sampleAudioURL, transcript: Fixtures.makeTranscript())
+        await controller._indexReadyForTest()
         controller._setCurrentTimeForTest(0.6)
         #expect(controller.currentWordID == "0_1")
     }

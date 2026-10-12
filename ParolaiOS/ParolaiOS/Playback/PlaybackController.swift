@@ -16,6 +16,8 @@ final class PlaybackController {
     @ObservationIgnored private var player: AVPlayer?
     @ObservationIgnored private var timeObserver: Any?
     @ObservationIgnored private var durationTask: Task<Void, Never>?
+    @ObservationIgnored private var indexTask: Task<Void, Never>?
+    @ObservationIgnored private var unindexedSegments: [TranscriptSegment] = []
     @ObservationIgnored private var seekGeneration = 0
     @ObservationIgnored private var pendingSeek: Int?
     @ObservationIgnored var seekHoldLimit: Duration = .milliseconds(750)
@@ -35,7 +37,12 @@ final class PlaybackController {
 
     func load(audioURL: URL?, transcript: Transcript) {
         tearDown()
-        index = TranscriptIndex(transcript: transcript)
+        unindexedSegments = transcript.segments
+        indexTask = Task { [weak self] in
+            let built = await Task.detached(priority: .userInitiated) { TranscriptIndex(transcript: transcript) }.value
+            guard !Task.isCancelled else { return }
+            self?.installIndex(built)
+        }
         guard let audioURL else { return }
 
         let item = AVPlayerItem(url: audioURL)
@@ -123,9 +130,15 @@ final class PlaybackController {
         pendingSeek = nil
     }
 
+    private func installIndex(_ built: TranscriptIndex) {
+        index = built
+        unindexedSegments = []
+        tick(to: currentTime)
+    }
+
     private func tick(to time: TimeInterval) {
         currentTime = time
-        let segID = index?.segmentID(at: time)
+        let segID = index?.segmentID(at: time) ?? TranscriptIndex.segmentID(at: time, scanning: unindexedSegments)
         if segID != currentSegmentID { currentSegmentID = segID }
         let wordID = index?.word(at: time)?.id
         if wordID != currentWordID { currentWordID = wordID }
@@ -133,6 +146,8 @@ final class PlaybackController {
 
     #if DEBUG
     static var liveTimeObserverCount = 0
+
+    func _indexReadyForTest() async { await indexTask?.value }
 
     func _setCurrentTimeForTest(_ value: TimeInterval) {
         tick(to: value)
@@ -156,6 +171,10 @@ final class PlaybackController {
     private func tearDown() {
         durationTask?.cancel()
         durationTask = nil
+        indexTask?.cancel()
+        indexTask = nil
+        index = nil
+        unindexedSegments = []
         pendingSeek = nil
         if let timeObserver, let player {
             player.removeTimeObserver(timeObserver)

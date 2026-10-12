@@ -14,9 +14,10 @@ struct PlaybackRowObservationTests {
         var count: Int { lock.withLock { value } }
     }
 
-    private func makeController() -> PlaybackController {
+    private func makeController() async -> PlaybackController {
         let controller = PlaybackController()
         controller.load(audioURL: nil, transcript: Fixtures.makeLongTranscript(segments: 40, wordsPerSegment: 10))
+        await controller._indexReadyForTest()
         controller._setCurrentTimeForTest(0.1)
         return controller
     }
@@ -36,8 +37,8 @@ struct PlaybackRowObservationTests {
     }
 
     @Test("a word change inside the active segment invalidates only that row")
-    func wordChangeTouchesOneRow() {
-        let controller = makeController()
+    func wordChangeTouchesOneRow() async {
+        let controller = await makeController()
         let rows = invalidatedRows(controller, rows: 40) { controller, row in
             _ = controller.activeWordID(inSegment: row)
         } change: {
@@ -47,8 +48,8 @@ struct PlaybackRowObservationTests {
     }
 
     @Test("the old per-row reads invalidate every row on the same word change")
-    func previousPatternTouchesEveryRow() {
-        let controller = makeController()
+    func previousPatternTouchesEveryRow() async {
+        let controller = await makeController()
         let rows = invalidatedRows(controller, rows: 40) { controller, _ in
             _ = controller.currentSegmentID
             _ = controller.currentWordID
@@ -59,8 +60,8 @@ struct PlaybackRowObservationTests {
     }
 
     @Test("a segment change reaches every row's active check, once per segment")
-    func segmentChangeTouchesEveryActiveCheck() {
-        let controller = makeController()
+    func segmentChangeTouchesEveryActiveCheck() async {
+        let controller = await makeController()
         let rows = invalidatedRows(controller, rows: 40) { controller, row in
             _ = controller.activeWordID(inSegment: row)
         } change: {

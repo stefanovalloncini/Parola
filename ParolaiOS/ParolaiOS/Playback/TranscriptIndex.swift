@@ -21,6 +21,15 @@ struct TranscriptIndex: Sendable {
         predecessor(in: words, at: time, start: \.start, end: \.end)
     }
 
+    static func segmentID(at time: Double, scanning segments: [TranscriptSegment]) -> TranscriptSegment.ID? {
+        var best: TranscriptSegment?
+        for segment in segments where segment.start <= time && (best == nil || segment.start >= best!.start) {
+            best = segment
+        }
+        guard let best, time <= best.end else { return nil }
+        return best.id
+    }
+
     private func predecessor<T>(
         in array: [T],
         at time: Double,
