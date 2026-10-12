@@ -113,7 +113,9 @@ struct ContentSheetsModifier: ViewModifier {
     }
 
     static func retranscribeMessage(for ask: RetranscribeAsk) -> String {
-        let replaced = String(localized: "The current transcript, its favorites, notes, summary and translation will be replaced.")
+        let replaced = String(
+            localized: "The transcript will be replaced. Its summary, chapters, action items, favorites, notes, translation, chat and speaker assignments will be removed. If Generate an AI title and summary is on, a new AI title is written."
+        )
         guard let substitute = ask.substituteModelLabel else { return replaced }
         let fallback = String(localized: "This transcript's own model isn't available, so Parola will run \(substitute).")
         return replaced + "\n\n" + fallback

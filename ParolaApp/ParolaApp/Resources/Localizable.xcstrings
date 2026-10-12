@@ -16331,17 +16331,6 @@
         }
       }
     },
-    "The current transcript, its favorites, notes, summary and translation will be replaced.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "La trascrizione attuale, con preferiti, note, riassunto e traduzione, verrà sostituita."
-          }
-        }
-      }
-    },
     "The dictation and recording shortcuts that work from any app.": {
       "extractionState": "manual",
       "localizations": {
@@ -16724,6 +16713,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "La trascrizione è stata rifatta, ma Parola non è riuscita a salvare il risultato. %@"
+          }
+        }
+      }
+    },
+    "The transcript will be replaced. Its summary, chapters, action items, favorites, notes, translation, chat and speaker assignments will be removed. If Generate an AI title and summary is on, a new AI title is written.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The transcript will be replaced. Its summary, chapters, action items, favorites, notes, translation, chat and speaker assignments will be removed. If Generate an AI title and summary is on, a new AI title is written."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La trascrizione verrà sostituita. Riassunto, capitoli, azioni, preferiti, note, traduzione, chat e assegnazioni degli speaker verranno rimossi. Se “Genera un titolo e un riassunto con l'AI” è attivo, viene scritto un nuovo titolo."
           }
         }
       }
