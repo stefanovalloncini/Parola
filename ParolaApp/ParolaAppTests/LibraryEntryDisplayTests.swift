@@ -203,6 +203,23 @@ struct LibraryEntryDisplayTests {
         #expect(cache.displays.keys.sorted() == ["e"])
     }
 
+    @Test("rows written under other formatting are dropped, rows under the same stay")
+    func displayCacheFollowsFormatting() {
+        let entry = display().entry
+        var cache = LibraryRowDisplayCache()
+        _ = cache.display(for: entry)
+
+        cache.prune(keeping: [entry.id])
+        #expect(cache.displays.count == 1)
+
+        cache.prune(keeping: [entry.id], formatting: "it_IT|Europe/Rome|h23")
+        #expect(cache.displays.isEmpty)
+
+        _ = cache.display(for: entry)
+        cache.prune(keeping: [entry.id], formatting: "it_IT|Europe/Rome|h23")
+        #expect(cache.displays.count == 1)
+    }
+
     /// A view that shows a subset, like a filtered category, must not let the rest of the library pile up.
     @Test("pruning to a subset drops the rows that fell outside it")
     func pruneToASubsetDropsTheRest() {

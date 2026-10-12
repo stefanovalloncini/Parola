@@ -366,7 +366,6 @@ private struct LibraryBrowseList: View, Equatable {
     @State private var emptyKind = LibraryEmptyState.Kind.none
     @State private var showsHero = false
     @State private var libraryLoaded = false
-    @State private var displayCache = LibraryRowDisplayCache()
     @State private var animatesRows = false
 
     private var activeFilters: LibraryListContent.ActiveFilters {
@@ -408,7 +407,7 @@ private struct LibraryBrowseList: View, Equatable {
             dateRange: filters.dateRange,
             personFilter: filters.person
         )
-        var cache = displayCache
+        var cache = model.libraryBrowseDisplays
         cache.prune(keeping: model.libraryEntries.lazy.map(\.id))
         let headers = LibraryDateGroups.Headers(sortOrder: model.librarySortOrder, groupsByDate: model.libraryGroupsByDate)
         let usualLanguage = model.usualLanguage
@@ -419,7 +418,7 @@ private struct LibraryBrowseList: View, Equatable {
                 showsAITitle: model.showAITitles, showsAISummary: model.showAISummaries
             )
         }
-        displayCache = cache
+        model.libraryBrowseDisplays = cache
         rowItems = LibraryListItem.items(for: headers.groups(for: displays))
         shownTotals = LibraryListContent.totals(of: computed, sizes: model.libraryBundleSizes)
         pageCount = LibraryListContent.pageCount(of: model.libraryEntries, category: category, person: filters.person)
@@ -496,7 +495,7 @@ private struct LibraryBrowseList: View, Equatable {
         }
         // The one input no entry carries, so no row notices it changed on its own.
         .onReceive(NotificationCenter.default.publisher(for: NSLocale.currentLocaleDidChangeNotification)) { _ in
-            displayCache.removeAll()
+            model.libraryBrowseDisplays.removeAll()
             recomputeEntries()
         }
         .modifier(LibraryListAlerts(

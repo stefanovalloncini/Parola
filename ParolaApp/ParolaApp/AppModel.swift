@@ -736,6 +736,9 @@ final class AppModel {
     }
 
     private(set) var batchBuckets = BatchJobBuckets()
+    @ObservationIgnored var libraryBrowseDisplays = LibraryRowDisplayCache()
+    @ObservationIgnored var librarySearchDisplays = LibraryRowDisplayCache()
+    @ObservationIgnored var recentlyDeletedDisplays = LibraryRowDisplayCache()
     @ObservationIgnored let batchProgress = BatchProgressBoard()
     struct UnsavedBatchJob {
         let jobID: BatchJob.ID

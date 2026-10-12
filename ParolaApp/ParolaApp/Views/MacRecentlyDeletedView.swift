@@ -12,7 +12,6 @@ struct MacRecentlyDeletedView: View {
     @State private var sortOption: RecentlyDeletedSort = .deletedEarliest
     @State private var previews: [LibraryEntry.ID: String] = [:]
     @State private var rows: [LibraryRowDisplay] = []
-    @State private var displayCache = LibraryRowDisplayCache()
     @State private var now = Date()
     @State private var groups: [BucketGroup] = []
 
@@ -101,7 +100,7 @@ struct MacRecentlyDeletedView: View {
         }
         // The one input no entry carries, so no row notices it changed on its own.
         .onReceive(NotificationCenter.default.publisher(for: NSLocale.currentLocaleDidChangeNotification)) { _ in
-            displayCache.removeAll()
+            model.recentlyDeletedDisplays.removeAll()
             recomputeRows()
         }
         .axBranch("RecentlyDeleted")
@@ -287,7 +286,7 @@ struct MacRecentlyDeletedView: View {
     }
 
     private func recomputeRows() {
-        var cache = displayCache
+        var cache = model.recentlyDeletedDisplays
         cache.prune(keeping: model.deletedEntries.lazy.map(\.id))
         let usualLanguage = model.usualLanguage
         rows = model.deletedEntries.map { entry in
@@ -299,7 +298,7 @@ struct MacRecentlyDeletedView: View {
                 showsAITitle: model.showAITitles
             )
         }
-        displayCache = cache
+        model.recentlyDeletedDisplays = cache
         recomputeGroups()
     }
 

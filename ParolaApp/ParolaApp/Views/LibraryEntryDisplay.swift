@@ -171,9 +171,24 @@ struct LibraryRowDisplay: Identifiable, Equatable {
 /// Caches the strings a row needs, since the list rebuilds rows on every filter and sort change.
 struct LibraryRowDisplayCache {
     private(set) var displays: [LibraryEntry.ID: LibraryRowDisplay] = [:]
+    private var formatting = LibraryRowDisplayCache.currentFormatting
 
-    /// Only entries that left the kept set: the rest stay, since `display(for:)` checks each row itself.
-    mutating func prune(keeping ids: some Collection<LibraryEntry.ID>) {
+    /// What the strings were written under besides the entry: locale, time zone and 12/24-hour clock.
+    static var currentFormatting: String {
+        let locale = AppFormat.locale
+        return "\(locale.identifier)|\(TimeZone.current.identifier)|\(locale.hourCycle)"
+    }
+
+    /// Drops everything written under other formatting, then the entries that left the kept set.
+    /// The rest stay, since `display(for:)` checks each row itself.
+    mutating func prune(
+        keeping ids: some Collection<LibraryEntry.ID>,
+        formatting current: String = LibraryRowDisplayCache.currentFormatting
+    ) {
+        if formatting != current {
+            formatting = current
+            displays.removeAll()
+        }
         guard !displays.isEmpty else { return }
         let live = Set(ids)
         displays = displays.filter { live.contains($0.key) }

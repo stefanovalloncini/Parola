@@ -21,7 +21,6 @@ struct LibrarySearchResults: View {
     @State private var items: [LibraryListItem] = []
     @State private var shownCount = LibrarySearchResults.pageSize
     @State private var shownQuery = ""
-    @State private var displayCache = LibraryRowDisplayCache()
     @State private var animatesRows = false
 
     /// True once a row within a lead's distance of the last realised one is on screen and more results wait.
@@ -31,7 +30,7 @@ struct LibrarySearchResults: View {
 
     private func recompute() {
         let resolved = ranking.compactMap { model.libraryEntry(id: $0) }
-        var cache = displayCache
+        var cache = model.librarySearchDisplays
         cache.prune(keeping: ranking)
         let usualLanguage = model.usualLanguage
         let displays = resolved.prefix(shownCount).map {
@@ -40,7 +39,7 @@ struct LibrarySearchResults: View {
                 showsAITitle: model.showAITitles, showsAISummary: model.showAISummaries
             )
         }
-        displayCache = cache
+        model.librarySearchDisplays = cache
         resultIDs = resolved.map(\.id)
         rows = displays
         items = LibraryListItem.items(for: LibraryDateGroups.ungrouped(displays, id: "results"))
@@ -128,7 +127,7 @@ struct LibrarySearchResults: View {
         // A row's time names its day, so midnight has to rewrite it.
         .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in recompute() }
         .onReceive(NotificationCenter.default.publisher(for: NSLocale.currentLocaleDidChangeNotification)) { _ in
-            displayCache.removeAll()
+            model.librarySearchDisplays.removeAll()
             recompute()
         }
         .modifier(LibraryListAlerts(
