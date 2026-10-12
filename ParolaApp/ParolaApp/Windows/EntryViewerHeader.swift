@@ -46,7 +46,7 @@ struct EntryViewerHeader: View {
                 .axLeaf("Toggle.Info")
             }
 
-            Button("Copy Transcript") { session.copyTranscript() }
+            Button("Copy Transcript") { Task { await session.copyTranscript() } }
                 .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
                 .disabled(session.transcript == nil)
                 .axLeaf("Button.CopyTranscript")

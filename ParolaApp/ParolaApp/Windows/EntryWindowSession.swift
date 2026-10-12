@@ -76,8 +76,6 @@ final class EntryWindowSession {
 
     var translationLanguage: String? { document?.transcript.translation?.targetLanguage }
 
-    private(set) var transcriptText = ""
-
     private(set) var speakers: [String] = []
 
     /// The library's count when it has one: `LibraryStore` keeps it with every transcript write.
@@ -107,8 +105,6 @@ final class EntryWindowSession {
 
     private func rebuildDerivations(storedWordCount: Int?) {
         let transcript = transcript
-        let text = transcript?.text ?? ""
-        if text != transcriptText { transcriptText = text }
         let uniqueSpeakers = transcript?.uniqueSpeakers ?? []
         if uniqueSpeakers != speakers { speakers = uniqueSpeakers }
         let words = storedWordCount ?? transcript?.wordCount ?? 0
@@ -383,10 +379,8 @@ final class EntryWindowSession {
 
     // MARK: - Copying
 
-    func copyTranscript() {
-        let text = transcriptText
-        guard !text.isEmpty else { return }
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(text, forType: .string)
+    func copyTranscript(to pasteboard: NSPasteboard = .general) async {
+        guard let transcript, !transcript.segments.isEmpty else { return }
+        await model.copyTranscriptAsPlainText(transcript, to: pasteboard)
     }
 }

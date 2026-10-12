@@ -38,7 +38,7 @@ struct EntryWindowViewerTests {
             model, texts: ["alpha beta", "gamma"], speakers: ["Ada", "Bo"], audio: nil
         )
         let session = await EntryWindowTestSupport.openSession(model, entry)
-        #expect(session.transcriptText == "alpha beta gamma")
+        #expect(session.transcript?.segments.map(\.text) == ["alpha beta", "gamma"])
         #expect(session.speakers == ["Ada", "Bo"])
         #expect(session.wordCount == 3)
         let before = session.contentSignature
@@ -53,10 +53,33 @@ struct EntryWindowViewerTests {
         session.reload()
         await session.loadTask?.value
 
-        #expect(session.transcriptText == "alpha gamma delta epsilon")
+        #expect(session.transcript?.segments.map(\.text) == ["alpha", "gamma delta epsilon"])
         #expect(session.speakers == ["Ada"])
         #expect(session.wordCount == 4)
         #expect(session.contentSignature != before)
+    }
+
+    @Test("Copy Transcript copies paragraphs with speaker names, as the main window does")
+    func copyMatchesTheMainWindow() async throws {
+        let model = EntryWindowTestSupport.makeModel("viewercopy")
+        let entry = try await EntryWindowTestSupport.seed(
+            model, texts: ["alpha beta", "gamma"], speakers: ["Ada", "Bo"], audio: nil
+        )
+        let session = await EntryWindowTestSupport.openSession(model, entry)
+        let viewer = NSPasteboard(name: NSPasteboard.Name("viewer-copy-\(UUID())"))
+        let main = NSPasteboard(name: NSPasteboard.Name("main-copy-\(UUID())"))
+        defer {
+            viewer.releaseGlobally()
+            main.releaseGlobally()
+        }
+
+        await session.copyTranscript(to: viewer)
+        await model.copyTranscriptAsPlainText(try #require(session.transcript), to: main)
+
+        let copied = try #require(viewer.string(forType: .string))
+        #expect(copied == main.string(forType: .string))
+        #expect(copied.contains("Ada"))
+        #expect(copied.contains("Bo"))
     }
 
     @Test("the word count is the library's when the manifest carries one")
@@ -123,7 +146,7 @@ struct EntryWindowViewerTests {
 
         #expect(session.favorites == [1])
         #expect(session.translations == [0: "alfa"])
-        #expect(session.transcriptText == "alpha beta")
+        #expect(session.transcript?.segments.map(\.text) == ["alpha", "beta"])
     }
 
     @Test("a speaker assigned to a person wears that person's colour")
