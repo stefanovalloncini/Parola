@@ -131,9 +131,7 @@ final class DictationController {
         let hotkey = hotkeyFactory?(configuration.hotkeyKeyCode, configuration.hotkeyModifiers)
             ?? Self.hotkeyMonitor(for: configuration)
         let workflows = configuration.workflows
-        // Own session, not appModel.session: the shared one serializes whole transcribe runs, so a
-        // fallback stop would queue behind a long file job. It outlives restarts to keep its model
-        // warm; rearm() starts a new one so nothing queues behind an abandoned final.
+        // Own session so a stop never queues behind a file job; it outlives restarts, and rearm() replaces it.
         let recorder = recorderFactory?(configuration) ?? MicDictationRecorder(
             model: configuration.modelName,
             language: configuration.language,

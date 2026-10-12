@@ -321,7 +321,7 @@ struct StreamingModelCacheTests {
         #expect(await cache.residentModelNames().isEmpty)
     }
 
-    @Test("pressure and evict leave a leased model alone and drop an unleased one")
+    @Test("pressure unloads a leased model when its lease returns, and evict leaves it alone")
     func pressureAndEvictSpareLeasedModels() async throws {
         let probe = CacheProbe()
         let cache = StreamingModelCache.probing(probe)
@@ -522,6 +522,42 @@ struct StreamingModelCacheTests {
         #expect(await cache.residentModelNames() == [Self.tiny])
         #expect(probe.loads.value == 1)
         await lease.release()
+    }
+
+    @Test("an unload that found a leased model still loading happens when its lease returns")
+    func unloadUnleasedCoversALeasedLoad() async throws {
+        let probe = CacheProbe()
+        let gate = LoadGate()
+        let cache = StreamingModelCache.probing(probe, gate: gate)
+        let store = Self.makeStore()
+
+        let borrowing = GuardedTask { try await cache.borrow(Self.tiny, store: store) }
+        await probe.loads.wait(atLeast: 1, "the borrow's load to start")
+        await cache.unloadUnleased()
+        await gate.open(Self.tiny)
+        let lease = try #require(try await borrowing.value("the borrow to finish"))
+        await lease.release()
+
+        await probe.unloads.wait(atLeast: 1, "the unload the loading lease was holding up")
+        #expect(await cache.residentModelNames().isEmpty)
+    }
+
+    @Test("a borrow cancelled during a load that an unload request covers drops the load when it lands")
+    func cancelledBorrowDropsAMarkedLoad() async throws {
+        let probe = CacheProbe()
+        let gate = LoadGate()
+        let cache = StreamingModelCache.probing(probe, gate: gate)
+        let store = Self.makeStore()
+
+        let borrowing = GuardedTask { try await cache.borrow(Self.tiny, store: store) }
+        await probe.loads.wait(atLeast: 1, "the borrow's load to start")
+        await cache.unloadUnleased()
+        borrowing.cancel()
+        _ = try? await borrowing.value("the cancelled borrow to end")
+        await gate.open(Self.tiny)
+
+        await pollUntil("the marked load to be dropped") { await cache.inFlightCount == 0 }
+        #expect(await cache.residentModelNames().isEmpty)
     }
 
     @Test("a reload waits for the kit's pending unload")

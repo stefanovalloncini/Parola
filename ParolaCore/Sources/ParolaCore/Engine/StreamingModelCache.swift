@@ -127,7 +127,11 @@ actor StreamingModelCache {
         if evictOnRelease.remove(modelName) != nil {
             evict(modelName)
         } else if unloadOnRelease.remove(modelName) != nil {
-            unloadModels(of: modelName)
+            if entries[modelName]?.isResident == true {
+                unloadModels(of: modelName)
+            } else {
+                inFlight[modelName]?.dropUnlessLeased = true
+            }
         }
         armIdleUnloadIfUnleased()
     }
@@ -142,6 +146,8 @@ actor StreamingModelCache {
         leases[modelName, default: 0]
     }
 
+    var inFlightCount: Int { inFlight.count }
+
     func residentModelNames() -> [String] {
         entries.filter(\.value.isResident).keys.sorted()
     }
@@ -152,7 +158,7 @@ actor StreamingModelCache {
         for name in inFlight.keys where leaseCount(for: name) == 0 {
             inFlight[name]?.dropUnlessLeased = true
         }
-        unloadOnRelease.formUnion(residentModelNames().filter { leaseCount(for: $0) > 0 })
+        unloadOnRelease.formUnion(Set(residentModelNames()).union(inFlight.keys).filter { leaseCount(for: $0) > 0 })
         return unloadIdleModels()
     }
 
