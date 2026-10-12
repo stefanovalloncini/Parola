@@ -42,8 +42,12 @@ final class DictationController {
     var indicatorStyle: DictationIndicatorStyle = .nearField {
         didSet {
             guard oldValue != indicatorStyle, let panel = hud else { return }
-            refreshAnchor()
-            placeHUD(animate: true)
+            anchorEpoch += 1
+            Task { [weak self] in
+                guard let self else { return }
+                await refreshAnchor()
+                placeHUD(animate: true)
+            }
             if panel.isVisible { startRepositionLoop() }
         }
     }
@@ -53,6 +57,9 @@ final class DictationController {
     @ObservationIgnored var teardownBound: Duration = .seconds(30)
 
     @ObservationIgnored var anchorProvider: any FieldAnchorProviding = FocusedFieldLocator()
+    @ObservationIgnored private let anchorQueue = DispatchQueue(label: "app.parola.dictation.anchor", qos: .userInitiated)
+    @ObservationIgnored private var anchorProbeInFlight = false
+    @ObservationIgnored private var anchorEpoch = 0
     @ObservationIgnored var hotkeyFactory: ((Int, NSEvent.ModifierFlags) -> any HotkeyMonitor)?
     @ObservationIgnored var recorderFactory: ((Configuration) -> any DictationRecorder)?
     @ObservationIgnored var inserterFactory: (() -> any TextInserter)?
@@ -464,15 +471,32 @@ final class DictationController {
             }
         }
         guard let panel = hud else { return }
-        refreshAnchor()
         placeHUD()
         panel.orderFrontRegardless()
         startRepositionLoop()
+        Task { [weak self] in
+            guard let self, await refreshAnchor() else { return }
+            placeHUD()
+        }
     }
 
     @discardableResult
-    func refreshAnchor() -> Bool {
-        let anchor = indicatorStyle == .nearField ? anchorProvider.currentAnchor() : nil
+    func refreshAnchor() async -> Bool {
+        guard indicatorStyle == .nearField else { return setAnchor(nil) }
+        guard !anchorProbeInFlight else { return false }
+        anchorProbeInFlight = true
+        defer { anchorProbeInFlight = false }
+        let epoch = anchorEpoch
+        let geometry = ScreenGeometry.current()
+        let provider = anchorProvider
+        let anchor = await withCheckedContinuation { continuation in
+            anchorQueue.async { continuation.resume(returning: provider.currentAnchor(on: geometry)) }
+        }
+        guard epoch == anchorEpoch, indicatorStyle == .nearField else { return false }
+        return setAnchor(anchor)
+    }
+
+    private func setAnchor(_ anchor: FieldAnchor?) -> Bool {
         guard anchor != currentAnchor else { return false }
         currentAnchor = anchor
         return true
@@ -490,7 +514,7 @@ final class DictationController {
                 if Task.isCancelled { return }
                 guard let self else { return }
                 guard let panel = self.hud, panel.isVisible else { continue }
-                guard self.refreshAnchor() else { continue }
+                guard await self.refreshAnchor() else { continue }
                 self.placeHUD()
             }
         }
@@ -524,6 +548,7 @@ final class DictationController {
 
     private func hideHUD() {
         hudIsUp = false
+        anchorEpoch += 1
         stopLevelStream()
         repositionTask?.cancel()
         repositionTask = nil

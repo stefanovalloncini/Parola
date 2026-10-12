@@ -1,20 +1,33 @@
 import AppKit
 import ApplicationServices
 
-protocol FieldAnchorProviding {
-    @MainActor func currentAnchor() -> FieldAnchor?
+struct ScreenGeometry: Sendable {
+    var primaryHeight: CGFloat
+    var screens: [(frame: NSRect, visible: NSRect)]
+
+    @MainActor
+    static func current() -> ScreenGeometry {
+        ScreenGeometry(
+            primaryHeight: NSScreen.screens.first?.frame.height ?? 0,
+            screens: NSScreen.screens.map { ($0.frame, $0.visibleFrame) }
+        )
+    }
 }
 
-@MainActor
+/// Blocks on accessibility calls; callers run it off the main actor.
+protocol FieldAnchorProviding: Sendable {
+    func currentAnchor(on geometry: ScreenGeometry) -> FieldAnchor?
+}
+
 struct FocusedFieldLocator: FieldAnchorProviding {
-    func currentAnchor() -> FieldAnchor? {
+    func currentAnchor(on geometry: ScreenGeometry) -> FieldAnchor? {
         guard AXIsProcessTrusted() else { return nil }
         guard let element = Self.focusedElement() else { return nil }
         return Self.anchor(
             caretTopLeft: Self.caretRect(of: element),
             elementTopLeft: Self.elementFrame(of: element),
-            primaryScreenHeight: NSScreen.screens.first?.frame.height ?? 0,
-            screens: NSScreen.screens.map { ($0.frame, $0.visibleFrame) }
+            primaryScreenHeight: geometry.primaryHeight,
+            screens: geometry.screens
         )
     }
 
@@ -74,18 +87,12 @@ struct FocusedFieldLocator: FieldAnchorProviding {
         return intersection.width * intersection.height
     }
 
-    /// These lookups run on the main actor every second while the pill is visible; the
-    /// default AX messaging timeout is 6 s per call, so a beachballing frontmost app
-    /// would freeze Parola's UI without the tight per-element timeout.
+    /// The default AX messaging timeout is 6 s per call; a beachballing frontmost app would hold the probe queue that long.
     private static let messagingTimeout: Float = 0.25
 
-    private static let systemWide: AXUIElement = {
-        let element = AXUIElementCreateSystemWide()
-        AXUIElementSetMessagingTimeout(element, messagingTimeout)
-        return element
-    }()
-
     private static func focusedElement() -> AXUIElement? {
+        let systemWide = AXUIElementCreateSystemWide()
+        AXUIElementSetMessagingTimeout(systemWide, messagingTimeout)
         var ref: CFTypeRef?
         let result = AXUIElementCopyAttributeValue(
             systemWide,
