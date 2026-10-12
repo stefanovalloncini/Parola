@@ -1,5 +1,6 @@
 import AVFoundation
 import Foundation
+import os
 import Testing
 @testable import Parola
 import ParolaCore
@@ -126,8 +127,11 @@ struct PermissionLoggingTests {
 }
 
 /// A settable box so a permission stub can answer differently between refreshes.
-@MainActor
-private final class Box<Value> {
-    var value: Value
-    init(_ value: Value) { self.value = value }
+private final class Box<Value: Sendable>: Sendable {
+    private let stored: OSAllocatedUnfairLock<Value>
+    init(_ value: Value) { stored = OSAllocatedUnfairLock(initialState: value) }
+    var value: Value {
+        get { stored.withLock { $0 } }
+        set { stored.withLock { $0 = newValue } }
+    }
 }

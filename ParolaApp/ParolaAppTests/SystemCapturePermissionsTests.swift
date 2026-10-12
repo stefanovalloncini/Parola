@@ -1,4 +1,5 @@
 import Foundation
+import os
 import Testing
 @testable import Parola
 import ParolaCore
@@ -6,14 +7,27 @@ import ParolaCore
 @Suite("System capture permissions")
 @MainActor
 struct SystemCapturePermissionsTests {
-    // @unchecked: only mutated from @MainActor test bodies and the permissions object's MainActor callbacks.
-    private final class Box: @unchecked Sendable {
-        var screen = false
-        var screenRequestResult = false
-        var screenRequests = 0
-        var audio: SystemAudioRecordingPermission = .undetermined
-        var probeRuns = 0
-        var openedPanes: [String] = []
+    private final class Box: Sendable {
+        private struct State {
+            var screen = false
+            var screenRequestResult = false
+            var screenRequests = 0
+            var audio: SystemAudioRecordingPermission = .undetermined
+            var probeRuns = 0
+            var openedPanes: [String] = []
+        }
+        private let state = OSAllocatedUnfairLock(initialState: State())
+        var screen: Bool { get { state.withLock { $0.screen } } set { state.withLock { $0.screen = newValue } } }
+        var screenRequestResult: Bool { get { state.withLock { $0.screenRequestResult } } set { state.withLock { $0.screenRequestResult = newValue } } }
+        var screenRequests: Int { get { state.withLock { $0.screenRequests } } set { state.withLock { $0.screenRequests = newValue } } }
+        var audio: SystemAudioRecordingPermission { get { state.withLock { $0.audio } } set { state.withLock { $0.audio = newValue } } }
+        var probeRuns: Int { get { state.withLock { $0.probeRuns } } set { state.withLock { $0.probeRuns = newValue } } }
+        var openedPanes: [String] { get { state.withLock { $0.openedPanes } } set { state.withLock { $0.openedPanes = newValue } } }
+    }
+
+    private func withSink(_ body: (CapturingDiagnosticsSink) async throws -> Void) async rethrows {
+        let sink = CapturingDiagnosticsSink()
+        try await ParolaLog.withSink(sink) { try await body(sink) }
     }
 
     private func make(_ box: Box) -> SystemCapturePermissions {
@@ -116,5 +130,58 @@ struct SystemCapturePermissionsTests {
         gate.continuation.finish()
         await waitUntil { permissions.systemAudioGranted }
         #expect(box.probeRuns == 1)
+    }
+
+    @Test("a launch that defers its reads starts neutral, then takes the answer from off the main thread")
+    func deferredLaunchRead() async {
+        let box = Box()
+        box.screen = true
+        box.audio = .granted
+        let permissions = SystemCapturePermissions(
+            screenCheck: { box.screen },
+            screenRequest: { false },
+            audioCheck: { box.audio },
+            consentProbe: {},
+            openSettingsPane: { _ in },
+            readsAtLaunch: false
+        )
+        #expect(!permissions.screenRecordingGranted)
+        await waitUntil { permissions.screenRecordingGranted }
+        #expect(permissions.systemAudioGranted)
+    }
+
+    @Test("a background answer that a direct refresh overtook is dropped")
+    func staleBackgroundAnswerIsDropped() async {
+        let gate = DispatchSemaphore(value: 0)
+        let permissions = SystemCapturePermissions(
+            screenCheck: {
+                if Thread.isMainThread { return false }
+                gate.wait()
+                return true
+            },
+            screenRequest: { false },
+            audioCheck: { .undetermined },
+            consentProbe: {},
+            openSettingsPane: { _ in }
+        )
+        permissions.refreshInBackground()
+        permissions.refresh()
+        gate.signal()
+        try? await Task.sleep(for: .milliseconds(150))
+        #expect(!permissions.screenRecordingGranted)
+    }
+
+    @Test("a launch read that finds a grant logs no change")
+    func launchReadIsSilent() async {
+        await withSink { sink in
+            let permissions = SystemCapturePermissions(
+                screenCheck: { true }, screenRequest: { false }, audioCheck: { .granted },
+                consentProbe: {}, openSettingsPane: { _ in }, readsAtLaunch: false
+            )
+            await waitUntil { permissions.screenRecordingGranted }
+            #expect(permissions.systemAudioGranted)
+            let permissionRecords = sink.records.filter { $0.category == .appPermissions }
+            #expect(permissionRecords.isEmpty)
+        }
     }
 }

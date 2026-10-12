@@ -13,31 +13,36 @@ final class DictationPermissions {
 
     @ObservationIgnored var onAccessibilityGranted: (() -> Void)?
 
-    @ObservationIgnored private let trustCheck: () -> Bool
-    @ObservationIgnored private let microphoneStatus: () -> AVAuthorizationStatus
+    @ObservationIgnored private let trustCheck: @Sendable () -> Bool
+    @ObservationIgnored private let microphoneStatus: @Sendable () -> AVAuthorizationStatus
+    @ObservationIgnored private var reads = 0
+    @ObservationIgnored private var settled: Bool
     @ObservationIgnored private let grantPollInterval: Duration
     @ObservationIgnored private var activationObserver: NSObjectProtocol?
     @ObservationIgnored private var grantPollTask: Task<Void, Never>?
 
     init(
-        trustCheck: @escaping () -> Bool = { AXIsProcessTrusted() },
-        microphoneStatus: @escaping () -> AVAuthorizationStatus = { AVCaptureDevice.authorizationStatus(for: .audio) },
-        grantPollInterval: Duration = .seconds(2)
+        trustCheck: @escaping @Sendable () -> Bool = { AXIsProcessTrusted() },
+        microphoneStatus: @escaping @Sendable () -> AVAuthorizationStatus = { AVCaptureDevice.authorizationStatus(for: .audio) },
+        grantPollInterval: Duration = .seconds(2),
+        readsAtLaunch: Bool = true
     ) {
         self.trustCheck = trustCheck
         self.microphoneStatus = microphoneStatus
         self.grantPollInterval = grantPollInterval
-        accessibilityGranted = trustCheck()
-        let mic = microphoneStatus()
+        settled = readsAtLaunch
+        let mic = readsAtLaunch ? microphoneStatus() : .notDetermined
+        accessibilityGranted = readsAtLaunch && trustCheck()
         microphoneAuthorized = mic == .authorized
-        microphoneUndetermined = mic == .notDetermined
+        microphoneUndetermined = readsAtLaunch && mic == .notDetermined
         activationObserver = NotificationCenter.default.addObserver(
             forName: NSApplication.didBecomeActiveNotification,
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.refresh() }
+            MainActor.assumeIsolated { self?.refreshInBackground() }
         }
+        if !readsAtLaunch { refreshInBackground() }
     }
 
     isolated deinit {
@@ -72,15 +77,35 @@ final class DictationPermissions {
         grantPollTask = nil
     }
 
+    /// The checks are TCC round trips, so a launch or an app activation asks off the main thread and applies the answer unless a direct `refresh()` has landed since.
+    func refreshInBackground() {
+        let started = reads
+        let trust = trustCheck
+        let status = microphoneStatus
+        Task { [weak self] in
+            guard let answer = try? await AppModel.offMainIO(qos: .utility, { (trust(), status()) }) else { return }
+            guard let self, self.reads == started else { return }
+            self.apply(trusted: answer.0, microphone: answer.1)
+        }
+    }
+
     func refresh() {
+        apply(trusted: trustCheck(), microphone: microphoneStatus())
+    }
+
+    private func apply(trusted: Bool, microphone mic: AVAuthorizationStatus) {
+        reads += 1
         let wasGranted = accessibilityGranted
         let previousMicrophone = PermissionState(
             granted: microphoneAuthorized, undetermined: microphoneUndetermined
         )
-        accessibilityGranted = trustCheck()
-        let mic = microphoneStatus()
+        accessibilityGranted = trusted
         microphoneAuthorized = mic == .authorized
         microphoneUndetermined = mic == .notDetermined
+        guard settled else {
+            settled = true
+            return
+        }
         // Every app activation refreshes, so only a changed answer is worth a record.
         if accessibilityGranted != wasGranted {
             ParolaLog.notice(

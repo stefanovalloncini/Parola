@@ -1513,8 +1513,8 @@ final class AppModel {
     ]
 
     @ObservationIgnored let dictationController = DictationController()
-    @ObservationIgnored let dictationPermissions = DictationPermissions()
-    @ObservationIgnored let capturePermissions = SystemCapturePermissions()
+    @ObservationIgnored let dictationPermissions = DictationPermissions(readsAtLaunch: false)
+    @ObservationIgnored let capturePermissions = SystemCapturePermissions(readsAtLaunch: false)
 
     var dictationState: DictationCoordinator.State = .idle
     /// The meter the take in progress writes; set once per take, never per buffer.

@@ -1,16 +1,22 @@
 import AVFoundation
 import Foundation
+import os
 import Testing
 @testable import Parola
 
 @Suite("Dictation permissions")
 @MainActor
 struct DictationPermissionsTests {
-    // @unchecked: only mutated from @MainActor test bodies and the permissions object's MainActor callbacks.
-    private final class Box: @unchecked Sendable {
-        var trusted = false
-        var mic: AVAuthorizationStatus = .notDetermined
-        var grantedFired = 0
+    private final class Box: Sendable {
+        private struct State {
+            var trusted = false
+            var mic: AVAuthorizationStatus = .notDetermined
+            var grantedFired = 0
+        }
+        private let state = OSAllocatedUnfairLock(initialState: State())
+        var trusted: Bool { get { state.withLock { $0.trusted } } set { state.withLock { $0.trusted = newValue } } }
+        var mic: AVAuthorizationStatus { get { state.withLock { $0.mic } } set { state.withLock { $0.mic = newValue } } }
+        var grantedFired: Int { get { state.withLock { $0.grantedFired } } set { state.withLock { $0.grantedFired = newValue } } }
     }
 
     private func make(_ box: Box) -> DictationPermissions {
@@ -96,5 +102,65 @@ struct DictationPermissionsTests {
         box.trusted = true
         try? await Task.sleep(for: .milliseconds(100))
         #expect(box.grantedFired == 0)
+    }
+
+    @Test("a launch that defers its reads starts neutral, then takes the answer from off the main thread")
+    func deferredLaunchRead() async {
+        let box = Box()
+        box.trusted = true
+        box.mic = .authorized
+        let permissions = DictationPermissions(
+            trustCheck: { box.trusted },
+            microphoneStatus: { box.mic },
+            readsAtLaunch: false
+        )
+        #expect(!permissions.accessibilityGranted)
+        for _ in 0..<400 where !permissions.accessibilityGranted {
+            try? await Task.sleep(for: .milliseconds(5))
+        }
+        #expect(permissions.accessibilityGranted)
+        #expect(permissions.microphoneAuthorized)
+    }
+
+    @Test("a background answer that a direct refresh overtook is dropped")
+    func staleBackgroundAnswerIsDropped() async {
+        let gate = DispatchSemaphore(value: 0)
+        let permissions = DictationPermissions(
+            trustCheck: {
+                if Thread.isMainThread { return false }
+                gate.wait()
+                return true
+            },
+            microphoneStatus: { .authorized }
+        )
+        permissions.refreshInBackground()
+        permissions.refresh()
+        gate.signal()
+        try? await Task.sleep(for: .milliseconds(150))
+        #expect(!permissions.accessibilityGranted)
+    }
+
+    @Test("a launch read that finds Accessibility granted neither fires the grant callback nor logs")
+    func launchReadIsSilent() async {
+        let box = Box()
+        box.trusted = true
+        box.mic = .authorized
+        let permissions = DictationPermissions(
+            trustCheck: { box.trusted },
+            microphoneStatus: { box.mic },
+            readsAtLaunch: false
+        )
+        permissions.onAccessibilityGranted = { box.grantedFired += 1 }
+        for _ in 0..<400 where !permissions.accessibilityGranted {
+            try? await Task.sleep(for: .milliseconds(5))
+        }
+        #expect(permissions.accessibilityGranted)
+        #expect(box.grantedFired == 0)
+
+        box.trusted = false
+        permissions.refresh()
+        box.trusted = true
+        permissions.refresh()
+        #expect(box.grantedFired == 1, "later grants still fire")
     }
 }
