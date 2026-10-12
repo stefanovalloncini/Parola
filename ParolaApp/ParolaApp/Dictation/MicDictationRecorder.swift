@@ -81,7 +81,6 @@ actor MicDictationRecorder: DictationRecorder {
     }
 
     func stopAndTranscribe() async throws -> String {
-        await resolveLanguageOverride()
         if streamingSession != nil {
             return try await stopStreaming()
         }
