@@ -116,7 +116,8 @@ public actor LibrarySearchIndex {
 
     private struct IndexedEntry: Sendable {
         let title: String
-        let tokens: [String]
+        /// Vocabulary ids in the order of their words, which is also the order of `counts` and `offsets`.
+        var tokens: [UInt32]
         let counts: [UInt32]
         /// Parallel to `tokens`: where the token first occurs in the body, `noOffset` for title-only tokens.
         let offsets: [Int32]
@@ -152,9 +153,11 @@ public actor LibrarySearchIndex {
         let entries: [String: String]
     }
 
+    /// `entry` arrives without token ids; `words` are its tokens in order and take their ids when the entry is installed.
     private struct PreparedEntry: Sendable {
         let id: String
         let entry: IndexedEntry
+        let words: [String]
         let body: String
     }
 
@@ -280,9 +283,71 @@ public actor LibrarySearchIndex {
         }
     }
 
+    /// Every distinct token once, with the entries that hold it; a token no entry holds gives its id back.
+    private struct Vocabulary: Sendable {
+        private(set) var words: [String] = []
+        private(set) var postings: [[UInt32]] = []
+        private var ids: [String: UInt32] = [:]
+        private var freeIDs: [UInt32] = []
+
+        func id(of word: String) -> UInt32? { ids[word] }
+        var liveIDs: Dictionary<String, UInt32>.Values { ids.values }
+
+        mutating func reserveCapacity(_ capacity: Int) {
+            ids.reserveCapacity(capacity)
+            words.reserveCapacity(capacity)
+            postings.reserveCapacity(capacity)
+        }
+
+        mutating func intern(_ word: String) -> (id: UInt32, isNew: Bool) {
+            if let existing = ids[word] { return (existing, false) }
+            let id: UInt32
+            if let reused = freeIDs.popLast() {
+                id = reused
+                words[Int(reused)] = word
+            } else {
+                id = UInt32(words.count)
+                words.append(word)
+                postings.append([])
+            }
+            ids[word] = id
+            return (id, true)
+        }
+
+        mutating func reservePostings(_ capacity: Int, for id: UInt32) {
+            postings[Int(id)].reserveCapacity(capacity)
+        }
+
+        mutating func appendAscending(_ ordinal: UInt32, to id: UInt32) {
+            if postings[Int(id)].last != ordinal { postings[Int(id)].append(ordinal) }
+        }
+
+        mutating func insert(_ ordinal: UInt32, into id: UInt32) {
+            Postings.insert(ordinal, into: &postings[Int(id)])
+        }
+
+        /// True when the token left the vocabulary because no entry holds it any more.
+        mutating func remove(_ ordinal: UInt32, from id: UInt32) -> Bool {
+            Postings.remove(ordinal, from: &postings[Int(id)])
+            guard postings[Int(id)].isEmpty else { return false }
+            postings[Int(id)] = []
+            ids.removeValue(forKey: words[Int(id)])
+            words[Int(id)] = ""
+            freeIDs.append(id)
+            return true
+        }
+
+        mutating func removeAll() {
+            words.removeAll()
+            postings.removeAll()
+            ids.removeAll()
+            freeIDs.removeAll()
+        }
+    }
+
     private struct LoadedState: Sendable {
         let entries: EntryTable
-        let inverted: [String: [UInt32]]
+        let vocabulary: Vocabulary
     }
 
     private enum LoadOutcome: Sendable {
@@ -328,7 +393,7 @@ public actor LibrarySearchIndex {
     public static let excerptLength = 240
 
     private var entries = EntryTable()
-    private var inverted: [String: [UInt32]] = [:]
+    private var vocabulary = Vocabulary()
     private var excerptsByEntry: [String: String] = [:]
     private var excerptsGeneration = 0
     private var dirtyEntryIDs: Set<String> = []
@@ -341,7 +406,7 @@ public actor LibrarySearchIndex {
     private var pendingFingerprints: [String: String] = [:]
     private var unsoundBodies: Set<String> = []
     private var ticketCounter = 0
-    private var sortedTokens: [String]?
+    private var sortedTokenIDs: [UInt32]?
     private var isLoaded = false
     private var isDirty = false
     private var legacySnapshotPresent = false
@@ -456,7 +521,7 @@ public actor LibrarySearchIndex {
         let unchanged = !unsoundBodies.contains(id)
             && entries[id].map { $0.bodyBytes == prepared.entry.bodyBytes && $0.bodyHash == prepared.entry.bodyHash } == true
         removeFromIndex(id)
-        install(prepared.entry, body: unchanged ? nil : prepared.body, for: id)
+        install(prepared.entry, words: prepared.words, body: unchanged ? nil : prepared.body, for: id)
         if let fingerprint = pendingFingerprints.removeValue(forKey: id) { applyFingerprint(fingerprint, for: id) }
         scheduleSave()
     }
@@ -467,8 +532,8 @@ public actor LibrarySearchIndex {
         await ensureLoaded()
         guard indexTickets[id] == nil, let entry = entries[id] else { return false }
         var tallies: [String: Tally] = [:]
-        for (position, token) in entry.tokens.enumerated() {
-            tallies[token] = Tally(
+        for (position, tokenID) in entry.tokens.enumerated() {
+            tallies[vocabulary.words[Int(tokenID)]] = Tally(
                 count: position < entry.counts.count ? Int(entry.counts[position]) : 1,
                 offset: position < entry.offsets.count ? Int(entry.offsets[position]) : Self.noOffset
             )
@@ -480,7 +545,7 @@ public actor LibrarySearchIndex {
         let tokens = tallies.keys.sorted()
         let replaced = IndexedEntry(
             title: entry.title,
-            tokens: tokens,
+            tokens: [],
             counts: tokens.map { UInt32(clamping: max(1, tallies[$0]?.count ?? 1)) },
             offsets: tokens.map { Int32(clamping: tallies[$0]?.offset ?? Self.noOffset) },
             boundaryOffsets: entry.boundaryOffsets,
@@ -491,7 +556,7 @@ public actor LibrarySearchIndex {
             bodyHash: entry.bodyHash
         )
         removeFromIndex(id)
-        install(replaced, body: nil, for: id)
+        install(replaced, words: tokens, body: nil, for: id)
         scheduleSave()
         return true
     }
@@ -513,11 +578,13 @@ public actor LibrarySearchIndex {
         guard !queryTokens.isEmpty else { return [] }
         await ensureLoaded()
 
-        if sortedTokens == nil {
-            sortedTokens = inverted.keys.sorted()
+        if sortedTokenIDs == nil {
+            let words = vocabulary.words
+            sortedTokenIDs = vocabulary.liveIDs.sorted { words[Int($0)] < words[Int($1)] }
             vocabularySorts &+= 1
         }
-        let tokens = sortedTokens ?? []
+        let tokens = sortedTokenIDs ?? []
+        let words = vocabulary.words
         let slotCount = entries.slotCount
         var scores = [Int](repeating: 0, count: slotCount)
         var hits = [Int](repeating: 0, count: slotCount)
@@ -525,15 +592,15 @@ public actor LibrarySearchIndex {
         var touched: [UInt32] = []
         for queryToken in Set(queryTokens) {
             // Prefix matches sort contiguously; binary-search the range instead of scanning the whole vocabulary.
-            let lower = Self.firstIndex(in: tokens, atLeast: queryToken)
-            let upper = Self.firstIndex(in: tokens, atLeast: queryToken + "\u{10FFFF}")
-            for indexToken in tokens[lower..<upper] where indexToken.hasPrefix(queryToken) {
-                for ordinal in inverted[indexToken] ?? [] {
+            let lower = Self.firstIndex(in: tokens, atLeast: queryToken, words: words)
+            let upper = Self.firstIndex(in: tokens, atLeast: queryToken + "\u{10FFFF}", words: words)
+            for tokenID in tokens[lower..<upper] where words[Int(tokenID)].hasPrefix(queryToken) {
+                for ordinal in vocabulary.postings[Int(tokenID)] {
                     let slot = Int(ordinal)
                     if scores[slot] == 0 { touched.append(ordinal) }
                     scores[slot] += 1
                     guard let entry = entries.entry(at: ordinal) else { continue }
-                    let position = Self.position(of: indexToken, in: entry)
+                    let position = Self.position(of: tokenID, in: entry, words: words)
                     hits[slot] += Self.occurrences(at: position, in: entry)
                     if let offset = Self.bodyOffset(at: position, in: entry), offset < earliest[slot] {
                         earliest[slot] = offset
@@ -580,10 +647,11 @@ public actor LibrarySearchIndex {
             if let entry = entries[match.entryID] { captured[match.entryID] = entry }
         }
         let bodies = await bodies(for: captured)
+        let words = vocabulary.words
         return batch.map { match in
             guard let entry = captured[match.entryID], entries[match.entryID]?.revision == entry.revision,
                   let body = bodies[match.entryID] else { return match }
-            let snippet = Self.snippet(for: queryTokens, body: body, in: entry)
+            let snippet = Self.snippet(for: queryTokens, body: body, in: entry, words: words)
             return Match(
                 entryID: match.entryID,
                 score: match.score,
@@ -713,15 +781,15 @@ public actor LibrarySearchIndex {
         // Tokenized before the old index is dropped, so a search during the pass still answers from it.
         let prepared = await Self.tokenizeOffActor(rebuilt)
         entries.removeAll()
-        inverted.removeAll()
+        vocabulary.removeAll()
         dirtyEntryIDs.removeAll()
         dirtyBodyIDs.removeAll()
         pendingBodies.removeAll()
         indexTickets.removeAll()
         pendingFingerprints.removeAll()
-        sortedTokens = nil
+        sortedTokenIDs = nil
         for entry in prepared {
-            install(entry.entry, body: entry.body, for: entry.id)
+            install(entry.entry, words: entry.words, body: entry.body, for: entry.id)
         }
         let kept = Set(prepared.map(\.id))
         let dropped = excerptsByEntry.keys.filter { !kept.contains($0) }
@@ -748,7 +816,7 @@ public actor LibrarySearchIndex {
         }
         for entry in prepared {
             removeFromIndex(entry.id)
-            install(entry.entry, body: entry.body, for: entry.id)
+            install(entry.entry, words: entry.words, body: entry.body, for: entry.id)
         }
         scheduleSave()
     }
@@ -774,7 +842,7 @@ public actor LibrarySearchIndex {
         for entry in changes.decoded {
             removeFromIndex(entry.id)
             discardBody(of: entry.id)
-            install(entry.entry, body: nil, for: entry.id)
+            install(entry.entry, words: entry.words, body: nil, for: entry.id)
         }
         entriesDecoded &+= changes.decoded.count
         snapshotStamp = stamp
@@ -894,10 +962,10 @@ public actor LibrarySearchIndex {
         switch result.outcome {
         case .loaded(let state):
             entries = state.entries
-            inverted = state.inverted
+            vocabulary = state.vocabulary
             snapshotListed = Set(state.entries.keys)
             entriesDecoded &+= state.entries.count
-            sortedTokens = nil
+            sortedTokenIDs = nil
             excerptsByEntry = state.entries.excerpts
             if !excerptsByEntry.isEmpty { excerptsGeneration &+= 1 }
         case .staleDiscarded:
@@ -957,35 +1025,37 @@ public actor LibrarySearchIndex {
         }
         var entries = EntryTable()
         entries.reserveCapacity(decoded.count)
-        var postingCounts: [String: Int] = [:]
+        var vocabulary = Vocabulary()
+        var holders: [Int] = []
+        var tokenIDs: [[UInt32]] = []
+        tokenIDs.reserveCapacity(decoded.count)
         for (id, entry) in zip(ids, decoded) {
             // A file left behind by a write that failed under a manifest a later save wrote: stale, not current.
             guard entry.id == id, manifest.entries[id] == entry.fingerprint else {
                 return LoadResult(outcome: .staleDiscarded, legacySnapshotPresent: legacy)
             }
-            for token in Set(entry.tokens) { postingCounts[token, default: 0] += 1 }
+            let interned = entry.tokens.map { vocabulary.intern($0).id }
+            if holders.count < vocabulary.words.count {
+                holders.append(contentsOf: repeatElement(0, count: vocabulary.words.count - holders.count))
+            }
+            for tokenID in interned { holders[Int(tokenID)] += 1 }
+            tokenIDs.append(interned)
         }
-        var inverted: [String: [UInt32]] = [:]
-        inverted.reserveCapacity(postingCounts.count)
-        for (token, count) in postingCounts {
-            var list: [UInt32] = []
-            list.reserveCapacity(count)
-            inverted[token] = list
-        }
-        for (id, entry) in zip(ids, decoded) {
-            let ordinal = entries.insert(indexedEntry(from: entry), for: id)
-            for token in Set(entry.tokens) { inverted[token]?.append(ordinal) }
+        for (tokenID, count) in holders.enumerated() { vocabulary.reservePostings(count, for: UInt32(tokenID)) }
+        for (position, entry) in zip(ids, decoded).enumerated() {
+            let ordinal = entries.insert(indexedEntry(from: entry.1, tokens: tokenIDs[position]), for: entry.0)
+            for tokenID in tokenIDs[position] { vocabulary.appendAscending(ordinal, to: tokenID) }
         }
         return LoadResult(
-            outcome: .loaded(LoadedState(entries: entries, inverted: inverted)),
+            outcome: .loaded(LoadedState(entries: entries, vocabulary: vocabulary)),
             legacySnapshotPresent: legacy
         )
     }
 
-    private static func indexedEntry(from entry: SnapshotEntry) -> IndexedEntry {
+    private static func indexedEntry(from entry: SnapshotEntry, tokens: [UInt32] = []) -> IndexedEntry {
         IndexedEntry(
             title: entry.title,
-            tokens: entry.tokens,
+            tokens: tokens,
             counts: entry.counts,
             offsets: entry.offsets,
             boundaryOffsets: entry.boundaryOffsets,
@@ -1017,7 +1087,7 @@ public actor LibrarySearchIndex {
         var prepared: [PreparedEntry] = []
         for (id, entry) in zip(ids, decoded) {
             guard entry.id == id, manifest.entries[id] == entry.fingerprint else { return nil }
-            prepared.append(PreparedEntry(id: id, entry: indexedEntry(from: entry), body: ""))
+            prepared.append(PreparedEntry(id: id, entry: indexedEntry(from: entry), words: entry.tokens, body: ""))
         }
         return SnapshotChanges(listed: Set(manifest.entries.keys), decoded: prepared)
     }
@@ -1065,17 +1135,14 @@ public actor LibrarySearchIndex {
             nonisolated(unsafe) let slots = buffer
             DispatchQueue.concurrentPerform(iterations: rebuilt.count) { position in
                 let source = rebuilt[position]
-                slots[position] = PreparedEntry(
-                    id: source.id,
-                    entry: makeIndexedEntry(
-                        title: source.title,
-                        text: source.text,
-                        auxiliaryText: source.auxiliaryText,
-                        boundaries: source.boundaries,
-                        fingerprint: source.fingerprint
-                    ),
-                    body: source.text
+                let tokenized = makeIndexedEntry(
+                    title: source.title,
+                    text: source.text,
+                    auxiliaryText: source.auxiliaryText,
+                    boundaries: source.boundaries,
+                    fingerprint: source.fingerprint
                 )
+                slots[position] = PreparedEntry(id: source.id, entry: tokenized.entry, words: tokenized.words, body: source.text)
             }
         }
         return prepared.compactMap { $0 }
@@ -1087,16 +1154,16 @@ public actor LibrarySearchIndex {
         auxiliaryText: String,
         boundaries: [SegmentBoundary],
         fingerprint: String
-    ) -> IndexedEntry {
+    ) -> (entry: IndexedEntry, words: [String]) {
         var tallies: [String: Tally] = [:]
         enumerateTokens(in: title) { token, _ in tallies[token, default: Tally()].count += 1 }
         enumerateTokens(in: text) { token, offset in tallies[token, default: Tally()].add(at: offset) }
         enumerateTokens(in: auxiliaryText) { token, _ in tallies[token, default: Tally()].count += 1 }
         let tokens = tallies.keys.sorted()
         let bodyDigest = digest(of: text)
-        return IndexedEntry(
+        let entry = IndexedEntry(
             title: title,
-            tokens: tokens,
+            tokens: [],
             counts: tokens.map { UInt32(clamping: tallies[$0]?.count ?? 0) },
             offsets: tokens.map { Int32(clamping: tallies[$0]?.offset ?? noOffset) },
             boundaryOffsets: boundaries.map { Int32(clamping: $0.textOffset) },
@@ -1106,11 +1173,18 @@ public actor LibrarySearchIndex {
             bodyBytes: bodyDigest.0,
             bodyHash: bodyDigest.1
         )
+        return (entry, tokens)
     }
 
     /// A nil `body` leaves the one already held or on disk as it is.
-    private func install(_ entry: IndexedEntry, body: String?, for id: String) {
+    private func install(_ entry: IndexedEntry, words: [String], body: String?, for id: String) {
         var entry = entry
+        var vocabularyGrew = false
+        entry.tokens = words.map { word in
+            let interned = vocabulary.intern(word)
+            if interned.isNew { vocabularyGrew = true }
+            return interned.id
+        }
         revisionCounter &+= 1
         entry.revision = revisionCounter
         let ordinal = entries.insert(entry, for: id)
@@ -1125,12 +1199,8 @@ public actor LibrarySearchIndex {
             excerptsGeneration &+= 1
         }
         dirtyEntryIDs.insert(id)
-        var vocabularyGrew = false
-        for token in entry.tokens {
-            if inverted[token] == nil { vocabularyGrew = true }
-            Postings.insert(ordinal, into: &inverted[token, default: []])
-        }
-        if vocabularyGrew { sortedTokens = nil }
+        for tokenID in entry.tokens { vocabulary.insert(ordinal, into: tokenID) }
+        if vocabularyGrew { sortedTokenIDs = nil }
         isDirty = true
     }
 
@@ -1138,26 +1208,19 @@ public actor LibrarySearchIndex {
         guard let (entry, ordinal) = entries.removeValue(forKey: id) else { return }
         dirtyEntryIDs.remove(id)
         var vocabularyShrank = false
-        for token in entry.tokens {
-            guard inverted[token] != nil else { continue }
-            Postings.remove(ordinal, from: &inverted[token]!)
-            if inverted[token]?.isEmpty == true {
-                inverted.removeValue(forKey: token)
-                vocabularyShrank = true
-            }
-        }
-        if vocabularyShrank { sortedTokens = nil }
+        for tokenID in entry.tokens where vocabulary.remove(ordinal, from: tokenID) { vocabularyShrank = true }
+        if vocabularyShrank { sortedTokenIDs = nil }
         isDirty = true
     }
 
-    private static func snapshotEntry(id: String, entry: IndexedEntry) -> SnapshotEntry {
+    private static func snapshotEntry(id: String, entry: IndexedEntry, words: [String]) -> SnapshotEntry {
         SnapshotEntry(
             id: id,
             title: entry.title,
             excerpt: entry.excerpt,
             bodyBytes: entry.bodyBytes,
             bodyHash: entry.bodyHash,
-            tokens: entry.tokens,
+            tokens: entry.tokens.map { words[Int($0)] },
             counts: entry.counts,
             offsets: entry.offsets,
             boundaryOffsets: entry.boundaryOffsets,
@@ -1166,19 +1229,19 @@ public actor LibrarySearchIndex {
         )
     }
 
-    private static func firstIndex(in sorted: [String], atLeast key: String) -> Int {
+    private static func firstIndex(in sorted: [UInt32], atLeast key: String, words: [String]) -> Int {
         var low = 0
         var high = sorted.count
         while low < high {
             let mid = (low + high) / 2
-            if sorted[mid] < key { low = mid + 1 } else { high = mid }
+            if words[Int(sorted[mid])] < key { low = mid + 1 } else { high = mid }
         }
         return low
     }
 
-    private static func position(of token: String, in entry: IndexedEntry) -> Int? {
-        let position = firstIndex(in: entry.tokens, atLeast: token)
-        guard position < entry.tokens.count, entry.tokens[position] == token else { return nil }
+    private static func position(of tokenID: UInt32, in entry: IndexedEntry, words: [String]) -> Int? {
+        let position = firstIndex(in: entry.tokens, atLeast: words[Int(tokenID)], words: words)
+        guard position < entry.tokens.count, entry.tokens[position] == tokenID else { return nil }
         return position
     }
 
@@ -1244,18 +1307,20 @@ public actor LibrarySearchIndex {
         return UInt32(exactly: (seconds * 100).rounded()) ?? 0
     }
 
-    private static func snippet(for queryTokens: Set<String>, body: String, in entry: IndexedEntry) -> (text: String, highlights: [Highlight]) {
-        makeSnippet(text: body, tokens: queryTokens, hit: earliestHit(of: queryTokens, in: entry))
+    private static func snippet(
+        for queryTokens: Set<String>, body: String, in entry: IndexedEntry, words: [String]
+    ) -> (text: String, highlights: [Highlight]) {
+        makeSnippet(text: body, tokens: queryTokens, hit: earliestHit(of: queryTokens, in: entry, words: words))
     }
 
     /// Where the body first holds a word some query token starts; at a tie the longer token wins, never set order.
-    private static func earliestHit(of queryTokens: Set<String>, in entry: IndexedEntry) -> Hit? {
+    private static func earliestHit(of queryTokens: Set<String>, in entry: IndexedEntry, words: [String]) -> Hit? {
         var best: Hit?
         for queryToken in queryTokens {
             // The same range `search` reads: sorted by scalars, then held to the prefix by characters.
-            let lower = firstIndex(in: entry.tokens, atLeast: queryToken)
-            let upper = firstIndex(in: entry.tokens, atLeast: queryToken + "\u{10FFFF}")
-            for position in lower..<upper where entry.tokens[position].hasPrefix(queryToken) {
+            let lower = firstIndex(in: entry.tokens, atLeast: queryToken, words: words)
+            let upper = firstIndex(in: entry.tokens, atLeast: queryToken + "\u{10FFFF}", words: words)
+            for position in lower..<upper where words[Int(entry.tokens[position])].hasPrefix(queryToken) {
                 guard let offset = bodyOffset(at: position, in: entry) else { continue }
                 if offset < best?.offset ?? Int.max
                     || (offset == best?.offset && queryToken.count > best?.length ?? 0) {
@@ -1388,7 +1453,7 @@ public actor LibrarySearchIndex {
         let generation = snapshotGeneration
         latestGeneration.withLock { $0 = generation }
         let write = SnapshotWrite(
-            entries: pending.compactMap { id in entries[id].map { Self.snapshotEntry(id: id, entry: $0) } },
+            entries: pending.compactMap { id in entries[id].map { Self.snapshotEntry(id: id, entry: $0, words: vocabulary.words) } },
             bodies: pendingBodyIDs.compactMap { id in
                 pendingBodies[id].map { BodyWrite(id: id, text: $0.text, sequence: $0.sequence) }
             },

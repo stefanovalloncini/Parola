@@ -212,3 +212,21 @@ struct LibrarySearchNarrowNumberTests {
         #expect(reloaded == live)
     }
 }
+
+@Suite("LibrarySearchIndex vocabulary")
+struct LibrarySearchVocabularyTests {
+    @Test("a word nobody holds any more frees its id for the next new word without leaking matches")
+    func freedWordIDsAreReused() async {
+        let index = LibrarySearchIndex(indexDirectory: FileManager.default.temporaryDirectory.appendingPathComponent("parola-vocab-\(UUID().uuidString)"))
+        await index.index(id: "a", title: "kept", text: "common zzzq words", createdAt: Date())
+        await index.index(id: "b", title: "kept", text: "common words", createdAt: Date())
+        await index.remove("a")
+        await index.index(id: "c", title: "kept", text: "common yyyq words", createdAt: Date())
+
+        #expect(await index.search("zzzq").isEmpty)
+        let found = await index.search("yyyq")
+        #expect(found.map(\.entryID) == ["c"])
+        #expect(found.first?.snippet.contains("yyyq") == true)
+        #expect(Set(await index.search("common").map(\.entryID)) == ["b", "c"])
+    }
+}
