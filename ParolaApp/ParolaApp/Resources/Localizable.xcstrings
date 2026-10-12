@@ -2278,6 +2278,17 @@
         }
       }
     },
+    "Assistant": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Assistente"
+          }
+        }
+      }
+    },
     "Assistant mode": {
       "extractionState": "manual",
       "localizations": {
@@ -18299,6 +18310,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Usato per la voce attiva nella sidebar, i bottoni principali e altri elementi in evidenza."
+          }
+        }
+      }
+    },
+    "User": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Utente"
           }
         }
       }

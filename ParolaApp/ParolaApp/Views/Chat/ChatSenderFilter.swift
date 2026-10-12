@@ -5,9 +5,9 @@ enum ChatSenderFilter: CaseIterable, Hashable {
 
     var label: String {
         switch self {
-        case .all: return "All"
-        case .user: return "User"
-        case .assistant: return "Assistant"
+        case .all: return String(localized: "All")
+        case .user: return String(localized: "User")
+        case .assistant: return String(localized: "Assistant")
         }
     }
 

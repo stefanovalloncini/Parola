@@ -59,7 +59,6 @@ struct EntryViewerPlaybackBar: View {
                 .pickerStyle(.menu)
                 .fixedSize()
                 .help("Playback speed")
-                .accessibilityLabel("Playback speed")
                 .axLeaf("Picker.Rate")
             }
         }

@@ -206,7 +206,9 @@ struct ChatPane: View {
                             .foregroundStyle(DS.Color.secondaryText)
                     }
                     .buttonStyle(GlyphButtonStyle())
-                    .help("Clear")
+                    .help("Clear search")
+                    .accessibilityLabel("Clear search")
+                    .axLeaf("Search.Button.Clear")
                 }
             }
 

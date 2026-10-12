@@ -190,6 +190,15 @@ struct MainWindowTests {
         #expect(italian.localizedString(forKey: key, value: "MISSING", table: nil) != "MISSING")
     }
 
+    @Test("the chat sender filter names have Italian")
+    func chatSenderFilterHasItalian() throws {
+        let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
+        let italian = try #require(Bundle(path: path))
+        for (key, value) in ["All": "Tutti", "User": "Utente", "Assistant": "Assistente"] {
+            #expect(italian.localizedString(forKey: key, value: "MISSING", table: nil) == value)
+        }
+    }
+
     @Test("export blurbs, dictation style names and panel messages have Italian")
     func fx2StringsHaveItalian() throws {
         let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))

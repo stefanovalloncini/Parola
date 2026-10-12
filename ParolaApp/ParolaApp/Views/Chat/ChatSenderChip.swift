@@ -20,10 +20,12 @@ struct ChatSenderChip: View {
             HStack(spacing: 4) {
                 Image(systemName: "person.crop.circle")
                     .font(DS.Font.caption)
+                    .accessibilityHidden(true)
                 Text(selection.label)
                     .font(DS.Font.secondary)
                 Image(systemName: "chevron.down")
                     .font(DS.Font.caption)
+                    .accessibilityHidden(true)
             }
         }
         .menuStyle(.button)
@@ -31,6 +33,9 @@ struct ChatSenderChip: View {
         .menuIndicator(.hidden)
         .fixedSize()
         .help("Filter by sender")
+        .accessibilityLabel("Filter by sender")
+        .accessibilityValue(selection.label)
+        .axLeaf("Search.Menu.Sender")
     }
 }
 
