@@ -114,9 +114,13 @@ extension TranscriberMockSuites {
                 defer { try? FileManager.default.removeItem(at: rig.folder) }
                 let model = rig.model
                 let own = try await openOwnEntry(rig)
+                let player = try #require(model.player)
+                if let observer = model.playerTimeObserver {
+                    player.removeTimeObserver(observer)
+                    model.playerTimeObserver = nil
+                }
                 model.isPlaying = true
                 model.currentTimeSeconds = 12.5
-                let player = try #require(model.player)
                 let source = model.sourceFileURL
                 let route = model.route
                 let arrived = try makeWAV("Standup", in: rig.folder)
