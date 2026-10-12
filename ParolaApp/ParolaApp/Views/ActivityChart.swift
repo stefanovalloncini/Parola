@@ -71,19 +71,28 @@ struct ActivityChart: View {
     }
 
     private var hoveredBucket: Bucket? {
-        hovered.flatMap(bucket(at:))
+        hovered.flatMap { Self.bucket(at: $0, in: buckets) }
     }
 
-    private func bucket(at date: Date) -> Bucket? {
+    static func bucket(at date: Date, in buckets: [Bucket]) -> Bucket? {
         buckets.last { $0.start <= date }
+    }
+
+    /// What to store for a pointer position: nil while it stays in the bucket already selected.
+    static func selectionWrite(for raw: Date?, current: Date?, in buckets: [Bucket]) -> SelectionWrite? {
+        let snapped = raw.flatMap { bucket(at: $0, in: buckets) }?.start
+        return snapped == current ? nil : SelectionWrite(value: snapped)
+    }
+
+    struct SelectionWrite {
+        let value: Date?
     }
 
     private var snappedSelection: Binding<Date?> {
         Binding(
             get: { hovered },
             set: { raw in
-                let snapped = raw.flatMap(bucket(at:))?.start
-                if snapped != hovered { hovered = snapped }
+                if let write = Self.selectionWrite(for: raw, current: hovered, in: buckets) { hovered = write.value }
             }
         )
     }
