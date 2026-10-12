@@ -95,6 +95,7 @@ actor StreamingRealtimeLoop {
 
     private struct StopSignal: Sendable {
         var requested = false
+        var interruptsDecode: Bool?
         var interruptedDecode = false
     }
 
@@ -334,7 +335,19 @@ actor StreamingRealtimeLoop {
         return voiceDetected(inNext: newSeconds)
     }
 
-    private func voiceDetected(inNext seconds: Float) -> Bool {
+    /// Decided once, when the stop first shows during a decode: it is cut short only if the audio that arrived since the decode began holds speech, as the flush must decode that anyway; a silent tail lets the decode finish and be promoted.
+    nonisolated private func stopInterruptsDecode() -> Bool {
+        let (requested, decided) = stopSignal.withLock { ($0.requested, $0.interruptsDecode) }
+        guard requested else { return false }
+        if let decided { return decided }
+        let tailSamples = inbox.withLock { $0.pending.count }
+        let tailSeconds = Float(tailSamples) / Float(config.sampleRate)
+        let interrupts = tailSeconds > 0.05 && (!config.useVAD || voiceDetected(inNext: tailSeconds))
+        stopSignal.withLock { $0.interruptsDecode = interrupts }
+        return interrupts
+    }
+
+    nonisolated private func voiceDetected(inNext seconds: Float) -> Bool {
         // isVoiceDetected only reads one entry per 100 ms of new audio off the end, so a longer snapshot would just hold the capture callback's lock for longer.
         let considered = max(0, Int(seconds / 0.1))
         let energies = inbox.withLock { $0.energies.suffix(considered).map(\.rel) }
@@ -492,10 +505,8 @@ actor StreamingRealtimeLoop {
         let compressionCheckWindow = config.compressionCheckWindow
         let stopSignal = self.stopSignal
         let result = try await decoder.transcribe(decoded, options) { [options] progress in
-            if yieldsToFinalFlush, stopSignal.withLock({ signal in
-                if signal.requested { signal.interruptedDecode = true }
-                return signal.requested
-            }) {
+            if yieldsToFinalFlush, self.stopInterruptsDecode() {
+                stopSignal.withLock { $0.interruptedDecode = true }
                 return false
             }
             if emitProgressPartials {

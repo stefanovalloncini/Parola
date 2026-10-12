@@ -738,6 +738,7 @@ struct StreamingRealtimeLoopTests {
 
         capture.push(seconds: 3, value: 0.5)
         await decoder.parked.wait("the first decode to park")
+        capture.push(seconds: 0.5, value: 0.5)
         await loop.stop()
         decoder.released.fire()
         let outcome = await runTask.outcome()
@@ -747,7 +748,7 @@ struct StreamingRealtimeLoopTests {
         }
 
         #expect(decoder.stepsPerCall == [2, SlowDecoder.fullSteps], "the in-flight decode ends at its next progress callback")
-        #expect(decoder.sampleCounts == [3 * sampleRate, 3 * sampleRate])
+        #expect(decoder.sampleCounts == [3 * sampleRate, Int(3.5 * Double(sampleRate))])
         #expect(recorder.batches.flatMap(\.segments).map(\.text) == ["a", "b", "c"], "the interrupted result is dropped")
     }
 
@@ -764,6 +765,7 @@ struct StreamingRealtimeLoopTests {
 
         capture.push(seconds: 3, value: 0.5)
         await decoder.parked.wait("the first decode to park")
+        capture.push(seconds: 0.5, value: 0.5)
         await loop.stop()
         decoder.released.fire()
         let outcome = await runTask.outcome()
@@ -774,12 +776,9 @@ struct StreamingRealtimeLoopTests {
         #expect(recorder.batches.flatMap(\.segments).map(\.text) == ["a", "b", "c"])
     }
 
-    @Test("a stop with a silent tail after the cut decode re-decodes exactly the audio that decode saw")
-    func interruptedFlushWithSilentTailKeepsTheInput() async throws {
-        let decoder = SlowDecoder(responses: [
-            [segment(0, 1, "stale")],
-            [segment(0, 1, "a"), segment(1, 2, "b"), segment(2, 3, "c")],
-        ])
+    @Test("a stop with a silent tail lets the in-flight decode finish and promotes it, with no second decode")
+    func silentTailAtStopLetsTheDecodeFinish() async throws {
+        let decoder = SlowDecoder(responses: [[segment(0, 1, "a"), segment(1, 2, "b"), segment(2, 3, "c")]])
         let (loop, capture, recorder) = makeSlowLoop(decoder: decoder, useVAD: true)
         let runTask = LoopRun(loop)
         let installedWait = await eventually { capture.installed }
@@ -793,8 +792,8 @@ struct StreamingRealtimeLoopTests {
         decoder.released.fire()
         _ = await runTask.outcome()
 
-        let firstInput = Int(3.1 * Double(sampleRate))
-        #expect(decoder.sampleCounts == [firstInput, firstInput], "the silent tail is left out of the flush")
+        #expect(decoder.stepsPerCall == [SlowDecoder.fullSteps])
+        #expect(decoder.sampleCounts == [Int(3.1 * Double(sampleRate))])
         #expect(recorder.batches.flatMap(\.segments).map(\.text) == ["a", "b", "c"])
     }
 
@@ -809,11 +808,12 @@ struct StreamingRealtimeLoopTests {
         capture.pushBuffers(count: 1, secondsEach: 0.1, value: 0)
         capture.push(seconds: 3, value: 0.5)
         await decoder.parked.wait("the first decode to park")
-        capture.push(seconds: 1, value: 0.5)
+        capture.pushBuffers(count: 10, secondsEach: 0.1, value: 0.5)
         await loop.stop()
         decoder.released.fire()
         _ = await runTask.outcome()
 
+        #expect(decoder.stepsPerCall.first == 2)
         #expect(decoder.sampleCounts == [Int(3.1 * Double(sampleRate)), Int(4.1 * Double(sampleRate))])
     }
 
