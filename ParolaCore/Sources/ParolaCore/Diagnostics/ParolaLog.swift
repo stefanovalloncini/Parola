@@ -86,7 +86,8 @@ public enum ParolaLog {
     ) {
         let (sink, logger) = destination(for: category)
         let osLogEnabled = logger.isEnabled(type: level.osLogType)
-        guard sink != nil || osLogEnabled else { return }
+        let sinkWantsIt = sink?.accepts(level) ?? false
+        guard sinkWantsIt || osLogEnabled else { return }
 
         let record = LogRecord(
             timestamp: Date(),
@@ -105,7 +106,7 @@ public enum ParolaLog {
                 : "\(record.message.rendered) \(fieldText)"
             logger.log(level: level.osLogType, "\(text, privacy: .public)")
         }
-        sink?.enqueue(record)
+        if sinkWantsIt { sink?.enqueue(record) }
     }
 
     private static func currentSink() -> (any DiagnosticsSink)? {

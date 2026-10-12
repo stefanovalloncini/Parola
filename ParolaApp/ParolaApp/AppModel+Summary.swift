@@ -44,7 +44,7 @@ extension AppModel {
     /// The autostart rule for a run that just landed: a transcript long enough gets a summary when the setting is on.
     func applyAutostartSummary(to entryID: LibraryEntry.ID, transcript: Transcript) {
         guard autostartSummary, features.isEnabled(.ai),
-              transcript.text.trimmingCharacters(in: .whitespacesAndNewlines).count >= CardMetadataService.minimumCharacters
+              transcript.textHasAtLeast(characters: CardMetadataService.minimumCharacters)
         else { return }
         summarise(entry: entryID, transcript: transcript)
     }

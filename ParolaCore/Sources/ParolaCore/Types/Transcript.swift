@@ -144,6 +144,20 @@ public struct Transcript: Codable, Hashable, Sendable {
             .joined(separator: " ")
     }
 
+    /// Whether `text` has at least `count` characters, without building it: stops at the segment that gets there.
+    public func textHasAtLeast(characters count: Int) -> Bool {
+        var total = 0
+        var spokenSegments = 0
+        for segment in segments {
+            let length = segment.text.trimmingCharacters(in: .whitespacesAndNewlines).count
+            guard length > 0 else { continue }
+            spokenSegments += 1
+            total += length + (spokenSegments > 1 ? 1 : 0)
+            if total >= count { return true }
+        }
+        return count <= 0
+    }
+
     /// Words of spoken text, counted the way the inspector and the library statistics count them.
     public var wordCount: Int {
         segments.reduce(0) { $0 + $1.text.split(whereSeparator: \.isWhitespace).count }

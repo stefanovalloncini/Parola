@@ -124,6 +124,8 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
         return rotation == 0 ? "\(baseName).jsonl" : "\(baseName)-\(rotation).jsonl"
     }
 
+    public func accepts(_ level: LogLevel) -> Bool { level >= minimumLevel }
+
     public func enqueue(_ record: LogRecord) {
         guard record.level >= minimumLevel else { return }
         let (shouldDrainNow, armDelay): (Bool, Duration?) = bufferState.withLock { current in

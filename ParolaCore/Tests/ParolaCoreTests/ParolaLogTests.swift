@@ -120,6 +120,26 @@ struct ParolaLogTests {
         }
     }
 
+    @Test("a sink that drops a level never has that call's message or fields built")
+    func sinkFloorSkipsTheBuild() throws {
+        let logger = Logger(subsystem: LogSubsystem.core.rawValue, category: LogCategory.models.rawValue)
+        guard !logger.isEnabled(type: .debug) else { return }
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("log-floor-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let sink = FileDiagnosticsSink(directory: dir, minimumLevel: .info)
+        try ParolaLog.withSink(sink) {
+            var builds = 0
+            func token() -> ModelToken {
+                builds += 1
+                return ModelToken("openai_whisper-tiny")
+            }
+            ParolaLog.debug(.models, "loading \(token())", [.model: .safe(token())])
+            #expect(builds == 0)
+            ParolaLog.info(.models, "loading \(token())", [.model: .safe(token())])
+            #expect(builds == 2)
+        }
+    }
+
     @Test("a record's subsystem follows its category, not the host process")
     func subsystemFollowsCategory() {
         withSink { sink in

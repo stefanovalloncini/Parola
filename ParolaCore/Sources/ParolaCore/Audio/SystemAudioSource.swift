@@ -168,6 +168,7 @@ private final class SampleHandler: NSObject, SCStreamDelegate, SCStreamOutput, @
     private let onEnd: @Sendable (any Error) -> Void
     private var sampleScratch: AVAudioPCMBuffer?
     private var outputScratch: AVAudioPCMBuffer?
+    private var sourceFormats = SourceFormatCache()
 
     var failure: String? { writer.failure }
 
@@ -203,10 +204,7 @@ private final class SampleHandler: NSObject, SCStreamDelegate, SCStreamOutput, @
               let asbd = formatDesc.audioStreamBasicDescription else {
             return
         }
-        let maybeSrcFormat: AVAudioFormat? = withUnsafePointer(to: asbd) { ptr in
-            AVAudioFormat(streamDescription: ptr)
-        }
-        guard let srcFormat = maybeSrcFormat else { return }
+        guard let srcFormat = sourceFormats.format(for: asbd) else { return }
 
         let frameCount = AVAudioFrameCount(sampleBuffer.numSamples)
         guard let copied = SystemAudioSampleCopy.copy(
@@ -259,6 +257,27 @@ enum SystemAudioSampleCopy {
         guard status == noErr else { return nil }
         return copy
     }
+}
+
+
+/// The capture's format almost never changes, so each buffer's description is compared before a new `AVAudioFormat` is made.
+struct SourceFormatCache {
+    private var current: (description: AudioStreamBasicDescription, format: AVAudioFormat)?
+
+    mutating func format(for description: AudioStreamBasicDescription) -> AVAudioFormat? {
+        if let current, sameDescription(current.description, description) { return current.format }
+        var copy = description
+        guard let format = AVAudioFormat(streamDescription: &copy) else { return nil }
+        current = (description, format)
+        return format
+    }
+}
+
+private func sameDescription(_ lhs: AudioStreamBasicDescription, _ rhs: AudioStreamBasicDescription) -> Bool {
+    lhs.mSampleRate == rhs.mSampleRate && lhs.mFormatID == rhs.mFormatID && lhs.mFormatFlags == rhs.mFormatFlags
+        && lhs.mBytesPerPacket == rhs.mBytesPerPacket && lhs.mFramesPerPacket == rhs.mFramesPerPacket
+        && lhs.mBytesPerFrame == rhs.mBytesPerFrame && lhs.mChannelsPerFrame == rhs.mChannelsPerFrame
+        && lhs.mBitsPerChannel == rhs.mBitsPerChannel
 }
 
 #endif

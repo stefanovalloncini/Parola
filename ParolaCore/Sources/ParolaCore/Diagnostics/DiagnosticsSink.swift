@@ -9,10 +9,14 @@ public protocol DiagnosticsSink: Sendable {
 
     /// Blocks until buffered records are on disk. For exit paths that have no `await` left.
     func flushSynchronously()
+
+    /// False for a level the sink would drop, so the facade skips building the record.
+    func accepts(_ level: LogLevel) -> Bool
 }
 
 extension DiagnosticsSink {
     public func flushSynchronously() {}
+    public func accepts(_ level: LogLevel) -> Bool { true }
 }
 
 public final class CapturingDiagnosticsSink: DiagnosticsSink {

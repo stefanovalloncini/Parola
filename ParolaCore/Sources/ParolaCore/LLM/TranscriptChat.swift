@@ -270,16 +270,12 @@ struct FoundationLanguageModel: LanguageModel {
                 do {
                     let (session, prompt) = try makeSession(history: history)
                     let response = session.streamResponse(to: prompt)
-                    var lastEmitted = ""
+                    var emittedBytes = 0
                     for try await snapshot in response {
                         try Task.checkCancellation()
-                        let current = snapshot.content
-                        guard current.count >= lastEmitted.count else { continue }
-                        let delta = String(current.dropFirst(lastEmitted.count))
-                        if !delta.isEmpty {
-                            continuation.yield(delta)
-                            lastEmitted = current
-                        }
+                        guard let delta = Self.delta(of: snapshot.content, after: emittedBytes) else { continue }
+                        continuation.yield(delta.text)
+                        emittedBytes = delta.bytes
                     }
                     continuation.finish()
                 } catch {
@@ -288,6 +284,15 @@ struct FoundationLanguageModel: LanguageModel {
             }
             continuation.onTermination = { _ in task.cancel() }
         }
+    }
+
+    /// The text a snapshot added past the `emittedBytes` already sent, or nil when it added none; it assumes each snapshot extends the last.
+    static func delta(of snapshot: String, after emittedBytes: Int) -> (text: String, bytes: Int)? {
+        let bytes = snapshot.utf8.count
+        guard bytes > emittedBytes,
+              let text = String(snapshot.utf8.dropFirst(emittedBytes))
+        else { return nil }
+        return (text, bytes)
     }
 
     private func makeSession(history: [ChatTurn]) throws -> (LanguageModelSession, String) {
