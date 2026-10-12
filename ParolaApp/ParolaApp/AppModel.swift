@@ -1884,7 +1884,11 @@ final class AppModel {
     @ObservationIgnored var transcriptCloseTask: Task<Void, Never>?
     @ObservationIgnored var pendingTranscriptSaveGeneration: Int = 0
     @ObservationIgnored private var pendingSaveTextChanged = false
-    @ObservationIgnored weak var undoManager: UndoManager?
+    /// Each undo step holds a whole transcript, so an editing session can't pin them without limit.
+    static let undoLevels = 100
+    @ObservationIgnored weak var undoManager: UndoManager? {
+        didSet { undoManager?.levelsOfUndo = Self.undoLevels }
+    }
     static let trashRetentionDays = 30
 
     // MARK: - Engine

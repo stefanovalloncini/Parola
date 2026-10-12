@@ -240,7 +240,7 @@ final class EntryWindowSession {
         let interval = CMTime(seconds: 0.2, preferredTimescale: 600)
         timeObserver = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
             let seconds = CMTimeGetSeconds(time)
-            Task { @MainActor in self?.clockAdvanced(to: seconds) }
+            MainActor.assumeIsolated { self?.clockAdvanced(to: seconds) }
         }
         statusObserver = player.observe(\.timeControlStatus, options: [.new]) { [weak self] player, _ in
             let playing = player.timeControlStatus == .playing

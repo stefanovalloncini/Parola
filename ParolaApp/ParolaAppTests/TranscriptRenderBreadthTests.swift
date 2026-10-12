@@ -179,4 +179,23 @@ struct TranscriptRenderBreadthTests {
             #expect(hasZed)
         }
     }
+
+    @Test("the window's undo manager is capped when the model adopts it")
+    func undoStackIsBounded() async throws {
+        try await withIsolatedDefaults { defaults in
+            let model = makeModel(defaults)
+            let undo = UndoManager()
+            undo.groupsByEvent = false
+            model.undoManager = undo
+            #expect(undo.levelsOfUndo == AppModel.undoLevels)
+            for step in 0..<(AppModel.undoLevels + 40) {
+                undo.beginUndoGrouping()
+                undo.registerUndo(withTarget: model) { _ in _ = step }
+                undo.endUndoGrouping()
+            }
+            var undone = 0
+            while undo.canUndo { undo.undo(); undone += 1 }
+            #expect(undone == AppModel.undoLevels)
+        }
+    }
 }
