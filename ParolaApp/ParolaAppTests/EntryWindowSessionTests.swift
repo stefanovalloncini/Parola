@@ -406,6 +406,23 @@ struct EntryWindowSessionTests {
         #expect(session.currentSegmentID == 2)
         #expect(model.currentTimeSeconds == 0)
     }
+
+    @Test("a clicked row isn't scrolled away; the next move of the highlight follows again")
+    func clickedRowStaysPut() async throws {
+        let model = EntryWindowTestSupport.makeModel("windowsclickscroll")
+        let entry = try await EntryWindowTestSupport.seed(
+            model, texts: ["alpha", "beta", "gamma"], speakers: [nil, nil, nil], audio: nil
+        )
+        let session = await EntryWindowTestSupport.openSession(model, entry)
+
+        session.seek(toSegment: 1)
+        #expect(session.shouldScrollToCurrentSegment(1) == false)
+        #expect(session.shouldScrollToCurrentSegment(1))
+
+        session.seek(toSegment: 1)
+        session.scrub(to: 2)
+        #expect(session.shouldScrollToCurrentSegment(2))
+    }
 }
 
 /// Holds the first scan it sees until the test opens it; later scans pass straight through.

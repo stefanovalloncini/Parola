@@ -273,8 +273,17 @@ final class EntryWindowSession {
         player?.seek(to: CMTime(seconds: target, preferredTimescale: 600))
     }
 
+    @ObservationIgnored private var clickedSegmentID: TranscriptSegment.ID?
+
+    /// A clicked row is already under the pointer; scrolling it to the centre would put the second click of a double click on another row.
+    func shouldScrollToCurrentSegment(_ id: TranscriptSegment.ID) -> Bool {
+        defer { clickedSegmentID = nil }
+        return id != clickedSegmentID
+    }
+
     func seek(toSegment id: TranscriptSegment.ID) {
         guard let segment = transcript?.segments.first(where: { $0.id == id }) else { return }
+        clickedSegmentID = id
         scrub(to: segment.start)
         player?.play()
     }

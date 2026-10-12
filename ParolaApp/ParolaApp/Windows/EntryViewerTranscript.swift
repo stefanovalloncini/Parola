@@ -56,7 +56,7 @@ struct EntryViewerSegments: View {
             // The window deliberately ignores model.favoritesOnly: a filter set in the main pane is
             // a transient view of that pane, not of a transcript opened in its own window.
             .onChange(of: session.currentSegmentID) { _, id in
-                guard let id else { return }
+                guard let id, session.shouldScrollToCurrentSegment(id) else { return }
                 withAnimation(DS.Motion.follow(reduceMotion: reduceMotion)) { proxy.scrollTo(id, anchor: .center) }
             }
         }

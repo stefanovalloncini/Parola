@@ -47,7 +47,7 @@ struct EntryViewerContinuous: View {
             .onDisappear { buildTask?.cancel() }
             .onChange(of: session.currentSegmentID) { _, id in
                 applyHighlight()
-                guard let id, let chunkID = chunkIndexBySegment[id] else { return }
+                guard let id, session.shouldScrollToCurrentSegment(id), let chunkID = chunkIndexBySegment[id] else { return }
                 withAnimation(DS.Motion.follow(reduceMotion: reduceMotion)) { proxy.scrollTo(chunkID, anchor: .center) }
             }
         }
