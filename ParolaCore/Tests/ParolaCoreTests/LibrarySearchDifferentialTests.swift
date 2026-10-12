@@ -161,3 +161,34 @@ struct LibrarySearchDifferentialTests {
         await check(index, rows, &rng, "seed \(seed) end")
     }
 }
+
+@Suite("LibrarySearchIndex postings and entry slots")
+struct LibrarySearchPostingsTests {
+    @Test("postings stay sorted and unique under inserts and removals in any order")
+    func postingsStaySorted() {
+        var list: [UInt32] = []
+        for ordinal: UInt32 in [5, 1, 9, 3, 3, 7, 0, 9, 12, 2] { LibrarySearchIndex.Postings.insert(ordinal, into: &list) }
+        #expect(list == [0, 1, 2, 3, 5, 7, 9, 12])
+        for ordinal: UInt32 in [5, 4, 0, 12, 12] { LibrarySearchIndex.Postings.remove(ordinal, from: &list) }
+        #expect(list == [1, 2, 3, 7, 9])
+    }
+
+    @Test("an entry added after removals takes a freed slot and answers for itself only")
+    func freedSlotsAreReused() async {
+        let index = LibrarySearchIndex(indexDirectory: FileManager.default.temporaryDirectory.appendingPathComponent("parola-slots-\(UUID().uuidString)"))
+        for name in ["one", "two", "three", "four", "five"] {
+            await index.index(id: name, title: name, text: "alpha \(name) shared", createdAt: Date())
+        }
+        await index.remove("two")
+        await index.remove("four")
+        await index.index(id: "six", title: "six", text: "alpha six shared", createdAt: Date())
+        await index.index(id: "seven", title: "seven", text: "gamma seven", createdAt: Date())
+        await index.index(id: "one", title: "one", text: "gamma replaced", createdAt: Date())
+
+        #expect(Set(await index.search("shared", snippets: false).map(\.entryID)) == ["three", "five", "six"])
+        #expect(Set(await index.search("gamma", snippets: false).map(\.entryID)) == ["seven", "one"])
+        #expect(await index.search("two", snippets: false).isEmpty)
+        #expect(await index.search("four", snippets: false).isEmpty)
+        #expect(Set(await index.search("alpha", snippets: false).map(\.entryID)) == ["three", "five", "six"])
+    }
+}

@@ -170,9 +170,119 @@ public actor LibrarySearchIndex {
         let sequence: Int
     }
 
+    /// Entries by id, each held in a dense slot whose number the postings use; a removed entry's slot is reused.
+    private struct EntryTable: Sendable {
+        private var ordinals: [String: UInt32] = [:]
+        private var slots: [IndexedEntry?] = []
+        private var ids: [String] = []
+        private var freeSlots: [UInt32] = []
+
+        var count: Int { ordinals.count }
+        var isEmpty: Bool { ordinals.isEmpty }
+        var keys: Dictionary<String, UInt32>.Keys { ordinals.keys }
+        var slotCount: Int { slots.count }
+
+        subscript(id: String) -> IndexedEntry? {
+            get { ordinals[id].flatMap { slots[Int($0)] } }
+            set {
+                if let newValue {
+                    insert(newValue, for: id)
+                } else {
+                    removeValue(forKey: id)
+                }
+            }
+        }
+
+        func ordinal(of id: String) -> UInt32? { ordinals[id] }
+        func entry(at ordinal: UInt32) -> IndexedEntry? { slots[Int(ordinal)] }
+        func id(at ordinal: UInt32) -> String { ids[Int(ordinal)] }
+
+        mutating func reserveCapacity(_ capacity: Int) {
+            ordinals.reserveCapacity(capacity)
+            slots.reserveCapacity(capacity)
+            ids.reserveCapacity(capacity)
+        }
+
+        @discardableResult
+        mutating func insert(_ entry: IndexedEntry, for id: String) -> UInt32 {
+            if let existing = ordinals[id] {
+                slots[Int(existing)] = entry
+                return existing
+            }
+            let ordinal: UInt32
+            if let reused = freeSlots.popLast() {
+                ordinal = reused
+                slots[Int(reused)] = entry
+                ids[Int(reused)] = id
+            } else {
+                ordinal = UInt32(slots.count)
+                slots.append(entry)
+                ids.append(id)
+            }
+            ordinals[id] = ordinal
+            return ordinal
+        }
+
+        @discardableResult
+        mutating func removeValue(forKey id: String) -> (entry: IndexedEntry, ordinal: UInt32)? {
+            guard let ordinal = ordinals.removeValue(forKey: id), let entry = slots[Int(ordinal)] else { return nil }
+            slots[Int(ordinal)] = nil
+            ids[Int(ordinal)] = ""
+            freeSlots.append(ordinal)
+            return (entry, ordinal)
+        }
+
+        mutating func removeAll() {
+            ordinals.removeAll()
+            slots.removeAll()
+            ids.removeAll()
+            freeSlots.removeAll()
+        }
+
+        var fingerprints: [String: String] {
+            Dictionary(uniqueKeysWithValues: ordinals.map { ($0.key, slots[Int($0.value)]?.fingerprint ?? "") })
+        }
+
+        var excerpts: [String: String] {
+            var out: [String: String] = [:]
+            for (id, ordinal) in ordinals {
+                if let excerpt = slots[Int(ordinal)]?.excerpt { out[id] = excerpt }
+            }
+            return out
+        }
+    }
+
+    /// Ordinals in ascending order, so a posting list is found by bisection and merged by walking.
+    enum Postings {
+        static func insert(_ ordinal: UInt32, into list: inout [UInt32]) {
+            guard let last = list.last, last >= ordinal else {
+                list.append(ordinal)
+                return
+            }
+            let position = lowerBound(of: ordinal, in: list)
+            if position < list.count, list[position] == ordinal { return }
+            list.insert(ordinal, at: position)
+        }
+
+        static func remove(_ ordinal: UInt32, from list: inout [UInt32]) {
+            let position = lowerBound(of: ordinal, in: list)
+            if position < list.count, list[position] == ordinal { list.remove(at: position) }
+        }
+
+        static func lowerBound(of ordinal: UInt32, in list: [UInt32]) -> Int {
+            var low = 0
+            var high = list.count
+            while low < high {
+                let mid = (low + high) / 2
+                if list[mid] < ordinal { low = mid + 1 } else { high = mid }
+            }
+            return low
+        }
+    }
+
     private struct LoadedState: Sendable {
-        let entries: [String: IndexedEntry]
-        let inverted: [String: Set<String>]
+        let entries: EntryTable
+        let inverted: [String: [UInt32]]
     }
 
     private enum LoadOutcome: Sendable {
@@ -217,8 +327,8 @@ public actor LibrarySearchIndex {
     /// The length a library row quotes; excerpts are cut once, at index time, to this.
     public static let excerptLength = 240
 
-    private var entries: [String: IndexedEntry] = [:]
-    private var inverted: [String: Set<String>] = [:]
+    private var entries = EntryTable()
+    private var inverted: [String: [UInt32]] = [:]
     private var excerptsByEntry: [String: String] = [:]
     private var excerptsGeneration = 0
     private var dirtyEntryIDs: Set<String> = []
@@ -408,38 +518,43 @@ public actor LibrarySearchIndex {
             vocabularySorts &+= 1
         }
         let tokens = sortedTokens ?? []
-        var scores: [String: Int] = [:]
-        var hits: [String: Int] = [:]
-        var earliest: [String: Hit] = [:]
+        let slotCount = entries.slotCount
+        var scores = [Int](repeating: 0, count: slotCount)
+        var hits = [Int](repeating: 0, count: slotCount)
+        var earliest = [Int](repeating: Int.max, count: slotCount)
+        var touched: [UInt32] = []
         for queryToken in Set(queryTokens) {
             // Prefix matches sort contiguously; binary-search the range instead of scanning the whole vocabulary.
             let lower = Self.firstIndex(in: tokens, atLeast: queryToken)
             let upper = Self.firstIndex(in: tokens, atLeast: queryToken + "\u{10FFFF}")
             for indexToken in tokens[lower..<upper] where indexToken.hasPrefix(queryToken) {
-                for id in inverted[indexToken] ?? [] {
-                    scores[id, default: 0] += 1
-                    guard let entry = entries[id] else { continue }
+                for ordinal in inverted[indexToken] ?? [] {
+                    let slot = Int(ordinal)
+                    if scores[slot] == 0 { touched.append(ordinal) }
+                    scores[slot] += 1
+                    guard let entry = entries.entry(at: ordinal) else { continue }
                     let position = Self.position(of: indexToken, in: entry)
-                    hits[id, default: 0] += Self.occurrences(at: position, in: entry)
-                    if let offset = Self.bodyOffset(at: position, in: entry),
-                       offset < earliest[id]?.offset ?? Int.max {
-                        earliest[id] = Hit(offset: offset, length: queryToken.count)
+                    hits[slot] += Self.occurrences(at: position, in: entry)
+                    if let offset = Self.bodyOffset(at: position, in: entry), offset < earliest[slot] {
+                        earliest[slot] = offset
                     }
                 }
             }
         }
 
+        touched.sort { scores[Int($0)] != scores[Int($1)] ? scores[Int($0)] > scores[Int($1)] : $0 < $1 }
         var results: [Match] = []
-        results.reserveCapacity(scores.count)
-        for (id, score) in scores.sorted(by: { $0.value > $1.value }) {
-            guard let entry = entries[id] else { continue }
+        results.reserveCapacity(touched.count)
+        for ordinal in touched {
+            let slot = Int(ordinal)
+            guard let entry = entries.entry(at: ordinal) else { continue }
             results.append(Match(
-                entryID: id,
-                score: score,
-                matchCount: hits[id] ?? 0,
+                entryID: entries.id(at: ordinal),
+                score: scores[slot],
+                matchCount: hits[slot],
                 snippet: "",
                 highlights: [],
-                firstHit: earliest[id].flatMap { Self.firstHit(atOffset: $0.offset, in: entry) }
+                firstHit: earliest[slot] == Int.max ? nil : Self.firstHit(atOffset: earliest[slot], in: entry)
             ))
         }
         return snippets ? await withSnippets(results, query: query) : results
@@ -783,7 +898,7 @@ public actor LibrarySearchIndex {
             snapshotListed = Set(state.entries.keys)
             entriesDecoded &+= state.entries.count
             sortedTokens = nil
-            excerptsByEntry = state.entries.compactMapValues(\.excerpt)
+            excerptsByEntry = state.entries.excerpts
             if !excerptsByEntry.isEmpty { excerptsGeneration &+= 1 }
         case .staleDiscarded:
             ParolaLog.notice(.libraryIndex, "search index snapshot discarded, rebuilding")
@@ -840,18 +955,26 @@ public actor LibrarySearchIndex {
         guard let decoded = decodeEntries(ids, in: entriesDirectory(in: directory)) else {
             return LoadResult(outcome: .staleDiscarded, legacySnapshotPresent: legacy)
         }
-        var entries: [String: IndexedEntry] = [:]
-        var inverted: [String: Set<String>] = [:]
+        var entries = EntryTable()
         entries.reserveCapacity(decoded.count)
+        var postingCounts: [String: Int] = [:]
         for (id, entry) in zip(ids, decoded) {
             // A file left behind by a write that failed under a manifest a later save wrote: stale, not current.
             guard entry.id == id, manifest.entries[id] == entry.fingerprint else {
                 return LoadResult(outcome: .staleDiscarded, legacySnapshotPresent: legacy)
             }
-            entries[entry.id] = indexedEntry(from: entry)
-            for token in entry.tokens {
-                inverted[token, default: []].insert(entry.id)
-            }
+            for token in Set(entry.tokens) { postingCounts[token, default: 0] += 1 }
+        }
+        var inverted: [String: [UInt32]] = [:]
+        inverted.reserveCapacity(postingCounts.count)
+        for (token, count) in postingCounts {
+            var list: [UInt32] = []
+            list.reserveCapacity(count)
+            inverted[token] = list
+        }
+        for (id, entry) in zip(ids, decoded) {
+            let ordinal = entries.insert(indexedEntry(from: entry), for: id)
+            for token in Set(entry.tokens) { inverted[token]?.append(ordinal) }
         }
         return LoadResult(
             outcome: .loaded(LoadedState(entries: entries, inverted: inverted)),
@@ -990,7 +1113,7 @@ public actor LibrarySearchIndex {
         var entry = entry
         revisionCounter &+= 1
         entry.revision = revisionCounter
-        entries[id] = entry
+        let ordinal = entries.insert(entry, for: id)
         if let body {
             unsoundBodies.remove(id)
             bodySequence &+= 1
@@ -1005,24 +1128,22 @@ public actor LibrarySearchIndex {
         var vocabularyGrew = false
         for token in entry.tokens {
             if inverted[token] == nil { vocabularyGrew = true }
-            inverted[token, default: []].insert(id)
+            Postings.insert(ordinal, into: &inverted[token, default: []])
         }
         if vocabularyGrew { sortedTokens = nil }
         isDirty = true
     }
 
     private func removeFromIndex(_ id: String) {
-        guard let entry = entries.removeValue(forKey: id) else { return }
+        guard let (entry, ordinal) = entries.removeValue(forKey: id) else { return }
         dirtyEntryIDs.remove(id)
         var vocabularyShrank = false
         for token in entry.tokens {
-            guard var ids = inverted[token] else { continue }
-            ids.remove(id)
-            if ids.isEmpty {
+            guard inverted[token] != nil else { continue }
+            Postings.remove(ordinal, from: &inverted[token]!)
+            if inverted[token]?.isEmpty == true {
                 inverted.removeValue(forKey: token)
                 vocabularyShrank = true
-            } else {
-                inverted[token] = ids
             }
         }
         if vocabularyShrank { sortedTokens = nil }
@@ -1271,7 +1392,7 @@ public actor LibrarySearchIndex {
             bodies: pendingBodyIDs.compactMap { id in
                 pendingBodies[id].map { BodyWrite(id: id, text: $0.text, sequence: $0.sequence) }
             },
-            manifest: Manifest(version: Self.snapshotVersion, entries: entries.mapValues(\.fingerprint)),
+            manifest: Manifest(version: Self.snapshotVersion, entries: entries.fingerprints),
             generation: generation,
             removesLegacySnapshot: legacySnapshotPresent
         )
