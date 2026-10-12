@@ -403,11 +403,12 @@ struct StageTranscribingStatus: View {
     @Environment(AppModel.self) private var model
     @State private var eta = ETACalculator()
     @State private var finish: Date?
+    @State private var epoch = Date()
 
     var body: some View {
         Group {
             if ticks, let finish {
-                TimelineView(.periodic(from: .now, by: 1)) { context in
+                TimelineView(.periodic(from: epoch, by: 1)) { context in
                     line(remaining: finish.timeIntervalSince(context.date))
                 }
             } else {
