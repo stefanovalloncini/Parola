@@ -103,7 +103,11 @@ struct PeopleDirectoryList: View {
                 .disabled(renameDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 .axLeaf("People.Button.RenameConfirm")
         } message: { _ in
-            Text("The new name replaces the old one in every transcript. That rewrite can't be undone.")
+            if inForm {
+                Text("The new name replaces the old one in every transcript.")
+            } else {
+                Text("The new name replaces the old one in every transcript. ⌘Z puts the old name back.")
+            }
         }
         .alert("Merge people", isPresented: isMerging, presenting: merging) { pair in
             Button("Cancel", role: .cancel) { merging = nil }

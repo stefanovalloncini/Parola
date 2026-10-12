@@ -4,14 +4,15 @@ import ParolaCore
 
 extension AppModel {
     /// The single seam for user edits: installs the new value, persists, remaps the id-keyed side
-    /// maps, and registers an inverse edit with the undo manager.
+    /// maps, and registers an inverse edit with the undo manager unless the caller registers its own.
     func applyTranscriptEdit(
         _ new: Transcript,
         actionName: String,
         textChanged: Bool = true,
         favorites: (old: Set<Int>, new: Set<Int>)? = nil,
         notes: (old: [Int: String], new: [Int: String])? = nil,
-        assignments: SpeakerAssignmentEdit? = nil
+        assignments: SpeakerAssignmentEdit? = nil,
+        undoable: Bool = true
     ) {
         guard let old = transcript, old != new else { return }
         let resolvedFavorites = favorites ?? (favoriteSegmentIDs, favoriteSegmentIDs)
@@ -23,6 +24,7 @@ extension AppModel {
         if resolvedFavorites.new != resolvedFavorites.old { replaceFavorites(resolvedFavorites.new) }
         if resolvedNotes.new != resolvedNotes.old { replaceSegmentNotes(resolvedNotes.new) }
         if let assignments { applySpeakerAssignmentEdit(assignments) }
+        guard undoable else { return }
         registerTranscriptUndo(
             restoring: old, translationAfterEdit: new.translation, favorites: resolvedFavorites,
             notes: resolvedNotes, actionName: actionName, textChanged: textChanged, assignments: inverseAssignments

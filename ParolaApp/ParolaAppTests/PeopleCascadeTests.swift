@@ -5,6 +5,11 @@ import ParolaCore
 import ParolaTestSupport
 
 @MainActor
+final class CascadeGate {
+    var open = false
+}
+
+@MainActor
 @Suite("People cascades across the library")
 struct PeopleCascadeTests {
 
@@ -43,9 +48,9 @@ struct PeopleCascadeTests {
         #expect(model.people.map(\.name) == ["Ada Lovelace"])
     }
 
-    @Test("only the open transcript's rewrite is undoable")
-    func onlyTheOpenTranscriptUndoes() async throws {
-        let (model, _, other) = try await makeTwoAssignedEntries("cascadeundo")
+    @Test("a rename is one undo step: undo names them back everywhere, redo renames again")
+    func renameUndoesAsOneStep() async throws {
+        let (model, open, other) = try await makeTwoAssignedEntries("cascadeundo")
         let undo = UndoManager()
         undo.groupsByEvent = false
         model.undoManager = undo
@@ -55,10 +60,165 @@ struct PeopleCascadeTests {
         #expect(undo.undoActionName == "Rename Person")
 
         undo.undo()
+        #expect(!undo.canUndo)
+        #expect(undo.redoActionName == "Rename Person")
+        #expect(await waitUntil {
+            let stored = try? await storedSpeakers(model, other.id)
+            return model.people.map(\.name) == ["Ada"]
+                && model.transcript?.segments.map(\.speaker) == ["Ada", "SPEAKER_01", "Ada"]
+                && model.libraryEntry(id: open.id)?.speakerAssignments == ["Ada": ada.id]
+                && model.libraryEntry(id: other.id)?.speakerAssignments == ["Ada": ada.id]
+                && stored == ["Ada", "SPEAKER_01", "Ada"]
+        })
 
-        // The open transcript steps back to the name it carried; the other entry keeps the new one.
-        #expect(model.transcript?.segments.first?.speaker == "Ada")
+        undo.redo()
+        #expect(undo.undoActionName == "Rename Person")
+        #expect(await waitUntil {
+            let stored = try? await storedSpeakers(model, other.id)
+            return model.people.map(\.name) == ["Ada Lovelace"]
+                && model.transcript?.segments.first?.speaker == "Ada Lovelace"
+                && stored == ["Ada Lovelace", "SPEAKER_01", "Ada Lovelace"]
+        })
+    }
+
+    @Test("two undos right after an assign and a rename leave no dangling assignment")
+    func doubleUndoAfterAssignAndRename() async throws {
+        let model = PeopleTestSupport.makeModel("cascadelifo")
+        let entry = try await PeopleTestSupport.openSeededEntry(model)
+        let undo = UndoManager()
+        undo.groupsByEvent = false
+        model.undoManager = undo
+        await model.assignSpeaker(label: "SPEAKER_00", toNewPersonNamed: "Ada")
+        let ada = try #require(model.person(forSpeaker: "Ada"))
+        await model.renamePerson(ada.id, to: "Ada Lovelace")
+
+        undo.undo()
+        undo.undo()
+
+        #expect(model.transcript?.segments.map(\.speaker) == ["SPEAKER_00", "SPEAKER_01", "SPEAKER_00"])
+        #expect(model.speakerAssignments.isEmpty)
+        await model.awaitSpeakerAssignmentWrites()
+        await model.personRenameTask?.value
+        await model.awaitSpeakerAssignmentWrites()
+        #expect(model.speakerAssignments.isEmpty)
+        #expect(try await model.library.load(entry.id).entry.speakerAssignments.isEmpty)
+        #expect(model.people.map(\.name) == ["Ada"])
+    }
+
+    @Test("undoing a rename puts an entry back under the label it carried, even when entries differed")
+    func undoRestoresEachEntrysOwnLabel() async throws {
+        let (model, _, other) = try await makeTwoAssignedEntries("cascadelabels")
+        let ada = try #require(model.person(forSpeaker: "Ada"))
+        try await model.library.mutateTranscript(for: other.id) { stored in
+            stored = stored.renamingSpeaker("Ada", to: "Dr Ada")
+        }
+        _ = try await model.library.mutateSpeakerAssignments(for: other.id) { $0 = ["Dr Ada": ada.id] }
+        await model.library.dropCaches()
+        await model.refreshLibraryAndWait()
+        let undo = UndoManager()
+        undo.groupsByEvent = false
+        model.undoManager = undo
+
+        await model.renamePerson(ada.id, to: "Ada Lovelace")
         #expect(try await storedSpeakers(model, other.id) == ["Ada Lovelace", "SPEAKER_01", "Ada Lovelace"])
+
+        undo.undo()
+        #expect(await waitUntil {
+            let stored = try? await storedSpeakers(model, other.id)
+            return stored == ["Dr Ada", "SPEAKER_01", "Dr Ada"]
+                && model.libraryEntry(id: other.id)?.speakerAssignments == ["Dr Ada": ada.id]
+                && model.people.map(\.name) == ["Ada"]
+        })
+        #expect(model.transcript?.segments.first?.speaker == "Ada")
+    }
+
+    private func assertNoDanglingAssignments(_ model: AppModel) async throws {
+        let known = Set(model.people.map(\.id))
+        #expect(Set(model.speakerAssignments.values).isSubset(of: known))
+        for entry in model.libraryEntries {
+            #expect(Set(entry.speakerAssignments.values).isSubset(of: known))
+        }
+    }
+
+    @Test("undoing a rename does nothing once the old name belongs to another person")
+    func undoIntoATakenNameChangesNothing() async throws {
+        let (model, _, _) = try await makeTwoAssignedEntries("cascadetakenundo")
+        let undo = UndoManager()
+        undo.groupsByEvent = false
+        model.undoManager = undo
+        let ada = try #require(model.person(forSpeaker: "Ada"))
+        await model.renamePerson(ada.id, to: "Ada Lovelace")
+        await model.addPerson(named: "Ada")
+
+        undo.undo()
+        await model.personRenameTask?.value
+        await model.awaitSpeakerAssignmentWrites()
+
+        #expect(model.people.map(\.name).sorted() == ["Ada", "Ada Lovelace"])
+        #expect(model.transcript?.segments.first?.speaker == "Ada Lovelace")
+        try await assertNoDanglingAssignments(model)
+    }
+
+    @Test("redoing a rename does nothing once the new name belongs to another person")
+    func redoIntoATakenNameChangesNothing() async throws {
+        let (model, _, _) = try await makeTwoAssignedEntries("cascadetakenredo")
+        let undo = UndoManager()
+        undo.groupsByEvent = false
+        model.undoManager = undo
+        let ada = try #require(model.person(forSpeaker: "Ada"))
+        await model.renamePerson(ada.id, to: "Ada Lovelace")
+        undo.undo()
+        await model.personRenameTask?.value
+        await model.addPerson(named: "Ada Lovelace")
+
+        undo.redo()
+        await model.personRenameTask?.value
+        await model.awaitSpeakerAssignmentWrites()
+
+        #expect(model.people.map(\.name).sorted() == ["Ada", "Ada Lovelace"])
+        #expect(model.transcript?.segments.first?.speaker == "Ada")
+        try await assertNoDanglingAssignments(model)
+    }
+
+    @Test("an entry opened while the rename is still reaching it comes back under its own label")
+    func entryOpenedMidCascadeIsRestored() async throws {
+        let (model, open, other) = try await makeTwoAssignedEntries("cascademid")
+        let undo = UndoManager()
+        undo.groupsByEvent = false
+        model.undoManager = undo
+        let ada = try #require(model.person(forSpeaker: "Ada"))
+        let gate = CascadeGate()
+        model.personRenameCascadeHook = { while !gate.open { try? await Task.sleep(for: .milliseconds(5)) } }
+
+        let renaming = Task { await model.renamePerson(ada.id, to: "Ada Lovelace") }
+        #expect(await waitUntil { model.transcript?.segments.first?.speaker == "Ada Lovelace" })
+        undo.undo()
+        _ = try await model.openEntry(other.id)
+        gate.open = true
+        await renaming.value
+        await model.personRenameTask?.value
+        await model.awaitSpeakerAssignmentWrites()
+
+        #expect(model.people.map(\.name) == ["Ada"])
+        #expect(model.transcript?.segments.map(\.speaker) == ["Ada", "SPEAKER_01", "Ada"])
+        #expect(try await storedSpeakers(model, other.id) == ["Ada", "SPEAKER_01", "Ada"])
+        #expect(try await storedSpeakers(model, open.id) == ["Ada", "SPEAKER_01", "Ada"])
+        try await assertNoDanglingAssignments(model)
+    }
+
+    @Test("a merge registers no undo, as its alert says")
+    func mergeRegistersNoUndo() async throws {
+        let (model, _, _) = try await makeTwoAssignedEntries("cascademergeundo", secondPerson: "Grace")
+        let undo = UndoManager()
+        undo.groupsByEvent = false
+        model.undoManager = undo
+        let ada = try #require(model.person(forSpeaker: "Ada"))
+        let grace = try #require(model.people.first { $0.name == "Grace" })
+
+        await model.mergePerson(ada.id, into: grace.id)
+
+        #expect(model.transcript?.segments.first?.speaker == "Grace")
+        #expect(!undo.canUndo)
     }
 
     @Test("merging rewrites the source's name and drops the source person")

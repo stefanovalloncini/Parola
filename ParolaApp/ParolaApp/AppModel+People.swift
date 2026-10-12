@@ -2,6 +2,12 @@ import Foundation
 import SwiftUI
 import ParolaCore
 
+/// The label each entry carried for a person before a rename, so undoing it puts every entry back exactly.
+@MainActor
+final class PersonRenameLedger {
+    var labels: [LibraryEntry.ID: String] = [:]
+}
+
 /// Keys to set or drop in an entry's speaker map. Edits travel as a transform, never as a whole
 /// map read somewhere else, so two assignments in flight can't drop each other's key.
 struct SpeakerAssignmentEdit: Equatable, Sendable {
@@ -277,15 +283,94 @@ extension AppModel {
         await refreshPeople()
     }
 
-    /// Renames a person and rewrites the name into every entry that stands for them. The library
-    /// rewrite is not undoable; the open transcript's edit is.
+    /// Renames a person in every entry that names them, as one undo step; folding into someone else's name has none, like a merge.
     func renamePerson(_ id: UUID, to newName: String) async {
         let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, person(id: id)?.name != trimmed else { return }
-        let targets = entries(withPerson: id)
-        guard let renamed = await peopleStore.rename(id, to: trimmed) else { return }
-        await refreshPeople()
-        await rewriteEntries(targets, from: id, toName: renamed.name, keeping: renamed.id)
+        guard !trimmed.isEmpty, let previous = person(id: id)?.name, previous != trimmed else { return }
+        if let holder = person(named: trimmed), holder.id != id {
+            queuePersonRename {
+                let targets = self.entries(withPerson: id)
+                guard let renamed = await self.peopleStore.rename(id, to: trimmed) else { return }
+                await self.refreshPeople()
+                await self.rewriteEntries(targets, from: id, toName: renamed.name, keeping: renamed.id)
+            }
+        } else {
+            stepPersonRename(id, ledger: PersonRenameLedger(), target: trimmed, inverseTarget: previous, restore: false)
+        }
+        await personRenameTask?.value
+    }
+
+    /// Renames the open transcript and registers the undo step before any await, so undo stays in order with the edits around it.
+    private func stepPersonRename(_ id: UUID, ledger: PersonRenameLedger, target: String, inverseTarget: String, restore: Bool) {
+        if let holder = person(named: target), holder.id != id { return }
+        registerUndoStep(actionName: String(localized: "Rename Person")) { model in
+            model.stepPersonRename(id, ledger: ledger, target: inverseTarget, inverseTarget: target, restore: !restore)
+        }
+        let openID = selectedEntryID
+        if let openID, let old = relabelOpenTranscript(of: id, to: { restore ? (ledger.labels[openID] ?? target) : target }),
+           !restore, ledger.labels[openID] == nil {
+            ledger.labels[openID] = old
+        }
+        queuePersonRename { [self] in
+            await personRenameCascadeHook?()
+            if let holder = await peopleStore.person(named: target), holder.id != id { return }
+            guard await peopleStore.rename(id, to: target) != nil else { return }
+            await refreshPeople()
+            for entry in entries(withPerson: id) {
+                let oldNames = entry.speakerAssignments.filter { $0.value == id }.map(\.key).sorted()
+                guard let first = oldNames.first else { continue }
+                if !restore, ledger.labels[entry.id] == nil { ledger.labels[entry.id] = first }
+                let label = restore ? (ledger.labels[entry.id] ?? target) : target
+                if entry.id == selectedEntryID {
+                    relabelOpenTranscript(of: id, to: { label })
+                    await awaitSpeakerAssignmentWrites()
+                    continue
+                }
+                let renames = oldNames.filter { $0 != label }
+                if !renames.isEmpty {
+                    do {
+                        try await library.mutateTranscript(for: entry.id) { stored in
+                            for name in renames { stored = stored.renamingSpeaker(name, to: label) }
+                        }
+                    } catch {
+                        ParolaLog.error(.library, "person rename not written", Self.entryFields(entry.id, error))
+                        continue
+                    }
+                }
+                await mutateAssignments(for: entry.id) { map in
+                    map = map.filter { $0.value != id }
+                    map[label] = id
+                }
+            }
+        }
+    }
+
+    /// Gives the open transcript's labels for this person one new label, now. Returns the label it carried before.
+    @discardableResult
+    private func relabelOpenTranscript(of personID: UUID, to newLabel: () -> String) -> String? {
+        let oldNames = speakerAssignments.filter { $0.value == personID }.map(\.key).sorted()
+        guard let first = oldNames.first, let current = transcript else { return nil }
+        let label = newLabel()
+        let renames = oldNames.filter { $0 != label }
+        var updated = current
+        for name in renames { updated = updated.renamingSpeaker(name, to: label) }
+        let edit = SpeakerAssignmentEdit(assign: [label: personID], clear: renames)
+        if updated != current {
+            applyTranscriptEdit(
+                updated, actionName: String(localized: "Rename Person"), assignments: edit, undoable: false
+            )
+        } else {
+            applySpeakerAssignmentEdit(edit)
+        }
+        return first
+    }
+
+    private func queuePersonRename(_ work: @escaping @MainActor () async -> Void) {
+        let earlier = personRenameTask
+        personRenameTask = Task {
+            await earlier?.value
+            await work()
+        }
     }
 
     /// Folds one person into another, rewriting the source's name to the target's everywhere.
@@ -329,7 +414,9 @@ extension AppModel {
                 for name in renames { updated = updated.renamingSpeaker(name, to: newName) }
                 let edit = SpeakerAssignmentEdit(assign: [newName: survivor], clear: renames)
                 if updated != current {
-                    applyTranscriptEdit(updated, actionName: String(localized: "Rename Person"), assignments: edit)
+                    applyTranscriptEdit(
+                        updated, actionName: String(localized: "Rename Person"), assignments: edit, undoable: false
+                    )
                 } else {
                     applySpeakerAssignmentEdit(edit)
                 }

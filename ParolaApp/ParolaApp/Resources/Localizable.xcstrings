@@ -16429,13 +16429,36 @@
         }
       }
     },
-    "The new name replaces the old one in every transcript. That rewrite can't be undone.": {
+    "The new name replaces the old one in every transcript.": {
       "extractionState": "manual",
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The new name replaces the old one in every transcript."
+          }
+        },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Il nuovo nome sostituisce il vecchio in ogni trascrizione. La riscrittura non si può annullare."
+            "value": "Il nuovo nome sostituisce il vecchio in ogni trascrizione."
+          }
+        }
+      }
+    },
+    "The new name replaces the old one in every transcript. ⌘Z puts the old name back.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The new name replaces the old one in every transcript. ⌘Z puts the old name back."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il nuovo nome sostituisce il vecchio in ogni trascrizione. ⌘Z rimette il vecchio nome."
           }
         }
       }

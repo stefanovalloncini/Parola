@@ -989,6 +989,9 @@ final class AppModel {
     var showMostUsedPeople: Bool = true { didSet { defaults.set(showMostUsedPeople, forKey: "showMostUsedPeople") } }
     /// The speaker-map writes in flight, kept in order so the bundle never sees them out of turn.
     @ObservationIgnored var speakerAssignmentWriteTask: Task<Void, Never>?
+    /// The person renames in flight, run in order so a quick undo and redo never interleave their rewrites.
+    @ObservationIgnored var personRenameTask: Task<Void, Never>?
+    @ObservationIgnored var personRenameCascadeHook: (@MainActor () async -> Void)?
 
     // MARK: - Prompt library
 
