@@ -1705,6 +1705,22 @@ struct LibraryStoreTests {
         #expect(FileManager.default.fileExists(atPath: indexManifestURL(in: tmp).path) == false)
     }
 
+    @Test("a listing that fails is not cached as an empty library")
+    func failedListingIsNotCached() async throws {
+        let (store, libraryURL) = try makeTempLibrary()
+        let entry = try await store.add(
+            transcript: Transcript(segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "hello")], language: "en", modelName: "tiny"),
+            audioSource: nil
+        )
+        await store.dropCaches()
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: libraryURL.path) }
+        try FileManager.default.setAttributes([.posixPermissions: 0o300], ofItemAtPath: libraryURL.path)
+        #expect(await store.list().isEmpty)
+
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: libraryURL.path)
+        #expect(await store.list().map(\.id) == [entry.id])
+    }
+
     @Test("search on a fresh store instance finds previously indexed entries")
     func coldStoreSearch() async throws {
         let (store1, libraryURL) = try makeTempLibrary()

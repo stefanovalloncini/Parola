@@ -1,5 +1,6 @@
 import Foundation
 import MachO
+import os
 
 public actor LibraryStore {
     public enum LibraryError: Error, LocalizedError {
@@ -104,6 +105,7 @@ public actor LibraryStore {
     private var cachedDeleted: [LibraryEntry]?
     private var cachedLoaded = LoadedEntryCache(capacity: 3)
     private var listCacheEpoch = 0
+    private nonisolated let listingFailureLogged = OSAllocatedUnfairLock(initialState: false)
     /// Moves with a write to one bundle, so a decode of another entry isn't thrown away; `storeGeneration` moves with a write that names no entry.
     private var bundleGenerations: [LibraryEntry.ID: Int] = [:]
     /// A key is a bundle whose turn is held; its value is the calls waiting for it, in order.
@@ -438,12 +440,12 @@ public actor LibraryStore {
             let stamp = Self.folderStamp(of: url)
             let entries = await offActorIO { [self] in scanEntries(at: url) }
             if epoch == listCacheEpoch {
-                applyScan(entries ?? [], folderStamp: stamp)
+                if let entries { applyScan(entries, folderStamp: stamp) }
                 return
             }
         }
         let stamp = Self.folderStamp(of: url)
-        applyScan(scanEntries(at: url) ?? [], folderStamp: stamp)
+        if let entries = scanEntries(at: url) { applyScan(entries, folderStamp: stamp) }
     }
 
     /// Read before the scan it belongs to, so a write landing during the scan still reads as a change.
@@ -514,9 +516,12 @@ public actor LibraryStore {
         let fm = FileManager.default
         guard let contents = try? fm.contentsOfDirectory(at: libraryURL, includingPropertiesForKeys: nil) else {
             guard fm.fileExists(atPath: libraryURL.path) else { return [] }
-            ParolaLog.error(.library, "library folder could not be listed")
+            if !listingFailureLogged.withLock({ let seen = $0; $0 = true; return seen }) {
+                ParolaLog.error(.library, "library folder could not be listed")
+            }
             return nil
         }
+        listingFailureLogged.withLock { $0 = false }
         let decoder = Self.manifestDecoder()
         return contents
             .filter { $0.pathExtension == "parola" }
@@ -677,7 +682,7 @@ public actor LibraryStore {
     }
 
     public func adopt(parolaBundle url: URL) async throws -> LibraryEntry {
-        let sourceDoc = try ParolaDocument.read(at: url)
+        let sourceTranscript = try await offActorThrowingIO { try ParolaDocument.read(at: url).transcript }
         let name = uniqueEntryName(at: Date())
         let target = libraryURL.appendingPathComponent("\(name).parola")
         // Stage under a .tmp name: the copy runs off the actor, so a concurrent list scan
@@ -703,7 +708,7 @@ public actor LibraryStore {
         }
         invalidateListCaches()
         let entry = try makeEntry(bundleURL: target)
-        await indexEntry(entry, transcript: sourceDoc.transcript)
+        await indexEntry(entry, transcript: sourceTranscript)
         return entry
     }
 

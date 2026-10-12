@@ -74,6 +74,11 @@ struct LibraryLoggingTests {
         )
         #expect(record.level == .error)
         #expect(record.formattedLine.contains("/") == false)
+
+        _ = await store.list()
+        _ = await store.list()
+        let listed = sink.records.filter { $0.message.rendered == "library folder could not be listed" }
+        #expect(listed.count == 1, "logged once for the whole streak of failures")
     }
 
     @Test("bundles that cannot be read during a rebuild are counted once, not listed")
