@@ -10,12 +10,11 @@ struct TranscriptDetailView: View {
     @State private var showingChat: Bool = false
     @State private var showingSpeakers: Bool = false
     @State private var query: String = ""
-    @State private var currentMatchIndex: Int = 0
+    @State private var find = TranscriptFindState()
     @State private var selectedSpeaker: String?
     @State private var speakers: [String] = []
     @State private var filtered: [TranscriptSegment] = []
-    @State private var matchIDs: [TranscriptSegment.ID] = []
-    @State private var matchSet: Set<TranscriptSegment.ID> = []
+    @State private var transcriptIsEmpty = false
 
     var body: some View {
         @Bindable var model = model
@@ -39,9 +38,9 @@ struct TranscriptDetailView: View {
                         TranscriptScrollView(
                             segments: filtered,
                             showSpeaker: Self.showsSpeakerLabels(speakerCount: speakers.count),
-                            query: trimmedQuery,
-                            matchingSet: matchSet,
-                            targetMatchID: targetMatchID(in: matchIDs)
+                            query: find.appliedQuery,
+                            matchingSet: find.matchSet,
+                            targetMatchID: find.targetMatchID
                         )
                     }
                     if playback.hasAudio {
@@ -82,13 +81,13 @@ struct TranscriptDetailView: View {
                         )
                     }
                     ToolbarItemGroup(placement: .keyboard) {
-                        if !matchIDs.isEmpty {
-                            Text("\(currentMatchIndex + 1) / \(matchIDs.count)")
+                        if !find.matchIDs.isEmpty {
+                            Text("\(find.currentMatchIndex + 1) / \(find.matchIDs.count)")
                                 .font(.caption.monospacedDigit())
                                 .foregroundStyle(.secondary)
                             Spacer()
                             Button {
-                                advanceMatch(total: matchIDs.count)
+                                find.advance()
                             } label: {
                                 Image(systemName: "chevron.down")
                             }
@@ -98,18 +97,10 @@ struct TranscriptDetailView: View {
                 }
                 .searchable(text: $query, prompt: "Search transcript")
                 .task(id: query) {
-                    currentMatchIndex = 0
-                    guard !trimmedQuery.isEmpty else {
-                        applyMatches([])
-                        return
-                    }
-                    try? await Task.sleep(for: TranscriptFind.debounce)
-                    guard !Task.isCancelled else { return }
-                    recomputeMatches()
+                    await find.queryChanged(query, in: filtered)
                 }
                 .onChange(of: selectedSpeaker) { _, _ in
-                    currentMatchIndex = 0
-                    recomputeFiltered()
+                    recomputeFiltered(resetsPosition: true)
                 }
                 .sheet(isPresented: $showingChat) {
                     ChatSheet(entry: loaded.entry, transcript: loaded.document.transcript) { updated in
@@ -157,45 +148,18 @@ struct TranscriptDetailView: View {
         .onDisappear { playback.pause() }
     }
 
-    private func recomputeFiltered() {
+    private func recomputeFiltered(resetsPosition: Bool = false) {
         guard let transcript = loaded?.document.transcript else {
             speakers = []
             filtered = []
-            applyMatches([])
+            transcriptIsEmpty = false
+            find.segmentsChanged([], resetsPosition: resetsPosition)
             return
         }
         speakers = transcript.uniqueSpeakers
+        transcriptIsEmpty = !transcript.segments.contains { !Self.displayText($0.text).isEmpty }
         filtered = Self.visibleSegments(transcript.segments, speaker: selectedSpeaker)
-        recomputeMatches()
-    }
-
-    private func recomputeMatches() {
-        applyMatches(TranscriptFind.matchingIDs(in: filtered, query: trimmedQuery))
-    }
-
-    private func applyMatches(_ ids: [TranscriptSegment.ID]) {
-        matchIDs = ids
-        matchSet = Set(ids)
-    }
-
-    private var trimmedQuery: String {
-        query.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    private func targetMatchID(in matches: [TranscriptSegment.ID]) -> TranscriptSegment.ID? {
-        guard !matches.isEmpty else { return nil }
-        let safeIndex = min(max(0, currentMatchIndex), matches.count - 1)
-        return matches[safeIndex]
-    }
-
-    private func advanceMatch(total: Int) {
-        guard total > 0 else { return }
-        currentMatchIndex = (currentMatchIndex + 1) % total
-    }
-
-    private var transcriptIsEmpty: Bool {
-        guard let segments = loaded?.document.transcript.segments else { return false }
-        return Self.visibleSegments(segments, speaker: nil).isEmpty
+        find.segmentsChanged(filtered, resetsPosition: resetsPosition)
     }
 
     static func visibleSegments(_ segments: [TranscriptSegment], speaker: String?) -> [TranscriptSegment] {
