@@ -184,6 +184,25 @@ struct OpenInNewWindowSettingTests {
         #expect(model.mainTranscriptCommandsEnabled)
     }
 
+    @Test("Back and Export Segment Notes wait for something to act on")
+    func backAndNotesExportFollowTheirTargets() async throws {
+        let model = EntryWindowTestSupport.makeModel("newwindowbackandnotes")
+        let entry = try await EntryWindowTestSupport.seed(
+            model, texts: ["alpha"], speakers: [nil], audio: nil
+        )
+        model.loadEntry(entry.id)
+        await waitUntil(timeoutMs: 3000) { model.hasTranscript }
+
+        #expect(model.canExportSegmentNotes == false)
+        model.setSegmentNote("check the mix", segmentID: 0)
+        #expect(await waitUntil { model.canExportSegmentNotes })
+
+        #expect(model.backCommandEnabled == model.canReturnToOrigin)
+        model.entryWindowKeyChanged(entry.id, isKey: true)
+        #expect(model.backCommandEnabled == false)
+        #expect(model.canExportSegmentNotes == false)
+    }
+
     @Test("Find follows the key window")
     func findFollowsTheKeyWindow() async throws {
         let model = EntryWindowTestSupport.makeModel("newwindowfind")

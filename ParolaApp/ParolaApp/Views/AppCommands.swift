@@ -398,7 +398,7 @@ struct TranscriptCommands: View {
     var body: some View {
         Button("Back") { model.returnToOrigin() }
             .keyboardShortcut("[", modifiers: [.command])
-            .disabled(!model.canReturnToOrigin)
+            .disabled(!model.backCommandEnabled)
         Button("Next Segment") { model.stepSegment(forward: true) }
             .keyboardShortcut(.downArrow, modifiers: [.command, .option])
             .disabled(!model.mainTranscriptCommandsEnabled || !model.keyWindowHasPlayer)
@@ -483,7 +483,7 @@ struct TranscriptCommands: View {
         }
         .disabled(!model.mainTranscriptCommandsEnabled)
         Button("Export Segment Notes…") { model.exportSegmentNotesAsMarkdown() }
-            .disabled(!model.mainTranscriptCommandsEnabled)
+            .disabled(!model.canExportSegmentNotes)
         Button("Send via Mail…") { model.shareTranscriptViaMail() }
             .keyboardShortcut("m", modifiers: [.command, .shift])
             .disabled(!model.mainTranscriptCommandsEnabled)

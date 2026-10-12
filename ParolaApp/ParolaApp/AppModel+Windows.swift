@@ -127,6 +127,12 @@ extension AppModel {
     /// Off while a viewer holds focus or another page covers the transcript, where these would act on something the user can't see.
     var mainTranscriptCommandsEnabled: Bool { transcriptIsOnScreen && !keyWindowIsViewer }
 
+    /// Back is the main window's: a viewer has no origin to return to.
+    var backCommandEnabled: Bool { canReturnToOrigin && !keyWindowIsViewer }
+
+    /// A file holding only the heading would be no export, so the command waits for a first note.
+    var canExportSegmentNotes: Bool { mainTranscriptCommandsEnabled && !segmentNotesByID.isEmpty }
+
     /// The main window shows the loaded transcript, with no list, results or other page over it.
     var transcriptIsOnScreen: Bool {
         route == .transcript && hasTranscript && !isBrowsingLibrary
