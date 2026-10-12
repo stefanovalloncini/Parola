@@ -14,14 +14,6 @@ private func applyAppAppearance(_ theme: String) {
 }
 
 @MainActor
-private func applyAlwaysOnTop(_ on: Bool) {
-    // Main and viewer windows carry their transcript's name, so the Mini Player is told apart by its own titles.
-    for window in NSApp.windows where window.canBecomeMain && !["Mini Player", "Parola Mini Player"].contains(window.title) {
-        window.level = on ? .floating : .normal
-    }
-}
-
-@MainActor
 func handleParolaOpen(_ url: URL, model: AppModel) {
     model.introduction.defer()
     if url.isFileURL {
@@ -107,9 +99,6 @@ struct ParolaApp: App {
                 }
                 .onChange(of: model.appTheme) { _, newValue in
                     applyAppAppearance(newValue)
-                }
-                .onChange(of: model.mainWindowAlwaysOnTop) { _, on in
-                    applyAlwaysOnTop(on)
                 }
                 .onOpenURL { url in handleParolaOpen(url, model: model) }
         }

@@ -35,6 +35,27 @@ struct MainWindowTests {
         #expect(released)
     }
 
+    @Test("Always on Top floats the main window as it appears and follows the setting, and leaves other windows alone")
+    func alwaysOnTopFollowsTheSetting() async {
+        let model = AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("main-window-float"))
+        model.mainWindowAlwaysOnTop = true
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 240, height: 120), styleMask: [.titled, .closable], backing: .buffered, defer: true)
+        window.isReleasedWhenClosed = false
+        let viewer = NSWindow(contentRect: .zero, styleMask: [.titled], backing: .buffered, defer: true)
+        viewer.isReleasedWhenClosed = false
+        window.contentView = NSHostingView(rootView: Color.clear.background(MainWindowReporter(model: model)))
+        window.contentView?.layoutSubtreeIfNeeded()
+        #expect(window.level == .floating)
+        #expect(viewer.level == .normal)
+
+        model.mainWindowAlwaysOnTop = false
+        #expect(await waitUntil { window.level == .normal })
+
+        model.mainWindowAlwaysOnTop = true
+        #expect(await waitUntil { window.level == .floating })
+        window.close()
+    }
+
     @Test("the main window takes no tabs, so View ▸ Show Tab Bar can't open a second one over the same model")
     func mainWindowTakesNoTabs() {
         let model = AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("main-window-tabs"))

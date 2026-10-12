@@ -85,12 +85,14 @@ struct MainWindowReporter: NSViewRepresentable {
         private func followTake() {
             guard !followsTake, let model else {
                 nameWindow()
+                floatWindow()
                 return
             }
             followsTake = true
             withObservationTracking {
                 _ = model.takeIsRunning
                 nameWindow()
+                floatWindow()
                 guardClose()
             } onChange: { [weak self] in
                 Task { @MainActor [weak self] in
@@ -104,6 +106,12 @@ struct MainWindowReporter: NSViewRepresentable {
             guard let model, let window else { return }
             let title = MainWindowTitle.title(takeRunning: model.takeIsRunning, transcriptTitle: model.shownTranscriptTitle)
             if window.title != title { window.title = title }
+        }
+
+        private func floatWindow() {
+            guard let model, let window else { return }
+            let level: NSWindow.Level = model.mainWindowAlwaysOnTop ? .floating : .normal
+            if window.level != level { window.level = level }
         }
 
         /// Again as each take starts, in case the window's delegate changed since the window opened.
