@@ -218,12 +218,8 @@ struct BatchExportSettingsPane: View {
                 SettingRow("Batch view",
                            description: "Pick presets in the Batch view too. Parola writes them as each transcription finishes.") {
                     Button("Open Batch") {
-                        model.route = .batch
-                        NSApp.activate(ignoringOtherApps: true)
-                        for window in NSApp.windows where window.canBecomeMain {
-                            window.makeKeyAndOrderFront(nil)
-                            break
-                        }
+                        model.openBatch()
+                        model.bringMainWindowForward()
                     }
                     .axLeaf("BatchExport.Button.OpenBatch")
                 }

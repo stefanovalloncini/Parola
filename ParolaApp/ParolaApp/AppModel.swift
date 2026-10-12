@@ -3694,6 +3694,13 @@ final class AppModel {
         }
     }
 
+    /// On screen, on the Space in front, and not covered completely: a count-in anywhere else would delay the take unseen.
+    private var mainWindowShowsOverlay: Bool {
+        guard mainWindowPresence == .onScreen else { return false }
+        guard mode != .test, let mainWindow else { return true }
+        return mainWindow.isOnActiveSpace && mainWindow.occlusionState.contains(.visible)
+    }
+
     nonisolated static func missingPermission(
         for error: Error, source: RecordSource, screenRecordingGranted: Bool, hasCaptureTargets: Bool = false
     ) -> RecordingSession.Permission? {
@@ -3772,7 +3779,7 @@ final class AppModel {
         let diskCheck = startDiskSpaceCheck()
         let countIn = max(0, recordingCountInSeconds)
         // The count-in shows only in a main window Parola has in front; anywhere else it would delay the take unseen.
-        let overlayVisible = appIsActive() && (mode == .test || NSApp.windows.contains { $0.isVisible && $0.canBecomeMain })
+        let overlayVisible = appIsActive() && mainWindowShowsOverlay
         let request = TakeRequest(category: requestedCategory(for: source), captureTargets: pendingCaptureBundleIDs ?? [])
         forgetTakeRequest()
         if countIn > 0, overlayVisible {

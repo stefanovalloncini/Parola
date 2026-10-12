@@ -132,6 +132,24 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("no countdown is shown while the main window is closed or hidden")
+        func noCountdownWithoutAVisibleMainWindow() async throws {
+            let fixture = try makeSilentWAV()
+            try await withMocksCleared(.audioSource) {
+                await MockAudioSourceRegistry.shared.install(kind: .mic, fixtureURL: fixture)
+
+                let model = makeRecordingModel()
+                model.useStreaming = false
+                model.recordingCountInSeconds = 3
+                model.mainWindowPresenceOverride = .hidden
+
+                model.startRecording(source: .microphone)
+                #expect(model.recordingCountdown == nil)
+
+                model.cancelCurrentWork()
+            }
+        }
+
         @Test("a zero count-in shows no countdown")
         func zeroCountInNoCountdown() async throws {
             let fixture = try makeSilentWAV()
