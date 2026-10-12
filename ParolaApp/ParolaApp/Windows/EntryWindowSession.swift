@@ -283,7 +283,7 @@ final class EntryWindowSession {
 
     func seek(toSegment id: TranscriptSegment.ID) {
         guard let segment = transcript?.segments.first(where: { $0.id == id }) else { return }
-        clickedSegmentID = id
+        if id != currentSegmentID { clickedSegmentID = id }
         scrub(to: segment.start)
         player?.play()
     }

@@ -281,4 +281,12 @@ struct JobRowTests {
         #expect(BatchJobStatus.symbol(for: .done) == "checkmark.circle.fill")
         #expect(BatchJobStatus.symbol(for: .failed) == "exclamationmark.triangle.fill")
     }
+
+    @Test("a row's tooltip covers the badge and text, not the trailing actions")
+    func rowTooltipLeavesTheActionsAlone() throws {
+        let path = #filePath.replacingOccurrences(of: "ParolaAppTests/EntryRowTests.swift", with: "ParolaApp/Views/Components/EntryRow.swift")
+        let row = try String(contentsOfFile: path, encoding: .utf8).split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        #expect(row.contains("chromedRow .onHover"))
+        #expect(row.components(separatedBy: ".help(rowHelp)").count - 1 == 3)
+    }
 }

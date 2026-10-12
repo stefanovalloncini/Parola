@@ -181,8 +181,17 @@ struct TranscriptTitleTests {
             let focused = alert.makeFirstResponder(field)
             #expect(focused)
             let editor = try #require(field.currentEditor() as? NSTextView)
+            @MainActor func confirmEnabled() -> Bool? {
+                HostedAccessibility.elements(in: alert).first { $0.identifier?.hasSuffix("alert.rename.confirm") == true }?.isEnabled
+            }
+            #expect(confirmEnabled() == true)
             editor.selectAll(nil)
+            editor.insertText("", replacementRange: editor.selectedRange())
+            let off = await waitUntil { confirmEnabled() == false }
+            #expect(off, "Rename stays on with an empty title")
             editor.insertText("Budget review", replacementRange: editor.selectedRange())
+            let on = await waitUntil { confirmEnabled() == true }
+            #expect(on)
             let confirmed = HostedAccessibility.press(endingWith: "alert.rename.confirm", in: alert)
             #expect(confirmed, "no confirm in \(ids)")
             let renamed = await waitUntil { model.libraryEntry(id: seeded.id)?.manifest.title == "Budget review" }

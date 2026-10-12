@@ -374,11 +374,15 @@ struct LibraryRowMenu: View {
         }
     }
 
+    @ViewBuilder
     private var move: some View {
-        Menu("Move to") {
-            ForEach(Self.moveTargets(for: entries, features: model.features), id: \.self) { target in
-                Button(LocalizedStringKey(libraryCategoryName(target))) {
-                    model.moveEntries(ids, to: target)
+        let targets = Self.moveTargets(for: entries, features: model.features)
+        if !targets.isEmpty {
+            Menu("Move to") {
+                ForEach(targets, id: \.self) { target in
+                    Button(LocalizedStringKey(libraryCategoryName(target))) {
+                        model.moveEntries(ids, to: target)
+                    }
                 }
             }
         }

@@ -56,10 +56,13 @@ extension AppModel {
     }
 
     /// A relaunch that restores only a viewer, or nothing, gets no main window from SwiftUI; menu bar only launches stay windowless.
-    func openMainWindowIfMissingAfterLaunch(after delay: Duration = .seconds(1)) async {
+    func openMainWindowIfMissingAfterLaunch(
+        after delay: Duration = .seconds(1),
+        activate: () -> Void = { NSApp.activate(ignoringOtherApps: true) }
+    ) async {
         try? await Task.sleep(for: delay)
         guard mainWindow == nil, !isHeadless, appVisibilityMode.launchesWithMainWindow else { return }
-        bringMainWindowForward()
+        bringMainWindowForward(activate: activate)
     }
 
     /// The one way a transcript window opens; false when the library has no such entry or no scene can open one.
@@ -131,7 +134,7 @@ extension AppModel {
     var backCommandEnabled: Bool { canReturnToOrigin && !keyWindowIsViewer }
 
     /// A file holding only the heading would be no export, so the command waits for a first note.
-    var canExportSegmentNotes: Bool { mainTranscriptCommandsEnabled && !segmentNotesByID.isEmpty }
+    var canExportSegmentNotes: Bool { mainTranscriptCommandsEnabled && !selectedEntryNotes.isEmpty }
 
     /// The main window shows the loaded transcript, with no list, results or other page over it.
     var transcriptIsOnScreen: Bool {

@@ -106,11 +106,11 @@ struct MainWindowTests {
     func launchCheckOpensTheMissingWindow() async {
         for mode in [AppVisibilityMode.dockOnly, .dockAndMenuBar] {
             let (model, opened) = launchRig("launch-\(mode.rawValue)", mode: mode)
-            await model.openMainWindowIfMissingAfterLaunch(after: .zero)
+            await model.openMainWindowIfMissingAfterLaunch(after: .zero, activate: {})
             #expect(opened.count == 1)
         }
         let (menuBarOnly, quiet) = launchRig("launch-menubar", mode: .menuBarOnly)
-        await menuBarOnly.openMainWindowIfMissingAfterLaunch(after: .zero)
+        await menuBarOnly.openMainWindowIfMissingAfterLaunch(after: .zero, activate: {})
         #expect(quiet.count == 0)
         menuBarOnly.bringMainWindowForward(activate: {})
         #expect(quiet.count == 1)
@@ -122,12 +122,12 @@ struct MainWindowTests {
         let window = NSWindow(contentRect: .zero, styleMask: [.titled], backing: .buffered, defer: true)
         window.isReleasedWhenClosed = false
         restored.mainWindow = window
-        await restored.openMainWindowIfMissingAfterLaunch(after: .zero)
+        await restored.openMainWindowIfMissingAfterLaunch(after: .zero, activate: {})
         #expect(restoredOpened.count == 0)
 
         let (headless, headlessOpened) = launchRig("launch-headless", mode: .dockAndMenuBar)
         headless.isHeadless = true
-        await headless.openMainWindowIfMissingAfterLaunch(after: .zero)
+        await headless.openMainWindowIfMissingAfterLaunch(after: .zero, activate: {})
         #expect(headlessOpened.count == 0)
     }
 
@@ -146,6 +146,24 @@ struct MainWindowTests {
         model.bringMainWindowForward(activate: {})
         #expect(reopens.count == 1)
         #expect(scene.count == 1)
+    }
+
+    @Test("a reopen the app asked for itself is not answered with another one")
+    func ownReopenDoesNotLoop() {
+        let model = AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("main-window-loop"))
+        let delegate = AppDelegate()
+        var requests = 0
+        delegate.installReopenFallback(on: model) {
+            requests += 1
+            if requests < 20 { _ = delegate.applicationShouldHandleReopen(NSApp, hasVisibleWindows: true) }
+        }
+
+        let handled = delegate.applicationShouldHandleReopen(NSApp, hasVisibleWindows: true)
+
+        #expect(handled == false)
+        #expect(requests == 1)
+        #expect(delegate.applicationShouldHandleReopen(NSApp, hasVisibleWindows: true) == false)
+        #expect(requests == 2)
     }
 
     @Test("the viewer, Settings and the Mini Player hand the main window's opener over too")
@@ -188,20 +206,6 @@ struct MainWindowTests {
         let italian = try #require(Bundle(path: path))
         let key = "Select audio or video files to transcribe."
         #expect(italian.localizedString(forKey: key, value: "MISSING", table: nil) != "MISSING")
-    }
-
-    @Test("both rename alerts keep Rename off while the title is empty")
-    func renameNeedsATitle() throws {
-        let guardText = #".disabled(renameDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)"#
-        #expect(try source("Views/LibraryRowList").contains(#"Button("Rename") { if let id = renamingEntry?.id { model.renameEntry(id, to: renameDraft) } renamingEntry = nil } "# + guardText))
-        #expect(try source("Views/Transcript/TranscriptTitle").contains(#"Button("Rename") { model.renameOpenTranscript(to: renameDraft) } "# + guardText))
-    }
-
-    @Test("a row's tooltip covers the badge and text, not the trailing actions")
-    func rowTooltipLeavesTheActionsAlone() throws {
-        let row = try source("Views/Components/EntryRow")
-        #expect(row.contains("chromedRow .onHover"))
-        #expect(row.components(separatedBy: ".help(rowHelp)").count - 1 == 2)
     }
 
     @Test("the chat sender filter names have Italian")

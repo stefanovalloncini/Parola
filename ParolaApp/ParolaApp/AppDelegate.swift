@@ -22,6 +22,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let takeAnnouncer = TakeAnnouncer()
     private let playbackKeys = PlaybackKeyMonitor()
 
+    private var awaitingOwnReopen = false
+
+    /// Our own reopen comes back through `applicationShouldHandleReopen`; answering it would ask again, forever, with any other window visible.
+    func installReopenFallback(on model: AppModel, request: @escaping @MainActor () -> Void = {
+        NSWorkspace.shared.openApplication(at: Bundle.main.bundleURL, configuration: NSWorkspace.OpenConfiguration())
+    }) {
+        self.model = model
+        model.bindMainWindowReopenUntilASceneBinds { [weak self] in
+            self?.awaitingOwnReopen = true
+            request()
+        }
+    }
+
     func bind(model: AppModel) {
         guard self.model !== model else { return }
         self.model = model
@@ -34,9 +47,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         playbackKeys.bind(model)
         model.activationPolicyApplier = { NSApp.setActivationPolicy($0) }
         model.settingsWindowOpener = { SettingsWindowOpener.open() }
-        model.bindMainWindowReopenUntilASceneBinds {
-            NSWorkspace.shared.openApplication(at: Bundle.main.bundleURL, configuration: NSWorkspace.OpenConfiguration())
-        }
+        installReopenFallback(on: model)
         model.applyAppVisibilityMode()
         if dictationSubscription == nil, Self.hearsDictationSignal(model.activeSideEffects) {
             dictationSubscription = DictationSignal.subscribe { [weak self] name in
@@ -241,7 +252,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// SwiftUI reopens the main scene on a Dock click only when nothing is visible; a viewer or Settings alone has to bring it back.
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        guard flag, let model, model.mainWindow == nil else { return true }
+        let ours = awaitingOwnReopen
+        awaitingOwnReopen = false
+        guard flag, !ours, let model, model.mainWindow == nil else { return true }
         model.bringMainWindowForward()
         return false
     }

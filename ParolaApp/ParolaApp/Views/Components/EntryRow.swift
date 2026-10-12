@@ -172,9 +172,9 @@ struct EntryRow<Accessory: View, Actions: View>: View {
             VStack(alignment: .leading, spacing: DS.Spacing.hair) {
                 titleLine
                 detailLine
+                    .help(rowHelp)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .help(rowHelp)
             trailingActions
         }
         .frame(minHeight: EntryRowMetrics.height)
@@ -196,6 +196,7 @@ struct EntryRow<Accessory: View, Actions: View>: View {
                 .font(DS.Font.body.weight(.semibold))
                 .foregroundStyle(onAccent ? DS.Color.onAccent : DS.Color.primaryText)
                 .lineLimit(1)
+                .help(rowHelp)
             if display.pinned {
                 Image(systemName: "pin.fill")
                     .font(.system(size: 9))
