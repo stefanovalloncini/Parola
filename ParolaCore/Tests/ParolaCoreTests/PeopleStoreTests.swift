@@ -29,14 +29,16 @@ struct PeopleStoreTests {
         #expect(people.first?.usageCount == 2)
     }
 
-    @Test("name matching is case-insensitive but the canonical form follows the latest input")
+    @Test("name matching is case-insensitive and the stored spelling stays")
     func caseInsensitive() async throws {
         let store = PeopleStore(storageURL: makeTempURL())
-        _ = await store.recordUsage(name: "stefano")
-        _ = await store.recordUsage(name: "Stefano")
+        _ = await store.recordUsage(name: "Alice")
+        let again = await store.recordUsage(name: "alice")
         let people = await store.people
         #expect(people.count == 1)
-        #expect(people.first?.name == "Stefano")
+        #expect(people.first?.name == "Alice")
+        #expect(again.name == "Alice")
+        #expect(people.first?.usageCount == 2)
     }
 
     @Test("suggestions are sorted by recent usage and limited")

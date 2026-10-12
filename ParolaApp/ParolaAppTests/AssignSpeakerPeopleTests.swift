@@ -68,6 +68,21 @@ struct AssignSpeakerPeopleTests {
         #expect(model.libraryEntry(id: entry.id)?.personIDs == [person.id])
     }
 
+    @Test("typing an existing name in another casing keeps the stored spelling in the segment and the directory")
+    func existingPersonKeepsSpelling() async throws {
+        let model = PeopleTestSupport.makeModel("assigncasing")
+        _ = try await PeopleTestSupport.openSeededEntry(model)
+        await model.addPerson(named: "Alice")
+
+        await model.assignSpeaker(label: "SPEAKER_00", toNewPersonNamed: "alice")
+        await model.assignSegment(1, toNewPersonNamed: "ALICE")
+        await model.addPerson(named: "alice")
+
+        #expect(model.transcript?.segments.map(\.speaker) == ["Alice", "Alice", "Alice"])
+        #expect(model.people.map(\.name) == ["Alice"])
+        #expect(model.people.first?.usageCount == 3)
+    }
+
     @Test("the map reaches the bundle on disk")
     func mapIsPersisted() async throws {
         let model = PeopleTestSupport.makeModel("assignpersist")

@@ -182,7 +182,7 @@ extension AppModel {
         guard !personName.isEmpty else { return }
         let person = await peopleStore.recordUsage(name: personName)
         await refreshPeople()
-        applySegmentSpeaker(personName, toSegmentID: id, recording: person)
+        applySegmentSpeaker(person.name, toSegmentID: id, recording: person)
         await awaitSpeakerAssignmentWrites()
     }
 
@@ -272,7 +272,7 @@ extension AppModel {
 
     func addPerson(named name: String) async {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
+        guard !trimmed.isEmpty, await peopleStore.person(named: trimmed) == nil else { return }
         _ = await peopleStore.recordUsage(name: trimmed)
         await refreshPeople()
     }

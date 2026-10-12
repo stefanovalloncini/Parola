@@ -8,14 +8,15 @@ extension AppModel {
             let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
             return trimmed.isEmpty ? nil : trimmed
         }
-        let updated = transcript.renamingSpeakers(nonEmpty)
+        var spelled: [String: String] = [:]
+        for (from, to) in nonEmpty {
+            spelled[from] = await peopleStore.recordUsage(name: to).name
+        }
+        let updated = transcript.renamingSpeakers(spelled)
         do {
             try await library.updateTranscript(updated, for: entryID)
         } catch {
             lastError = error.localizedDescription
-        }
-        for to in nonEmpty.values {
-            _ = await peopleStore.recordUsage(name: to)
         }
         return updated
     }

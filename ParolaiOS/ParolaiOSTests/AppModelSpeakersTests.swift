@@ -41,6 +41,22 @@ struct AppModelSpeakersTests {
         #expect(updated.segments[1].speaker == "SPEAKER_01")
     }
 
+    @Test("a name typed in another casing takes the spelling of the person already stored")
+    func existingPersonKeepsSpelling() async throws {
+        let (model, _) = try makeModel()
+        let entry = try await model.library.add(transcript: twoSpeakerTranscript(), audioSource: nil)
+        _ = await model.peopleStore.recordUsage(name: "Alice")
+
+        let updated = await model.applySpeakerRenames(
+            ["SPEAKER_00": "alice"],
+            on: twoSpeakerTranscript(),
+            entryID: entry.id
+        )
+
+        #expect(updated.segments[0].speaker == "Alice")
+        #expect(await model.peopleStore.people.map(\.name).filter { $0.lowercased() == "alice" } == ["Alice"])
+    }
+
     @Test("swapping two speakers keeps them apart")
     func swapKeepsSpeakersApart() async throws {
         let (model, _) = try makeModel()
