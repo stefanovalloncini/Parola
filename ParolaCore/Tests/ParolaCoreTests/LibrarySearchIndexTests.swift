@@ -1,3 +1,4 @@
+import Clocks
 import Testing
 import Foundation
 import os
@@ -1304,6 +1305,67 @@ final class LibrarySearchIndexTests {
         let manifestPath = manifestURL(in: url).path
         let fileExistsWait = await eventually { FileManager.default.fileExists(atPath: manifestPath) }
         #expect(fileExistsWait)
+    }
+
+    @Test("retries of a write that keeps failing back off, and a write that lands starts over")
+    func failedWritesBackOff() async throws {
+        let url = makeTempDirectory()
+        let clock = TestClock()
+        let attempts = OSAllocatedUnfairLock(initialState: 0)
+        let failing = OSAllocatedUnfairLock(initialState: true)
+        let index = LibrarySearchIndex(
+            indexDirectory: url,
+            saveDebounce: .milliseconds(250),
+            clock: clock,
+            writeSnapshotData: { data, target in
+                attempts.withLock { $0 += 1 }
+                if failing.withLock({ $0 }) { throw CocoaError(.fileWriteNoPermission) }
+                try data.write(to: target, options: .atomic)
+            }
+        )
+        func advance(_ duration: Duration) async throws {
+            try await Task.sleep(for: .milliseconds(50))
+            await clock.advance(by: duration)
+        }
+        func settle(_ expected: Int) async -> Bool {
+            await eventually { attempts.withLock { $0 } == expected }
+        }
+
+        await index.index(id: "e1", title: "One", text: "sprint planning", createdAt: Date())
+        try await advance(.milliseconds(250))
+        #expect(await settle(1))
+
+        try await advance(.milliseconds(250))
+        #expect(await settle(2), "the first retry waits the debounce")
+
+        try await advance(.milliseconds(250))
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(attempts.withLock { $0 } == 2, "the second waits twice that")
+        try await advance(.milliseconds(250))
+        #expect(await settle(3))
+
+        try await advance(.milliseconds(500))
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(attempts.withLock { $0 } == 3, "the third waits four times")
+        try await advance(.milliseconds(500))
+        #expect(await settle(4))
+
+        for _ in 0..<8 {
+            try await advance(.seconds(30))
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        let beforeRecovery = attempts.withLock { $0 }
+        failing.withLock { $0 = false }
+        try await advance(.seconds(30))
+        let manifestPath = manifestURL(in: url).path
+        #expect(await eventually { FileManager.default.fileExists(atPath: manifestPath) })
+        #expect(attempts.withLock { $0 } > beforeRecovery)
+
+        failing.withLock { $0 = true }
+        await index.index(id: "e2", title: "Two", text: "retro feedback", createdAt: Date())
+        let beforeNextFailure = attempts.withLock { $0 }
+        try await advance(.milliseconds(250))
+        #expect(await settle(beforeNextFailure + 1), "a landed write resets the delay to the debounce")
     }
 
     @Test("a missing snapshot asks for a rebuild")

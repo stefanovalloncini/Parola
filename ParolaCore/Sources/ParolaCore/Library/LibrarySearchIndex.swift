@@ -229,6 +229,8 @@ public actor LibrarySearchIndex {
     private var legacySnapshotPresent = false
     private var rebuildNeed: RebuildNeed = .none
     private var snapshotWriteFailing = false
+    private var failedWriteStreak = 0
+    private static let longestRetryDelay = Duration.seconds(30)
     /// Started by the first call that needs the index, so a process that never searches never decodes the snapshot.
     private var loadTask: Task<LoadResult, Never>?
     /// The snapshot manifest's date when this index last read it, and the ids that manifest listed.
@@ -1103,13 +1105,19 @@ public actor LibrarySearchIndex {
 
     private func scheduleSave() {
         guard persists, isDirty, pendingSaveTask == nil else { return }
-        let debounce = saveDebounce
+        let debounce = retryDelay
         let clock = clock
         pendingSaveTask = Task { [weak self] in
             try? await Task.sleep(for: debounce, clock: clock)
             if Task.isCancelled { return }
             await self?.persistAfterDebounce()
         }
+    }
+
+    /// The debounce, doubled for each write in a row that failed, so a folder that cannot be written is not retried at the debounce's rate.
+    private var retryDelay: Duration {
+        guard failedWriteStreak > 0 else { return saveDebounce }
+        return min(Self.longestRetryDelay, saveDebounce * (1 << min(failedWriteStreak - 1, 20)))
     }
 
     private func persistAfterDebounce() async {
@@ -1150,6 +1158,7 @@ public actor LibrarySearchIndex {
         switch result.outcome {
         case .written:
             snapshotWriteFailing = false
+            failedWriteStreak = 0
             legacySnapshotPresent = false
             releaseBodies(write.bodies)
         case .superseded:
@@ -1157,6 +1166,7 @@ public actor LibrarySearchIndex {
             releaseBodies(write.bodies)
         case .failed(let error):
             // The retry runs on the debounce until the write lands, so only the first of a run is logged.
+            failedWriteStreak += 1
             if !snapshotWriteFailing {
                 snapshotWriteFailing = true
                 ParolaLog.error(
