@@ -195,6 +195,7 @@ extension AppModel {
     /// the AI runs asked for it before the save follow it into the entry.
     func selectLanded(_ entryID: LibraryEntry.ID) {
         selectedEntryID = entryID
+        savedTranscriptEntryID = entryID
         aiJobs.adoptUnsaved(as: entryID)
     }
 

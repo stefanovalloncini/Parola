@@ -58,6 +58,24 @@ struct TranscriptDisplayTitleTests {
         #expect(AppModel.transcriptDisplayTitle(sourceFileURL: audio, entry: untitled, showsAITitle: false, fallback: "Untitled") == "jfk")
     }
 
+    @Test("an entry known to be the transcript's own is trusted though its source sits outside the bundle")
+    func savedEntryIsTrustedOutsideItsBundle() {
+        let bundle = URL(fileURLWithPath: "/lib/20260624-new.parola")
+        var manifest = ParolaDocument.Manifest(
+            originalAudioName: "meeting.m4a", modelName: "Whisper Tiny", language: "en", audioFilename: "audio.m4a"
+        )
+        manifest.aiTitle = "Weekly planning"
+        let e = LibraryEntry(id: "20260624-new", bundleURL: bundle, manifest: manifest)
+        let source = URL(fileURLWithPath: "/Users/me/Downloads/meeting.m4a")
+
+        #expect(AppModel.transcriptDisplayTitle(
+            sourceFileURL: source, entry: e, showsAITitle: true, fallback: "Untitled", entryIsTheTranscript: true
+        ) == "Weekly planning")
+        #expect(AppModel.transcriptDisplayTitle(
+            sourceFileURL: source, entry: e, showsAITitle: true, fallback: "Untitled"
+        ) == "meeting")
+    }
+
     @Test("a fresh transcribe keeps the source filename even if a stale entry is still selected")
     func freshTranscribeIgnoresStaleEntry() {
         let staleBundle = URL(fileURLWithPath: "/lib/20260624-abc.parola")
@@ -151,5 +169,26 @@ struct CurrentTranscriptTitleTests {
         model.selectedEntryID = stale.id
         model.sourceFileURL = URL(fileURLWithPath: "/Users/me/Downloads/New Recording 133.m4a")
         #expect(model.currentTranscriptTitle == "New Recording 133")
+    }
+
+    @Test("a transcript just saved reads under its AI title in the header until the selection moves")
+    func landedTranscriptShowsItsAITitle() {
+        let model = makeModel()
+        var manifest = ParolaDocument.Manifest(
+            originalAudioName: "meeting.m4a", modelName: "stub", language: "en", audioFilename: "audio.m4a"
+        )
+        manifest.aiTitle = "Weekly planning"
+        let e = LibraryEntry(id: "20260624-new", bundleURL: URL(fileURLWithPath: "/lib/20260624-new.parola"), manifest: manifest)
+        model.libraryEntries = [e]
+        model.sourceFileURL = URL(fileURLWithPath: "/Users/me/Downloads/meeting.m4a")
+
+        model.selectLanded(e.id)
+        #expect(model.transcriptHeaderTitle == "Weekly planning")
+        #expect(model.currentTranscriptTitle == "Weekly planning")
+
+        model.selectedEntryID = nil
+        model.selectedEntryID = e.id
+        #expect(model.transcriptHeaderTitle == "meeting")
+        #expect(model.currentTranscriptTitle == "meeting")
     }
 }

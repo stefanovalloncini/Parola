@@ -1753,8 +1753,11 @@ final class AppModel {
             transcriptPaneMode = .transcript
             updateSelectedEntryMirrors()
             dropTakeSavedOnceLeft()
+            savedTranscriptEntryID = nil
         }
     }
+    /// The entry the transcript on screen was just saved as: its source file sits outside the bundle, so only this ties them.
+    var savedTranscriptEntryID: LibraryEntry.ID?
     /// The menus read this rather than the whole library, so a library write doesn't rebuild them.
     private(set) var selectedEntryHasFavorites = false
     /// The open entry's favorites, notes and speaker map, copied out of the library so a card reads them without tying itself to every library write.
@@ -3711,9 +3714,10 @@ final class AppModel {
         sourceFileURL: URL?,
         entry: LibraryEntry?,
         showsAITitle: Bool,
-        fallback: String
+        fallback: String,
+        entryIsTheTranscript: Bool = false
     ) -> String {
-        if let entry, sourceBelongsToEntry(sourceFileURL, bundleURL: entry.bundleURL) {
+        if let entry, entryIsTheTranscript || sourceBelongsToEntry(sourceFileURL, bundleURL: entry.bundleURL) {
             return LibraryEntryDisplay.listTitle(for: entry, showsAITitle: showsAITitle)
         }
         if let sourceFileURL {

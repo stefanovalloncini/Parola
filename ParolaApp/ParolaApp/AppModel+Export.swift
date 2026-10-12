@@ -208,11 +208,13 @@ extension AppModel {
 
     /// A take still playing from its working file goes by its own title, never the file's name.
     var transcriptHeaderTitle: String {
-        recordedTakeTitle(playing: sourceFileURL) ?? Self.transcriptDisplayTitle(
+        let entry = selectedEntryID.flatMap { libraryEntry(id: $0) }
+        return recordedTakeTitle(playing: sourceFileURL) ?? Self.transcriptDisplayTitle(
             sourceFileURL: sourceFileURL,
-            entry: selectedEntryID.flatMap { libraryEntry(id: $0) },
+            entry: entry,
             showsAITitle: showAITitles,
-            fallback: String(localized: "Untitled")
+            fallback: String(localized: "Untitled"),
+            entryIsTheTranscript: entry != nil && entry?.id == savedTranscriptEntryID
         )
     }
 
@@ -223,11 +225,13 @@ extension AppModel {
     }
 
     var currentTranscriptTitle: String {
-        recordedTakeTitle(playing: sourceFileURL) ?? Self.transcriptDisplayTitle(
+        let entry = selectedEntryID.flatMap { libraryEntry(id: $0) }
+        return recordedTakeTitle(playing: sourceFileURL) ?? Self.transcriptDisplayTitle(
             sourceFileURL: sourceFileURL,
-            entry: selectedEntryID.flatMap { libraryEntry(id: $0) },
+            entry: entry,
             showsAITitle: showAITitles,
-            fallback: String(localized: "Transcript")
+            fallback: String(localized: "Transcript"),
+            entryIsTheTranscript: entry != nil && entry?.id == savedTranscriptEntryID
         )
     }
 
