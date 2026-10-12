@@ -4,7 +4,7 @@ import Foundation
 
 @Suite("LibrarySearchIndex against a brute-force model")
 struct LibrarySearchDifferentialTests {
-    private struct SplitMix: RandomNumberGenerator {
+    struct SplitMix: RandomNumberGenerator {
         var state: UInt64
         mutating func next() -> UInt64 {
             state &+= 0x9E3779B97F4A7C15
@@ -15,7 +15,7 @@ struct LibrarySearchDifferentialTests {
         }
     }
 
-    private struct Row {
+    struct Row {
         var title: String
         var text: String
         var aux: String
@@ -45,7 +45,7 @@ struct LibrarySearchDifferentialTests {
         return out
     }
 
-    private static func tokens(title: String, text: String, aux: String) -> [String: (count: Int, offset: Int)] {
+    static func tokens(title: String, text: String, aux: String) -> [String: (count: Int, offset: Int)] {
         var table: [String: (count: Int, offset: Int)] = [:]
         for (word, _) in words(title) { table[word, default: (0, -1)].count += 1 }
         for (word, offset) in words(text) {
@@ -58,11 +58,14 @@ struct LibrarySearchDifferentialTests {
         return table
     }
 
-    private static func sentence(_ rng: inout SplitMix, length: Int) -> String {
-        (0..<length).map { _ in vocabulary[Int(rng.next() % UInt64(vocabulary.count))] }.joined(separator: " ")
+    /// Every sentence carries a word no other one has, so vocabulary ids are freed and reused as entries come and go.
+    static func sentence(_ rng: inout SplitMix, length: Int, unique: String? = nil) -> String {
+        var pieces = (0..<length).map { _ in vocabulary[Int(rng.next() % UInt64(vocabulary.count))] }
+        if let unique { pieces.insert(unique, at: Int(rng.next() % UInt64(pieces.count + 1))) }
+        return pieces.joined(separator: " ")
     }
 
-    private static func boundaries(for text: String, _ rng: inout SplitMix) -> [LibrarySearchIndex.SegmentBoundary] {
+    static func boundaries(for text: String, _ rng: inout SplitMix) -> [LibrarySearchIndex.SegmentBoundary] {
         var offsets = [0]
         var offset = 0
         for piece in text.split(separator: " ", omittingEmptySubsequences: false) {
@@ -70,6 +73,16 @@ struct LibrarySearchDifferentialTests {
             if offset < text.count, rng.next() % 5 == 0 { offsets.append(offset) }
         }
         return offsets.enumerated().map { .init(textOffset: $1, seconds: Double($0) * 2.25) }
+    }
+
+    static func newRow(_ rng: inout SplitMix, tag: String) -> Row {
+        let title = sentence(&rng, length: Int(rng.next() % 3), unique: "ut\(tag)")
+        let text = sentence(&rng, length: Int(rng.next() % 40), unique: "ux\(tag)")
+        let aux = sentence(&rng, length: Int(rng.next() % 5), unique: "ua\(tag)")
+        return Row(
+            title: title, text: text, aux: aux, boundaries: boundaries(for: text, &rng),
+            tokens: tokens(title: title, text: text, aux: aux)
+        )
     }
 
     private static func expected(for query: String, in rows: [String: Row]) -> [String: Expected] {
@@ -104,39 +117,72 @@ struct LibrarySearchDifferentialTests {
         })
     }
 
-    private func check(_ index: LibrarySearchIndex, _ rows: [String: Row], _ rng: inout SplitMix, _ label: String) async {
-        var queries = (0..<6).map { _ in Self.sentence(&rng, length: Int(1 + rng.next() % 2)) }
-        queries += (0..<6).map { _ in
-            let word = Self.vocabulary[Int(rng.next() % UInt64(Self.vocabulary.count))]
-            return String(word.prefix(Int(2 + rng.next() % 3)))
-        }
-        queries.append("nomatchhere")
-        for query in queries {
-            let matches = await index.search(query, snippets: false)
-            #expect(Self.actual(matches) == Self.expected(for: query, in: rows), "\(label): \(query)")
-            #expect(matches.map(\.score) == matches.map(\.score).sorted(by: >), "\(label): order \(query)")
+    private static func describe(_ matches: [LibrarySearchIndex.Match]) -> [String] {
+        matches.sorted { ($1.score, $0.entryID) < ($0.score, $1.entryID) }.map { match in
+            let hit = match.firstHit.map { "\($0.seconds)/\($0.segmentIndex)/\($0.textOffset)" } ?? "-"
+            let marks = match.highlights.map { "\($0.start)+\($0.length)" }.joined(separator: ",")
+            return "\(match.entryID)|\(match.score)|\(match.matchCount)|\(hit)|\(marks)|\(match.snippet)"
         }
     }
 
-    @Test("random add, remove, reindex and auxiliary swaps answer like the model, live and after a reload", arguments: [1, 2, 3, 4, 5, 6])
+    static func rebuildEntries(_ rows: [String: Row]) -> [LibrarySearchIndex.RebuildEntry] {
+        rows.sorted { $0.key < $1.key }.map {
+            .init(id: $0.key, title: $0.value.title, text: $0.value.text, auxiliaryText: $0.value.aux, boundaries: $0.value.boundaries)
+        }
+    }
+
+    /// `index` must answer exactly as the model does and exactly as an index rebuilt from the model's rows, snippets included.
+    static func check(_ index: LibrarySearchIndex, _ rows: [String: Row], _ rng: inout SplitMix, _ label: String) async {
+        var queries = (0..<6).map { _ in sentence(&rng, length: Int(1 + rng.next() % 2)) }
+        queries += (0..<6).map { _ in
+            let word = vocabulary[Int(rng.next() % UInt64(vocabulary.count))]
+            return String(word.prefix(Int(2 + rng.next() % 3)))
+        }
+        queries += ["u", "ux\(rng.next() % 70)", "ut\(rng.next() % 70)", "ua\(rng.next() % 70)", "nomatchhere"]
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("parola-diff-fresh-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let fresh = LibrarySearchIndex(indexDirectory: url, saveDebounce: .seconds(60))
+        await fresh.rebuild(entries: rebuildEntries(rows))
+        for query in queries {
+            let matches = await index.search(query, snippets: false)
+            #expect(actual(matches) == expected(for: query, in: rows), "\(label): \(query)")
+            #expect(matches.map(\.score) == matches.map(\.score).sorted(by: >), "\(label): order \(query)")
+            #expect(describe(await index.search(query)) == describe(await fresh.search(query)), "\(label): snippets \(query)")
+        }
+    }
+
+    private func makeIndex(at url: URL, gate: TokenizeGate) -> LibrarySearchIndex {
+        LibrarySearchIndex(
+            indexDirectory: url,
+            saveDebounce: .seconds(60),
+            clock: ContinuousClock(),
+            writeSnapshotData: { data, target in try data.write(to: target, options: .atomic) },
+            beforeTokenizing: { gate.hook() }
+        )
+    }
+
+    @Test("random add, remove, reindex, swaps, reconciles, reloads and reader refreshes answer like the model and a rebuilt index", arguments: [1, 2, 3, 4, 5, 6])
     func randomSequences(seed: Int) async throws {
         var rng = SplitMix(state: UInt64(seed) &* 7919)
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("parola-diff-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: url) }
-        var index = LibrarySearchIndex(indexDirectory: url)
+        let gate = TokenizeGate()
+        var index = makeIndex(at: url, gate: gate)
+        var reader = LibrarySearchIndex(readingSnapshotIn: url)
+        _ = await reader.search("warm", snippets: false)
         var rows: [String: Row] = [:]
         let ids = (0..<14).map { "entry-\($0)" }
 
         for step in 0..<70 {
             let id = ids[Int(rng.next() % UInt64(ids.count))]
-            switch rng.next() % 6 {
+            switch rng.next() % 8 {
             case 0:
                 await index.remove(id)
                 rows[id] = nil
             case 1:
                 guard var row = rows[id] else { continue }
                 let old = row.aux
-                let new = Self.sentence(&rng, length: Int(rng.next() % 4))
+                let new = Self.sentence(&rng, length: Int(rng.next() % 4), unique: "ua\(step)")
                 let replaced = await index.replaceAuxiliaryText(old, with: new, for: id)
                 #expect(replaced)
                 for (word, _) in Self.words(old) { row.tokens[word]?.count -= 1 }
@@ -144,23 +190,73 @@ struct LibrarySearchDifferentialTests {
                 row.tokens = row.tokens.filter { $0.value.count > 0 || $0.value.offset != -1 }
                 row.aux = new
                 rows[id] = row
-            case 2 where step % 2 == 0:
+            case 2:
                 await index.flush()
-                index = LibrarySearchIndex(indexDirectory: url)
-                await check(index, rows, &rng, "seed \(seed) step \(step) reloaded")
+                index = makeIndex(at: url, gate: gate)
+                await Self.check(index, rows, &rng, "seed \(seed) step \(step) reloaded")
+            case 3:
+                let other = ids[Int(rng.next() % UInt64(ids.count))]
+                let changed = [id, other].reduce(into: [String: Row]()) { $0[$1] = Self.newRow(&rng, tag: "\(step)\($1.last!)") }
+                let gone = Set(ids.filter { rows[$0] != nil && changed[$0] == nil && rng.next() % 4 == 0 })
+                await index.reconcile(entries: Self.rebuildEntries(changed), removing: gone)
+                for (key, row) in changed { rows[key] = row }
+                for key in gone { rows[key] = nil }
+            case 4:
+                await index.flush()
+                if await !reader.refreshFromSnapshot() { reader = LibrarySearchIndex(readingSnapshotIn: url) }
+                await Self.check(reader, rows, &rng, "seed \(seed) step \(step) reader")
             default:
-                let title = Self.sentence(&rng, length: Int(rng.next() % 3))
-                let text = Self.sentence(&rng, length: Int(rng.next() % 40))
-                let aux = Self.sentence(&rng, length: Int(rng.next() % 5))
-                let boundaries = Self.boundaries(for: text, &rng)
-                await index.index(id: id, title: title, text: text, auxiliaryText: aux, boundaries: boundaries, createdAt: Date())
-                rows[id] = Row(title: title, text: text, aux: aux, boundaries: boundaries, tokens: Self.tokens(title: title, text: text, aux: aux))
+                let row = Self.newRow(&rng, tag: "\(step)")
+                await index.index(
+                    id: id, title: row.title, text: row.text, auxiliaryText: row.aux,
+                    boundaries: row.boundaries, createdAt: Date()
+                )
+                rows[id] = row
             }
-            if step % 7 == 0 { await check(index, rows, &rng, "seed \(seed) step \(step)") }
+            if step % 7 == 0 { await Self.check(index, rows, &rng, "seed \(seed) step \(step)") }
         }
-        await check(index, rows, &rng, "seed \(seed) end")
+        await Self.check(index, rows, &rng, "seed \(seed) end")
+    }
+
+    @Test("an index in flight while other entries leave and arrive in its slots and word ids lands correctly", arguments: [1, 2, 3])
+    func inFlightIndexAmidChurn(seed: Int) async throws {
+        var rng = SplitMix(state: UInt64(seed) &* 104729)
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("parola-diff-gate-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let gate = TokenizeGate()
+        let index = makeIndex(at: url, gate: gate)
+        var rows: [String: Row] = [:]
+        for name in ["w", "x0", "y", "v", "t"] {
+            let row = Self.newRow(&rng, tag: name)
+            await index.index(id: name, title: row.title, text: row.text, auxiliaryText: row.aux, boundaries: row.boundaries, createdAt: Date())
+            rows[name] = row
+        }
+
+        let inFlight = Self.newRow(&rng, tag: "x1")
+        gate.arm()
+        let pending = Task {
+            await index.index(
+                id: "x1", title: inFlight.title, text: inFlight.text, auxiliaryText: inFlight.aux,
+                boundaries: inFlight.boundaries, createdAt: Date()
+            )
+        }
+        while gate.entered == 0 { await Task.yield() }
+
+        await index.remove("y")
+        rows["y"] = nil
+        let arrival = Self.newRow(&rng, tag: "z")
+        await index.index(id: "z", title: arrival.title, text: arrival.text, auxiliaryText: arrival.aux, boundaries: arrival.boundaries, createdAt: Date())
+        rows["z"] = arrival
+        await index.remove("v")
+        rows["v"] = nil
+
+        gate.open()
+        await pending.value
+        rows["x1"] = inFlight
+        await Self.check(index, rows, &rng, "seed \(seed) gated")
     }
 }
+
 
 @Suite("LibrarySearchIndex postings and entry slots")
 struct LibrarySearchPostingsTests {
