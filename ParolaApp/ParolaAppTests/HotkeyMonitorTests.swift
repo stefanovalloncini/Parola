@@ -45,7 +45,9 @@ final class FakeFallback: HotkeyFallbackSource {
 private final class HeldKey: @unchecked Sendable {
     private let lock = NSLock()
     private var down = true
-    var isDown: Bool { lock.withLock { down } }
+    private var reads = 0
+    var readCount: Int { lock.withLock { reads } }
+    var isDown: Bool { lock.withLock { reads += 1; return down } }
     func lift() { lock.withLock { down = false } }
 }
 
@@ -261,15 +263,64 @@ struct HotkeyMonitorTests {
         let registry = CarbonHotkeyRegistry(backend: backend)
         let held = HeldKey()
         let monitor = GlobalHotkeyMonitor(
-            keyCode: 2, modifiers: [.control, .option], registry: registry, keyIsDown: { _ in held.isDown }
+            keyCode: 2, modifiers: [.control, .option], registry: registry, fallbackSource: FakeFallback(),
+            keyIsDown: { _ in held.isDown }
         )
         let log = EventLog()
         await monitor.start { log.append($0) }
         registry.deliver(id: backend.registered.keys.first!, event: .press)
+        await waitUntil { held.readCount > 0 }
         held.lift()
         await waitUntil { log.all == [.press, .release] }
         registry.deliver(id: backend.registered.keys.first!, event: .release)
         #expect(log.all == [.press, .release])
+    }
+
+    @Test("a key-state that never reads down never releases early")
+    func pollIgnoresBlindKeyState() async {
+        let backend = FakeBackend()
+        let registry = CarbonHotkeyRegistry(backend: backend)
+        let monitor = GlobalHotkeyMonitor(
+            keyCode: 2, modifiers: [.control], registry: registry, fallbackSource: FakeFallback(),
+            keyIsDown: { _ in false }
+        )
+        let log = EventLog()
+        await monitor.start { log.append($0) }
+        registry.deliver(id: backend.registered.keys.first!, event: .press)
+        await settle(for: .milliseconds(300))
+        #expect(log.all == [.press])
+        registry.deliver(id: backend.registered.keys.first!, event: .release)
+        #expect(log.all == [.press, .release])
+    }
+
+    @Test("a fallback combination ignores presses while suspended, releases on suspend and needs the exact modifiers")
+    func fallbackSuspendAndExactMatch() async {
+        let backend = FakeBackend()
+        let registry = CarbonHotkeyRegistry(backend: backend)
+        let fallback = FakeFallback()
+        let monitor = makeMonitor(backend, registry: registry, code: kVK_Space, mods: [.option], fallback: fallback)
+        let log = EventLog()
+        await monitor.start { log.append($0) }
+        fallback.send(down: true, flags: [.option, .command])
+        #expect(log.all.isEmpty)
+        fallback.send(down: true, flags: [.option])
+        registry.suspend()
+        #expect(log.all == [.press, .release])
+        fallback.send(down: true, flags: [.option])
+        #expect(log.all == [.press, .release])
+        registry.resume()
+        fallback.send(down: true, flags: [.option])
+        #expect(log.all == [.press, .release, .press])
+    }
+
+    @Test("a saved reserved ⌘ combination is refused and flagged")
+    func reservedSavedComboRefused() async {
+        let backend = FakeBackend()
+        let registry = CarbonHotkeyRegistry(backend: backend)
+        let monitor = makeMonitor(backend, registry: registry, code: kVK_ANSI_V, mods: [.command])
+        await monitor.start { _ in }
+        #expect(backend.registerCalls == 0)
+        #expect(registry.health.refusal(keyCode: kVK_ANSI_V, modifiers: [.command]) == .byParola)
     }
 
     @Test("rules: bare keys, option-only and reserved command keys are rejected; F keys and ⌃/⌘ combos pass")
@@ -282,7 +333,12 @@ struct HotkeyMonitorTests {
             #expect(HotkeyRules.rejection(keyCode: code, modifiers: [.command]) == .reserved)
         }
         #expect(HotkeyRules.rejection(keyCode: kVK_F5, modifiers: []) == nil)
-        #expect(HotkeyRules.rejection(keyCode: kVK_F20, modifiers: [.option]) == nil)
+        #expect(HotkeyRules.rejection(keyCode: kVK_F20, modifiers: [.option]) == .optionOnly)
+        #expect(HotkeyRules.rejection(keyCode: kVK_F5, modifiers: [.option, .shift]) == .optionOnly)
+        #expect(HotkeyRules.rejection(keyCode: kVK_F5, modifiers: [.option, .command]) == nil)
+        for code in [kVK_ANSI_S, kVK_ANSI_F, kVK_ANSI_T, kVK_ANSI_N, kVK_ANSI_O, kVK_ANSI_P, kVK_ANSI_H, kVK_ANSI_M, kVK_ANSI_Comma] {
+            #expect(HotkeyRules.rejection(keyCode: code, modifiers: [.command]) == .reserved)
+        }
         #expect(HotkeyRules.rejection(keyCode: kVK_ANSI_D, modifiers: [.control, .option]) == nil)
         #expect(HotkeyRules.rejection(keyCode: kVK_ANSI_R, modifiers: [.command, .option, .control]) == nil)
         #expect(HotkeyRules.rejection(keyCode: kVK_ANSI_W, modifiers: [.command, .option]) == nil)

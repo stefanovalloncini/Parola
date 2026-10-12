@@ -27,17 +27,27 @@ enum HotkeyRules {
 
     private static let reservedWithCommand: Set<Int> = [
         kVK_ANSI_W, kVK_ANSI_Q, kVK_ANSI_C, kVK_ANSI_V, kVK_ANSI_X, kVK_ANSI_Z, kVK_ANSI_A, kVK_Space, kVK_Tab,
+        kVK_ANSI_S, kVK_ANSI_F, kVK_ANSI_T, kVK_ANSI_N, kVK_ANSI_O, kVK_ANSI_P, kVK_ANSI_H, kVK_ANSI_M, kVK_ANSI_Comma,
     ]
+
+    /// ⌘ alone or ⌘⇧ with a key every app already uses.
+    static func isReserved(keyCode: Int, command: Bool, control: Bool, option: Bool) -> Bool {
+        command && !control && !option && reservedWithCommand.contains(keyCode)
+    }
+
+    static func isOptionOnly(command: Bool, control: Bool, option: Bool) -> Bool {
+        option && !command && !control
+    }
 
     static func isFunctionKey(_ keyCode: Int) -> Bool { functionKeyCodes.contains(keyCode) }
 
     static func rejection(keyCode: Int, modifiers: NSEvent.ModifierFlags) -> HotkeyRejection? {
-        if isFunctionKey(keyCode) { return nil }
         let flags = modifiers.intersection([.command, .control, .option, .shift])
-        if !flags.contains(.command), !flags.contains(.control) {
-            return flags.contains(.option) ? .optionOnly : .needsCommandOrControl
-        }
-        if flags.subtracting(.shift) == .command, reservedWithCommand.contains(keyCode) { return .reserved }
+        let command = flags.contains(.command), control = flags.contains(.control), option = flags.contains(.option)
+        if isOptionOnly(command: command, control: control, option: option) { return .optionOnly }
+        if isFunctionKey(keyCode) { return nil }
+        if !command, !control { return .needsCommandOrControl }
+        if isReserved(keyCode: keyCode, command: command, control: control, option: option) { return .reserved }
         return nil
     }
 }
@@ -63,23 +73,53 @@ struct CarbonHotkeyKey: Hashable {
         return modifiers & UInt32(optionKey) != 0 && modifiers & ~optionOrShift == 0
     }
 
-    /// Carbon would consume a bare letter or Escape system-wide, so only F-keys may go without a modifier.
-    var isPermitted: Bool {
-        HotkeyRules.isFunctionKey(Int(keyCode)) || modifiers & UInt32(cmdKey | controlKey | optionKey) != 0
+    var isReserved: Bool {
+        HotkeyRules.isReserved(
+            keyCode: Int(keyCode),
+            command: modifiers & UInt32(cmdKey) != 0,
+            control: modifiers & UInt32(controlKey) != 0,
+            option: modifiers & UInt32(optionKey) != 0
+        )
     }
+
+    /// Carbon would consume a bare letter or Escape system-wide, and a reserved ⌘ key would break every app.
+    var isPermitted: Bool {
+        guard !isReserved else { return false }
+        return HotkeyRules.isFunctionKey(Int(keyCode)) || modifiers & UInt32(cmdKey | controlKey | optionKey) != 0
+    }
+}
+
+enum HotkeyRefusal {
+    case byParola
+    case bySystem
+    case monitorOnly
+
+    var message: String {
+        switch self {
+        case .byParola: String(localized: "Hotkey.Refused.Parola")
+        case .bySystem: String(localized: "Hotkey.Refused.System")
+        case .monitorOnly: String(localized: "Hotkey.Refused.OptionOnly")
+        }
+    }
+
+    var needsAccessibility: Bool { self != .byParola }
 }
 
 @MainActor
 @Observable
 final class HotkeyHealth {
-    private(set) var refused: Set<CarbonHotkeyKey> = []
+    private(set) var refused: [CarbonHotkeyKey: HotkeyRefusal] = [:]
 
-    func isRefused(keyCode: Int, modifiers: NSEvent.ModifierFlags) -> Bool {
-        refused.contains(CarbonHotkeyKey(keyCode: keyCode, modifiers: modifiers))
+    func refusal(keyCode: Int, modifiers: NSEvent.ModifierFlags) -> HotkeyRefusal? {
+        refused[CarbonHotkeyKey(keyCode: keyCode, modifiers: modifiers)]
     }
 
-    fileprivate func set(_ key: CarbonHotkeyKey, refused isRefused: Bool) {
-        if isRefused { refused.insert(key) } else { refused.remove(key) }
+    func isRefused(keyCode: Int, modifiers: NSEvent.ModifierFlags) -> Bool {
+        refusal(keyCode: keyCode, modifiers: modifiers) != nil
+    }
+
+    fileprivate func set(_ key: CarbonHotkeyKey, _ refusal: HotkeyRefusal?) {
+        refused[key] = refusal
     }
 }
 
@@ -110,6 +150,7 @@ final class CarbonHotkeyRegistry {
     private struct Entry {
         let id: UInt32
         var status: OSStatus?
+        var monitorOnly = false
         var handlers: [UUID: @Sendable (HotkeyEvent) -> Void]
         var isRegistered: Bool { status == noErr }
     }
@@ -125,35 +166,35 @@ final class CarbonHotkeyRegistry {
         self.backend = backend
     }
 
-    private var isSuspended: Bool { suspensions > 0 }
+    var isSuspended: Bool { suspensions > 0 }
 
     func add(_ key: CarbonHotkeyKey, handler: @escaping @Sendable (HotkeyEvent) -> Void) -> Addition {
         guard key.isPermitted else {
-            ParolaLog.notice(.dictation, "hotkey refused: key \(Int(key.keyCode)) with modifiers \(Int(key.modifiers)) needs a modifier")
-            health.set(key, refused: true)
+            ParolaLog.notice(.dictation, "hotkey refused: key \(Int(key.keyCode)) with modifiers \(Int(key.modifiers)) is bare or reserved")
+            health.set(key, .byParola)
             return Addition(token: nil, outcome: .refusedByPolicy)
         }
         let token = UUID()
-        if key.isOptionOnly {
-            health.set(key, refused: true)
-            return Addition(token: token, outcome: .monitorOnly)
-        }
         var entry = entries[key] ?? makeEntry(for: key)
         entry.handlers[token] = handler
-        if !isSuspended, !entry.isRegistered { attemptRegistration(of: key, entry: &entry) }
+        if key.isOptionOnly {
+            entry.monitorOnly = true
+            health.set(key, .monitorOnly)
+        } else if !isSuspended, !entry.isRegistered {
+            attemptRegistration(of: key, entry: &entry)
+        }
         entries[key] = entry
         return Addition(token: token, outcome: outcome(of: entry))
     }
 
     func remove(_ key: CarbonHotkeyKey, token: UUID) {
-        if key.isOptionOnly { health.set(key, refused: false) }
         guard var entry = entries[key] else { return }
         entry.handlers[token] = nil
         if entry.handlers.isEmpty {
             if entry.isRegistered { backend.unregister(id: entry.id) }
             entries[key] = nil
             keyByID[entry.id] = nil
-            health.set(key, refused: false)
+            health.set(key, nil)
         } else {
             entries[key] = entry
         }
@@ -177,7 +218,7 @@ final class CarbonHotkeyRegistry {
         guard suspensions > 0 else { return }
         suspensions -= 1
         guard suspensions == 0 else { return }
-        for (key, var entry) in entries {
+        for (key, var entry) in entries where !entry.monitorOnly {
             attemptRegistration(of: key, entry: &entry)
             entries[key] = entry
         }
@@ -198,13 +239,14 @@ final class CarbonHotkeyRegistry {
     private func attemptRegistration(of key: CarbonHotkeyKey, entry: inout Entry) {
         let status = backend.register(key, id: entry.id)
         entry.status = status
-        health.set(key, refused: status != noErr)
+        health.set(key, status == noErr ? nil : .bySystem)
         if status != noErr {
             ParolaLog.notice(.dictation, "hotkey registration refused by the system: OSStatus \(Int(status)), key \(Int(key.keyCode)), modifiers \(Int(key.modifiers))")
         }
     }
 
     private func outcome(of entry: Entry) -> Outcome {
+        if entry.monitorOnly { return .monitorOnly }
         if isSuspended { return .suspended }
         guard let status = entry.status else { return .suspended }
         return status == noErr ? .registered : .refusedByOS(status)
@@ -395,10 +437,16 @@ final class GlobalHotkeyMonitor: HotkeyMonitor {
         let keyIsDown = keyIsDown
         heldWatch = Task { [weak self] in
             var missed = 0
+            var seenDown = false
             while !Task.isCancelled {
                 try? await Task.sleep(for: .milliseconds(50))
                 if Task.isCancelled { return }
-                missed = keyIsDown(code) ? 0 : missed + 1
+                if keyIsDown(code) {
+                    seenDown = true
+                    missed = 0
+                } else if seenDown {
+                    missed += 1
+                }
                 if missed >= 2 {
                     self?.process(.release)
                     return
@@ -412,7 +460,8 @@ final class GlobalHotkeyMonitor: HotkeyMonitor {
         fallbackTokens = fallbackSource.install(keyCode: UInt16(keyCode)) { [weak self] event in
             guard let self else { return }
             if event.isDown {
-                guard !event.isRepeat, event.flags.contains(required) else { return }
+                guard !registry.isSuspended, !event.isRepeat,
+                      event.flags.intersection([.command, .control, .option, .shift]) == required else { return }
                 process(.press)
             } else {
                 process(.release)

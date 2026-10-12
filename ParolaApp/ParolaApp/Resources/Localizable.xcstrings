@@ -7142,20 +7142,56 @@
         }
       }
     },
-    "Hotkey.Refused.System": {
-      "comment": "Shown next to a saved shortcut the system refused to register.",
+    "Hotkey.Refused.OptionOnly": {
+      "comment": "Shown next to a saved shortcut that uses only the Option key.",
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "macOS won't reserve this combination, so it may not work. Pick one with ⌘ or ⌃, or an F key."
+            "value": "A shortcut with only ⌥ works outside Parola only with Accessibility, and may type its character. Record it again with ⌘ or ⌃."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "macOS non riserva questa combinazione, quindi potrebbe non funzionare. Scegline una con ⌘ o ⌃, oppure un tasto F."
+            "value": "Una scorciatoia con solo ⌥ funziona fuori da Parola solo con l'Accessibilità e può scrivere il suo carattere. Registrala di nuovo con ⌘ o ⌃."
+          }
+        }
+      }
+    },
+    "Hotkey.Refused.Parola": {
+      "comment": "Shown next to a saved shortcut that Parola itself refuses to register.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parola can't use this combination. Press ⌘ or ⌃ with a key, or an F key."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parola non può usare questa combinazione. Premi ⌘ o ⌃ con un tasto, oppure un tasto F."
+          }
+        }
+      }
+    },
+    "Hotkey.Refused.System": {
+      "comment": "Shown next to a saved shortcut that macOS refused to register.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "macOS won't reserve this combination. Outside Parola it works only with Accessibility; without it, only while Parola is in front."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "macOS non riserva questa combinazione. Fuori da Parola funziona solo con l'Accessibilità; senza, solo quando Parola è in primo piano."
           }
         }
       }
@@ -7185,13 +7221,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "macOS doesn't allow shortcuts that use only ⌥ or ⌥⇧. Add ⌘ or ⌃, or use an F key."
+            "value": "macOS doesn't allow shortcuts that use only ⌥ or ⌥⇧. Add ⌘ or ⌃, or use an F key on its own."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "macOS non consente scorciatoie con solo ⌥ o ⌥⇧. Aggiungi ⌘ o ⌃, oppure usa un tasto F."
+            "value": "macOS non consente scorciatoie con solo ⌥ o ⌥⇧. Aggiungi ⌘ o ⌃, oppure usa un tasto F da solo."
           }
         }
       }
@@ -14412,6 +14448,24 @@
           "stringUnit": {
             "state": "translated",
             "value": "Scorciatoie"
+          }
+        }
+      }
+    },
+    "Shortcuts.Accessibility.NeededForShortcut": {
+      "comment": "Accessibility row detail in Settings > Shortcuts when a saved shortcut relies on key monitors.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lets Parola type dictated text into other apps. One of your shortcuts needs it to work outside Parola."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Permette a Parola di scrivere il testo dettato in altre app. Una delle tue scorciatoie ne ha bisogno per funzionare fuori da Parola."
           }
         }
       }

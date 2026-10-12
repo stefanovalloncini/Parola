@@ -15,17 +15,13 @@ struct HotkeyRecorder: View {
             .intersection(.deviceIndependentFlagsMask)
     }
 
-    private var isRefusedBySystem: Bool {
-        CarbonHotkeyRegistry.shared.health.isRefused(keyCode: keyCode, modifiers: modifiers)
-    }
-
     var body: some View {
         VStack(alignment: .trailing, spacing: 4) {
             recorderButton
             if let rejection {
                 hint(rejection.message)
-            } else if isRefusedBySystem, !recording {
-                hint(String(localized: "Hotkey.Refused.System"))
+            } else if !recording, let refusal = CarbonHotkeyRegistry.shared.health.refusal(keyCode: keyCode, modifiers: modifiers) {
+                hint(refusal.message)
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)) { _ in stop() }
@@ -106,6 +102,7 @@ struct HotkeyRecorder: View {
             self.monitor = nil
         }
         guard recording else { return }
+        rejection = nil
         recording = false
         CarbonHotkeyRegistry.shared.resume()
         onRecordingChanged?(false)

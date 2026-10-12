@@ -4,6 +4,21 @@ import ParolaCore
 struct ShortcutsPane: View {
     @Environment(AppModel.self) private var model
 
+    private var shortcutNeedsAccessibility: Bool {
+        let health = CarbonHotkeyRegistry.shared.health
+        let dictation = health.refusal(keyCode: model.dictationKeyCode, modifiers: model.dictationModifierFlags)
+        let mic = model.micHotkeyEnabled
+            ? health.refusal(keyCode: model.micHotkeyKeyCode, modifiers: model.micHotkeyModifierFlags)
+            : nil
+        return dictation?.needsAccessibility == true || mic?.needsAccessibility == true
+    }
+
+    private var accessibilityDetail: String {
+        shortcutNeedsAccessibility
+            ? String(localized: "Shortcuts.Accessibility.NeededForShortcut")
+            : String(localized: "Lets Parola type dictated text into other apps. The shortcuts work without it.")
+    }
+
     var body: some View {
         @Bindable var model = model
         return SettingsForm {
@@ -31,7 +46,7 @@ struct ShortcutsPane: View {
             SettingsSection {
                 PermissionRow(
                     title: String(localized: "Accessibility"),
-                    detail: String(localized: "Lets Parola type dictated text into other apps. The shortcuts work without it."),
+                    detail: accessibilityDetail,
                     granted: model.dictationPermissions.accessibilityGranted,
                     axID: "Shortcuts.Button.GrantAccessibility",
                     action: { model.dictationPermissions.openAccessibilitySettings() },
