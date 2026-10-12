@@ -696,14 +696,15 @@ extension AppModel {
 
     /// Keeps going past a failure: the notice counts what landed and names what didn't.
     func exportEntries(_ entries: [LibraryEntry], format: ExportFormat, to folder: URL) async -> ExportNotice {
-        let exporter = makeExporter(for: format)
         var usedNames = Set<String>()
         var failures: [ExportNotice.Failure] = []
         for entry in entries {
             do {
                 let loaded = try await library.load(entry.id)
                 let transcript = loaded.document.transcript
-                let safe = TranscriptShareFile.safeName(for: LibraryEntryDisplay.listTitle(for: entry, showsAITitle: showAITitles))
+                let title = LibraryEntryDisplay.listTitle(for: entry, showsAITitle: showAITitles)
+                let exporter = makeExporter(for: format, documentTitle: title)
+                let safe = TranscriptShareFile.safeName(for: title)
                 var name = safe
                 var suffix = 2
                 while usedNames.contains(name) {

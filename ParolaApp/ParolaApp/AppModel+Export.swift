@@ -57,7 +57,9 @@ extension AppModel {
     func copyExportToPasteboard(pasteboard: NSPasteboard) -> Task<Bool, Never>? {
         guard let transcript else { return nil }
         // docx and pdf have no text to paste; the clipboard gets what the preview shows.
-        let spec = exportSheetSpec.textRendering
+        var titled = exportSheetSpec.textRendering
+        titled.options.documentTitle = currentTranscriptTitle
+        let spec = titled
         return Task { [weak self] in
             do {
                 let text = try await AppModel.offMainIO { try Exporters.exporter(for: spec).renderText(transcript) }
@@ -75,8 +77,11 @@ extension AppModel {
     /// Writes the transcript to `url` as the spec describes it. The bridge and the save panel share this.
     func exportTranscript(spec: ExportSpec, to url: URL) async throws {
         guard let transcript else { throw ParolaError.ioError("No transcript to export.") }
+        var spec = spec
+        spec.options.documentTitle = currentTranscriptTitle
+        let titled = spec
         try await AppModel.offMainIO {
-            let data = try Exporters.exporter(for: spec).render(transcript)
+            let data = try Exporters.exporter(for: titled).render(transcript)
             try data.write(to: url, options: .atomic)
             OutputMarker.mark(url)
         }
@@ -291,7 +296,7 @@ extension AppModel {
 
     func copyTranscriptAsFormat(_ format: ExportFormat) {
         guard let transcript else { return }
-        let exporter = makeExporter(for: format)
+        let exporter = makeExporter(for: format, documentTitle: currentTranscriptTitle)
         Task {
             guard let data = try? await AppModel.offMainIO({ try exporter.render(transcript) }),
                   let text = String(data: data, encoding: .utf8) else {
@@ -401,7 +406,9 @@ extension AppModel {
         return spec
     }
 
-    func makeExporter(for format: ExportFormat, includeTimestamps: Bool? = nil) -> TranscriptExporter {
-        Exporters.exporter(for: exportSpec(for: format, includeTimestamps: includeTimestamps))
+    func makeExporter(for format: ExportFormat, includeTimestamps: Bool? = nil, documentTitle: String? = nil) -> TranscriptExporter {
+        var spec = exportSpec(for: format, includeTimestamps: includeTimestamps)
+        spec.options.documentTitle = documentTitle
+        return Exporters.exporter(for: spec)
     }
 }

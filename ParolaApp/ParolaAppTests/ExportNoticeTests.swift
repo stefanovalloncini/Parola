@@ -151,6 +151,21 @@ struct ExportNoticeTests {
         }
     }
 
+    @Test("a bulk export heads each file with the entry's title, not the file it was made from")
+    func bulkExportHeadingIsTheEntryTitle() async throws {
+        let model = makeModel()
+        var transcript = transcript("Solo")
+        transcript.sourceURL = URL(fileURLWithPath: "/tmp/recording-0042.wav")
+        let entry = try await model.library.add(transcript: transcript, audioSource: nil, title: "Weekly planning")
+        let folder = try scratch()
+        defer { try? FileManager.default.removeItem(at: folder) }
+
+        _ = await model.exportEntries([entry], format: .md, to: folder)
+
+        let written = try String(contentsOf: folder.appendingPathComponent("Weekly planning.md"), encoding: .utf8)
+        #expect(written.hasPrefix("# Weekly planning\n"))
+    }
+
     @Test("a bulk export with nothing failed is a success")
     func cleanBulkExport() async throws {
         let model = makeModel()

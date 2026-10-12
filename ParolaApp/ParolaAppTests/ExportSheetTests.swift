@@ -30,6 +30,24 @@ struct ExportSheetTests {
         )
     }
 
+    @Test("a file export heads the document with the entry's title, not the source file name")
+    func exportHeadingFollowsTheEntryTitle() async throws {
+        let model = makeModel()
+        var transcript = Self.transcript()
+        transcript.sourceURL = URL(fileURLWithPath: "/tmp/recording-0042.wav")
+        let entry = try await model.library.add(transcript: transcript, audioSource: nil, title: "Weekly planning")
+        await model.refreshLibraryAndWait()
+        model.transcript = transcript
+        model.selectedEntryID = entry.id
+        model.sourceFileURL = entry.bundleURL.appendingPathComponent("audio.wav")
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("heading-\(UUID().uuidString).md")
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        try await model.exportTranscript(spec: .standard(for: .md), to: url)
+
+        #expect(try String(contentsOf: url, encoding: .utf8).hasPrefix("# Weekly planning\n"))
+    }
+
     @Test("the sheet only opens with a transcript loaded")
     func openNeedsATranscript() {
         let model = makeModel()
