@@ -193,8 +193,8 @@ struct EntryDurationTests {
         await model.refreshLibraryAndWait()
 
         #expect(await openEntry(entry.id, in: model))
-        let transcriptDurationNearOneSecond = await waitUntil { abs((model.transcript?.durationSeconds ?? 0) - 1) < 0.02 }
-        #expect(transcriptDurationNearOneSecond)
+        let transcriptTakesTheManifestDuration = await waitUntil { abs((model.transcript?.durationSeconds ?? 0) - 1.03) < 0.001 }
+        #expect(transcriptTakesTheManifestDuration)
         await settle()
 
         #expect(try manifest(of: entry).durationSeconds == 1.03)

@@ -100,6 +100,9 @@ public actor LibraryStore {
     private var cachedDeleted: [LibraryEntry]?
     private var cachedLoaded = LoadedEntryCache(capacity: 3)
     private var listCacheEpoch = 0
+    /// Moves with a write to one bundle, so a decode of another entry isn't thrown away; `storeGeneration` moves with a write that names no entry.
+    private var bundleGenerations: [LibraryEntry.ID: Int] = [:]
+    private var storeGeneration = 0
     /// The library folder's modification date as of the last scan or this store's own last add or removal.
     private var folderStamp: Date?
     /// A reader's view of the owner's index snapshot as of its last `reloadIfChangedElsewhere`.
@@ -522,13 +525,16 @@ public actor LibraryStore {
         guard FileManager.default.fileExists(atPath: bundleURL.path) else {
             throw LibraryError.notFound(id)
         }
-        let doc = try await decodedDocument(at: bundleURL)
+        var doc = try await decodedDocument(id: id, at: bundleURL)
         // Bundles written before the manifest carried a duration learn it the first time
         // they're opened, so the library list fills in instead of staying blank forever.
         if role == .owner, doc.manifest.durationSeconds == nil,
            let duration = doc.transcript.durationSeconds, duration > 0 {
             try? ParolaDocument.updateManifest(at: bundleURL) { $0.durationSeconds = duration }
             announceManifestEdit()
+        }
+        if let measured = doc.manifest.durationSeconds, measured > 0 {
+            doc.transcript.durationSeconds = measured
         }
         let entry = try makeEntry(bundleURL: bundleURL)
         let loaded = LoadedEntry(entry: entry, document: doc)
@@ -537,15 +543,15 @@ public actor LibraryStore {
     }
 
     /// Off the actor because a long transcript is megabytes of JSON; a mutation landing mid-decode would hand back pre-mutation content, so retry under the new epoch as `primeCaches` does, with the same on-actor last resort to terminate.
-    private func decodedDocument(at bundleURL: URL) async throws -> ParolaDocument {
+    private func decodedDocument(id: LibraryEntry.ID, at bundleURL: URL) async throws -> ParolaDocument {
         for _ in 0..<8 {
-            let epoch = listCacheEpoch
+            let generation = (storeGeneration, bundleGenerations[id, default: 0])
             let doc = try await offActorThrowingIO { [didDecodeDocument] in
                 let decoded = try Self.readCleanedDocument(at: bundleURL)
                 didDecodeDocument?()
                 return decoded
             }
-            if epoch == listCacheEpoch { return doc }
+            if generation == (storeGeneration, bundleGenerations[id, default: 0]) { return doc }
         }
         return try Self.readCleanedDocument(at: bundleURL)
     }
@@ -1236,6 +1242,7 @@ public actor LibraryStore {
         // A patch is a write like any other: an in-flight primeCaches must re-scan rather than cache
         // the snapshot it took before this manifest landed.
         listCacheEpoch &+= 1
+        bundleGenerations[entry.id, default: 0] &+= 1
     }
 
     private func patched(
@@ -1257,6 +1264,7 @@ public actor LibraryStore {
         cachedDeleted?.removeAll { $0.id == id }
         cachedLoaded.remove(id)
         listCacheEpoch &+= 1
+        bundleGenerations[id, default: 0] &+= 1
     }
 
     /// Soft-deletes by stamping `deletedAt`. The bundle stays on disk so it can be restored,
@@ -1442,6 +1450,7 @@ public actor LibraryStore {
         cachedActive = nil
         cachedDeleted = nil
         listCacheEpoch &+= 1
+        storeGeneration &+= 1
     }
 
     /// Drops every in-memory cache so the next read re-scans disk, and has the next search catch the
@@ -1453,6 +1462,7 @@ public actor LibraryStore {
         folderStamp = nil
         cachedLoaded.removeAll()
         listCacheEpoch &+= 1
+        storeGeneration &+= 1
         searchIndexNeedsCheck = true
     }
 
