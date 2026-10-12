@@ -145,7 +145,10 @@ struct TranscriptDetailView: View {
                 loadError = error.localizedDescription
             }
         }
-        .onDisappear { playback.pause() }
+        .onDisappear {
+            playback.pause()
+            playback.cancelIndexing()
+        }
     }
 
     private func recomputeFiltered(resetsPosition: Bool = false) {

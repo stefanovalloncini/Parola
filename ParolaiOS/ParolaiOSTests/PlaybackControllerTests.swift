@@ -23,13 +23,35 @@ struct PlaybackControllerTests {
         #expect(controller.currentWordID == "0_1")
     }
 
+    @Test("an entry without audio shows no highlight when its index lands")
+    func noAudioNoHighlight() async {
+        let controller = PlaybackController()
+        controller.load(audioURL: nil, transcript: Fixtures.makeTranscript())
+        await controller._indexReadyForTest()
+        #expect(controller.index != nil)
+        #expect(controller.currentSegmentID == nil)
+        #expect(controller.currentWordID == nil)
+    }
+
     @Test("a stale index from the previous entry never lands")
     func staleIndexDropped() async {
         let controller = PlaybackController()
         controller.load(audioURL: nil, transcript: Fixtures.makeLongTranscript(segments: 2000))
+        let first = controller._indexTaskForTest
         controller.load(audioURL: nil, transcript: Fixtures.makeTranscript())
         await controller._indexReadyForTest()
+        await first?.value
         #expect(controller.index?.segments.count == 2)
+    }
+
+    @Test("leaving the entry cancels the pending index")
+    func leavingCancelsIndex() async {
+        let controller = PlaybackController()
+        controller.load(audioURL: nil, transcript: Fixtures.makeLongTranscript(segments: 2000))
+        let task = controller._indexTaskForTest
+        controller.cancelIndexing()
+        await task?.value
+        #expect(controller.index == nil)
     }
 
     @Test("currentSegmentID follows currentTime")

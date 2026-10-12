@@ -17,6 +17,7 @@ final class PlaybackController {
     @ObservationIgnored private var timeObserver: Any?
     @ObservationIgnored private var durationTask: Task<Void, Never>?
     @ObservationIgnored private var indexTask: Task<Void, Never>?
+    @ObservationIgnored private var hasTicked = false
     @ObservationIgnored private var unindexedSegments: [TranscriptSegment] = []
     @ObservationIgnored private var seekGeneration = 0
     @ObservationIgnored private var pendingSeek: Int?
@@ -80,6 +81,11 @@ final class PlaybackController {
         isPlaying = true
     }
 
+    func cancelIndexing() {
+        indexTask?.cancel()
+        indexTask = nil
+    }
+
     func pause() {
         player?.pause()
         isPlaying = false
@@ -133,10 +139,11 @@ final class PlaybackController {
     private func installIndex(_ built: TranscriptIndex) {
         index = built
         unindexedSegments = []
-        tick(to: currentTime)
+        if hasTicked { tick(to: currentTime) }
     }
 
     private func tick(to time: TimeInterval) {
+        hasTicked = true
         currentTime = time
         let segID = index?.segmentID(at: time) ?? TranscriptIndex.segmentID(at: time, scanning: unindexedSegments)
         if segID != currentSegmentID { currentSegmentID = segID }
@@ -148,6 +155,8 @@ final class PlaybackController {
     static var liveTimeObserverCount = 0
 
     func _indexReadyForTest() async { await indexTask?.value }
+
+    var _indexTaskForTest: Task<Void, Never>? { indexTask }
 
     func _setCurrentTimeForTest(_ value: TimeInterval) {
         tick(to: value)
@@ -173,6 +182,7 @@ final class PlaybackController {
         durationTask = nil
         indexTask?.cancel()
         indexTask = nil
+        hasTicked = false
         index = nil
         unindexedSegments = []
         pendingSeek = nil
