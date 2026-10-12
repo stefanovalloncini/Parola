@@ -321,6 +321,43 @@ struct MeetingTakeMixerTests {
         #expect(downmixedPeak < 0.81)
     }
 
+    @Test("the mono mix matches the scalar limiter on quiet, loud and NaN-carrying chunks")
+    func monoMixMatchesTheScalarLimiter() throws {
+        let dir = try folder()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        var state: UInt64 = 7
+        func noise(_ amplitude: Float, _ count: Int) -> [Float] {
+            (0..<count).map { _ in
+                state = state &* 6364136223846793005 &+ 1442695040888963407
+                return amplitude * (Float(Int64(bitPattern: state >> 11) % 2001) / 1000 - 1)
+            }
+        }
+        var nanChunk = noise(0.4, 500)
+        nanChunk[250] = .nan
+        let cases: [(left: [Float], right: [Float])] = [
+            (noise(0.9, 1000), noise(0.9, 1000)),
+            (noise(0.5, 1000), noise(1.5, 1000)),
+            (nanChunk, noise(0.4, 500)),
+            ([-0.9, 0.9, 0.9000001], [0.9, -0.9, 0]),
+        ]
+        for (index, testCase) in cases.enumerated() {
+            let stereo = dir.appendingPathComponent("stereo\(index).wav")
+            let mono = dir.appendingPathComponent("mono\(index).wav")
+            let writer = try MixWriter(stereo: stereo, mono: mono, rate: 16_000)
+            try writer.write(left: testCase.left, right: testCase.right)
+        }
+        for (index, testCase) in cases.enumerated() {
+            let file = try AVAudioFile(forReading: dir.appendingPathComponent("mono\(index).wav"))
+            let buffer = try #require(AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: AVAudioFrameCount(file.length)))
+            try file.read(into: buffer)
+            let written = Array(UnsafeBufferPointer(start: try #require(buffer.floatChannelData)[0], count: Int(buffer.frameLength)))
+            let expected = zip(testCase.left, testCase.right).map {
+                (MeetingTakeMixer.limited($0) + MeetingTakeMixer.limited($1)) / 2
+            }
+            #expect(written.map(\.bitPattern) == expected.map(\.bitPattern), "case \(index)")
+        }
+    }
+
     @Test("the limiter curve is identity below 0.9, monotonic, and keeps extreme bursts inside full scale")
     func limiterCurveShapesOnlyAboveThreshold() {
         #expect(MeetingTakeMixer.limited(0.5) == 0.5)

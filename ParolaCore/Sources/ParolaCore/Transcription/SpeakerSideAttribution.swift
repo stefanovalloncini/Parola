@@ -1,3 +1,4 @@
+import Accelerate
 import AVFoundation
 import Foundation
 
@@ -62,12 +63,17 @@ struct SideLevels {
             try file.read(into: buffer, frameCount: buffer.frameCapacity)
             let frames = Int(buffer.frameLength)
             guard frames > 0, let data = buffer.floatChannelData else { break }
-            for frame in 0..<frames {
-                let left = Double(data[0][frame])
-                let right = Double(data[1][frame])
-                macSum += left * left
-                micSum += right * right
-                filled += 1
+            var position = 0
+            while position < frames {
+                let count = min(windowFrames - filled, frames - position)
+                var leftSquares: Float = 0
+                var rightSquares: Float = 0
+                vDSP_svesq(data[0] + position, 1, &leftSquares, vDSP_Length(count))
+                vDSP_svesq(data[1] + position, 1, &rightSquares, vDSP_Length(count))
+                macSum += Double(leftSquares)
+                micSum += Double(rightSquares)
+                filled += count
+                position += count
                 guard filled == windowFrames else { continue }
                 mac.append(macSum / Double(windowFrames))
                 mic.append(micSum / Double(windowFrames))

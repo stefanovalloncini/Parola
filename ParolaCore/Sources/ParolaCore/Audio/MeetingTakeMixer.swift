@@ -1,3 +1,4 @@
+import Accelerate
 import AVFoundation
 import Foundation
 
@@ -63,11 +64,7 @@ public enum MeetingTakeMixer {
             try file.read(into: chunk, frameCount: AVAudioFrameCount(chunkFrames))
             let frames = Int(chunk.frameLength)
             guard frames > 0, let source = chunk.floatChannelData, let sink = mixed.floatChannelData?[0] else { break }
-            for frame in 0..<frames {
-                var sum: Float = 0
-                for channel in 0..<channels { sum += source[channel][frame] }
-                sink[frame] = sum / Float(channels)
-            }
+            Self.average(source, channels: channels, frames: frames, into: sink, dividingBy: true)
             mixed.frameLength = AVAudioFrameCount(frames)
             try target.write(from: mixed)
         }
@@ -76,6 +73,28 @@ public enum MeetingTakeMixer {
     /// Whether a file holds two channels, as a meeting's take does once its microphone is mixed in.
     public static func isStereo(_ url: URL) -> Bool {
         (try? AVAudioFile(forReading: url))?.fileFormat.channelCount == 2
+    }
+
+    /// Averages the channels into `sink`; dividing and multiplying by the reciprocal are not the same float, so the caller picks the one it always used.
+    static func average(
+        _ channels: UnsafePointer<UnsafeMutablePointer<Float>>,
+        channels count: Int,
+        frames: Int,
+        into sink: UnsafeMutablePointer<Float>,
+        dividingBy divides: Bool
+    ) {
+        let length = vDSP_Length(frames)
+        var zero: Float = 0
+        vDSP_vsadd(channels[0], 1, &zero, sink, 1, length)
+        guard count > 1 else { return }
+        for channel in 1..<count { vDSP_vadd(sink, 1, channels[channel], 1, sink, 1, length) }
+        if divides {
+            var divisor = Float(count)
+            vDSP_vsdiv(sink, 1, &divisor, sink, 1, length)
+        } else {
+            var scale = 1 / Float(count)
+            vDSP_vsmul(sink, 1, &scale, sink, 1, length)
+        }
     }
 
     static let limiterKnee: Float = 0.9
@@ -100,6 +119,10 @@ struct MixPlan {
     let micFirstSourceFrame: Double
     let micFramesPerOutputFrame: Double
     let micFrames: Int
+
+    func position(ofOutputFrame frame: Int) -> Double {
+        micFirstSourceFrame + (Double(frame) - micFirstOutputFrame) * micFramesPerOutputFrame
+    }
 
     init(macFrames: Int, rate: Double, micFrames: Int, micRate: Double, offset: TimeInterval, tolerance: Double, trimsOverrun: Bool) {
         self.micFrames = micFrames
@@ -145,21 +168,18 @@ struct MonoFileReader {
     }
 
     mutating func next(_ count: Int) throws -> [Float] {
-        var out: [Float] = []
-        out.reserveCapacity(count)
-        while out.count < count, file.framePosition < file.length {
-            buffer.frameLength = 0
-            try file.read(into: buffer, frameCount: AVAudioFrameCount(min(MeetingTakeMixer.chunkFrames, count - out.count)))
-            let frames = Int(buffer.frameLength)
-            guard frames > 0, let data = buffer.floatChannelData else { break }
-            let scale = 1 / Float(channels)
-            for frame in 0..<frames {
-                var sum: Float = 0
-                for channel in 0..<channels { sum += data[channel][frame] }
-                out.append(sum * scale)
+        var out = [Float](repeating: 0, count: count)
+        var filled = 0
+        try out.withUnsafeMutableBufferPointer { destination in
+            while filled < count, file.framePosition < file.length {
+                buffer.frameLength = 0
+                try file.read(into: buffer, frameCount: AVAudioFrameCount(min(MeetingTakeMixer.chunkFrames, count - filled)))
+                let frames = Int(buffer.frameLength)
+                guard frames > 0, let data = buffer.floatChannelData, let base = destination.baseAddress else { break }
+                MeetingTakeMixer.average(data, channels: channels, frames: frames, into: base + filled, dividingBy: false)
+                filled += frames
             }
         }
-        if out.count < count { out.append(contentsOf: repeatElement(0, count: count - out.count)) }
         return out
     }
 }
@@ -179,22 +199,33 @@ struct StretchedReader {
 
     mutating func next(_ count: Int, startingAt first: Int) throws -> [Float] {
         var out = [Float](repeating: 0, count: count)
-        for index in 0..<count {
-            let frame = Double(first + index)
-            guard frame >= plan.micFirstOutputFrame else { continue }
-            let position = plan.micFirstSourceFrame + (frame - plan.micFirstOutputFrame) * plan.micFramesPerOutputFrame
-            let lower = Int(position)
-            guard lower < plan.micFrames else { break }
-            try fill(through: lower + 1)
-            let a = sample(lower)
-            let b = sample(lower + 1)
-            out[index] = a + (b - a) * Float(position - Double(lower))
+        let firstActive = max(0, Int(plan.micFirstOutputFrame.rounded(.up)) - first)
+        if firstActive < count {
+            try fill(through: Int(plan.position(ofOutputFrame: first + count - 1)) + 1)
+            out.withUnsafeMutableBufferPointer { fillActive(into: $0, from: firstActive, startingAt: first) }
         }
         let nextFrame = Double(first + count)
         if nextFrame > plan.micFirstOutputFrame {
             forget(before: Int(plan.micFirstSourceFrame + (nextFrame - plan.micFirstOutputFrame) * plan.micFramesPerOutputFrame))
         }
         return out
+    }
+
+    private func fillActive(into out: UnsafeMutableBufferPointer<Float>, from firstActive: Int, startingAt first: Int) {
+        window.withUnsafeBufferPointer { samples in
+            func sample(_ frame: Int) -> Float {
+                let index = frame - windowStart
+                return index >= 0 && index < samples.count ? samples[index] : 0
+            }
+            for index in firstActive..<out.count {
+                let position = plan.position(ofOutputFrame: first + index)
+                let lower = Int(position)
+                guard lower < plan.micFrames else { break }
+                let a = sample(lower)
+                let b = sample(lower + 1)
+                out[index] = a + (b - a) * Float(position - Double(lower))
+            }
+        }
     }
 
     private mutating func fill(through frame: Int) throws {
@@ -252,12 +283,29 @@ struct MixWriter {
     func write(left: [Float], right: [Float]) throws {
         let frames = min(left.count, right.count)
         guard frames > 0, let channels = stereoBuffer.floatChannelData, let mixed = monoBuffer.floatChannelData?[0] else { return }
-        for frame in 0..<frames {
-            let leftLimited = MeetingTakeMixer.limited(left[frame])
-            let rightLimited = MeetingTakeMixer.limited(right[frame])
-            channels[0][frame] = leftLimited
-            channels[1][frame] = rightLimited
-            mixed[frame] = (leftLimited + rightLimited) / 2
+        left.withUnsafeBufferPointer { leftSamples in
+            right.withUnsafeBufferPointer { rightSamples in
+                var leftPeak: Float = 0
+                var rightPeak: Float = 0
+                vDSP_maxmgv(leftSamples.baseAddress!, 1, &leftPeak, vDSP_Length(frames))
+                vDSP_maxmgv(rightSamples.baseAddress!, 1, &rightPeak, vDSP_Length(frames))
+                if leftPeak <= MeetingTakeMixer.limiterKnee, rightPeak <= MeetingTakeMixer.limiterKnee {
+                    channels[0].update(from: leftSamples.baseAddress!, count: frames)
+                    channels[1].update(from: rightSamples.baseAddress!, count: frames)
+                    if mono != nil {
+                        var half: Float = 0.5
+                        vDSP_vasm(leftSamples.baseAddress!, 1, rightSamples.baseAddress!, 1, &half, mixed, 1, vDSP_Length(frames))
+                    }
+                } else {
+                    for frame in 0..<frames {
+                        let leftLimited = MeetingTakeMixer.limited(leftSamples[frame])
+                        let rightLimited = MeetingTakeMixer.limited(rightSamples[frame])
+                        channels[0][frame] = leftLimited
+                        channels[1][frame] = rightLimited
+                        mixed[frame] = (leftLimited + rightLimited) / 2
+                    }
+                }
+            }
         }
         stereoBuffer.frameLength = AVAudioFrameCount(frames)
         try stereo.write(from: stereoBuffer)
