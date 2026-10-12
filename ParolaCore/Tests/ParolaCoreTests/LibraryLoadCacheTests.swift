@@ -256,4 +256,31 @@ struct LibraryLoadCacheTests {
             #expect(firstText(try await store.load(entry.id)) == "edited \(i)")
         }
     }
+
+    @Test("a mutation reads the transcript again when an edit landed during its decode")
+    func mutationRereadsAfterAnEditDuringDecode() async throws {
+        let decodes = OSAllocatedUnfairLock(initialState: 0)
+        let edited = DispatchSemaphore(value: 0)
+        let (store, tmp) = try makeStore(didDecodeDocument: {
+            guard decodes.withLock({ count -> Bool in count += 1; return count == 1 }) else { return }
+            edited.wait()
+        })
+        defer { try? FileManager.default.removeItem(at: tmp) }
+        let entry = try await store.add(transcript: makeTranscript("original"), audioSource: nil)
+        decodes.withLock { $0 = 0 }
+
+        let mutation = Task {
+            try await store.mutateTranscript(for: entry.id) { $0.language = "it" }
+        }
+        while decodes.withLock({ $0 }) < 1 { try await Task.sleep(for: .milliseconds(1)) }
+        try await store.updateTranscript(makeTranscript("edited"), for: entry.id)
+        edited.signal()
+
+        let result = try await mutation.value
+        #expect(result.segments.first?.text == "edited")
+        #expect(result.language == "it")
+        let stored = try await store.load(entry.id).document.transcript
+        #expect(stored.segments.first?.text == "edited")
+        #expect(stored.language == "it")
+    }
 }

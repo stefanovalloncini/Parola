@@ -842,12 +842,30 @@ public actor LibraryStore {
         guard FileManager.default.fileExists(atPath: bundleURL.path) else {
             throw LibraryError.notFound(id)
         }
-        let stored = try Self.readStoredTranscript(at: bundleURL)
+        let stored = try await storedTranscript(id: id, at: bundleURL)
         var transcript = stored
         transform(&transcript)
         guard transcript != stored else { return stored }
         try await updateTranscript(transcript, for: id, reindex: reindex)
         return transcript
+    }
+
+    /// Not cancellable, as the on-actor read it replaces was: a write the caller asked for still lands. Decoded off the actor, and read again when a write to this bundle landed meanwhile, so the caller transforms the latest content; the last attempt reads on the actor to terminate.
+    private func storedTranscript(id: LibraryEntry.ID, at bundleURL: URL) async throws -> Transcript {
+        for _ in 0..<8 {
+            let generation = (storeGeneration, bundleGenerations[id, default: 0])
+            let stored = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Transcript, any Error>) in
+                DispatchQueue.global(qos: .userInitiated).async { [didDecodeDocument] in
+                    continuation.resume(with: Result {
+                        let decoded = try Self.readStoredTranscript(at: bundleURL)
+                        didDecodeDocument?()
+                        return decoded
+                    })
+                }
+            }
+            if generation == (storeGeneration, bundleGenerations[id, default: 0]) { return stored }
+        }
+        return try Self.readStoredTranscript(at: bundleURL)
     }
 
     /// Re-stamps the engine and language on an entry the user transcribed again. `updateTranscript`
@@ -973,7 +991,7 @@ public actor LibraryStore {
         guard FileManager.default.fileExists(atPath: bundleURL.path) else {
             throw LibraryError.notFound(id)
         }
-        var transcript = try Self.readStoredTranscript(at: bundleURL)
+        var transcript = try await storedTranscript(id: id, at: bundleURL)
         let keptChapters = chapters ?? transcript.chapters
         guard transcript.summary != summary || transcript.chapters != keptChapters else {
             // The debounced transcript save can land this summary first, with indexing off.
