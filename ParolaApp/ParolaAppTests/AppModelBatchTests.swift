@@ -1027,6 +1027,26 @@ struct AppModelBatchTests {
         #expect(!moved.fired)
     }
 
+    @Test("a landing after the run ended leaves Resume and the rows alone")
+    func batchLateLandingLeavesResumeAlone() {
+        let model = makeModel()
+        var done = Self.makeJob("a", status: .done)
+        done.transcript = Self.makeTranscript()
+        done.segmentCount = 1
+        model.batchJobs = [done, Self.makeJob("b")]
+        let moved = BatchObservationFlag()
+        withObservationTracking {
+            _ = model.canResumeBatch
+            _ = model.batchBuckets
+        } onChange: {
+            moved.fired = true
+        }
+
+        model.landBatchJobEntry("entry-a", jobID: done.id)
+
+        #expect(!moved.fired)
+    }
+
     @Test("a status change reaches the queue page's inputs")
     func batchStatusChangeReachesRows() async {
         let model = makeModel()
