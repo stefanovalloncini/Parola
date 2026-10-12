@@ -374,6 +374,49 @@ struct ModelResidencyTests {
         await gate.release()
     }
 
+    @Test("a fallback model still loading when dictation turns off is pended under the configured name")
+    func loadingFallbackModelIsPended() async {
+        let gate = Gate()
+        let rig = makeRig()
+        let model = rig.model
+        model.dictationController.recorderFactory = { _ in SlowFinalRecorder(gate: gate) }
+        model.dictationEnabled = true
+        await model.dictationController.monitorWork?.value
+        model.dictationController.simulatePress()
+        await waitUntil { model.dictationState == .listening }
+        model.dictationController.simulateRelease()
+        await waitUntil { model.dictationState == .transcribing }
+
+        model.turnOffDictation()
+        await model.dictationController.monitorWork?.value
+
+        #expect(model.modelResidency.pendingUnloadCount == 1)
+        await gate.release()
+    }
+
+    @Test("turning dictation back on forgets the fallback unload the last run left pending")
+    func armingClearsThePendingFallbackUnload() async {
+        let gate = Gate()
+        let rig = makeRig(dictationLoaded: "fallback-model", dictationBusy: true)
+        let model = rig.model
+        model.dictationController.recorderFactory = { _ in SlowFinalRecorder(gate: gate) }
+        model.dictationEnabled = true
+        await model.dictationController.monitorWork?.value
+        model.dictationController.simulatePress()
+        await waitUntil { model.dictationState == .listening }
+        model.dictationController.simulateRelease()
+        await waitUntil { model.dictationState == .transcribing }
+        model.turnOffDictation()
+        await model.dictationController.monitorWork?.value
+        #expect(model.modelResidency.pendingUnloadCount == 1)
+
+        model.dictationEnabled = true
+
+        #expect(model.modelResidency.pendingUnloadCount == 0)
+        model.abortDictation()
+        await gate.release()
+    }
+
     @Test("turning dictation off with nothing running unloads the fallback model at once")
     func idleFallbackModelUnloadsOnTurnOff() async {
         let rig = makeRig(dictationLoaded: "fallback-model")

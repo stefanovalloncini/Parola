@@ -247,12 +247,13 @@ extension AppModel {
         pendingDictationRestart?.cancel()
         pendingDictationRestart = nil
         let mayBeTranscribing = dictationController.state != .idle
+        let configuredModel = dictationController.configuration?.modelName ?? selectedModel
         dictationController.discardAndStop()
         let residency = modelResidency
         let epoch = residency.warmEpoch
         dictationController.afterTeardown {
             await residency.releaseStreamingModels(ifUnchangedSince: epoch)
-            await residency.releaseDictationSession(mayBeRunning: mayBeTranscribing)
+            await residency.releaseDictationSession(ifUnchangedSince: epoch, configuredModel: configuredModel, mayBeRunning: mayBeTranscribing)
         }
     }
 
@@ -279,6 +280,7 @@ extension AppModel {
         )
         dictationController.indicatorStyle = dictationIndicatorStyle
         dictationController.start(configuration: configuration)
+        modelResidency.dictationArmed()
         prewarmDictationModel()
     }
 

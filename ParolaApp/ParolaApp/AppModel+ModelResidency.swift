@@ -128,11 +128,15 @@ final class ModelResidencyCoordinator {
         await unload(name, fromHolder: Self.dictationHolder, mayBeRunning: false)
     }
 
-    func releaseDictationSession(mayBeRunning: Bool) async {
-        guard let holder = dictationSession?() ?? nil else { return }
-        if let name = await holder.loadedModelName() {
-            await unload(name, fromHolder: Self.dictationHolder, mayBeRunning: mayBeRunning)
-        }
+    func releaseDictationSession(ifUnchangedSince epoch: Int, configuredModel: String, mayBeRunning: Bool) async {
+        guard epoch == warmEpoch, let holder = dictationSession?() ?? nil else { return }
+        let loaded = await holder.loadedModelName()
+        guard let name = loaded ?? (mayBeRunning ? configuredModel : nil) else { return }
+        await unload(name, fromHolder: Self.dictationHolder, mayBeRunning: mayBeRunning)
+    }
+
+    func dictationArmed() {
+        pendingUnloads[Self.dictationHolder] = nil
     }
 
     func sessionRunBegan() {
