@@ -79,6 +79,18 @@ public actor SummaryService {
         instructions: String,
         respond: (String) async throws -> Summary
     ) async throws -> Summary {
+        var summary = try await summariseInWindows(transcript, options: options, instructions: instructions, respond: respond)
+        // A model can write action items it was told to leave out, so the option decides on every path.
+        if !options.actionItems { summary.actionItems = [] }
+        return summary
+    }
+
+    private func summariseInWindows(
+        _ transcript: Transcript,
+        options: SummaryOptions,
+        instructions: String,
+        respond: (String) async throws -> Summary
+    ) async throws -> Summary {
         let windows = await SummaryService.windows(for: transcript, budget: budget, instructions: instructions, options: options)
         guard windows.count > 1 else {
             return try await respond(SummaryService.buildPrompt(for: transcript, options: options))
@@ -140,9 +152,7 @@ public actor SummaryService {
             let session = LanguageModelSession(instructions: instructions)
             do {
                 let response = try await session.respond(to: prompt, generating: GenerableSummary.self)
-                var summary = response.content.toSummary()
-                if !options.actionItems { summary.actionItems = [] }
-                return summary
+                return response.content.toSummary()
             } catch {
                 ParolaLog.error(.ai, "on-device summary model failed", [.error: .error(error)])
                 throw FailureReason.modelError(error.localizedDescription)

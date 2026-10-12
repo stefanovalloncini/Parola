@@ -41,6 +41,44 @@ struct SummaryServiceTests {
         #expect(await recorder.last?.contains("ACTION ITEMS:") == true)
     }
 
+    @Test("with action items off, a model that writes them anyway still gets none into the summary")
+    func actionItemsOffIsHonoured() async throws {
+        let reply = "SUMMARY:\nA short recap.\n\nACTION ITEMS:\n- [Alice] Send the deck [by Friday]\n"
+        let transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 4, text: "Alice sends the deck on Friday.")],
+            language: "en",
+            modelName: "stub"
+        )
+
+        let off = try await SummaryService(budget: TokenBudget(tokens: 3500), makeModel: { _ in MockLanguageModel(scriptedResponses: [reply]) })
+            .summarise(transcript, options: SummaryOptions(actionItems: false))
+        #expect(off.text == "A short recap.")
+        #expect(off.actionItems.isEmpty)
+
+        let on = try await SummaryService(budget: TokenBudget(tokens: 3500), makeModel: { _ in MockLanguageModel(scriptedResponses: [reply]) })
+            .summarise(transcript, options: SummaryOptions(actionItems: true))
+        #expect(on.actionItems == ["[Alice] Send the deck [by Friday]"])
+    }
+
+    @Test("with action items off, a summary built in windows keeps none from any window or the reduce")
+    func actionItemsOffAcrossWindows() async throws {
+        let reply = "SUMMARY:\nPart recap.\n\nACTION ITEMS:\n- Send the deck\n"
+        let model = MockLanguageModel(scriptedResponses: Array(repeating: reply, count: 8))
+        let transcript = Transcript(
+            segments: (0..<6).map {
+                TranscriptSegment(id: $0, start: Double($0 * 10), end: Double($0 * 10 + 9), text: "Line \($0) of a long talk about the deck.")
+            },
+            language: "en",
+            modelName: "stub"
+        )
+
+        let summary = try await SummaryService(budget: TokenBudget(tokens: 40), makeModel: { _ in model })
+            .summarise(transcript, options: SummaryOptions(actionItems: false))
+
+        #expect(await model.receivedHistories.count > 1)
+        #expect(summary.actionItems.isEmpty)
+    }
+
     @Test("a summary saved before Parola could pick a model reads as the on-device one")
     func legacySummaryDecodesOnDevice() throws {
         let legacy = #"{"text":"Un riassunto","chapters":[]}"#
