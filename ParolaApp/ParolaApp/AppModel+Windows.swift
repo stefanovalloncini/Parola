@@ -49,6 +49,19 @@ extension AppModel {
         openMainWindowAction = action
     }
 
+    /// Before any scene has handed over `openWindow`, a reopen request is what gets SwiftUI to present the main scene; the first scene's opener replaces it.
+    func bindMainWindowReopenUntilASceneBinds(_ action: @escaping () -> Void) {
+        guard openMainWindowAction == nil else { return }
+        openMainWindowAction = action
+    }
+
+    /// A relaunch that restores only a viewer, or nothing, gets no main window from SwiftUI; menu bar only launches stay windowless.
+    func openMainWindowIfMissingAfterLaunch(after delay: Duration = .seconds(1)) async {
+        try? await Task.sleep(for: delay)
+        guard mainWindow == nil, !isHeadless, appVisibilityMode.launchesWithMainWindow else { return }
+        bringMainWindowForward()
+    }
+
     /// The one way a transcript window opens; false when the library has no such entry or no scene can open one.
     @discardableResult
     func openEntryWindow(_ id: LibraryEntry.ID) -> Bool {

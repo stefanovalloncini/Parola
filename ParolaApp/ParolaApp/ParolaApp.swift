@@ -176,6 +176,7 @@ struct ParolaApp: App {
                 .environment(liveCaptions)
                 .frame(minWidth: 880, idealWidth: 900, maxWidth: .infinity, minHeight: 600, idealHeight: 640, maxHeight: .infinity)
                 .preferredColorScheme(model.preferredColorScheme)
+                .bindsMainWindowOpening(to: model)
         }
 
         // No .id(themeRevision) here: re-identifying the view would release a live window's session.
@@ -184,6 +185,7 @@ struct ParolaApp: App {
                 .tint(DS.Color.accent)
                 .environment(model)
                 .preferredColorScheme(model.preferredColorScheme)
+                .bindsMainWindowOpening(to: model)
         }
         .defaultSize(width: 900, height: 640)
 
@@ -210,6 +212,7 @@ struct ParolaApp: App {
         Window("Mini Player", id: "mini-player") {
             MiniPlayerWindow()
                 .environment(model)
+                .bindsMainWindowOpening(to: model)
         }
         .windowResizability(.contentSize)
         .defaultSize(width: 360, height: 90)

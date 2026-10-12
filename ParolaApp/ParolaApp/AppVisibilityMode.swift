@@ -29,6 +29,8 @@ enum AppVisibilityMode: String, CaseIterable, Identifiable {
         case .dockOnly: return false
         }
     }
+
+    var launchesWithMainWindow: Bool { activationPolicy == .regular }
 }
 
 extension AppModel {

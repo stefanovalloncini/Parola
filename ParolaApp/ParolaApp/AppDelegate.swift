@@ -34,6 +34,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         playbackKeys.bind(model)
         model.activationPolicyApplier = { NSApp.setActivationPolicy($0) }
         model.settingsWindowOpener = { SettingsWindowOpener.open() }
+        model.bindMainWindowReopenUntilASceneBinds {
+            NSWorkspace.shared.openApplication(at: Bundle.main.bundleURL, configuration: NSWorkspace.OpenConfiguration())
+        }
         model.applyAppVisibilityMode()
         if dictationSubscription == nil, Self.hearsDictationSignal(model.activeSideEffects) {
             dictationSubscription = DictationSignal.subscribe { [weak self] name in
@@ -103,7 +106,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        if let model = AppDelegate.launchModel { bind(model: model) }
+        if let model = AppDelegate.launchModel {
+            bind(model: model)
+            Task { await model.openMainWindowIfMissingAfterLaunch() }
+        }
         ParolaLog.info(.appLifecycle, "app launched, version \(AppVersionToken())")
         if let model, Self.prunesStaleWindowKeys(model.activeSideEffects) { StaleWindowKeys.pruneInBackground() }
         NSApp.servicesProvider = provider
@@ -231,6 +237,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDockMenu(_ sender: NSApplication) -> NSMenu? {
         menuBar.dockMenu()
+    }
+
+    /// SwiftUI reopens the main scene on a Dock click only when nothing is visible; a viewer or Settings alone has to bring it back.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        guard flag, let model, model.mainWindow == nil else { return true }
+        model.bringMainWindowForward()
+        return false
     }
 
     func applicationDidResignActive(_ notification: Notification) {

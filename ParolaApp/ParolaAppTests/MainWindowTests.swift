@@ -67,6 +67,72 @@ struct MainWindowTests {
         #expect(opened == 1)
     }
 
+    private func launchRig(_ label: String, mode: AppVisibilityMode) -> (AppModel, Counter) {
+        let model = AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL(label))
+        model.appVisibilityMode = mode
+        model.isHeadless = false
+        let opened = Counter()
+        model.bindOpenMainWindow { opened.count += 1 }
+        return (model, opened)
+    }
+
+    @MainActor
+    private final class Counter {
+        var count = 0
+    }
+
+    @Test("a launch that brought up no main window gets one in the Dock modes, and stays windowless in menu bar only")
+    func launchCheckOpensTheMissingWindow() async {
+        for mode in [AppVisibilityMode.dockOnly, .dockAndMenuBar] {
+            let (model, opened) = launchRig("launch-\(mode.rawValue)", mode: mode)
+            await model.openMainWindowIfMissingAfterLaunch(after: .zero)
+            #expect(opened.count == 1)
+        }
+        let (menuBarOnly, quiet) = launchRig("launch-menubar", mode: .menuBarOnly)
+        await menuBarOnly.openMainWindowIfMissingAfterLaunch(after: .zero)
+        #expect(quiet.count == 0)
+        menuBarOnly.bringMainWindowForward(activate: {})
+        #expect(quiet.count == 1)
+    }
+
+    @Test("the launch check leaves a restored main window alone and never runs headless")
+    func launchCheckKeepsWhatCameUp() async {
+        let (restored, restoredOpened) = launchRig("launch-restored", mode: .dockAndMenuBar)
+        let window = NSWindow(contentRect: .zero, styleMask: [.titled], backing: .buffered, defer: true)
+        window.isReleasedWhenClosed = false
+        restored.mainWindow = window
+        await restored.openMainWindowIfMissingAfterLaunch(after: .zero)
+        #expect(restoredOpened.count == 0)
+
+        let (headless, headlessOpened) = launchRig("launch-headless", mode: .dockAndMenuBar)
+        headless.isHeadless = true
+        await headless.openMainWindowIfMissingAfterLaunch(after: .zero)
+        #expect(headlessOpened.count == 0)
+    }
+
+    @Test("with no scene up, Open Parola asks for a reopen, and the first scene's opener replaces that")
+    func reopenStandsInUntilASceneBinds() {
+        let model = AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("main-window-noscene"))
+        let reopens = Counter()
+        let scene = Counter()
+        model.bindMainWindowReopenUntilASceneBinds { reopens.count += 1 }
+
+        model.bringMainWindowForward(activate: {})
+        #expect(reopens.count == 1)
+
+        model.bindOpenMainWindow { scene.count += 1 }
+        model.bindMainWindowReopenUntilASceneBinds { reopens.count += 1 }
+        model.bringMainWindowForward(activate: {})
+        #expect(reopens.count == 1)
+        #expect(scene.count == 1)
+    }
+
+    @Test("the viewer, Settings and the Mini Player hand the main window's opener over too")
+    func everySceneBindsTheOpener() throws {
+        let app = try source("ParolaApp")
+        #expect(app.components(separatedBy: ".bindsMainWindowOpening(to: model)").count - 1 == 4)
+    }
+
     @Test("the main scene hands its opener to the model, and the menu bar's Open Parola goes through it")
     func openerIsBound() throws {
         #expect(try source("ParolaApp").contains(".bindsMainWindowOpening(to: model)"))
