@@ -772,7 +772,7 @@ struct AppModelLibraryTests {
     @Test("a failed label edit, move, pin, rename, delete, restore or purge shows a toast, not a phase change")
     func libraryMutationFailuresDoNotGatePhase() async {
         let mutations: [(String, (AppModel) -> Void)] = [
-            ("label edit", { $0.setLabels(["x"], for: "missing") }),
+            ("label edit", { $0.addLabel("x", to: "missing") }),
             ("move", { $0.moveEntry("missing", to: .meeting) }),
             ("pin", { $0.togglePinned(for: "missing") }),
             ("rename", { $0.renameEntry("missing", to: "New name") }),

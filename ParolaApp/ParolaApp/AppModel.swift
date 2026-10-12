@@ -1884,6 +1884,9 @@ final class AppModel {
     @ObservationIgnored var libraryExcerptsGeneration = 0
     @ObservationIgnored var searchTask: Task<Void, Never>?
     @ObservationIgnored var libraryRefreshTask: Task<Void, Never>?
+    /// An entry's labels while writes are still on their way to disk; edits build on this list, not on the cache.
+    var pendingLabels: [LibraryEntry.ID: [String]] = [:]
+    @ObservationIgnored var labelWrites: [LibraryEntry.ID: LabelWrite] = [:]
     /// How many scans `refreshLibrary()` has started, so a test can bound them.
     @ObservationIgnored var libraryRefreshes = 0
     /// Bumped by every row written in place, so a scan can tell its snapshot is older than the rows.

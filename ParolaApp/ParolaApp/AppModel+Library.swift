@@ -76,6 +76,36 @@ struct LibraryCounts: Equatable {
     }
 }
 
+struct LabelWrite {
+    let sequence: Int
+    let write: Task<Void, Never>
+    let settled: Task<Void, Never>
+}
+
+/// One change to an entry's label list; applying it yields the change that undoes it.
+enum LabelEdit {
+    case add(String)
+    case insert(String, at: Int)
+    case remove(String)
+
+    func apply(to labels: inout [String]) -> LabelEdit? {
+        switch self {
+        case .add(let label):
+            guard !labels.contains(where: { $0.localizedCaseInsensitiveCompare(label) == .orderedSame }) else { return nil }
+            labels.append(label)
+            return .remove(label)
+        case .insert(let label, let index):
+            guard !labels.contains(where: { $0.localizedCaseInsensitiveCompare(label) == .orderedSame }) else { return nil }
+            labels.insert(label, at: min(index, labels.count))
+            return .remove(label)
+        case .remove(let label):
+            guard let index = labels.firstIndex(of: label) else { return nil }
+            labels.remove(at: index)
+            return .insert(label, at: index)
+        }
+    }
+}
+
 extension AppModel {
 
     func refreshLibrary() {
@@ -287,16 +317,59 @@ extension AppModel {
         return size(of: audio) ?? 0
     }
 
-    func setLabels(_ labels: [String], for id: LibraryEntry.ID) {
-        Task { [weak self] in
+    func labels(for id: LibraryEntry.ID) -> [String] {
+        pendingLabels[id] ?? libraryEntry(id: id)?.labels ?? []
+    }
+
+    /// False when the label is blank or the entry already carries it in any casing.
+    @discardableResult
+    func addLabel(_ label: String, to id: LibraryEntry.ID) -> Bool {
+        let trimmed = label.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+        return applyLabelEdit(.add(trimmed), to: id, actionName: String(localized: "Add Label"))
+    }
+
+    func removeLabel(_ label: String, from id: LibraryEntry.ID) {
+        applyLabelEdit(.remove(label), to: id, actionName: String(localized: "Remove Label"))
+    }
+
+    @discardableResult
+    private func applyLabelEdit(_ edit: LabelEdit, to id: LibraryEntry.ID, actionName: String) -> Bool {
+        var next = labels(for: id)
+        guard let inverse = edit.apply(to: &next) else { return false }
+        registerUndoStep(actionName: actionName) { $0.applyLabelEdit(inverse, to: id, actionName: actionName) }
+        writeLabels(next, for: id)
+        return true
+    }
+
+    /// Writes queue behind each other and nothing else; one library refresh follows the last of a burst, and the list stays pending until it lands.
+    private func writeLabels(_ labels: [String], for id: LibraryEntry.ID) {
+        pendingLabels[id] = labels
+        patchLibraryEntry(id: id) { $0.labels = labels }
+        let previous = labelWrites[id]
+        let sequence = (previous?.sequence ?? 0) &+ 1
+        let write = Task { [weak self] in
+            await previous?.write.value
             guard let self else { return }
             do {
                 try await library.setLabels(labels, for: id)
             } catch {
                 noteLibraryFailure(String(localized: "Couldn't update labels"), error)
             }
-            refreshLibrary()
         }
+        let settled = Task { [weak self] in
+            await write.value
+            guard let self, labelWrites[id]?.sequence == sequence else { return }
+            await refreshLibraryAndWait()
+            guard labelWrites[id]?.sequence == sequence else { return }
+            labelWrites[id] = nil
+            pendingLabels[id] = nil
+        }
+        labelWrites[id] = LabelWrite(sequence: sequence, write: write, settled: settled)
+    }
+
+    func awaitLabelWrites(for id: LibraryEntry.ID) async {
+        await labelWrites[id]?.settled.value
     }
 
     func moveEntry(_ id: LibraryEntry.ID, to category: EntryCategory) {

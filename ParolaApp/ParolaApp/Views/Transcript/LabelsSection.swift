@@ -11,7 +11,10 @@ struct LabelsSection: View {
         return model.libraryEntry(id: id)
     }
 
-    private var labels: [String] { entry?.labels ?? [] }
+    private var labels: [String] {
+        guard let id = model.selectedEntryID else { return [] }
+        return model.labels(for: id)
+    }
 
     var body: some View {
         if entry != nil {
@@ -90,18 +93,12 @@ struct LabelsSection: View {
 
     private func add(_ label: String) {
         guard let entry else { return }
-        let trimmed = label.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        var next = labels
-        guard !next.contains(where: { $0.localizedCaseInsensitiveCompare(trimmed) == .orderedSame }) else { return }
-        next.append(trimmed)
-        model.setLabels(next, for: entry.id)
+        model.addLabel(label, to: entry.id)
     }
 
     private func remove(_ label: String) {
         guard let entry else { return }
-        let next = labels.filter { $0 != label }
-        model.setLabels(next, for: entry.id)
+        model.removeLabel(label, from: entry.id)
     }
 }
 
