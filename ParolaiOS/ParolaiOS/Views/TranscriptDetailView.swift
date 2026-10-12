@@ -76,7 +76,10 @@ struct TranscriptDetailView: View {
                         }
                     }
                     ToolbarItem(placement: .topBarTrailing) {
-                        ShareLink(item: loaded.document.transcript.text)
+                        ShareLink(
+                            item: TranscriptShareItem(transcript: loaded.document.transcript),
+                            preview: SharePreview(loaded.entry.title)
+                        )
                     }
                     ToolbarItemGroup(placement: .keyboard) {
                         if !matchIDs.isEmpty {
