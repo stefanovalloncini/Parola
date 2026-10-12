@@ -149,18 +149,11 @@ struct StageClock: View {
             self.text = text
             self.font = font
             self.ink = ink
-            withoutActions { build(restyled: restyled) }
+            CATransaction.withoutActions { build(restyled: restyled) }
         }
 
         private func redraw() {
-            withoutActions { build(restyled: false) }
-        }
-
-        private func withoutActions(_ change: () -> Void) {
-            CATransaction.begin()
-            CATransaction.setDisableActions(true)
-            change()
-            CATransaction.commit()
+            CATransaction.withoutActions { build(restyled: false) }
         }
 
         private func build(restyled: Bool) {
@@ -428,6 +421,15 @@ struct RecDot: View {
             let begin = RecDot.pulseBegin(origin: origin, now: Date(), layerTime: dot.convertTime(CACurrentMediaTime(), from: nil))
             dot.add(RecDot.pulseAnimation(beginTime: begin), forKey: RecDot.pulseKey)
         }
+    }
+}
+
+extension CATransaction {
+    static func withoutActions(_ change: () -> Void) {
+        begin()
+        setDisableActions(true)
+        change()
+        commit()
     }
 }
 

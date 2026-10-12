@@ -102,7 +102,7 @@ struct DSProgressBar: View {
 
         var fill: CGColor? {
             get { bar.fillColor }
-            set { withoutActions { bar.fillColor = newValue } }
+            set { CATransaction.withoutActions { bar.fillColor = newValue } }
         }
 
         override func setFrameSize(_ newSize: NSSize) {
@@ -119,7 +119,7 @@ struct DSProgressBar: View {
         }
 
         private func build() {
-            withoutActions {
+            CATransaction.withoutActions {
                 let scale = window?.backingScaleFactor ?? 2
                 track.contentsScale = scale
                 bar.contentsScale = scale
@@ -152,13 +152,6 @@ struct DSProgressBar: View {
             guard window != nil, bounds.width > 0 else { return }
             let begin = DSProgressBar.sweepBegin(now: Date(), layerTime: bar.convertTime(CACurrentMediaTime(), from: nil))
             bar.add(DSProgressBar.sweepAnimation(width: bounds.width, beginTime: begin), forKey: DSProgressBar.sweepKey)
-        }
-
-        private func withoutActions(_ change: () -> Void) {
-            CATransaction.begin()
-            CATransaction.setDisableActions(true)
-            change()
-            CATransaction.commit()
         }
     }
 }

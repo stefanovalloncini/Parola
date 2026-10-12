@@ -113,12 +113,12 @@ struct LiveLevelBars: View {
 
         override func setFrameSize(_ newSize: NSSize) {
             super.setFrameSize(newSize)
-            withoutActions(build)
+            CATransaction.withoutActions(build)
         }
 
         override func viewDidChangeBackingProperties() {
             super.viewDidChangeBackingProperties()
-            withoutActions(build)
+            CATransaction.withoutActions(build)
         }
 
         func show(_ levels: [Float], style: Style, ink: CGColor) {
@@ -126,7 +126,7 @@ struct LiveLevelBars: View {
             self.levels = levels
             self.style = style
             self.ink = ink
-            withoutActions(build)
+            CATransaction.withoutActions(build)
         }
 
         /// Each new sample, or under Reduce Motion four times a second, the bars take the take's levels without a SwiftUI update.
@@ -165,13 +165,6 @@ struct LiveLevelBars: View {
         private func showFeed() {
             guard let feed, let ink else { return }
             show(feed.levels(), style: feed.style, ink: ink)
-        }
-
-        private func withoutActions(_ change: () -> Void) {
-            CATransaction.begin()
-            CATransaction.setDisableActions(true)
-            change()
-            CATransaction.commit()
         }
 
         private func build() {

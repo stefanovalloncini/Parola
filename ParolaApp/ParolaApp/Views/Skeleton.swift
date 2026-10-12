@@ -91,7 +91,7 @@ struct Shimmer: ViewModifier {
                 guard let highlight, highlight != oldValue else { return }
                 // The highlight's own colour at no alpha, so the band fades out as SwiftUI's gradient to clear does rather than through black.
                 let edge = highlight.copy(alpha: 0) ?? highlight
-                withoutActions { band.colors = [edge, highlight, edge] }
+                CATransaction.withoutActions { band.colors = [edge, highlight, edge] }
             }
         }
 
@@ -99,7 +99,7 @@ struct Shimmer: ViewModifier {
             let resized = newSize != frame.size
             super.setFrameSize(newSize)
             guard resized else { return }
-            withoutActions {
+            CATransaction.withoutActions {
                 band.frame = CGRect(x: 0, y: 0, width: bounds.width * Shimmer.band, height: bounds.height)
             }
             run()
@@ -107,7 +107,7 @@ struct Shimmer: ViewModifier {
 
         override func viewDidChangeBackingProperties() {
             super.viewDidChangeBackingProperties()
-            withoutActions { band.contentsScale = window?.backingScaleFactor ?? 2 }
+            CATransaction.withoutActions { band.contentsScale = window?.backingScaleFactor ?? 2 }
         }
 
         override func viewDidMoveToWindow() {
@@ -122,13 +122,6 @@ struct Shimmer: ViewModifier {
             let began = began ?? band.convertTime(CACurrentMediaTime(), from: nil)
             self.began = began
             band.add(Shimmer.sweep(width: bounds.width, beginTime: began), forKey: Shimmer.key)
-        }
-
-        private func withoutActions(_ change: () -> Void) {
-            CATransaction.begin()
-            CATransaction.setDisableActions(true)
-            change()
-            CATransaction.commit()
         }
     }
 }

@@ -287,17 +287,17 @@ struct StageBand: View {
         override func setFrameSize(_ newSize: NSSize) {
             super.setFrameSize(newSize)
             guard newSize != builtSize else { return }
-            withoutActions(build)
+            CATransaction.withoutActions(build)
         }
 
         override func viewDidChangeBackingProperties() {
             super.viewDidChangeBackingProperties()
-            withoutActions(build)
+            CATransaction.withoutActions(build)
         }
 
         /// The bars as of `tape`, in one transaction with the slide that starts from its sample, so the two reach the screen together.
         func show(_ tape: StageTape, slide: Slide, ink: CGColor, accent: CGColor) {
-            withoutActions {
+            CATransaction.withoutActions {
                 let newBars = tape != built
                 if newBars || ink != self.ink || accent != self.accent {
                     if newBars { built = tape }
@@ -356,13 +356,6 @@ struct StageBand: View {
                     }
                 }
             }
-        }
-
-        private func withoutActions(_ change: () -> Void) {
-            CATransaction.begin()
-            CATransaction.setDisableActions(true)
-            change()
-            CATransaction.commit()
         }
 
         private func build() {
