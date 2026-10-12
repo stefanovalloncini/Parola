@@ -175,7 +175,9 @@ struct LibrarySearchPostingsTests {
 
     @Test("an entry added after removals takes a freed slot and answers for itself only")
     func freedSlotsAreReused() async {
-        let index = LibrarySearchIndex(indexDirectory: FileManager.default.temporaryDirectory.appendingPathComponent("parola-slots-\(UUID().uuidString)"))
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("parola-slots-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let index = LibrarySearchIndex(indexDirectory: url)
         for name in ["one", "two", "three", "four", "five"] {
             await index.index(id: name, title: name, text: "alpha \(name) shared", createdAt: Date())
         }
@@ -217,7 +219,9 @@ struct LibrarySearchNarrowNumberTests {
 struct LibrarySearchVocabularyTests {
     @Test("a word nobody holds any more frees its id for the next new word without leaking matches")
     func freedWordIDsAreReused() async {
-        let index = LibrarySearchIndex(indexDirectory: FileManager.default.temporaryDirectory.appendingPathComponent("parola-vocab-\(UUID().uuidString)"))
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("parola-vocab-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let index = LibrarySearchIndex(indexDirectory: url)
         await index.index(id: "a", title: "kept", text: "common zzzq words", createdAt: Date())
         await index.index(id: "b", title: "kept", text: "common words", createdAt: Date())
         await index.remove("a")
@@ -289,5 +293,25 @@ struct LibrarySearchRepeatedIDTests {
         #expect(await index.search("alpha", snippets: false).isEmpty)
         #expect(await index.search("beta", snippets: false).isEmpty)
         #expect(await index.search("gamma", snippets: false).map(\.entryID) == ["e2"])
+    }
+}
+
+@Suite("LibrarySearchIndex extreme offsets")
+struct LibrarySearchExtremeOffsetTests {
+    @Test("segment offsets of Int.max and below zero index without trapping and survive a reload")
+    func extremeBoundaryOffsets() async {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("parola-extreme-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let index = LibrarySearchIndex(indexDirectory: url)
+        await index.index(
+            id: "a", title: "t", text: "alpha beta",
+            boundaries: [.init(textOffset: -5, seconds: 1), .init(textOffset: 0, seconds: 2), .init(textOffset: Int.max, seconds: 3)],
+            createdAt: Date()
+        )
+        let live = await index.search("beta", snippets: false)
+        await index.flush()
+        let reloaded = await LibrarySearchIndex(indexDirectory: url).search("beta", snippets: false)
+        #expect(live.first?.firstHit?.textOffset == 6)
+        #expect(reloaded == live)
     }
 }
