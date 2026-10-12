@@ -126,7 +126,7 @@ struct ReadAloudToolbarButton: View {
         Button(action: toggle) {
             Label(title, systemImage: speaker.isSpeaking ? "speaker.wave.2.fill" : "speaker.wave.2")
         }
-        .disabled(model.transcript == nil)
+        .disabled(!model.hasTranscript)
         .help(help)
         .axLeaf("Toolbar.Transcript.Button.ReadAloud")
     }
@@ -153,7 +153,7 @@ struct TranscriptShareMenu: View {
             Label("Share", systemImage: "square.and.arrow.up")
         }
         .menuIndicator(.hidden)
-        .disabled(model.transcript == nil)
+        .disabled(!model.hasTranscript)
         .help("Export and share")
         .axLeaf("Toolbar.Transcript.Menu.Share")
     }
