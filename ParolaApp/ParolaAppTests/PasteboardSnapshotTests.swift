@@ -56,12 +56,21 @@ struct PasteboardSnapshotTests {
         private let lock = NSLock()
         private var served: [(type: String, onMain: Bool)] = []
         let size: Int
-        let delay: TimeInterval
-        init(size: Int, delay: TimeInterval) { self.size = size; self.delay = delay }
+        let started: AsyncStream<Void>
+        private let startedContinuation: AsyncStream<Void>.Continuation
+        private let gate = DispatchSemaphore(value: 0)
+        init(size: Int, blocking: Bool = false) {
+            self.size = size
+            self.blocking = blocking
+            (started, startedContinuation) = AsyncStream.makeStream(of: Void.self)
+        }
+        let blocking: Bool
+        func open() { gate.signal() }
         var requests: [(type: String, onMain: Bool)] { lock.withLock { served } }
         func pasteboard(_ pasteboard: NSPasteboard?, item: NSPasteboardItem, provideDataForType type: NSPasteboard.PasteboardType) {
             lock.withLock { served.append((type.rawValue, Thread.isMainThread)) }
-            Thread.sleep(forTimeInterval: delay)
+            startedContinuation.yield()
+            if blocking { gate.wait() }
             item.setData(Data(count: size), forType: type)
         }
     }
@@ -71,19 +80,16 @@ struct PasteboardSnapshotTests {
         let name = NSPasteboard.Name("snapshot-test-\(UUID())")
         let pasteboard = NSPasteboard(name: name)
         pasteboard.clearContents()
-        let provider = SlowProvider(size: 16, delay: 0.3)
+        let provider = SlowProvider(size: 16, blocking: true)
         let item = NSPasteboardItem()
         item.setDataProvider(provider, forTypes: [.png])
         pasteboard.writeObjects([item])
 
-        let started = ContinuousClock.now
         async let snapshot = PasteboardSnapshot.capture(named: name)
-        var ticks = 0
-        while ContinuousClock.now - started < .milliseconds(200) {
-            try? await Task.sleep(for: .milliseconds(10))
-            ticks += 1
-        }
-        #expect(ticks >= 10)
+        var started = provider.started.makeAsyncIterator()
+        await started.next()
+        await MainActor.run {}
+        provider.open()
         #expect(await snapshot.isEmpty == false)
         #expect(provider.requests.allSatisfy { !$0.onMain })
     }
@@ -92,8 +98,8 @@ struct PasteboardSnapshotTests {
     func overBudgetStopsReading() {
         let pasteboard = makePasteboard()
         pasteboard.clearContents()
-        let big = SlowProvider(size: 4096, delay: 0)
-        let after = SlowProvider(size: 8, delay: 0)
+        let big = SlowProvider(size: 4096)
+        let after = SlowProvider(size: 8)
         let first = NSPasteboardItem()
         first.setDataProvider(big, forTypes: [.png])
         first.setString("plain", forType: .string)

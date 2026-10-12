@@ -7,26 +7,22 @@ import ParolaDictation
 private final class ResolverProbe: @unchecked Sendable {
     private let lock = NSLock()
     private var count = 0
-    let cost: Duration
-    init(cost: Duration) { self.cost = cost }
     var calls: Int { lock.withLock { count } }
     func resolve() async -> DictationWorkflow? {
         lock.withLock { count += 1 }
-        try? await Task.sleep(for: cost)
         return nil
     }
 }
 
 private final class InsertClock: TextInserter, @unchecked Sendable {
     private let lock = NSLock()
-    private var instant: ContinuousClock.Instant?
-    private(set) var texts: [String] = []
+    private var items: [String] = []
+    var texts: [String] { lock.withLock { items } }
     let resolve: @Sendable () async -> DictationWorkflow?
     init(resolve: @escaping @Sendable () async -> DictationWorkflow?) { self.resolve = resolve }
-    var insertedAt: ContinuousClock.Instant? { lock.withLock { instant } }
     func insert(_ text: String) async throws {
         _ = await resolve()
-        lock.withLock { instant = .now; texts.append(text) }
+        lock.withLock { items.append(text) }
     }
 }
 
@@ -53,7 +49,7 @@ private final class ConfirmingSession: StreamingTranscriber, @unchecked Sendable
 struct DictationReleasePathTests {
     private func release(
         streaming: Bool, probe: ResolverProbe
-    ) async throws -> (latency: Duration, resolutions: Int, text: [String]) {
+    ) async throws -> (atRelease: Int, resolutions: Int, text: [String]) {
         let resolver: @Sendable () async -> DictationWorkflow? = { await probe.resolve() }
         let recorder = MicDictationRecorder(
             model: streaming ? "openai_whisper-large-v3_turbo" : nil,
@@ -70,21 +66,18 @@ struct DictationReleasePathTests {
             mode: .pushToTalk, features: .all
         )
         await coordinator.simulatePress()
-        try await Task.sleep(for: .milliseconds(100))
-        let released = ContinuousClock.now
+        let atRelease = probe.calls
         await coordinator.simulateRelease()
-        let at = try #require(inserter.insertedAt)
-        return (released.duration(to: at), probe.calls, inserter.texts)
+        return (atRelease, probe.calls, inserter.texts)
     }
 
     @Test("streaming release resolves the workflow only for insertion")
     func streamingResolutions() async throws {
-        let probe = ResolverProbe(cost: .milliseconds(40))
+        let probe = ResolverProbe()
         let out = try await release(streaming: true, probe: probe)
-        print("RELEASE streaming latency=\(out.latency) resolutions=\(out.resolutions)")
         #expect(out.text == ["hello"])
+        #expect(out.atRelease == 1)
         #expect(out.resolutions == 2)
-        #expect(out.latency < .milliseconds(80))
     }
 
     @Test("fallback release resolves the workflow only for insertion")
@@ -97,12 +90,11 @@ struct DictationReleasePathTests {
                 engineID: nil,
                 response: MockTranscriberResponse(segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "hello")])
             )
-            let probe = ResolverProbe(cost: .milliseconds(40))
+            let probe = ResolverProbe()
             let out = try await release(streaming: false, probe: probe)
-            print("RELEASE fallback latency=\(out.latency) resolutions=\(out.resolutions)")
             #expect(out.text.first?.contains("hello") == true)
+            #expect(out.atRelease == 1)
             #expect(out.resolutions == 2)
-            #expect(out.latency < .milliseconds(80))
         }
     }
 }

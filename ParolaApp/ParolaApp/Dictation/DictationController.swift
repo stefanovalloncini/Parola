@@ -58,7 +58,10 @@ final class DictationController {
 
     @ObservationIgnored var anchorProvider: any FieldAnchorProviding = FocusedFieldLocator()
     @ObservationIgnored private let anchorQueue = DispatchQueue(label: "app.parola.dictation.anchor", qos: .userInitiated)
-    @ObservationIgnored private var anchorProbeInFlight = false
+    @ObservationIgnored private var anchorProbeTask: Task<Bool, Never>?
+    @ObservationIgnored private var anchorReprobe = false
+    @ObservationIgnored private var hudRevealTask: Task<Void, Never>?
+    private static let firstAnchorWait: Duration = .milliseconds(120)
     @ObservationIgnored private var anchorEpoch = 0
     @ObservationIgnored var hotkeyFactory: ((Int, NSEvent.ModifierFlags) -> any HotkeyMonitor)?
     @ObservationIgnored var recorderFactory: ((Configuration) -> any DictationRecorder)?
@@ -471,29 +474,56 @@ final class DictationController {
             }
         }
         guard let panel = hud else { return }
+        let awaitsFirstAnchor = indicatorStyle == .nearField && currentAnchor == nil && !panel.isVisible
         placeHUD()
+        if awaitsFirstAnchor { panel.alphaValue = 0 }
         panel.orderFrontRegardless()
         startRepositionLoop()
-        Task { [weak self] in
-            guard let self, await refreshAnchor() else { return }
-            placeHUD()
+        hudRevealTask?.cancel()
+        hudRevealTask = Task { [weak self] in
+            guard let self else { return }
+            if awaitsFirstAnchor {
+                let timer = Task { [weak self] in
+                    try? await Task.sleep(for: Self.firstAnchorWait)
+                    if !Task.isCancelled { self?.revealHUD() }
+                }
+                defer { timer.cancel() }
+                if await refreshAnchor() { placeHUD() }
+                revealHUD()
+            } else if await refreshAnchor() {
+                placeHUD()
+            }
         }
     }
 
     @discardableResult
     func refreshAnchor() async -> Bool {
         guard indicatorStyle == .nearField else { return setAnchor(nil) }
-        guard !anchorProbeInFlight else { return false }
-        anchorProbeInFlight = true
-        defer { anchorProbeInFlight = false }
-        let epoch = anchorEpoch
-        let geometry = ScreenGeometry.current()
-        let provider = anchorProvider
-        let anchor = await withCheckedContinuation { continuation in
-            anchorQueue.async { continuation.resume(returning: provider.currentAnchor(on: geometry)) }
+        if let running = anchorProbeTask {
+            anchorReprobe = true
+            return await running.value
         }
-        guard epoch == anchorEpoch, indicatorStyle == .nearField else { return false }
-        return setAnchor(anchor)
+        let task = Task { @MainActor [weak self] () -> Bool in
+            var changed = false
+            repeat {
+                guard let self else { return changed }
+                self.anchorReprobe = false
+                let epoch = self.anchorEpoch
+                let geometry = ScreenGeometry.current()
+                let provider = self.anchorProvider
+                let queue = self.anchorQueue
+                let anchor = await withCheckedContinuation { continuation in
+                    queue.async { continuation.resume(returning: provider.currentAnchor(on: geometry)) }
+                }
+                if epoch == self.anchorEpoch, self.indicatorStyle == .nearField {
+                    changed = self.setAnchor(anchor) || changed
+                }
+            } while self?.anchorReprobe == true
+            self?.anchorProbeTask = nil
+            return changed
+        }
+        anchorProbeTask = task
+        return await task.value
     }
 
     private func setAnchor(_ anchor: FieldAnchor?) -> Bool {
@@ -546,8 +576,15 @@ final class DictationController {
         )
     }
 
+    private func revealHUD() {
+        hud?.alphaValue = 1
+    }
+
     private func hideHUD() {
         hudIsUp = false
+        hudRevealTask?.cancel()
+        hudRevealTask = nil
+        hud?.alphaValue = 1
         anchorEpoch += 1
         stopLevelStream()
         repositionTask?.cancel()

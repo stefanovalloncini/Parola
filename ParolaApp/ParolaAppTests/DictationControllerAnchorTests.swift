@@ -54,61 +54,77 @@ struct DictationControllerAnchorTests {
         #expect(DictationIndicatorStyle.allCases.first == .nearField)
     }
 
-    private final class SlowProvider: FieldAnchorProviding, @unchecked Sendable {
+    private final class GatedProvider: FieldAnchorProviding, @unchecked Sendable {
         let anchor: FieldAnchor?
-        let delay: TimeInterval
+        let started: AsyncStream<Void>
+        private let startedContinuation: AsyncStream<Void>.Continuation
+        private let gate = DispatchSemaphore(value: 0)
         private let lock = NSLock()
         private var onMain: [Bool] = []
-        init(anchor: FieldAnchor?, delay: TimeInterval) { self.anchor = anchor; self.delay = delay }
+
+        init(anchor: FieldAnchor?) {
+            self.anchor = anchor
+            (started, startedContinuation) = AsyncStream.makeStream(of: Void.self)
+        }
+
         var probes: [Bool] { lock.withLock { onMain } }
+        func open() { gate.signal() }
+
         func currentAnchor(on geometry: ScreenGeometry) -> FieldAnchor? {
             lock.withLock { onMain.append(Thread.isMainThread) }
-            Thread.sleep(forTimeInterval: delay)
+            startedContinuation.yield()
+            gate.wait()
             return anchor
         }
     }
 
-    @Test("a slow probe runs off the main thread and leaves the main actor free")
+    @Test("a blocked probe runs off the main thread and leaves the main actor free")
     func probeDoesNotBlockMain() async {
         let controller = DictationController()
         controller.indicatorStyle = .nearField
-        let provider = SlowProvider(anchor: anchor, delay: 0.4)
+        let provider = GatedProvider(anchor: anchor)
         controller.anchorProvider = provider
-        let started = ContinuousClock.now
         let refresh = Task { @MainActor in await controller.refreshAnchor() }
-        var ticks = 0
-        while ContinuousClock.now - started < .milliseconds(300) {
-            try? await Task.sleep(for: .milliseconds(10))
-            ticks += 1
-        }
-        #expect(ticks >= 15)
+        var started = provider.started.makeAsyncIterator()
+        await started.next()
+        await MainActor.run {}
+        #expect(controller.currentAnchor == nil)
+        provider.open()
         #expect(await refresh.value == true)
         #expect(provider.probes == [false])
     }
 
-    @Test("a probe already running absorbs the next request")
-    func overlappingRefreshSkips() async {
+    @Test("a request during a probe runs one more probe after it")
+    func overlappingRefreshReprobes() async {
         let controller = DictationController()
         controller.indicatorStyle = .nearField
-        let provider = SlowProvider(anchor: anchor, delay: 0.2)
+        let provider = GatedProvider(anchor: anchor)
         controller.anchorProvider = provider
-        async let first = controller.refreshAnchor()
-        try? await Task.sleep(for: .milliseconds(50))
-        let second = await controller.refreshAnchor()
-        #expect(second == false)
-        #expect(await first == true)
-        #expect(provider.probes.count == 1)
+        let first = Task { @MainActor in await controller.refreshAnchor() }
+        var started = provider.started.makeAsyncIterator()
+        await started.next()
+        let second = Task { @MainActor in await controller.refreshAnchor() }
+        await MainActor.run {}
+        provider.open()
+        await started.next()
+        provider.open()
+        #expect(await first.value == true)
+        #expect(await second.value == true)
+        #expect(provider.probes.count == 2)
     }
 
     @Test("an anchor that lands after the HUD was dismissed is dropped")
     func staleResultDiscarded() async {
         let controller = DictationController()
         controller.indicatorStyle = .nearField
-        controller.anchorProvider = SlowProvider(anchor: anchor, delay: 0.2)
-        async let result = controller.refreshAnchor()
-        try? await Task.sleep(for: .milliseconds(50))
+        let provider = GatedProvider(anchor: anchor)
+        controller.anchorProvider = provider
+        let result = Task { @MainActor in await controller.refreshAnchor() }
+        var started = provider.started.makeAsyncIterator()
+        await started.next()
         controller.stop()
-        #expect(await result == false)
+        provider.open()
+        #expect(await result.value == false)
         #expect(controller.currentAnchor == nil)
     }
 }
