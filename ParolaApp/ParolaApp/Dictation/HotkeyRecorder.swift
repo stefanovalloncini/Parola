@@ -49,6 +49,7 @@ struct HotkeyRecorder: View {
 
     private func start() {
         recording = true
+        CarbonHotkeyRegistry.shared.setSuspended(true)
         onRecordingChanged?(true)
         monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { event in
             if event.type == .flagsChanged { return event }
@@ -68,6 +69,7 @@ struct HotkeyRecorder: View {
         }
         guard recording else { return }
         recording = false
+        CarbonHotkeyRegistry.shared.setSuspended(false)
         onRecordingChanged?(false)
     }
 }
