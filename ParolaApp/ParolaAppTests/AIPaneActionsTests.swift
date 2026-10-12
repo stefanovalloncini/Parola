@@ -242,15 +242,14 @@ struct AIPaneActionsTests {
         let question = ChatMessage(role: .user, text: "What was decided?")
         let replyID = UUID()
         let live = ChatPane.LiveTurn(question: question, replyID: replyID)
-        let started = [question, ChatMessage(id: replyID, role: .assistant, text: "We ship on Fri ")]
-        guard case .keep(let reply) = ChatPane.stoppedTurn(live, in: started) else {
+        guard case .keep(let reply) = ChatPane.stoppedTurn(live, said: "We ship on Fri ") else {
             Issue.record("a reply with words wasn't kept")
             return
         }
         #expect(reply.id == replyID)
         #expect(reply.role == .assistant)
         #expect(reply.text == "We ship on Fri")
-        let unanswered = ChatPane.stoppedTurn(live, in: [question])
+        let unanswered = ChatPane.stoppedTurn(live, said: "")
         #expect(unanswered == .unanswered)
 
         let pane = try source("Views/Chat/ChatPane")

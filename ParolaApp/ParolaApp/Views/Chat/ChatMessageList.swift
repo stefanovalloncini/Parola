@@ -3,6 +3,7 @@ import ParolaCore
 
 struct ChatMessageList: View {
     let history: [ChatMessage]
+    let live: LiveReply
     let searchQuery: String
     let senderFilter: ChatSenderFilter
     let isSending: Bool
@@ -14,18 +15,22 @@ struct ChatMessageList: View {
                 LazyVStack(alignment: .leading, spacing: 4) {
                     let visible = filteredHistory
                     let trimmedQuery = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
-                    if history.isEmpty {
+                    if history.isEmpty && live.replyID == nil {
                         ChatHint()
                             .padding(.top, DS.Spacing.xlarge)
-                    } else if visible.isEmpty && !trimmedQuery.isEmpty {
+                    } else if visible.isEmpty && live.replyID == nil && !trimmedQuery.isEmpty {
                         ContentUnavailableView.search(text: trimmedQuery)
                             .padding(.top, DS.Spacing.xlarge)
-                    } else if visible.isEmpty && hasActiveFilter {
+                    } else if visible.isEmpty && live.replyID == nil && hasActiveFilter {
                         ContentUnavailableView("No Messages", systemImage: "line.3.horizontal.decrease.circle")
                             .padding(.top, DS.Spacing.xlarge)
                     }
                     ForEach(visible) { msg in
                         ChatBubble(message: msg).id(msg.id)
+                    }
+                    if let replyID = live.replyID {
+                        LiveReplyBubble(live: live, replyID: replyID, searchQuery: searchQuery, senderFilter: senderFilter)
+                            .id(replyID)
                     }
                     if isSending {
                         ChatThinkingIndicator(isActive: isSending)
@@ -41,6 +46,9 @@ struct ChatMessageList: View {
             .onChange(of: history.count) { _, _ in
                 scrollToEnd(proxy: proxy)
             }
+            .onChange(of: live.replyID) { _, replyID in
+                if replyID != nil { scrollToEnd(proxy: proxy) }
+            }
             .onChange(of: isSending) { _, sending in
                 if sending { scrollToEnd(proxy: proxy) }
             }
@@ -52,12 +60,14 @@ struct ChatMessageList: View {
     }
 
     private var filteredHistory: [ChatMessage] {
+        history.filter { Self.matches($0, searchQuery: searchQuery, senderFilter: senderFilter) }
+    }
+
+    static func matches(_ message: ChatMessage, searchQuery: String, senderFilter: ChatSenderFilter) -> Bool {
+        guard senderFilter.matches(message.role) else { return false }
         let trimmed = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
-        return history.filter { msg in
-            guard senderFilter.matches(msg.role) else { return false }
-            if trimmed.isEmpty { return true }
-            return msg.text.range(of: trimmed, options: .caseInsensitive) != nil
-        }
+        if trimmed.isEmpty { return true }
+        return message.text.range(of: trimmed, options: .caseInsensitive) != nil
     }
 
     private var hasActiveFilter: Bool {
@@ -68,6 +78,8 @@ struct ChatMessageList: View {
         withAnimation(.easeOut(duration: 0.2)) {
             if isSending {
                 proxy.scrollTo("thinking", anchor: .bottom)
+            } else if let replyID = live.replyID {
+                proxy.scrollTo(replyID, anchor: .bottom)
             } else if let last = history.last {
                 proxy.scrollTo(last.id, anchor: .bottom)
             }

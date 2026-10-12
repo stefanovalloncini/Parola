@@ -6,9 +6,24 @@ struct ChatSessionKey: Hashable {
     let hasTranscript: Bool
 }
 
-struct FocusChatComposerAction {
-    let focus: @MainActor () -> Void
-    @MainActor func callAsFunction() { focus() }
+/// One instance per pane, so the Edit menu's item isn't handed a new value on every pass.
+@MainActor
+@Observable
+final class FocusChatComposerAction {
+    private(set) var requests = 0
+    func callAsFunction() { requests &+= 1 }
+}
+
+struct ChatPreset: Identifiable {
+    let prompt: Prompt
+    let slug: String
+    var id: UUID { prompt.id }
+
+    @MainActor static let builtIns = rows(for: [])
+
+    @MainActor static func rows(for userPrompts: [Prompt]) -> [ChatPreset] {
+        ChatPane.presets(userPrompts: userPrompts).map { ChatPreset(prompt: $0, slug: ChatPane.identifierSlug($0.name)) }
+    }
 }
 
 private struct FocusChatComposerKey: FocusedValueKey {
@@ -32,13 +47,15 @@ struct ChatPane: View {
     @State private var isSending: Bool = false
     @State private var isReplying: Bool = false
     @State private var displayedHistory: [ChatMessage] = []
+    @State private var liveReply = LiveReply()
+    @State private var focusAction = FocusChatComposerAction()
     @State private var isSearching: Bool = false
     @State private var searchQuery: String = ""
     @State private var senderFilter: ChatSenderFilter = .all
     @State private var sendTask: Task<Void, Never>?
     @State private var liveTurn: LiveTurn?
     @State private var keepingStopped: Task<Void, Never>?
-    @State private var userPrompts: [Prompt] = []
+    @State private var presetRows = ChatPreset.builtIns
     @State private var confirmingClear = false
     @FocusState private var composerFocused: Bool
     @FocusState private var searchFocused: Bool
@@ -56,7 +73,8 @@ struct ChatPane: View {
         .onAppear { isSearching = isSearchingPersisted }
         .onChange(of: isSearching) { _, value in isSearchingPersisted = value }
         .onChange(of: model.chatSearchRequests) { _, _ in beginSearch() }
-        .focusedSceneValue(\.focusChatComposer, FocusChatComposerAction { composerFocused = true })
+        .focusedSceneValue(\.focusChatComposer, focusAction)
+        .onChange(of: focusAction.requests) { _, _ in composerFocused = true }
         .onChange(of: composerFocused) { _, focused in noteComposerFocus(focused) }
         .onDisappear { noteComposerFocus(false) }
         .axBranch("Chat")
@@ -81,12 +99,12 @@ struct ChatPane: View {
                 Text("Prompts")
                     .font(DS.Font.heading)
                 VStack(alignment: .leading, spacing: DS.Spacing.tight) {
-                    ForEach(Self.presets(userPrompts: userPrompts)) { prompt in
-                        Button(prompt.name) { sendPreset(prompt.instructions) }
+                    ForEach(presetRows) { preset in
+                        Button(preset.prompt.name) { sendPreset(preset.prompt.instructions) }
                             .buttonStyle(.plain)
                             .disabled(presetsDisabled)
-                            .accessibilityIdentifier("chat.preset.\(Self.identifierSlug(prompt.name))")
-                            .axLeaf("Chat.Button.Preset.\(Self.identifierSlug(prompt.name))")
+                            .accessibilityIdentifier("chat.preset.\(preset.slug)")
+                            .axLeaf("Chat.Button.Preset.\(preset.slug)")
                     }
                 }
                 Divider().opacity(0.4)
@@ -110,7 +128,7 @@ struct ChatPane: View {
     }
 
     private func refreshUserPrompts() async {
-        userPrompts = await model.promptLibrary.userPrompts
+        presetRows = ChatPreset.rows(for: await model.promptLibrary.userPrompts)
     }
 
     static let excludedBuiltInIDs: Set<UUID> = [
@@ -123,7 +141,7 @@ struct ChatPane: View {
         Prompt.builtIns.filter { !excludedBuiltInIDs.contains($0.id) } + userPrompts
     }
 
-    private static func identifierSlug(_ name: String) -> String {
+    static func identifierSlug(_ name: String) -> String {
         name
             .lowercased()
             .replacingOccurrences(of: " ", with: "_")
@@ -220,6 +238,7 @@ struct ChatPane: View {
         } else {
             ChatMessageList(
                 history: displayedHistory,
+                live: liveReply,
                 searchQuery: searchQuery,
                 senderFilter: senderFilter,
                 isSending: isSending,
@@ -301,19 +320,6 @@ struct ChatPane: View {
         input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isReplying
     }
 
-    /// Updates the in-flight assistant bubble by id; positional indexing crashed when the
-    /// history was cleared mid-stream.
-    static func updatedHistory(_ history: [ChatMessage], liveID: UUID, text: String) -> [ChatMessage] {
-        var history = history
-        let live = ChatMessage(id: liveID, role: .assistant, text: text)
-        if let index = history.lastIndex(where: { $0.id == liveID }) {
-            history[index] = live
-        } else {
-            history.append(live)
-        }
-        return history
-    }
-
     private var sessionKey: ChatSessionKey {
         ChatSessionKey(entryID: model.selectedEntryID, hasTranscript: model.transcript != nil)
     }
@@ -342,6 +348,7 @@ struct ChatPane: View {
         sendTask?.cancel()
         sendTask = nil
         liveTurn = nil
+        liveReply.end()
         keepingStopped = nil
         isSending = false
         isReplying = false
@@ -389,10 +396,10 @@ struct ChatPane: View {
 
     private func resetConversation() {
         guard let session else { return }
-        // Clearing while a reply streams: the next delta would index into the emptied history.
         sendTask?.cancel()
         sendTask = nil
         liveTurn = nil
+        liveReply.end()
         isSending = false
         isReplying = false
         turnError = nil
@@ -444,8 +451,11 @@ struct ChatPane: View {
         isReplying = false
         guard let live = liveTurn, let session else { return }
         liveTurn = nil
-        switch Self.stoppedTurn(live, in: displayedHistory) {
+        let said = liveReply.said
+        liveReply.end()
+        switch Self.stoppedTurn(live, said: said) {
         case .keep(let reply):
+            displayedHistory.append(reply)
             let entryID = model.selectedEntryID
             keepingStopped = Task {
                 let kept = await session.keepStopped(question: live.question, reply: reply)
@@ -468,8 +478,8 @@ struct ChatPane: View {
     }
 
     /// A stopped reply stays with the words it had said; one stopped before its first word hands the question back.
-    static func stoppedTurn(_ live: LiveTurn, in history: [ChatMessage]) -> StoppedTurn {
-        let said = history.last { $0.id == live.replyID }?.text.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    static func stoppedTurn(_ live: LiveTurn, said raw: String) -> StoppedTurn {
+        let said = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         return said.isEmpty ? .unanswered : .keep(ChatMessage(id: live.replyID, role: .assistant, text: said))
     }
 
@@ -492,33 +502,33 @@ struct ChatPane: View {
                     isSending = false
                     isReplying = false
                     liveTurn = nil
+                    liveReply.end()
                 }
             }
             // A reply stopped just before must be in the history this question is asked after.
             await keeping?.value
-            var collected = ""
             var started = false
             do {
                 for try await event in session.stream(text, id: question.id) {
                     guard !Task.isCancelled, entryID == model.selectedEntryID else { return }
                     switch event {
                     case .delta(let delta):
-                        collected += delta
                         if !started {
                             started = true
                             isSending = false
                         }
-                        displayedHistory = Self.updatedHistory(displayedHistory, liveID: liveID, text: collected)
+                        liveReply.append(delta, replyID: liveID)
                     case .completed:
                         liveTurn = nil
                         let updated = await session.history
                         displayedHistory = updated
+                        liveReply.end(ifHolding: liveID)
                         model.recordChat(history: updated, for: entryID)
                     }
                 }
             } catch {
                 guard !Task.isCancelled, entryID == model.selectedEntryID else { return }
-                displayedHistory.removeAll { $0.id == liveID }
+                liveReply.end()
                 turnError = error.localizedDescription
             }
         }
