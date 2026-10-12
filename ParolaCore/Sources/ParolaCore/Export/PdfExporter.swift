@@ -36,6 +36,7 @@ struct PdfExporter: TranscriptExporter {
 
         var iterator = ChunkIterator(
             transcript: transcript,
+            title: Format.documentTitle(for: transcript, options: options),
             fonts: fonts,
             chunkSize: Self.segmentsPerChunk,
             speakers: options.speakers,
@@ -111,6 +112,7 @@ struct PdfExporter: TranscriptExporter {
 
     private struct ChunkIterator {
         let transcript: Transcript
+        let title: String
         let fonts: Fonts
         let chunkSize: Int
         let speakers: Bool
@@ -118,8 +120,9 @@ struct PdfExporter: TranscriptExporter {
         private var cursor: Int = 0
         private var emittedTitle: Bool = false
 
-        init(transcript: Transcript, fonts: Fonts, chunkSize: Int, speakers: Bool, translations: [Int: String]) {
+        init(transcript: Transcript, title: String, fonts: Fonts, chunkSize: Int, speakers: Bool, translations: [Int: String]) {
             self.transcript = transcript
+            self.title = title
             self.fonts = fonts
             self.chunkSize = max(1, chunkSize)
             self.speakers = speakers
@@ -130,7 +133,7 @@ struct PdfExporter: TranscriptExporter {
             let fontKey = NSAttributedString.Key(kCTFontAttributeName as String)
             let chunk = NSMutableAttributedString()
             if !emittedTitle {
-                chunk.append(NSAttributedString(string: "\(Format.documentTitle(for: transcript))\n\n", attributes: [fontKey: fonts.title]))
+                chunk.append(NSAttributedString(string: "\(title)\n\n", attributes: [fontKey: fonts.title]))
                 emittedTitle = true
             }
             let end = min(cursor + chunkSize, transcript.segments.count)

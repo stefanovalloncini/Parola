@@ -61,6 +61,7 @@ public struct DeliveryPayload: Codable, Sendable, Equatable {
     public init(entry: LibraryEntry, document: ParolaDocument) throws {
         var spec = ExportSpec.standard(for: .md)
         spec.options.speakers = true
+        spec.options.documentTitle = entry.title
         let markdown = try Exporters.exporter(for: spec).renderText(document.transcript)
         self.init(
             entryID: entry.id,

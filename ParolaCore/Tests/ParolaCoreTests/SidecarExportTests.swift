@@ -203,6 +203,19 @@ struct SidecarExportTests {
         #expect(files == ["talk (2).srt", "talk (2).txt", "talk.txt"])
     }
 
+    @Test("a Markdown sidecar is headed with the entry title, while only the file name is cleaned")
+    func markdownSidecarHeading() async throws {
+        let dir = try scratch()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let md = ExportPreset(name: "Notes", spec: .standard(for: .md))
+        let source = SidecarSource(fileExtension: "m4a", folder: dir, baseName: "Standup 10:30 / notes", owner: "entry-1")
+
+        _ = await ExportRunner.run(SidecarExportPlanner.plan(presets: [md], source: source), transcript: transcript())
+
+        let written = try String(contentsOf: dir.appendingPathComponent("Standup 10-30 - notes.md"), encoding: .utf8)
+        #expect(written.hasPrefix("# Standup 10:30 / notes\n"))
+    }
+
     @Test("a name is taken when any of the source's formats already uses it, so its files share one number")
     func oneNumberPerSource() async throws {
         let dir = try scratch()

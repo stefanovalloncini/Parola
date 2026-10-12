@@ -24,6 +24,42 @@ struct ExportOptionsTests {
         return try Exporters.exporter(for: spec).renderText(sample())
     }
 
+    @Test("a document title replaces the source file name in the heading of every format that has one")
+    func documentTitleReplacesTheFileName() throws {
+        let headings: [(ExportFormat, (String) -> String)] = [
+            (.md, { "# \($0)\n" }),
+            (.html, { "<title>\($0)</title>" }),
+            (.fcpxml, { "<project name=\"\($0)\">" }),
+        ]
+        for (format, heading) in headings {
+            let named = try render(format) { $0.documentTitle = "Weekly planning" }
+            let plain = try render(format)  { _ in }
+            #expect(named.contains(heading("Weekly planning")))
+            #expect(!named.contains(heading("x")))
+            #expect(plain.contains(heading("x")))
+            #expect(!plain.contains("Weekly planning"))
+        }
+    }
+
+    @Test("every option survives a save and load, and the document title is never saved")
+    func optionsRoundTripWithoutTheTitle() throws {
+        let options = ExportOptions(
+            timestamps: true, endTimestamps: true, milliseconds: true, speakers: false,
+            captionLength: .long, htmlTheme: .dark, grouping: .speakerParagraphs, content: .both
+        )
+        var titled = options
+        titled.documentTitle = "Weekly planning"
+
+        let data = try JSONEncoder().encode(titled)
+
+        #expect(!String(decoding: data, as: UTF8.self).contains("Weekly planning"))
+        let decoded = try JSONDecoder().decode(ExportOptions.self, from: data)
+        #expect(decoded.documentTitle == nil)
+        #expect(decoded == options)
+        #expect(decoded != titled)
+        #expect(decoded.timestamps && decoded.endTimestamps && decoded.milliseconds && !decoded.speakers)
+    }
+
     @Test("the factory builds the exporter the spec names")
     func factoryFollowsTheSpec() {
         for format in ExportFormat.allCases {

@@ -182,6 +182,12 @@ public struct ExportOptions: Sendable, Codable, Hashable {
     public var htmlTheme: HtmlExportTheme
     public var grouping: ExportGrouping
     public var content: ExportContent
+    /// The heading of a Markdown, HTML, PDF or Final Cut export; without one it comes from the transcript's source. Never saved.
+    public var documentTitle: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case timestamps, endTimestamps, milliseconds, speakers, captionLength, htmlTheme, grouping, content
+    }
 
     public init(
         timestamps: Bool = false,
@@ -220,6 +226,7 @@ public struct ExportOptions: Sendable, Codable, Hashable {
     func masked(to format: ExportFormat) -> ExportOptions {
         var out = ExportSpec.standard(for: format).options
         out.content = content
+        out.documentTitle = documentTitle
         for field in format.optionFields {
             switch field {
             case .timestamps: out.timestamps = timestamps

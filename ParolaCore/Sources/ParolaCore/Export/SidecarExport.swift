@@ -9,6 +9,8 @@ public struct SidecarSource: Sendable, Hashable {
     public var owner: String
     /// A folder Parola picked may not exist yet; a source's own folder that is gone (an ejected drive) must not be recreated.
     public var createsDirectory: Bool
+    /// The heading a document carries when the name above had characters taken out of it.
+    public var documentTitle: String?
 
     /// Beside the file itself, under its own stem: `clip.mov` gets `clip.srt`.
     public init(besideFile url: URL) {
@@ -25,6 +27,7 @@ public struct SidecarSource: Sendable, Hashable {
     public init(fileExtension: String, folder: URL, baseName: String, owner: String) {
         self.fileExtension = fileExtension
         self.directory = folder
+        documentTitle = baseName.trimmingCharacters(in: .whitespacesAndNewlines)
         let cleaned = String(
             baseName
                 .replacingOccurrences(of: "/", with: "-")
@@ -115,11 +118,15 @@ public enum SidecarExportPlanner {
         var seenTargets = Set<URL>()
         var jobs: [ExportJob] = []
         for preset in presets + ruled where seenPresets.insert(preset.id).inserted {
+            var spec = preset.spec
+            if spec.options.documentTitle == nil, let title = source.documentTitle, !title.isEmpty {
+                spec.options.documentTitle = title
+            }
             let tails = ["", ".\(slug(preset))", ".\(slug(preset))-\(preset.id.uuidString.prefix(8))"]
             guard let job = tails
                 .map({
                     ExportJob(
-                        spec: preset.spec, directory: source.directory, baseName: source.baseName, nameTail: $0,
+                        spec: spec, directory: source.directory, baseName: source.baseName, nameTail: $0,
                         owner: source.owner, createsDirectory: source.createsDirectory
                     )
                 })
@@ -185,7 +192,9 @@ public enum ExportRunner {
 
     private static func write(_ job: ExportJob, number: Int, transcript: Transcript) -> ExportJobResult {
         do {
-            let data = try Exporters.exporter(for: job.spec).render(transcript)
+            var spec = job.spec
+            if spec.options.documentTitle == nil { spec.options.documentTitle = job.baseName }
+            let data = try Exporters.exporter(for: spec).render(transcript)
             if job.createsDirectory {
                 try FileManager.default.createDirectory(at: job.directory, withIntermediateDirectories: true)
             }

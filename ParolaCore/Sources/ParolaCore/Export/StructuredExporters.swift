@@ -145,7 +145,7 @@ public struct HtmlExporter: TranscriptExporter {
             body += paragraph
         }
         let theme = options.htmlTheme
-        let title = Format.escapeHTML(Format.documentTitle(for: transcript))
+        let title = Format.escapeHTML(Format.documentTitle(for: transcript, options: options))
         let css = "body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;max-width:720px;margin:2rem auto;padding:0 1rem;line-height:1.5;background:\(theme.background);color:\(theme.foreground)}.t{color:\(theme.timestamp);font-family:ui-monospace,monospace;font-size:.85em;text-decoration:none;margin-right:.4em}.s{font-weight:600}p{margin:0 0 1em}"
         // Only for a two-language export, so a single-language one keeps its exact bytes.
         let translationCSS = spec.resolvedContent == .both ? ".x{color:\(theme.timestamp)}" : ""

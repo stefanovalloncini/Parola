@@ -38,7 +38,7 @@ public struct MarkdownExporter: TranscriptExporter {
     }
 
     public func encode(_ transcript: Transcript) throws -> Data {
-        var out = "# \(Format.documentTitle(for: transcript))\n\n"
+        var out = "# \(Format.documentTitle(for: transcript, options: options))\n\n"
         for seg in transcript.segments {
             let body = seg.text.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !body.isEmpty else { continue }

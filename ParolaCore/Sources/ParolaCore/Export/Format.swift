@@ -73,6 +73,11 @@ public enum Format {
         return flattened.isEmpty ? nil : flattened
     }
 
+    static func documentTitle(for transcript: Transcript, options: ExportOptions) -> String {
+        if let title = options.documentTitle?.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty { return title }
+        return documentTitle(for: transcript)
+    }
+
     static func documentTitle(for transcript: Transcript) -> String {
         guard let source = transcript.sourceURL else { return "Transcript" }
         // A link's last path component is "watch" or a numeric id, never the video's name.

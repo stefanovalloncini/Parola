@@ -104,7 +104,7 @@ struct DeliveryPayloadTests {
         #expect(payload.duration == 134)
         #expect(payload.favorites == [1, 2])
         #expect(payload.markdown.contains("**Ada:** Welcome back."))
-        #expect(payload.markdown.hasPrefix("# interview\n"))
+        #expect(payload.markdown.hasPrefix("# Interview\n"))
     }
 
     @Test("favoriteSegments lists the starred segments in transcript order")

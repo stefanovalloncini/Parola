@@ -13,6 +13,21 @@ struct PdfExporterTests {
         PDFDocument(data: pdf)?.string ?? ""
     }
 
+    @Test("the heading is the document title when one is given, the source file name otherwise")
+    func headingFollowsTheDocumentTitle() throws {
+        let transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "Hello")],
+            language: "en", modelName: "x", sourceURL: URL(fileURLWithPath: "/tmp/recording.wav")
+        )
+        var spec = ExportSpec.standard(for: .pdf)
+        spec.options.documentTitle = "Weekly planning"
+        let named = text(of: try PdfExporter(spec: spec).render(transcript))
+        let plain = text(of: try PdfExporter().render(transcript))
+
+        #expect(named.hasPrefix("Weekly planning"))
+        #expect(plain.hasPrefix("recording"))
+    }
+
     @Test("emits a valid PDF whose text carries the segments")
     func rendersValidPdf() throws {
         let data = try render([

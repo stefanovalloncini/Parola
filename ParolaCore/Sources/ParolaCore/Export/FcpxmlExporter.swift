@@ -11,7 +11,7 @@ public struct FcpxmlExporter: TranscriptExporter {
     }
 
     public func encode(_ transcript: Transcript) throws -> Data {
-        let title = Format.escapeXML(Format.documentTitle(for: transcript))
+        let title = Format.escapeXML(Format.documentTitle(for: transcript, options: options))
         let role = "iTT?captionFormat=ITT.\(Self.captionLanguage(transcript.language))"
         let lastEnd = transcript.segments.map(\.end).max() ?? 0
         // FCP refuses a zero-length gap, so an empty transcript still spans one second.
