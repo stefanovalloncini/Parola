@@ -20,6 +20,28 @@ private final class FakeBackend: CarbonHotkeyBackend {
     func unregister(id: UInt32) { registered[id] = nil }
 }
 
+@MainActor
+final class FakeFallback: HotkeyFallbackSource {
+    var installs: [UInt16] = []
+    var removals = 0
+    var handlers: [@MainActor (FallbackKeyEvent) -> Void] = []
+
+    func install(keyCode: UInt16, handler: @escaping @MainActor (FallbackKeyEvent) -> Void) -> [Any] {
+        installs.append(keyCode)
+        handlers.append(handler)
+        return [1]
+    }
+
+    func remove(_ tokens: [Any]) {
+        removals += tokens.count
+        handlers = []
+    }
+
+    func send(down: Bool, flags: NSEvent.ModifierFlags, isRepeat: Bool = false) {
+        for handler in handlers { handler(FallbackKeyEvent(isDown: down, isRepeat: isRepeat, flags: flags)) }
+    }
+}
+
 private final class HeldKey: @unchecked Sendable {
     private let lock = NSLock()
     private var down = true
@@ -38,9 +60,10 @@ private final class EventLog: @unchecked Sendable {
 @Suite("Carbon hotkeys")
 struct HotkeyMonitorTests {
     private func makeMonitor(
-        _ backend: FakeBackend, registry: CarbonHotkeyRegistry, code: Int = kVK_F5, mods: NSEvent.ModifierFlags = []
+        _ backend: FakeBackend, registry: CarbonHotkeyRegistry, code: Int = kVK_F5, mods: NSEvent.ModifierFlags = [],
+        fallback: FakeFallback = FakeFallback()
     ) -> GlobalHotkeyMonitor {
-        GlobalHotkeyMonitor(keyCode: code, modifiers: mods, registry: registry)
+        GlobalHotkeyMonitor(keyCode: code, modifiers: mods, registry: registry, fallbackSource: fallback)
     }
 
     @Test("only the four Carbon modifiers survive; function, numpad and caps lock are dropped")
@@ -111,19 +134,56 @@ struct HotkeyMonitorTests {
         #expect(registry.registrationCount == 1)
     }
 
-    @Test("a combination the system refuses is reported, logged and falls back to key monitors")
+    @Test("a combination the system refuses is reported, logged and served by the fallback")
     func refusedByTheSystem() async {
         let backend = FakeBackend()
         backend.refuseWith = -9878
         let registry = CarbonHotkeyRegistry(backend: backend)
-        let monitor = makeMonitor(backend, registry: registry, code: kVK_Space, mods: [.option])
-        await monitor.start { _ in }
+        let fallback = FakeFallback()
+        let monitor = makeMonitor(backend, registry: registry, code: kVK_ANSI_D, mods: [.control], fallback: fallback)
+        let log = EventLog()
+        await monitor.start { log.append($0) }
         #expect(!monitor.isRegistered)
-        #expect(monitor.hasFallback)
-        #expect(registry.health.isRefused(keyCode: kVK_Space, modifiers: [.option]))
+        #expect(fallback.installs == [UInt16(kVK_ANSI_D)])
+        #expect(registry.health.isRefused(keyCode: kVK_ANSI_D, modifiers: [.control]))
+        fallback.send(down: true, flags: [.control])
+        fallback.send(down: true, flags: [.control], isRepeat: true)
+        fallback.send(down: false, flags: [])
+        #expect(log.all == [.press, .release])
         await monitor.stop()
-        #expect(!monitor.hasFallback)
-        #expect(!registry.health.isRefused(keyCode: kVK_Space, modifiers: [.option]))
+        #expect(fallback.removals == 1)
+        #expect(!registry.health.isRefused(keyCode: kVK_ANSI_D, modifiers: [.control]))
+    }
+
+    @Test("an option-only combination is never handed to Carbon and is served by the fallback")
+    func optionOnlyUsesFallback() async {
+        for mods: NSEvent.ModifierFlags in [[.option], [.option, .shift]] {
+            let backend = FakeBackend()
+            let registry = CarbonHotkeyRegistry(backend: backend)
+            let fallback = FakeFallback()
+            let monitor = makeMonitor(backend, registry: registry, code: kVK_Space, mods: mods, fallback: fallback)
+            let log = EventLog()
+            await monitor.start { log.append($0) }
+            #expect(backend.registerCalls == 0)
+            #expect(fallback.installs == [UInt16(kVK_Space)])
+            #expect(registry.health.isRefused(keyCode: kVK_Space, modifiers: mods))
+            fallback.send(down: true, flags: mods)
+            fallback.send(down: false, flags: [])
+            #expect(log.all == [.press, .release])
+            await monitor.stop()
+            #expect(!registry.health.isRefused(keyCode: kVK_Space, modifiers: mods))
+        }
+    }
+
+    @Test("a combination with ⌘ or ⌃ is not option-only")
+    func optionWithCommandStaysOnCarbon() async {
+        let backend = FakeBackend()
+        let registry = CarbonHotkeyRegistry(backend: backend)
+        let fallback = FakeFallback()
+        let monitor = makeMonitor(backend, registry: registry, code: kVK_Space, mods: [.option, .control], fallback: fallback)
+        await monitor.start { _ in }
+        #expect(backend.registerCalls == 1)
+        #expect(fallback.installs.isEmpty)
     }
 
     @Test("a saved bare letter is refused by policy and never registered")

@@ -57,6 +57,12 @@ struct CarbonHotkeyKey: Hashable {
         self.modifiers = UInt32(mask)
     }
 
+    /// macOS 15+ accepts these registrations but never delivers them, so they are served by key monitors instead.
+    var isOptionOnly: Bool {
+        let optionOrShift = UInt32(optionKey | shiftKey)
+        return modifiers & UInt32(optionKey) != 0 && modifiers & ~optionOrShift == 0
+    }
+
     /// Carbon would consume a bare letter or Escape system-wide, so only F-keys may go without a modifier.
     var isPermitted: Bool {
         HotkeyRules.isFunctionKey(Int(keyCode)) || modifiers & UInt32(cmdKey | controlKey | optionKey) != 0
@@ -92,6 +98,7 @@ final class CarbonHotkeyRegistry {
         case registered
         case suspended
         case refusedByOS(OSStatus)
+        case monitorOnly
         case refusedByPolicy
     }
 
@@ -127,6 +134,10 @@ final class CarbonHotkeyRegistry {
             return Addition(token: nil, outcome: .refusedByPolicy)
         }
         let token = UUID()
+        if key.isOptionOnly {
+            health.set(key, refused: true)
+            return Addition(token: token, outcome: .monitorOnly)
+        }
         var entry = entries[key] ?? makeEntry(for: key)
         entry.handlers[token] = handler
         if !isSuspended, !entry.isRegistered { attemptRegistration(of: key, entry: &entry) }
@@ -135,6 +146,7 @@ final class CarbonHotkeyRegistry {
     }
 
     func remove(_ key: CarbonHotkeyKey, token: UUID) {
+        if key.isOptionOnly { health.set(key, refused: false) }
         guard var entry = entries[key] else { return }
         entry.handlers[token] = nil
         if entry.handlers.isEmpty {
@@ -257,6 +269,53 @@ private final class SystemCarbonHotkeyBackend: CarbonHotkeyBackend {
     }
 }
 
+struct FallbackKeyEvent {
+    let isDown: Bool
+    let isRepeat: Bool
+    let flags: NSEvent.ModifierFlags
+}
+
+@MainActor
+protocol HotkeyFallbackSource: AnyObject {
+    func install(keyCode: UInt16, handler: @escaping @MainActor (FallbackKeyEvent) -> Void) -> [Any]
+    func remove(_ tokens: [Any])
+}
+
+@MainActor
+final class NSEventFallbackSource: HotkeyFallbackSource {
+    func install(keyCode: UInt16, handler: @escaping @MainActor (FallbackKeyEvent) -> Void) -> [Any] {
+        let mask: NSEvent.EventTypeMask = [.keyDown, .keyUp]
+        func translate(_ event: NSEvent) -> FallbackKeyEvent {
+            FallbackKeyEvent(
+                isDown: event.type == .keyDown,
+                isRepeat: event.type == .keyDown && event.isARepeat,
+                flags: event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            )
+        }
+        var tokens: [Any] = []
+        if let global = NSEvent.addGlobalMonitorForEvents(matching: mask, handler: { event in
+            guard event.keyCode == keyCode else { return }
+            let translated = translate(event)
+            MainActor.assumeIsolated { handler(translated) }
+        }) {
+            tokens.append(global)
+        }
+        if let local = NSEvent.addLocalMonitorForEvents(matching: mask, handler: { event in
+            guard event.keyCode == keyCode else { return event }
+            let translated = translate(event)
+            MainActor.assumeIsolated { handler(translated) }
+            return event
+        }) {
+            tokens.append(local)
+        }
+        return tokens
+    }
+
+    func remove(_ tokens: [Any]) {
+        for token in tokens { NSEvent.removeMonitor(token) }
+    }
+}
+
 @MainActor
 final class GlobalHotkeyMonitor: HotkeyMonitor {
     private let keyCode: Int
@@ -267,13 +326,15 @@ final class GlobalHotkeyMonitor: HotkeyMonitor {
     private var token: UUID?
     private var isPressed = false
     private var heldWatch: Task<Void, Never>?
-    private var fallbackMonitors: [Any] = []
+    private let fallbackSource: any HotkeyFallbackSource
+    private var fallbackTokens: [Any] = []
     private var handler: (@Sendable (HotkeyEvent) -> Void)?
 
     init(
         keyCode: Int = Int(kVK_F5),
         modifiers: NSEvent.ModifierFlags = [],
         registry: CarbonHotkeyRegistry = .shared,
+        fallbackSource: any HotkeyFallbackSource = NSEventFallbackSource(),
         keyIsDown: @escaping @Sendable (Int) -> Bool = {
             CGEventSource.keyState(.combinedSessionState, key: CGKeyCode($0))
         }
@@ -282,6 +343,7 @@ final class GlobalHotkeyMonitor: HotkeyMonitor {
         self.modifierMask = modifiers.intersection([.command, .shift, .option, .control])
         self.key = CarbonHotkeyKey(keyCode: keyCode, modifiers: modifiers)
         self.registry = registry
+        self.fallbackSource = fallbackSource
         self.keyIsDown = keyIsDown
     }
 
@@ -304,7 +366,10 @@ final class GlobalHotkeyMonitor: HotkeyMonitor {
             MainActor.assumeIsolated { self?.process(event) }
         }
         token = addition.token
-        if case .refusedByOS = addition.outcome { installFallback() }
+        switch addition.outcome {
+        case .refusedByOS, .monitorOnly: installFallback()
+        default: break
+        }
     }
 
     /// Key repeat and a release without a press never reach the handler.
@@ -343,41 +408,23 @@ final class GlobalHotkeyMonitor: HotkeyMonitor {
     }
 
     private func installFallback() {
-        let mask: NSEvent.EventTypeMask = [.keyDown, .keyUp]
-        let watched = UInt16(keyCode)
         let required = modifierMask
-        if let global = NSEvent.addGlobalMonitorForEvents(matching: mask, handler: { [weak self] event in
-            guard event.keyCode == watched else { return }
-            MainActor.assumeIsolated { self?.processFallback(event, required: required) }
-        }) {
-            fallbackMonitors.append(global)
-        }
-        if let local = NSEvent.addLocalMonitorForEvents(matching: mask, handler: { [weak self] event in
-            guard event.keyCode == watched else { return event }
-            MainActor.assumeIsolated { self?.processFallback(event, required: required) }
-            return event
-        }) {
-            fallbackMonitors.append(local)
-        }
-    }
-
-    private func processFallback(_ event: NSEvent, required: NSEvent.ModifierFlags) {
-        switch event.type {
-        case .keyDown:
-            guard !event.isARepeat, event.modifierFlags.intersection(.deviceIndependentFlagsMask).contains(required) else { return }
-            process(.press)
-        case .keyUp:
-            process(.release)
-        default:
-            break
+        fallbackTokens = fallbackSource.install(keyCode: UInt16(keyCode)) { [weak self] event in
+            guard let self else { return }
+            if event.isDown {
+                guard !event.isRepeat, event.flags.contains(required) else { return }
+                process(.press)
+            } else {
+                process(.release)
+            }
         }
     }
 
     private func unregister() {
         if let token { registry.remove(key, token: token) }
         token = nil
-        for monitor in fallbackMonitors { NSEvent.removeMonitor(monitor) }
-        fallbackMonitors = []
+        fallbackSource.remove(fallbackTokens)
+        fallbackTokens = []
         heldWatch?.cancel()
         heldWatch = nil
         isPressed = false
@@ -386,7 +433,7 @@ final class GlobalHotkeyMonitor: HotkeyMonitor {
 
     #if DEBUG
     var isRegistered: Bool { registry.outcome(for: key) == .registered && token != nil }
-    var hasFallback: Bool { !fallbackMonitors.isEmpty }
+    var hasFallback: Bool { !fallbackTokens.isEmpty }
     #endif
 }
 
