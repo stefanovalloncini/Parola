@@ -15,18 +15,24 @@ struct PasteboardSnapshot: Sendable {
 
     var isEmpty: Bool { items.allSatisfy(\.isEmpty) }
 
-    @MainActor
-    static func capture(from pasteboard: NSPasteboard, byteBudget: Int = defaultByteBudget) -> PasteboardSnapshot {
+    /// Lazy providers (Office, browsers) can take long to render; this keeps that wait off the main actor.
+    @concurrent
+    static func capture(named name: NSPasteboard.Name, byteBudget: Int = defaultByteBudget) async -> PasteboardSnapshot {
+        capture(from: NSPasteboard(name: name), byteBudget: byteBudget)
+    }
+
+    nonisolated static func capture(from pasteboard: NSPasteboard, byteBudget: Int = defaultByteBudget) -> PasteboardSnapshot {
         var captured: [[String: Data]] = []
         var budget = byteBudget
         var overBudget = false
         for item in pasteboard.pasteboardItems ?? [] {
+            if overBudget { break }
             var representations: [String: Data] = [:]
             for type in item.types {
                 guard let data = item.data(forType: type) else { continue }
                 if data.count > budget {
                     overBudget = true
-                    continue
+                    break
                 }
                 budget -= data.count
                 representations[type.rawValue] = data

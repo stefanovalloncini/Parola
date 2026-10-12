@@ -18,9 +18,9 @@ struct ClipboardPasteInserter: TextInserter {
         if preDelayMs > 0 {
             try? await Task.sleep(for: .milliseconds(preDelayMs))
         }
+        let prior = await PasteboardSnapshot.capture(named: pasteboardName)
         try await MainActor.run {
             let pasteboard = NSPasteboard(name: pasteboardName)
-            let prior = PasteboardSnapshot.capture(from: pasteboard)
             pasteboard.clearContents()
             pasteboard.setString(text, forType: .string)
             guard trustCheck() else {

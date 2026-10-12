@@ -51,4 +51,57 @@ struct PasteboardSnapshotTests {
         #expect(pasteboard.string(forType: .string) == "keep me")
         #expect(pasteboard.pasteboardItems?.first?.data(forType: .png) == nil)
     }
+
+    private final class SlowProvider: NSObject, NSPasteboardItemDataProvider, @unchecked Sendable {
+        private let lock = NSLock()
+        private var served: [(type: String, onMain: Bool)] = []
+        let size: Int
+        let delay: TimeInterval
+        init(size: Int, delay: TimeInterval) { self.size = size; self.delay = delay }
+        var requests: [(type: String, onMain: Bool)] { lock.withLock { served } }
+        func pasteboard(_ pasteboard: NSPasteboard?, item: NSPasteboardItem, provideDataForType type: NSPasteboard.PasteboardType) {
+            lock.withLock { served.append((type.rawValue, Thread.isMainThread)) }
+            Thread.sleep(forTimeInterval: delay)
+            item.setData(Data(count: size), forType: type)
+        }
+    }
+
+    @Test("a slow clipboard is read off the main actor")
+    func captureLeavesMainFree() async {
+        let name = NSPasteboard.Name("snapshot-test-\(UUID())")
+        let pasteboard = NSPasteboard(name: name)
+        pasteboard.clearContents()
+        let provider = SlowProvider(size: 16, delay: 0.3)
+        let item = NSPasteboardItem()
+        item.setDataProvider(provider, forTypes: [.png])
+        pasteboard.writeObjects([item])
+
+        let started = ContinuousClock.now
+        async let snapshot = PasteboardSnapshot.capture(named: name)
+        var ticks = 0
+        while ContinuousClock.now - started < .milliseconds(200) {
+            try? await Task.sleep(for: .milliseconds(10))
+            ticks += 1
+        }
+        #expect(ticks >= 10)
+        #expect(await snapshot.isEmpty == false)
+        #expect(provider.requests.allSatisfy { !$0.onMain })
+    }
+
+    @Test("once the budget is exceeded the remaining representations are not read")
+    func overBudgetStopsReading() {
+        let pasteboard = makePasteboard()
+        pasteboard.clearContents()
+        let big = SlowProvider(size: 4096, delay: 0)
+        let after = SlowProvider(size: 8, delay: 0)
+        let first = NSPasteboardItem()
+        first.setDataProvider(big, forTypes: [.png])
+        first.setString("plain", forType: .string)
+        let second = NSPasteboardItem()
+        second.setDataProvider(after, forTypes: [.tiff])
+        pasteboard.writeObjects([first, second])
+
+        _ = PasteboardSnapshot.capture(from: pasteboard, byteBudget: 128)
+        #expect(after.requests.isEmpty)
+    }
 }
