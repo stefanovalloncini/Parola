@@ -29,12 +29,14 @@ final class TranscriptionCoordinator {
     @ObservationIgnored private var streamingSession: StreamingTranscriptionSession?
     @ObservationIgnored private var streamingTask: Task<Void, Never>?
     @ObservationIgnored private var transcribeTask: Task<Void, Never>?
+    @ObservationIgnored private var transcribeGeneration = 0
     @ObservationIgnored private var recordingGeneration: Int = 0
     @ObservationIgnored private var cancelledGeneration: Int = -1
 
     init(library: LibraryStore, settings: UserSettings) {
         self.library = library
         self.settings = settings
+        Task { await StreamingTranscriberFactory.setIdleTimeout(ModelResidencyPolicy.idleTimeout) }
     }
 
     func releaseModelsInBackground() async {
@@ -91,6 +93,8 @@ final class TranscriptionCoordinator {
 
     private func runTranscription(audio: URL) {
         transcribeTask?.cancel()
+        transcribeGeneration += 1
+        let generation = transcribeGeneration
         transcribeTask = Task {
             defer { Self.removeImportCopy(audio) }
             do {
@@ -109,9 +113,9 @@ final class TranscriptionCoordinator {
                 phase = .idle
                 onComplete?(entry)
             } catch is CancellationError {
-                phase = .idle
+                if generation == transcribeGeneration { phase = .idle }
             } catch {
-                phase = .failed(message: error.localizedDescription)
+                if generation == transcribeGeneration { phase = .failed(message: error.localizedDescription) }
             }
         }
     }

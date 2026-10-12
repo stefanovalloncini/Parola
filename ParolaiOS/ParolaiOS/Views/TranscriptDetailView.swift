@@ -449,13 +449,16 @@ private struct WordChip: View, Equatable {
 private func highlighted(text: String, query: String) -> AttributedString {
     var attributed = AttributedString(text)
     guard !query.isEmpty else { return attributed }
-    var searchStart = text.startIndex
-    while let range = text.range(of: query, options: .caseInsensitive, range: searchStart..<text.endIndex) {
-        if let attrRange = Range(range, in: attributed) {
+    let ns = text as NSString
+    var location = 0
+    while location < ns.length {
+        let found = ns.range(of: query, options: .caseInsensitive, range: NSRange(location: location, length: ns.length - location))
+        guard found.location != NSNotFound else { break }
+        if let range = Range(found, in: text), let attrRange = Range(range, in: attributed) {
             attributed[attrRange].backgroundColor = .yellow.opacity(0.55)
             attributed[attrRange].font = .body.bold()
         }
-        searchStart = range.upperBound
+        location = found.location + found.length
     }
     return attributed
 }

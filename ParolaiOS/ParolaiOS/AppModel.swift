@@ -69,7 +69,6 @@ final class AppModel {
             )
         }
         refreshModelList()
-        Task { await StreamingTranscriberFactory.setIdleTimeout(ModelResidencyPolicy.idleTimeout) }
         Task { await store.warmSearchIndex() }
         refreshLibrary()
         Task { [weak self] in

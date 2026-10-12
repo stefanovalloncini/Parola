@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import os
 import Testing
 @testable import Parola
 import ParolaCore
@@ -7,13 +8,6 @@ import ParolaCore
 @Suite("Playback row observation")
 @MainActor
 struct PlaybackRowObservationTests {
-    private final class Counter: @unchecked Sendable {
-        private let lock = NSLock()
-        private var value = 0
-        func bump() { lock.withLock { value += 1 } }
-        var count: Int { lock.withLock { value } }
-    }
-
     private func makeController() async -> PlaybackController {
         let controller = PlaybackController()
         controller.load(audioURL: nil, transcript: Fixtures.makeLongTranscript(segments: 40, wordsPerSegment: 10))
@@ -28,12 +22,12 @@ struct PlaybackRowObservationTests {
         track: (PlaybackController, Int) -> Void,
         change: () -> Void
     ) -> Int {
-        let counter = Counter()
+        let counter = OSAllocatedUnfairLock(initialState: 0)
         for row in 0..<rows {
-            withObservationTracking { track(controller, row) } onChange: { counter.bump() }
+            withObservationTracking { track(controller, row) } onChange: { counter.withLock { $0 += 1 } }
         }
         change()
-        return counter.count
+        return counter.withLock { $0 }
     }
 
     @Test("a word change inside the active segment invalidates only that row")
