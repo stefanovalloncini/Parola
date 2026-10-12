@@ -230,3 +230,45 @@ struct LibrarySearchVocabularyTests {
         #expect(Set(await index.search("common").map(\.entryID)) == ["b", "c"])
     }
 }
+
+@Suite("LibrarySearchIndex vocabulary ids")
+struct LibrarySearchVocabularyIDTests {
+    @Test("removing an ordinal a word's list does not hold never frees the id")
+    func removingAbsentOrdinalKeepsID() {
+        var vocabulary = LibrarySearchIndex.Vocabulary()
+        let word = vocabulary.intern("word").id
+        vocabulary.insert(0, into: word)
+        let firstRemoval = vocabulary.remove(0, from: word)
+        let secondRemoval = vocabulary.remove(0, from: word)
+        #expect(firstRemoval)
+        #expect(!secondRemoval)
+        let first = vocabulary.intern("first").id
+        let second = vocabulary.intern("second").id
+        #expect(first != second)
+        #expect(vocabulary.words[Int(first)] == "first")
+        #expect(vocabulary.words[Int(second)] == "second")
+    }
+
+    @Test("an entry file whose tokens repeat a word is stale, not loaded")
+    func repeatedTokenInEntryFileIsStale() async throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("parola-repeat-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let writer = LibrarySearchIndex(indexDirectory: url)
+        await writer.index(id: "e1", title: "Notes", text: "alpha beta", fingerprint: "f1", createdAt: Date())
+        await writer.flush()
+        let file = url.appendingPathComponent("entries/e1.json")
+        let json = try String(contentsOf: file, encoding: .utf8)
+        let corrupted = json.replacingOccurrences(of: #""tokens":["alpha","beta","notes"]"#, with: #""tokens":["alpha","alpha","notes"]"#)
+        #expect(corrupted != json)
+        try corrupted.write(to: file, atomically: true, encoding: .utf8)
+
+        let reader = LibrarySearchIndex(indexDirectory: url)
+        #expect(await reader.needsRebuild(matching: ["e1": "f1"]))
+        await reader.rebuild(entries: [.init(id: "e1", title: "Notes", text: "alpha beta", fingerprint: "f1")])
+        await reader.remove("e1")
+        await reader.index(id: "e2", title: "Other", text: "gamma delta", createdAt: Date())
+        await reader.index(id: "e3", title: "More", text: "alpha epsilon", createdAt: Date())
+        #expect(Set(await reader.search("alpha", snippets: false).map(\.entryID)) == ["e3"])
+        #expect(Set(await reader.search("gamma", snippets: false).map(\.entryID)) == ["e2"])
+    }
+}

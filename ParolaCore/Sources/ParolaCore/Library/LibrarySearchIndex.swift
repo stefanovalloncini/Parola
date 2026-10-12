@@ -267,9 +267,12 @@ public actor LibrarySearchIndex {
             list.insert(ordinal, at: position)
         }
 
-        static func remove(_ ordinal: UInt32, from list: inout [UInt32]) {
+        @discardableResult
+        static func remove(_ ordinal: UInt32, from list: inout [UInt32]) -> Bool {
             let position = lowerBound(of: ordinal, in: list)
-            if position < list.count, list[position] == ordinal { list.remove(at: position) }
+            guard position < list.count, list[position] == ordinal else { return false }
+            list.remove(at: position)
+            return true
         }
 
         static func lowerBound(of ordinal: UInt32, in list: [UInt32]) -> Int {
@@ -284,7 +287,7 @@ public actor LibrarySearchIndex {
     }
 
     /// Every distinct token once, with the entries that hold it; a token no entry holds gives its id back.
-    private struct Vocabulary: Sendable {
+    struct Vocabulary: Sendable {
         private(set) var words: [String] = []
         private(set) var postings: [[UInt32]] = []
         private var ids: [String: UInt32] = [:]
@@ -328,8 +331,7 @@ public actor LibrarySearchIndex {
 
         /// True when the token left the vocabulary because no entry holds it any more.
         mutating func remove(_ ordinal: UInt32, from id: UInt32) -> Bool {
-            Postings.remove(ordinal, from: &postings[Int(id)])
-            guard postings[Int(id)].isEmpty else { return false }
+            guard Postings.remove(ordinal, from: &postings[Int(id)]), postings[Int(id)].isEmpty else { return false }
             postings[Int(id)] = []
             ids.removeValue(forKey: words[Int(id)])
             words[Int(id)] = ""
@@ -1096,7 +1098,7 @@ public actor LibrarySearchIndex {
         (try? FileManager.default.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date
     }
 
-    /// nil when a row the manifest lists is missing or will not decode: the snapshot is then stale as a whole.
+    /// nil when a row the manifest lists is missing or will not decode or whose tokens are not strictly ascending: the snapshot is then stale as a whole.
     private static func decodeEntries(_ ids: [String], in entriesDirectory: URL) -> [SnapshotEntry]? {
         guard !ids.isEmpty else { return [] }
         var decoded = [SnapshotEntry?](repeating: nil, count: ids.count)
@@ -1111,7 +1113,7 @@ public actor LibrarySearchIndex {
         var entries: [SnapshotEntry] = []
         entries.reserveCapacity(ids.count)
         for entry in decoded {
-            guard let entry else { return nil }
+            guard let entry, zip(entry.tokens, entry.tokens.dropFirst()).allSatisfy({ $0 < $1 }) else { return nil }
             entries.append(entry)
         }
         return entries
