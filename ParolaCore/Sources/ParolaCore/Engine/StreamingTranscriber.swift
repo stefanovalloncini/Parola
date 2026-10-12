@@ -60,12 +60,17 @@ public enum StreamingTranscriberFactory {
         await StreamingModelCache.shared.unloadUnleased()
     }
 
-    /// Drops the model from the streaming cache unless a running session holds it.
+    /// Drops the model from the streaming cache, or, while running sessions hold it, once the last of them ends.
     public static func evict(modelName: String) async {
-        await StreamingModelCache.shared.evict(modelName)
+        await StreamingModelCache.shared.evictWhenReleased(modelName)
     }
 
     public static func residentModelNames() async -> [String] {
         await StreamingModelCache.shared.residentModelNames()
+    }
+
+    /// How long a model nothing holds stays loaded; a test sandbox shortens it to see the unload.
+    public static func setIdleTimeout(_ timeout: Duration) async {
+        await StreamingModelCache.shared.setIdleTimeout(timeout)
     }
 }

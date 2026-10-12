@@ -66,11 +66,12 @@ actor StreamingModelCache {
     private let loader: Loader
     private let reloader: Reloader
     private let unloader: Unloader
-    private let idleTimeout: Duration
+    private var idleTimeout: Duration
     private let clock: any Clock<Duration>
     private var entries: [String: Entry] = [:]
     private var inFlight: [String: Load] = [:]
     private var leases: [String: Int] = [:]
+    private var evictOnRelease: Set<String> = []
     private var currentModelName: String?
     private var lastLoadID = 0
     private(set) var droppedLeases = 0
@@ -119,7 +120,9 @@ actor StreamingModelCache {
             return
         }
         leases[modelName] = held == 1 ? nil : held - 1
-        if held == 1 { armIdleUnloadIfUnleased() }
+        guard held == 1 else { return }
+        if evictOnRelease.remove(modelName) != nil { evict(modelName) }
+        armIdleUnloadIfUnleased()
     }
 
     func returnDroppedLease(_ modelName: String) {
@@ -150,6 +153,18 @@ actor StreamingModelCache {
         guard leaseCount(for: modelName) == 0 else { return }
         inFlight[modelName]?.dropUnlessLeased = true
         entries[modelName] = nil
+    }
+
+    /// Evicts now, or once the last lease on the model comes back.
+    func evictWhenReleased(_ modelName: String) {
+        guard leaseCount(for: modelName) > 0 else { return evict(modelName) }
+        evictOnRelease.insert(modelName)
+    }
+
+    /// Starts the idle wait again under the new timeout.
+    func setIdleTimeout(_ timeout: Duration) {
+        idleTimeout = timeout
+        armIdleUnloadIfUnleased()
     }
 
     func unloadAll() {

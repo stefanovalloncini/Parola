@@ -369,6 +369,57 @@ struct StreamingModelCacheTests {
         await lease.release()
     }
 
+    @Test("an evict that waits for the release drops an unleased model at once and a leased one when its last lease comes back")
+    func evictWhenReleasedWaitsForTheLastLease() async throws {
+        let probe = CacheProbe()
+        let cache = StreamingModelCache.probing(probe)
+        let store = Self.makeStore()
+
+        await cache.warm(Self.tiny, store: store)
+        await cache.evictWhenReleased(Self.tiny)
+        let afterUnleasedEvict = await cache.residentModelNames()
+        #expect(afterUnleasedEvict.isEmpty)
+
+        let first = try await cache.borrow(Self.tiny, store: store)
+        let second = try await cache.borrow(Self.tiny, store: store)
+        await cache.evictWhenReleased(Self.tiny)
+        await first.release()
+        let whileOneLeaseIsOut = await cache.residentModelNames()
+        #expect(whileOneLeaseIsOut == [Self.tiny], "a session still decoding keeps the model")
+
+        await second.release()
+        let afterTheLastLease = await cache.residentModelNames()
+        #expect(afterTheLastLease.isEmpty)
+        #expect(probe.unloads.value == 0, "the kit is dropped, not unloaded for a cheap reload")
+
+        let again = try await cache.borrow(Self.tiny, store: store)
+        #expect(probe.loads.value == 3, "each evict made the next borrow load fresh")
+        await again.release()
+        let afterARelease = await cache.residentModelNames()
+        #expect(afterARelease == [Self.tiny], "the evict was spent on the lease it waited for")
+    }
+
+    @Test("a shorter idle timeout applies to a model already waiting out the longer one")
+    func shorterIdleTimeoutRearmsThePendingUnload() async throws {
+        let probe = CacheProbe()
+        let clock = TestClock()
+        let cache = StreamingModelCache.probing(probe, clock: clock)
+        let store = Self.makeStore()
+
+        await cache.warm(Self.tiny, store: store)
+        await clock.waitForSleeper()
+        await cache.setIdleTimeout(.seconds(5))
+        await clock.waitForSleeper()
+        clock.advance(by: .seconds(4))
+        let beforeTheNewTimeout = await cache.residentModelNames()
+        #expect(beforeTheNewTimeout == [Self.tiny])
+
+        clock.advance(by: .seconds(1))
+        await probe.unloads.wait(atLeast: 1, "the unload five seconds in")
+        let afterTheNewTimeout = await cache.residentModelNames()
+        #expect(afterTheNewTimeout.isEmpty)
+    }
+
     @Test("an evict during an unborrowed load drops it when it lands")
     func evictDuringAnUnborrowedLoad() async throws {
         let probe = CacheProbe()
