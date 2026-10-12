@@ -15,6 +15,7 @@ struct TranscriptDetailView: View {
     @State private var speakers: [String] = []
     @State private var filtered: [TranscriptSegment] = []
     @State private var transcriptIsEmpty = false
+    @State private var shareText = ""
 
     var body: some View {
         @Bindable var model = model
@@ -75,10 +76,7 @@ struct TranscriptDetailView: View {
                         }
                     }
                     ToolbarItem(placement: .topBarTrailing) {
-                        ShareLink(
-                            item: TranscriptShareItem(transcript: loaded.document.transcript),
-                            preview: SharePreview(loaded.entry.title)
-                        )
+                        ShareLink(item: shareText)
                     }
                     ToolbarItemGroup(placement: .keyboard) {
                         if !find.matchIDs.isEmpty {
@@ -104,7 +102,7 @@ struct TranscriptDetailView: View {
                 }
                 .sheet(isPresented: $showingChat) {
                     ChatSheet(entry: loaded.entry, transcript: loaded.document.transcript) { updated in
-                        self.loaded = LoadedEntry(entry: loaded.entry, document: ParolaDocument(transcript: updated, audioURL: loaded.document.audioURL, manifest: loaded.document.manifest))
+                        install(LoadedEntry(entry: loaded.entry, document: ParolaDocument(transcript: updated, audioURL: loaded.document.audioURL, manifest: loaded.document.manifest)))
                     }
                     .environment(model)
                 }
@@ -116,7 +114,7 @@ struct TranscriptDetailView: View {
                         entryID: loaded.entry.id,
                         transcript: loaded.document.transcript
                     ) { updated in
-                        self.loaded = LoadedEntry(entry: loaded.entry, document: ParolaDocument(transcript: updated, audioURL: loaded.document.audioURL, manifest: loaded.document.manifest))
+                        install(LoadedEntry(entry: loaded.entry, document: ParolaDocument(transcript: updated, audioURL: loaded.document.audioURL, manifest: loaded.document.manifest)))
                         recomputeFiltered()
                     }
                     .environment(model)
@@ -135,7 +133,7 @@ struct TranscriptDetailView: View {
         .task(id: entryID) {
             do {
                 let result = try await model.library.load(entryID)
-                loaded = result
+                install(result)
                 recomputeFiltered()
                 playback.load(
                     audioURL: result.document.audioURL,
@@ -149,6 +147,11 @@ struct TranscriptDetailView: View {
             playback.pause()
             playback.cancelIndexing()
         }
+    }
+
+    private func install(_ entry: LoadedEntry) {
+        loaded = entry
+        shareText = entry.document.transcript.text
     }
 
     private func recomputeFiltered(resetsPosition: Bool = false) {
