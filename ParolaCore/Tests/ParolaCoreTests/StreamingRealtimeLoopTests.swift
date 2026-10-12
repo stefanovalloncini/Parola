@@ -100,39 +100,72 @@ private final class SlowDecoder: Sendable {
     private struct State {
         var stepsPerCall: [Int] = []
         var sampleCounts: [Int] = []
-        var started = 0
     }
 
     static let fullSteps = 100
     private let state = OSAllocatedUnfairLock(initialState: State())
     private let responses: [[TranscriptionSegment]]
+    let parked = TestSignal()
+    let released = TestSignal()
+    private let failsWhenInterrupted: Bool
 
-    init(responses: [[TranscriptionSegment]]) {
+    init(responses: [[TranscriptionSegment]], failsWhenInterrupted: Bool = false) {
         self.responses = responses
+        self.failsWhenInterrupted = failsWhenInterrupted
     }
 
     var stepsPerCall: [Int] { state.withLock { $0.stepsPerCall } }
     var sampleCounts: [Int] { state.withLock { $0.sampleCounts } }
-    var started: Int { state.withLock { $0.started } }
 
+    /// The first call parks after its first step until `released` fires; later calls run to the end unless the loop stops them.
     func decode(_ samples: [Float], _ callback: TranscriptionCallback) async throws -> TranscriptionResult {
         let index = state.withLock { state -> Int in
             state.sampleCounts.append(samples.count)
-            state.started += 1
             return state.sampleCounts.count - 1
         }
         var steps = 0
         for _ in 0..<Self.fullSteps {
-            try await Task.sleep(for: .milliseconds(5))
+            await Task.yield()
             steps += 1
             let progress = TranscriptionProgress(timings: TranscriptionTimings(), text: "", tokens: [])
-            if callback(progress) == false { break }
+            if callback(progress) == false {
+                if failsWhenInterrupted, index == 0 { throw ScriptError() }
+                break
+            }
+            if index == 0, steps == 1 {
+                parked.fire()
+                await released.wait("the test to release the first decode")
+            }
         }
         let finished = steps
         state.withLock { $0.stepsPerCall.append(finished) }
         let segments = index < responses.count ? responses[index] : []
         return TranscriptionResult(text: "", segments: segments, language: "en", timings: TranscriptionTimings())
     }
+}
+
+private func makeSlowLoop(
+    decoder: SlowDecoder, useVAD: Bool
+) -> (loop: StreamingRealtimeLoop, capture: FakeCapture, recorder: EventRecorder) {
+    let capture = FakeCapture()
+    let recorder = EventRecorder()
+    var config = StreamingRealtimeLoop.Configuration()
+    config.useVAD = useVAD
+    let loop = StreamingRealtimeLoop(
+        configuration: config,
+        decodingOptions: DecodingOptions(),
+        dependencies: .init(
+            requestPermission: { true },
+            startCapture: { capture.install($0) },
+            stopCapture: { capture.markStopped() },
+            transcribe: { samples, _, callback in try await decoder.decode(samples, callback) },
+            tick: { try await Task.sleep(nanoseconds: 1_000_000) }
+        ),
+        onPartial: { recorder.recordPartial($0) },
+        onEnergy: { _ in },
+        onConfirmed: { recorder.recordBatch($0) }
+    )
+    return (loop, capture, recorder)
 }
 
 private struct ScriptError: Error {}
@@ -698,44 +731,90 @@ struct StreamingRealtimeLoopTests {
             [segment(0, 1, "stale")],
             [segment(0, 1, "a"), segment(1, 2, "b"), segment(2, 3, "c")],
         ])
-        let capture = FakeCapture()
-        let recorder = EventRecorder()
-        var config = StreamingRealtimeLoop.Configuration()
-        config.useVAD = false
-        let loop = StreamingRealtimeLoop(
-            configuration: config,
-            decodingOptions: DecodingOptions(),
-            dependencies: .init(
-                requestPermission: { true },
-                startCapture: { capture.install($0) },
-                stopCapture: { capture.markStopped() },
-                transcribe: { samples, _, callback in try await decoder.decode(samples, callback) },
-                tick: { try await Task.sleep(nanoseconds: 1_000_000) }
-            ),
-            onPartial: { recorder.recordPartial($0) },
-            onEnergy: { _ in },
-            onConfirmed: { recorder.recordBatch($0) }
-        )
+        let (loop, capture, recorder) = makeSlowLoop(decoder: decoder, useVAD: false)
         let runTask = LoopRun(loop)
         let installedWait = await eventually { capture.installed }
         #expect(installedWait)
 
         capture.push(seconds: 3, value: 0.5)
-        let firstDecodeStarted = await eventually { decoder.started == 1 }
-        #expect(firstDecodeStarted)
+        await decoder.parked.wait("the first decode to park")
         await loop.stop()
+        decoder.released.fire()
         let outcome = await runTask.outcome()
         guard case .stopped = outcome else {
             Issue.record("expected .stopped, got \(String(describing: outcome))")
             return
         }
 
-        let steps = decoder.stepsPerCall
-        #expect(steps.count == 2)
-        #expect(steps.first.map { $0 < SlowDecoder.fullSteps / 2 } == true, "the in-flight decode ends early")
-        #expect(steps.last == SlowDecoder.fullSteps, "the final flush runs to the end")
+        #expect(decoder.stepsPerCall == [2, SlowDecoder.fullSteps], "the in-flight decode ends at its next progress callback")
         #expect(decoder.sampleCounts == [3 * sampleRate, 3 * sampleRate])
         #expect(recorder.batches.flatMap(\.segments).map(\.text) == ["a", "b", "c"], "the interrupted result is dropped")
+    }
+
+    @Test("an error from the decode a stop cut short still lets the flush run")
+    func interruptedDecodeErrorFallsThroughToTheFlush() async throws {
+        let decoder = SlowDecoder(
+            responses: [[], [segment(0, 1, "a"), segment(1, 2, "b"), segment(2, 3, "c")]],
+            failsWhenInterrupted: true
+        )
+        let (loop, capture, recorder) = makeSlowLoop(decoder: decoder, useVAD: false)
+        let runTask = LoopRun(loop)
+        let installedWait = await eventually { capture.installed }
+        #expect(installedWait)
+
+        capture.push(seconds: 3, value: 0.5)
+        await decoder.parked.wait("the first decode to park")
+        await loop.stop()
+        decoder.released.fire()
+        let outcome = await runTask.outcome()
+        guard case .stopped = outcome else {
+            Issue.record("expected .stopped, got \(String(describing: outcome))")
+            return
+        }
+        #expect(recorder.batches.flatMap(\.segments).map(\.text) == ["a", "b", "c"])
+    }
+
+    @Test("a stop with a silent tail after the cut decode re-decodes exactly the audio that decode saw")
+    func interruptedFlushWithSilentTailKeepsTheInput() async throws {
+        let decoder = SlowDecoder(responses: [
+            [segment(0, 1, "stale")],
+            [segment(0, 1, "a"), segment(1, 2, "b"), segment(2, 3, "c")],
+        ])
+        let (loop, capture, recorder) = makeSlowLoop(decoder: decoder, useVAD: true)
+        let runTask = LoopRun(loop)
+        let installedWait = await eventually { capture.installed }
+        #expect(installedWait)
+
+        capture.pushBuffers(count: 1, secondsEach: 0.1, value: 0)
+        capture.push(seconds: 3, value: 0.5)
+        await decoder.parked.wait("the first decode to park")
+        capture.pushBuffers(count: 20, secondsEach: 0.1, value: 0)
+        await loop.stop()
+        decoder.released.fire()
+        _ = await runTask.outcome()
+
+        let firstInput = Int(3.1 * Double(sampleRate))
+        #expect(decoder.sampleCounts == [firstInput, firstInput], "the silent tail is left out of the flush")
+        #expect(recorder.batches.flatMap(\.segments).map(\.text) == ["a", "b", "c"])
+    }
+
+    @Test("a stop with speech after the cut decode re-decodes the whole window")
+    func interruptedFlushWithVoicedTailDecodesEverything() async throws {
+        let decoder = SlowDecoder(responses: [[segment(0, 1, "stale")], [segment(0, 1, "a")]])
+        let (loop, capture, _) = makeSlowLoop(decoder: decoder, useVAD: true)
+        let runTask = LoopRun(loop)
+        let installedWait = await eventually { capture.installed }
+        #expect(installedWait)
+
+        capture.pushBuffers(count: 1, secondsEach: 0.1, value: 0)
+        capture.push(seconds: 3, value: 0.5)
+        await decoder.parked.wait("the first decode to park")
+        capture.push(seconds: 1, value: 0.5)
+        await loop.stop()
+        decoder.released.fire()
+        _ = await runTask.outcome()
+
+        #expect(decoder.sampleCounts == [Int(3.1 * Double(sampleRate)), Int(4.1 * Double(sampleRate))])
     }
 
     @Test("stop after a silent tail skips the flush decode but keeps the last hypothesis")

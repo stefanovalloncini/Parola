@@ -139,7 +139,7 @@ actor StreamingRealtimeLoop {
     private var modelLoad: Task<Decoder, any Error>?
     private var modelWaitLimit: Task<Void, Never>?
     private var gaveUpOnModel = false
-    private var interruptedDecode = false
+    private var interruptedTotal: Int?
 
     /// `decodingOptions` go with a ready `transcribe`; a model that loads brings its own.
     init(
@@ -227,7 +227,7 @@ actor StreamingRealtimeLoop {
                 )
                 isRunning = false
                 stopCapture()
-                return .failed(error)
+                guard stopRequested, flushesOnStop else { return .failed(error) }
             }
         }
         guard flushesOnStop else { return .cancelled }
@@ -298,12 +298,16 @@ actor StreamingRealtimeLoop {
     /// up unconfirmed: with no further audio coming, the last hypothesis is final.
     private func finalFlush(with decoder: Decoder) async {
         drainInbox()
-        enforceWindowCap()
-        let totalSamples = windowStartSample + window.count
-        let newSeconds = Float(totalSamples - lastTranscribedTotal) / Float(config.sampleRate)
-        if newSeconds > 0.05, interruptedDecode || voiceDetectedInTail(newSeconds) {
-            lastTranscribedTotal = totalSamples
-            try? await transcribeWindow(with: decoder, confirmAll: true)
+        if let interruptedTotal {
+            await flushAfterInterrupt(at: interruptedTotal, with: decoder)
+        } else {
+            enforceWindowCap()
+            let totalSamples = windowStartSample + window.count
+            let newSeconds = Float(totalSamples - lastTranscribedTotal) / Float(config.sampleRate)
+            if newSeconds > 0.05, voiceDetectedInTail(newSeconds) {
+                lastTranscribedTotal = totalSamples
+                _ = try? await transcribeWindow(with: decoder, confirmAll: true)
+            }
         }
         guard !unconfirmedSegments.isEmpty else { return }
         if let last = unconfirmedSegments.last, last.end > lastConfirmedEndSeconds {
@@ -311,6 +315,16 @@ actor StreamingRealtimeLoop {
         }
         onConfirmed(makeBatch(unconfirmedSegments))
         unconfirmedSegments = []
+    }
+
+    /// The decode a stop cut short saw `interruptedTotal` samples; a silent tail after them leaves it the same input, so the result matches a stop that waited for it.
+    private func flushAfterInterrupt(at interruptedTotal: Int, with decoder: Decoder) async {
+        let totalSamples = windowStartSample + window.count
+        let tailSeconds = Float(totalSamples - interruptedTotal) / Float(config.sampleRate)
+        let tailHasVoice = tailSeconds > 0.05 && voiceDetectedInTail(tailSeconds)
+        let decodedCount = tailHasVoice ? window.count : max(0, interruptedTotal - windowStartSample)
+        lastTranscribedTotal = windowStartSample + decodedCount
+        _ = try? await transcribeWindow(with: decoder, samples: Array(window.prefix(decodedCount)), confirmAll: true)
     }
 
     // Mirrors iterate()'s gate so a silent tail (VAD held it back all along) isn't
@@ -424,8 +438,15 @@ actor StreamingRealtimeLoop {
         }
         let previousTotal = lastTranscribedTotal
         lastTranscribedTotal = totalSamples
-        try await transcribeWindow(with: decoder, yieldsToFinalFlush: true)
-        if interruptedDecode { lastTranscribedTotal = previousTotal }
+        do {
+            if try await transcribeWindow(with: decoder, yieldsToFinalFlush: true) {
+                interruptedTotal = totalSamples
+                lastTranscribedTotal = previousTotal
+            }
+        } catch {
+            if stopRequested { lastTranscribedTotal = previousTotal }
+            throw error
+        }
     }
 
     private func drainInbox() {
@@ -452,13 +473,17 @@ actor StreamingRealtimeLoop {
         return min(Double(lastConfirmedEndSeconds), retainedStart)
     }
 
+    /// True when a stop cut the decode short and its result was dropped.
+    @discardableResult
     private func transcribeWindow(
         with decoder: Decoder,
+        samples: [Float]? = nil,
         confirmAll: Bool = false,
         yieldsToFinalFlush: Bool = false
-    ) async throws {
+    ) async throws -> Bool {
+        let decoded = samples ?? window
         let offsetSeconds = Double(windowStartSample) / Double(config.sampleRate)
-        let decodedEndSeconds = Float(offsetSeconds + Double(window.count) / Double(config.sampleRate))
+        let decodedEndSeconds = Float(offsetSeconds + Double(decoded.count) / Double(config.sampleRate))
         var options = decoder.options
         // clipTimestamps is window-relative; everything emitted from here back out must be absolute.
         options.clipTimestamps = [Float(max(0, retainedFloorSeconds - offsetSeconds))]
@@ -466,7 +491,7 @@ actor StreamingRealtimeLoop {
         let onPartial = self.onPartial
         let compressionCheckWindow = config.compressionCheckWindow
         let stopSignal = self.stopSignal
-        let result = try await decoder.transcribe(window, options) { [options] progress in
+        let result = try await decoder.transcribe(decoded, options) { [options] progress in
             if yieldsToFinalFlush, stopSignal.withLock({ signal in
                 if signal.requested { signal.interruptedDecode = true }
                 return signal.requested
@@ -483,8 +508,7 @@ actor StreamingRealtimeLoop {
             )
         }
         if yieldsToFinalFlush, stopSignal.withLock({ $0.interruptedDecode }) {
-            interruptedDecode = true
-            return
+            return true
         }
         currentText = ""
         let offset = Float(offsetSeconds)
@@ -523,6 +547,7 @@ actor StreamingRealtimeLoop {
         }
         emitPartial()
         purgeConfirmedAudio()
+        return false
     }
 
     private func makeBatch(_ segments: [TranscriptionSegment]) -> ConfirmedAudioBatch {
