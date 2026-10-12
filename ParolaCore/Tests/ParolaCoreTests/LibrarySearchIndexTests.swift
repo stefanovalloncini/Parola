@@ -1,4 +1,3 @@
-import Clocks
 import Testing
 import Foundation
 import os
@@ -22,6 +21,27 @@ private struct SnapshotWrites: Sendable {
 
     var writtenNames: [String] { written.map(\.lastPathComponent) }
     var removedNames: [String] { removed.map(\.lastPathComponent) }
+}
+
+private final class TokenizeGate: Sendable {
+    private let state = OSAllocatedUnfairLock(initialState: (armed: false, entered: 0))
+    private let release = DispatchSemaphore(value: 0)
+
+    var entered: Int { state.withLock { $0.entered } }
+
+    func arm() { state.withLock { $0.armed = true } }
+
+    func open() { release.signal() }
+
+    func hook() {
+        let hold = state.withLock { state -> Bool in
+            guard state.armed else { return false }
+            state.armed = false
+            state.entered += 1
+            return true
+        }
+        if hold { release.wait() }
+    }
 }
 
 @Suite("LibrarySearchIndex")
@@ -55,6 +75,18 @@ final class LibrarySearchIndexTests {
             }
         )
         return (index, log)
+    }
+
+    private func makeGatedIndex(_ gate: TokenizeGate) -> (LibrarySearchIndex, URL) {
+        let url = makeTempDirectory()
+        let index = LibrarySearchIndex(
+            indexDirectory: url,
+            saveDebounce: .seconds(60),
+            clock: ContinuousClock(),
+            writeSnapshotData: { data, target in try data.write(to: target, options: .atomic) },
+            beforeTokenizing: { gate.hook() }
+        )
+        return (index, url)
     }
 
     private func makeTempDirectory(_ name: String = "parola-search-test") -> URL {
@@ -852,12 +884,14 @@ final class LibrarySearchIndexTests {
 
     @Test("an index call that is still tokenizing yields to a later one for the same entry")
     func laterIndexCallWins() async throws {
-        let (index, _) = makeTempIndex()
+        let gate = TokenizeGate()
+        let (index, _) = makeGatedIndex(gate)
         _ = await index.search("warm")
-        let huge = String(repeating: "alpha bravo charlie delta echo ", count: 400_000)
-        let slow = Task { await index.index(id: "e1", title: "Slow", text: huge, createdAt: Date()) }
-        try await Task.sleep(for: .milliseconds(30))
+        gate.arm()
+        let slow = Task { await index.index(id: "e1", title: "Slow", text: "alpha bravo", createdAt: Date()) }
+        #expect(await eventually { gate.entered == 1 })
         await index.index(id: "e1", title: "Fast", text: "foxtrot golf", createdAt: Date())
+        gate.open()
         await slow.value
 
         #expect(await index.search("alpha").isEmpty)
@@ -866,15 +900,143 @@ final class LibrarySearchIndexTests {
 
     @Test("an entry removed while its index call is tokenizing stays out")
     func removeDuringIndexCall() async throws {
-        let (index, _) = makeTempIndex()
+        let gate = TokenizeGate()
+        let (index, _) = makeGatedIndex(gate)
         _ = await index.search("warm")
-        let huge = String(repeating: "alpha bravo charlie delta echo ", count: 400_000)
-        let slow = Task { await index.index(id: "e1", title: "Slow", text: huge, createdAt: Date()) }
-        try await Task.sleep(for: .milliseconds(30))
+        gate.arm()
+        let slow = Task { await index.index(id: "e1", title: "Slow", text: "alpha bravo", createdAt: Date()) }
+        #expect(await eventually { gate.entered == 1 })
         await index.remove("e1")
+        gate.open()
         await slow.value
 
         #expect(await index.search("alpha").isEmpty)
+    }
+
+    @Test("a search is answered while an index call tokenizes, so the actor is free")
+    func searchDoesNotWaitForTokenizing() async throws {
+        let gate = TokenizeGate()
+        let (index, _) = makeGatedIndex(gate)
+        await index.index(id: "e0", title: "Other", text: "delta echo", createdAt: Date())
+        gate.arm()
+        let finished = OSAllocatedUnfairLock(initialState: false)
+        let slow = Task {
+            await index.index(id: "e1", title: "Slow", text: "alpha bravo", createdAt: Date())
+            finished.withLock { $0 = true }
+        }
+        #expect(await eventually { gate.entered == 1 })
+
+        #expect(await index.search("delta").map(\.entryID) == ["e0"])
+        #expect(finished.withLock { $0 } == false)
+        gate.open()
+        await slow.value
+        #expect(await index.search("alpha").map(\.entryID) == ["e1"])
+    }
+
+    @Test("a flush waits for an index call that is still tokenizing")
+    func flushWaitsForIndexing() async throws {
+        let gate = TokenizeGate()
+        let (index, url) = makeGatedIndex(gate)
+        _ = await index.search("warm")
+        gate.arm()
+        let slow = Task { await index.index(id: "e1", title: "Slow", text: "alpha bravo", createdAt: Date()) }
+        #expect(await eventually { gate.entered == 1 })
+        let flushing = Task { await index.flush() }
+        gate.open()
+        await flushing.value
+        await slow.value
+
+        let reloaded = LibrarySearchIndex(indexDirectory: url)
+        #expect(await reloaded.search("alpha").map(\.entryID) == ["e1"])
+    }
+
+    @Test("an auxiliary-text swap is refused while the entry is being indexed")
+    func auxiliarySwapRefusedDuringIndexing() async throws {
+        let gate = TokenizeGate()
+        let (index, _) = makeGatedIndex(gate)
+        await index.index(id: "e1", title: "One", text: "alpha", createdAt: Date())
+        gate.arm()
+        let slow = Task { await index.index(id: "e1", title: "One", text: "alpha bravo", createdAt: Date()) }
+        #expect(await eventually { gate.entered == 1 })
+
+        #expect(await index.replaceAuxiliaryText("", with: "Summary", for: "e1") == false)
+        gate.open()
+        await slow.value
+    }
+
+    @Test("a fingerprint refresh that arrives during indexing is applied after the install")
+    func fingerprintRefreshWaitsForIndexing() async throws {
+        let gate = TokenizeGate()
+        let (index, _) = makeGatedIndex(gate)
+        await index.index(id: "e1", title: "One", text: "alpha", fingerprint: "f1", createdAt: Date())
+        gate.arm()
+        let slow = Task { await index.index(id: "e1", title: "One", text: "alpha bravo", fingerprint: "f2", createdAt: Date()) }
+        #expect(await eventually { gate.entered == 1 })
+        await index.refreshFingerprint("f3", for: "e1")
+        gate.open()
+        await slow.value
+
+        #expect(await index.staleness(matching: ["e1": "f3"]).changed.isEmpty)
+    }
+
+    @Test("a body that is missing or is not the entry's is left out and the entry is read again")
+    func unsoundBodyIsLeftOut() async throws {
+        for damage in ["missing", "other"] {
+            let (index, url) = makeTempIndex()
+            await index.index(id: "e1", title: "One", text: "sprint planning", fingerprint: "f1", createdAt: Date())
+            await index.flush()
+            if damage == "missing" {
+                try FileManager.default.removeItem(at: bodyURL("e1", in: url))
+            } else {
+                try Data("sprint planning, but another body".utf8).write(to: bodyURL("e1", in: url))
+            }
+
+            let reloaded = LibrarySearchIndex(indexDirectory: url)
+            #expect(await reloaded.search("sprint").first?.snippet == "", Comment(rawValue: damage))
+            #expect(await reloaded.staleness(matching: ["e1": "f1"]).changed == ["e1"], Comment(rawValue: damage))
+
+            await reloaded.index(id: "e1", title: "One", text: "sprint planning", fingerprint: "f1", createdAt: Date())
+            await reloaded.flush()
+            #expect(await reloaded.search("sprint").first?.snippet == "sprint planning", Comment(rawValue: damage))
+        }
+    }
+
+    @Test("snippets for many matches are built in batches and all come back")
+    func manyMatchesFillAcrossBatches() async throws {
+        let (index, _) = makeTempIndex()
+        for number in 0..<150 {
+            await index.index(id: "e\(number)", title: "Entry", text: "sprint planning number\(number)", createdAt: Date())
+        }
+        await index.flush()
+        let lean = await index.search("sprint", snippets: false)
+        #expect(lean.count == 150)
+        let filled = await index.withSnippets(lean, query: "sprint")
+        #expect(filled.map(\.entryID) == lean.map(\.entryID))
+        #expect(filled.allSatisfy { $0.snippet.hasPrefix("sprint planning number") })
+    }
+
+    @Test("a stray directory in bodies/ is not removed by the prune")
+    func pruneKeepsStrayDirectories() async throws {
+        let (index, url) = makeTempIndex()
+        let stray = url.appendingPathComponent("bodies/stray", isDirectory: true)
+        try FileManager.default.createDirectory(at: stray, withIntermediateDirectories: true)
+        await index.index(id: "e1", title: "One", text: "sprint", createdAt: Date())
+        await index.flush()
+        #expect(FileManager.default.fileExists(atPath: stray.path))
+    }
+
+    @Test("indexing the same text again does not rewrite the body")
+    func unchangedBodyIsNotRewritten() async throws {
+        let url = makeTempDirectory()
+        let (index, log) = makeObservedIndex(at: url)
+        await index.index(id: "e1", title: "One", text: "sprint planning", fingerprint: "f1", createdAt: Date())
+        await index.flush()
+
+        log.withLock { $0 = SnapshotWrites() }
+        await index.index(id: "e1", title: "Renamed", text: "sprint planning", fingerprint: "f2", createdAt: Date())
+        await index.flush()
+        #expect(log.withLock { $0.writtenNames } == ["e1.json", "manifest.json"])
+        #expect(await index.search("sprint").first?.snippet == "sprint planning")
     }
 
     @Test("a manifest row whose entry file is gone makes the snapshot stale")
@@ -1323,15 +1485,15 @@ final class LibrarySearchIndexTests {
         #expect(fileExistsWait)
     }
 
-    @Test("retries of a write that keeps failing back off, and a write that lands starts over")
-    func failedWritesBackOff() async throws {
+    private func makeFailingIndex(
+        debounce: Duration, clock: TestClock
+    ) -> (LibrarySearchIndex, OSAllocatedUnfairLock<Int>, OSAllocatedUnfairLock<Bool>, URL) {
         let url = makeTempDirectory()
-        let clock = TestClock()
         let attempts = OSAllocatedUnfairLock(initialState: 0)
         let failing = OSAllocatedUnfairLock(initialState: true)
         let index = LibrarySearchIndex(
             indexDirectory: url,
-            saveDebounce: .milliseconds(250),
+            saveDebounce: debounce,
             clock: clock,
             writeSnapshotData: { data, target in
                 attempts.withLock { $0 += 1 }
@@ -1339,49 +1501,67 @@ final class LibrarySearchIndexTests {
                 try data.write(to: target, options: .atomic)
             }
         )
-        func advance(_ duration: Duration) async throws {
-            try await Task.sleep(for: .milliseconds(50))
-            await clock.advance(by: duration)
-        }
-        func settle(_ expected: Int) async -> Bool {
-            await eventually { attempts.withLock { $0 } == expected }
+        return (index, attempts, failing, url)
+    }
+
+    private func nextSleeper(on clock: TestClock) async -> Bool {
+        await clock.waitForSleeper()
+    }
+
+    @Test("retries of a write that keeps failing back off, and a write that lands starts over")
+    func failedWritesBackOff() async throws {
+        let clock = TestClock()
+        let (index, attempts, failing, url) = makeFailingIndex(debounce: .milliseconds(250), clock: clock)
+        func step(_ wait: Duration, expecting expected: Int) async -> Bool {
+            guard await nextSleeper(on: clock) else { return false }
+            await clock.advance(by: wait)
+            return await eventually { attempts.withLock { $0 } == expected }
         }
 
         await index.index(id: "e1", title: "One", text: "sprint planning", createdAt: Date())
-        try await advance(.milliseconds(250))
-        #expect(await settle(1))
+        #expect(await step(.milliseconds(250), expecting: 1))
+        #expect(await step(.milliseconds(250), expecting: 2), "the first retry waits the debounce")
 
-        try await advance(.milliseconds(250))
-        #expect(await settle(2), "the first retry waits the debounce")
-
-        try await advance(.milliseconds(250))
-        try await Task.sleep(for: .milliseconds(50))
+        #expect(await nextSleeper(on: clock))
+        await clock.advance(by: .milliseconds(250))
         #expect(attempts.withLock { $0 } == 2, "the second waits twice that")
-        try await advance(.milliseconds(250))
-        #expect(await settle(3))
+        #expect(await step(.milliseconds(250), expecting: 3))
 
-        try await advance(.milliseconds(500))
-        try await Task.sleep(for: .milliseconds(50))
+        #expect(await nextSleeper(on: clock))
+        await clock.advance(by: .milliseconds(500))
         #expect(attempts.withLock { $0 } == 3, "the third waits four times")
-        try await advance(.milliseconds(500))
-        #expect(await settle(4))
+        #expect(await step(.milliseconds(500), expecting: 4))
 
+        var last = 4
         for _ in 0..<8 {
-            try await advance(.seconds(30))
-            try await Task.sleep(for: .milliseconds(20))
+            last += 1
+            #expect(await step(.seconds(30), expecting: last), "the delay stops growing at 30 s")
         }
-        let beforeRecovery = attempts.withLock { $0 }
         failing.withLock { $0 = false }
-        try await advance(.seconds(30))
+        #expect(await step(.seconds(30), expecting: last + 3), "the body, the entry file and the manifest")
         let manifestPath = manifestURL(in: url).path
-        #expect(await eventually { FileManager.default.fileExists(atPath: manifestPath) })
-        #expect(attempts.withLock { $0 } > beforeRecovery)
+        #expect(FileManager.default.fileExists(atPath: manifestPath))
 
         failing.withLock { $0 = true }
         await index.index(id: "e2", title: "Two", text: "retro feedback", createdAt: Date())
-        let beforeNextFailure = attempts.withLock { $0 }
-        try await advance(.milliseconds(250))
-        #expect(await settle(beforeNextFailure + 1), "a landed write resets the delay to the debounce")
+        let before = attempts.withLock { $0 }
+        #expect(await step(.milliseconds(250), expecting: before + 1), "a landed write resets the delay to the debounce")
+    }
+
+    @Test("a retry never comes sooner than a debounce longer than the cap")
+    func retryNeverBeatsTheDebounce() async throws {
+        let clock = TestClock()
+        let (index, attempts, _, _) = makeFailingIndex(debounce: .seconds(60), clock: clock)
+        await index.index(id: "e1", title: "One", text: "sprint planning", createdAt: Date())
+        #expect(await nextSleeper(on: clock))
+        await clock.advance(by: .seconds(60))
+        #expect(await eventually { attempts.withLock { $0 } == 1 })
+
+        #expect(await nextSleeper(on: clock))
+        await clock.advance(by: .seconds(30))
+        #expect(attempts.withLock { $0 } == 1)
+        await clock.advance(by: .seconds(30))
+        #expect(await eventually { attempts.withLock { $0 } == 2 })
     }
 
     @Test("a missing snapshot asks for a rebuild")

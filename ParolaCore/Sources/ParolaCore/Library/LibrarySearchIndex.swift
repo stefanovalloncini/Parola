@@ -125,6 +125,9 @@ public actor LibrarySearchIndex {
         let fingerprint: String
         /// Cut from the body when the entry is indexed; nil when the body has nothing to quote.
         let excerpt: String?
+        /// What the body file must hold; a file that differs is not this entry's body.
+        let bodyBytes: Int
+        let bodyHash: UInt64
         /// Names this installed state, so a snippet built across a suspension can tell the entry moved.
         var revision = 0
     }
@@ -133,6 +136,8 @@ public actor LibrarySearchIndex {
         let id: String
         let title: String
         let excerpt: String?
+        let bodyBytes: Int
+        let bodyHash: UInt64
         let tokens: [String]
         let counts: [Int]
         let offsets: [Int]
@@ -222,6 +227,9 @@ public actor LibrarySearchIndex {
     private var bodySequence = 0
     private var revisionCounter = 0
     private var indexTickets: [String: Int] = [:]
+    private var inFlightIndexes: [Int: Task<Void, Never>] = [:]
+    private var pendingFingerprints: [String: String] = [:]
+    private var unsoundBodies: Set<String> = []
     private var ticketCounter = 0
     private var sortedTokens: [String]?
     private var isLoaded = false
@@ -231,6 +239,7 @@ public actor LibrarySearchIndex {
     private var snapshotWriteFailing = false
     private var failedWriteStreak = 0
     private static let longestRetryDelay = Duration.seconds(30)
+    private static let snippetBatch = 64
     /// Started by the first call that needs the index, so a process that never searches never decodes the snapshot.
     private var loadTask: Task<LoadResult, Never>?
     /// The snapshot manifest's date when this index last read it, and the ids that manifest listed.
@@ -244,6 +253,8 @@ public actor LibrarySearchIndex {
     private var pendingSaveTask: Task<Void, Never>?
     private let writeSnapshotData: @Sendable (Data, URL) throws -> Void
     private let removeSnapshotFile: @Sendable (URL) throws -> Void
+    /// A test seam: runs on the thread that tokenizes one entry, ahead of the work.
+    private let beforeTokenizing: (@Sendable () -> Void)?
     // .default, not .utility: the quit path blocks the main thread on a plain semaphore, which donates no priority.
     private let writeQueue = DispatchQueue(label: "com.parola.search-index-write", qos: .default)
     private let latestGeneration = OSAllocatedUnfairLock(initialState: 0)
@@ -252,7 +263,7 @@ public actor LibrarySearchIndex {
     private(set) var vocabularySorts = 0
     private(set) var entriesDecoded = 0
 
-    /// `indexDirectory` holds the snapshot: a `manifest.json` and one file per entry under `entries/`.
+    /// `indexDirectory` holds the snapshot: a `manifest.json`, one file per entry under `entries/` and its body under `bodies/`.
     public init(
         indexDirectory: URL,
         saveDebounce: Duration = .milliseconds(250),
@@ -284,8 +295,10 @@ public actor LibrarySearchIndex {
         clock: any Clock<Duration>,
         writeSnapshotData: @escaping @Sendable (Data, URL) throws -> Void,
         removeSnapshotFile: @escaping @Sendable (URL) throws -> Void = { try FileManager.default.removeItem(at: $0) },
-        persists: Bool = true
+        persists: Bool = true,
+        beforeTokenizing: (@Sendable () -> Void)? = nil
     ) {
+        self.beforeTokenizing = beforeTokenizing
         self.indexDirectory = indexDirectory
         self.saveDebounce = saveDebounce
         self.clock = clock
@@ -311,22 +324,36 @@ public actor LibrarySearchIndex {
         ticketCounter &+= 1
         let ticket = ticketCounter
         indexTickets[id] = ticket
-        let prepared = await Self.tokenizeOffActor([RebuildEntry(
+        let request = RebuildEntry(
             id: id, title: title, text: text, auxiliaryText: auxiliaryText,
             boundaries: boundaries, fingerprint: fingerprint
-        )])
+        )
+        let work = Task { await self.finishIndexing(request, ticket: ticket) }
+        inFlightIndexes[ticket] = work
+        await work.value
+    }
+
+    /// Tokenizes off the actor and installs the result unless a later call for the same entry, or a removal, overtook this one.
+    private func finishIndexing(_ request: RebuildEntry, ticket: Int) async {
+        defer { inFlightIndexes[ticket] = nil }
+        let id = request.id
+        guard indexTickets[id] == ticket else { return }
+        let prepared = await Self.tokenizeOffActor([request], before: beforeTokenizing)
         guard indexTickets[id] == ticket, let prepared = prepared.first else { return }
         indexTickets[id] = nil
+        let unchanged = !unsoundBodies.contains(id)
+            && entries[id].map { $0.bodyBytes == prepared.entry.bodyBytes && $0.bodyHash == prepared.entry.bodyHash } == true
         removeFromIndex(id)
-        install(prepared.entry, body: prepared.body, for: id)
+        install(prepared.entry, body: unchanged ? nil : prepared.body, for: id)
+        if let fingerprint = pendingFingerprints.removeValue(forKey: id) { applyFingerprint(fingerprint, for: id) }
         scheduleSave()
     }
 
     /// Swaps one piece of an entry's auxiliary text for another without tokenizing the rest again.
-    /// False when the entry isn't indexed, so the caller can index it whole instead.
+    /// False when the entry is not indexed or is being indexed, so the caller can index it whole instead.
     public func replaceAuxiliaryText(_ old: String, with new: String, for id: String) async -> Bool {
         await ensureLoaded()
-        guard let entry = entries[id] else { return false }
+        guard indexTickets[id] == nil, let entry = entries[id] else { return false }
         var tallies: [String: Tally] = [:]
         for (position, token) in entry.tokens.enumerated() {
             tallies[token] = Tally(
@@ -347,7 +374,9 @@ public actor LibrarySearchIndex {
             boundaryOffsets: entry.boundaryOffsets,
             boundaryCentiseconds: entry.boundaryCentiseconds,
             fingerprint: entry.fingerprint,
-            excerpt: entry.excerpt
+            excerpt: entry.excerpt,
+            bodyBytes: entry.bodyBytes,
+            bodyHash: entry.bodyHash
         )
         removeFromIndex(id)
         install(replaced, body: nil, for: id)
@@ -358,6 +387,7 @@ public actor LibrarySearchIndex {
     public func remove(_ id: String) async {
         await ensureLoaded()
         indexTickets[id] = nil
+        pendingFingerprints[id] = nil
         removeFromIndex(id)
         discardBody(of: id)
         if excerptsByEntry.removeValue(forKey: id) != nil { excerptsGeneration &+= 1 }
@@ -418,12 +448,22 @@ public actor LibrarySearchIndex {
         let queryTokens = Set(Self.tokenize(query))
         guard !queryTokens.isEmpty, !matches.isEmpty else { return matches }
         await ensureLoaded()
+        var filled: [Match] = []
+        filled.reserveCapacity(matches.count)
+        for start in stride(from: 0, to: matches.count, by: Self.snippetBatch) {
+            let batch = matches[start..<min(start + Self.snippetBatch, matches.count)]
+            filled += await snippets(for: batch, queryTokens: queryTokens)
+        }
+        return filled
+    }
+
+    private func snippets(for batch: ArraySlice<Match>, queryTokens: Set<String>) async -> [Match] {
         var captured: [String: IndexedEntry] = [:]
-        for match in matches {
+        for match in batch {
             if let entry = entries[match.entryID] { captured[match.entryID] = entry }
         }
-        let bodies = await bodies(of: Array(captured.keys))
-        return matches.map { match in
+        let bodies = await bodies(for: captured)
+        return batch.map { match in
             guard let entry = captured[match.entryID], entries[match.entryID]?.revision == entry.revision,
                   let body = bodies[match.entryID] else { return match }
             let snippet = Self.snippet(for: queryTokens, body: body, in: entry)
@@ -481,6 +521,7 @@ public actor LibrarySearchIndex {
         let task = pendingSaveTask
         pendingSaveTask = nil
         task?.cancel()
+        while let indexing = inFlightIndexes.values.first { await indexing.value }
         guard persists, isLoaded else { return }
         await saveSnapshot()
         await drainWrites()
@@ -518,8 +559,16 @@ public actor LibrarySearchIndex {
     /// read the newer file as a reason to rebuild.
     func refreshFingerprint(_ fingerprint: String, for id: String) async {
         await ensureLoaded()
+        if indexTickets[id] != nil {
+            pendingFingerprints[id] = fingerprint
+            return
+        }
+        applyFingerprint(fingerprint, for: id)
+    }
+
+    private func applyFingerprint(_ fingerprint: String, for id: String) {
         guard let existing = entries[id], existing.fingerprint != fingerprint else { return }
-        let updated = IndexedEntry(
+        entries[id] = IndexedEntry(
             title: existing.title,
             tokens: existing.tokens,
             counts: existing.counts,
@@ -528,9 +577,10 @@ public actor LibrarySearchIndex {
             boundaryCentiseconds: existing.boundaryCentiseconds,
             fingerprint: fingerprint,
             excerpt: existing.excerpt,
+            bodyBytes: existing.bodyBytes,
+            bodyHash: existing.bodyHash,
             revision: existing.revision
         )
-        entries[id] = updated
         dirtyEntryIDs.insert(id)
         isDirty = true
         scheduleSave()
@@ -610,12 +660,13 @@ public actor LibrarySearchIndex {
         return true
     }
 
-    /// An id with no body anywhere comes back empty, as a body with nothing to quote does.
-    private func bodies(of ids: [String]) async -> [String: String] {
+    /// An entry whose body is missing, or is not the one it was indexed with, is left out. The owner marks it
+    /// stale so the next catch-up reads the bundle again.
+    private func bodies(for captured: [String: IndexedEntry]) async -> [String: String] {
         var found: [String: String] = [:]
-        var onDisk: [String] = []
-        for id in ids {
-            if let pending = pendingBodies[id] { found[id] = pending.text } else { onDisk.append(id) }
+        var onDisk: [String: IndexedEntry] = [:]
+        for (id, entry) in captured {
+            if let pending = pendingBodies[id] { found[id] = pending.text } else { onDisk[id] = entry }
         }
         guard !onDisk.isEmpty else { return found }
         let directory = Self.bodiesDirectory(in: indexDirectory)
@@ -624,25 +675,77 @@ public actor LibrarySearchIndex {
                 continuation.resume(returning: Self.readBodies(onDisk, in: directory))
             }
         }
-        return found.merging(read) { memory, _ in memory }
+        if persists {
+            for id in read.unsound where entries[id]?.revision == captured[id]?.revision { markUnsound(id) }
+        }
+        return found.merging(read.found) { memory, _ in memory }
     }
 
-    private static func readBodies(_ ids: [String], in directory: URL) -> [String: String] {
-        var texts = [String](repeating: "", count: ids.count)
+    private func markUnsound(_ id: String) {
+        guard let existing = entries[id] else { return }
+        unsoundBodies.insert(id)
+        entries[id] = IndexedEntry(
+            title: existing.title,
+            tokens: existing.tokens,
+            counts: existing.counts,
+            offsets: existing.offsets,
+            boundaryOffsets: existing.boundaryOffsets,
+            boundaryCentiseconds: existing.boundaryCentiseconds,
+            fingerprint: "",
+            excerpt: existing.excerpt,
+            bodyBytes: existing.bodyBytes,
+            bodyHash: existing.bodyHash,
+            revision: existing.revision
+        )
+        dirtyEntryIDs.insert(id)
+        isDirty = true
+        scheduleSave()
+    }
+
+    private static func readBodies(
+        _ expected: [String: IndexedEntry], in directory: URL
+    ) -> (found: [String: String], unsound: [String]) {
+        let ids = Array(expected.keys)
+        var texts = [String?](repeating: nil, count: ids.count)
         texts.withUnsafeMutableBufferPointer { buffer in
             // Each iteration owns its slot, so the shared buffer never races.
             nonisolated(unsafe) let slots = buffer
             DispatchQueue.concurrentPerform(iterations: ids.count) { position in
-                guard let data = try? Data(contentsOf: bodyURL(ids[position], in: directory)) else { return }
+                guard let entry = expected[ids[position]] else { return }
+                let data = (try? Data(contentsOf: bodyURL(ids[position], in: directory))) ?? Data()
+                guard digest(of: data) == (entry.bodyBytes, entry.bodyHash) else { return }
                 slots[position] = String(decoding: data, as: UTF8.self)
             }
         }
-        return Dictionary(uniqueKeysWithValues: zip(ids, texts))
+        var found: [String: String] = [:]
+        var unsound: [String] = []
+        for (id, text) in zip(ids, texts) {
+            if let text { found[id] = text } else { unsound.append(id) }
+        }
+        return (found, unsound)
+    }
+
+    /// FNV-1a over the UTF-8 bytes: cheap enough to run on every body read, enough to tell a body from a different one.
+    private static func digest(of data: Data) -> (Int, UInt64) {
+        var hash: UInt64 = 0xcbf29ce484222325
+        for byte in data { hash = (hash ^ UInt64(byte)) &* 0x100000001b3 }
+        return (data.count, hash)
+    }
+
+    private static func digest(of text: String) -> (Int, UInt64) {
+        var hash: UInt64 = 0xcbf29ce484222325
+        var count = 0
+        for byte in text.utf8 {
+            hash = (hash ^ UInt64(byte)) &* 0x100000001b3
+            count += 1
+        }
+        return (count, hash)
     }
 
     private func discardBody(of id: String) {
         pendingBodies.removeValue(forKey: id)
         dirtyBodyIDs.remove(id)
+        unsoundBodies.remove(id)
     }
 
     private func ensureLoaded() async {
@@ -756,7 +859,9 @@ public actor LibrarySearchIndex {
             boundaryOffsets: entry.boundaryOffsets,
             boundaryCentiseconds: entry.boundaryCentiseconds,
             fingerprint: entry.fingerprint,
-            excerpt: entry.excerpt
+            excerpt: entry.excerpt,
+            bodyBytes: entry.bodyBytes,
+            bodyHash: entry.bodyHash
         )
     }
 
@@ -810,9 +915,10 @@ public actor LibrarySearchIndex {
         return entries
     }
 
-    private static func tokenizeOffActor(_ rebuilt: [RebuildEntry]) async -> [PreparedEntry] {
+    private static func tokenizeOffActor(_ rebuilt: [RebuildEntry], before: (@Sendable () -> Void)? = nil) async -> [PreparedEntry] {
         await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .utility).async {
+                before?()
                 continuation.resume(returning: tokenizeInParallel(rebuilt))
             }
         }
@@ -855,6 +961,7 @@ public actor LibrarySearchIndex {
         enumerateTokens(in: text) { token, offset in tallies[token, default: Tally()].add(at: offset) }
         enumerateTokens(in: auxiliaryText) { token, _ in tallies[token, default: Tally()].count += 1 }
         let tokens = tallies.keys.sorted()
+        let bodyDigest = digest(of: text)
         return IndexedEntry(
             title: title,
             tokens: tokens,
@@ -863,7 +970,9 @@ public actor LibrarySearchIndex {
             boundaryOffsets: boundaries.map(\.textOffset),
             boundaryCentiseconds: boundaries.map { centiseconds($0.seconds) },
             fingerprint: fingerprint,
-            excerpt: excerpt(from: text, maxLength: excerptLength)
+            excerpt: excerpt(from: text, maxLength: excerptLength),
+            bodyBytes: bodyDigest.0,
+            bodyHash: bodyDigest.1
         )
     }
 
@@ -874,6 +983,7 @@ public actor LibrarySearchIndex {
         entry.revision = revisionCounter
         entries[id] = entry
         if let body {
+            unsoundBodies.remove(id)
             bodySequence &+= 1
             pendingBodies[id] = PendingBody(text: body, sequence: bodySequence)
             dirtyBodyIDs.insert(id)
@@ -915,6 +1025,8 @@ public actor LibrarySearchIndex {
             id: id,
             title: entry.title,
             excerpt: entry.excerpt,
+            bodyBytes: entry.bodyBytes,
+            bodyHash: entry.bodyHash,
             tokens: entry.tokens,
             counts: entry.counts,
             offsets: entry.offsets,
@@ -1118,7 +1230,7 @@ public actor LibrarySearchIndex {
     /// The debounce, doubled for each write in a row that failed, so a folder that cannot be written is not retried at the debounce's rate.
     private var retryDelay: Duration {
         guard failedWriteStreak > 0 else { return saveDebounce }
-        return min(Self.longestRetryDelay, saveDebounce * (1 << min(failedWriteStreak - 1, 20)))
+        return max(saveDebounce, min(Self.longestRetryDelay, saveDebounce * (1 << min(failedWriteStreak - 1, 20))))
     }
 
     private func persistAfterDebounce() async {
@@ -1166,7 +1278,7 @@ public actor LibrarySearchIndex {
             // The entry files landed; the newer generation writes the manifest that lists them.
             releaseBodies(write.bodies)
         case .failed(let error):
-            // The retry runs on the debounce until the write lands, so only the first of a run is logged.
+            // The retries back off until a write lands, so only the first of a run is logged.
             failedWriteStreak += 1
             if !snapshotWriteFailing {
                 snapshotWriteFailing = true
@@ -1178,6 +1290,8 @@ public actor LibrarySearchIndex {
             dirtyEntryIDs.formUnion(pending)
             dirtyBodyIDs.formUnion(pendingBodyIDs.filter { pendingBodies[$0] != nil })
             isDirty = true
+            pendingSaveTask?.cancel()
+            pendingSaveTask = nil
             scheduleSave()
         }
     }
@@ -1204,7 +1318,7 @@ public actor LibrarySearchIndex {
         }
     }
 
-    /// The manifest lands last, so a write interrupted anywhere before it reads as stale, never as complete.
+    /// Bodies land first, then entry files, then the manifest, so a write interrupted anywhere reads as stale, never as complete; a body that outlives its entry file fails the entry's digest and is not quoted.
     private static func performWrite(
         _ write: SnapshotWrite,
         in directory: URL,
@@ -1256,9 +1370,12 @@ public actor LibrarySearchIndex {
     }
 
     private static func unlistedBodyFiles(in bodiesDirectory: URL, keeping ids: Set<String>) -> [URL] {
-        let contents = (try? FileManager.default.contentsOfDirectory(at: bodiesDirectory, includingPropertiesForKeys: nil)) ?? []
+        let contents = (try? FileManager.default.contentsOfDirectory(
+            at: bodiesDirectory, includingPropertiesForKeys: [.isRegularFileKey]
+        )) ?? []
         return contents.filter { url in
-            url.pathExtension != "txt" || !ids.contains(url.deletingPathExtension().lastPathComponent)
+            guard (try? url.resourceValues(forKeys: [.isRegularFileKey]))?.isRegularFile == true else { return false }
+            return url.pathExtension != "txt" || !ids.contains(url.deletingPathExtension().lastPathComponent)
         }
     }
 
