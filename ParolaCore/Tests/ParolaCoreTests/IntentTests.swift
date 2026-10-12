@@ -230,26 +230,46 @@ struct IntentTests {
     }
 
     @Test("materialize passes a URL-backed IntentFile through")
-    func materializeURLBacked() throws {
+    func materializeURLBacked() async throws {
         let src = FileManager.default.temporaryDirectory
             .appendingPathComponent("parola-intent-src-\(UUID().uuidString).wav")
         try Data("RIFFfake".utf8).write(to: src)
         defer { try? FileManager.default.removeItem(at: src) }
 
-        let out = try TranscribeFileIntent.materialize(IntentFile(fileURL: src))
+        let out = try await TranscribeFileIntent.materialize(IntentFile(fileURL: src))
         #expect(out.url == src)
     }
 
     @Test("materialize writes a data-backed IntentFile to a temp path")
-    func materializeDataBacked() throws {
+    func materializeDataBacked() async throws {
         let file = IntentFile(data: Data("abc".utf8), filename: "clip.wav")
 
-        let out = try TranscribeFileIntent.materialize(file)
+        let out = try await TranscribeFileIntent.materialize(file)
         defer { try? FileManager.default.removeItem(at: out.url.deletingLastPathComponent()) }
 
         #expect(out.scoped == false)
         #expect(out.url.lastPathComponent == "clip.wav")
         #expect(try String(contentsOf: out.url, encoding: .utf8) == "abc")
+    }
+
+    @Test("releasing a data-backed file removes its scratch folder, and leaves a picked file alone")
+    func materializeReleaseCleansUp() async throws {
+        let out = try await TranscribeFileIntent.materialize(IntentFile(data: Data("abc".utf8), filename: "clip.wav"))
+        let folder = out.url.deletingLastPathComponent()
+        #expect(FileManager.default.fileExists(atPath: folder.path))
+        out.release()
+        var gone = false
+        for _ in 0..<200 where !gone {
+            try await Task.sleep(for: .milliseconds(10))
+            gone = !FileManager.default.fileExists(atPath: folder.path)
+        }
+        #expect(gone)
+
+        let src = FileManager.default.temporaryDirectory.appendingPathComponent("parola-intent-keep-\(UUID().uuidString).wav")
+        try Data("RIFFfake".utf8).write(to: src)
+        defer { try? FileManager.default.removeItem(at: src) }
+        try await TranscribeFileIntent.materialize(IntentFile(fileURL: src)).release()
+        #expect(FileManager.default.fileExists(atPath: src.path))
     }
 }
 
@@ -284,6 +304,38 @@ struct IntentPerformerTests {
         await #expect(throws: ParolaIntentError.unavailable) {
             _ = try await TranscribeFileIntent(file: IntentFile(fileURL: src)).perform()
         }
+    }
+
+    @Test("a data-backed run that fails leaves its file where Retry and Reveal expect it; a run that succeeds removes it")
+    func scratchSurvivesOnlyAFailure() async throws {
+        defer { IntentPerformers.transcribeFile = nil }
+        struct Failed: Error {}
+
+        let seen = URLBox()
+        IntentPerformers.transcribeFile = { url in
+            seen.url = url
+            throw Failed()
+        }
+        await #expect(throws: Failed.self) {
+            _ = try await TranscribeFileIntent(file: IntentFile(data: Data("abc".utf8), filename: "clip.wav")).perform()
+        }
+        let kept = try #require(seen.url)
+        defer { try? FileManager.default.removeItem(at: kept.deletingLastPathComponent()) }
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(FileManager.default.fileExists(atPath: kept.path))
+
+        IntentPerformers.transcribeFile = { url in
+            seen.url = url
+            return "ok"
+        }
+        _ = try await TranscribeFileIntent(file: IntentFile(data: Data("abc".utf8), filename: "clip.wav")).perform()
+        let done = try #require(seen.url)
+        var gone = false
+        for _ in 0..<200 where !gone {
+            try await Task.sleep(for: .milliseconds(10))
+            gone = !FileManager.default.fileExists(atPath: done.path)
+        }
+        #expect(gone)
     }
 
     @Test("TranscribeFileIntent hands the picked file URL to the performer")

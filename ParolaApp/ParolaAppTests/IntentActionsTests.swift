@@ -326,6 +326,26 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("a data-backed file's scratch folder is left by the window and the recents before the intent returns", .timeLimit(.minutes(1)))
+        func scratchFileIsNotKept() async throws {
+            try await withMocksCleared(.transcriber) {
+                await installMock()
+                let model = makeModel("scratch")
+                let wav = try makeWAV("scratch")
+                let folder = FileManager.default.temporaryDirectory.appendingPathComponent("parola-intent-\(UUID().uuidString)", isDirectory: true)
+                try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                let scratch = folder.appendingPathComponent("clip.wav")
+                try FileManager.default.moveItem(at: wav, to: scratch)
+                defer { try? FileManager.default.removeItem(at: folder) }
+
+                _ = try await model.transcribeFileFromIntent(scratch)
+
+                let kept = try #require(model.sourceFileURL)
+                #expect(!TranscribeFileIntent.isIntentScratch(kept), "the window still points at the scratch file")
+                #expect(!model.recentFilesRaw.contains(folder.lastPathComponent))
+            }
+        }
+
         @Test("a Shortcut whose run fails after the user went to another page hears the run's own error", .timeLimit(.minutes(1)))
         func failureOutOfSightReachesTheShortcut() async throws {
             try await withMocksCleared(.transcriber) {

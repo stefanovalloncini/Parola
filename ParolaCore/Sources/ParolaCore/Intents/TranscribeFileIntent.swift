@@ -24,20 +24,59 @@ public struct TranscribeFileIntent: AppIntent {
         guard let transcribeFile = IntentPerformers.transcribeFile else {
             throw ParolaIntentError.unavailable
         }
-        let source = try Self.materialize(file)
-        defer { if source.scoped { source.url.stopAccessingSecurityScopedResource() } }
-        return .result(value: try await transcribeFile(source.url))
+        let source = try await Self.materialize(file)
+        defer { source.stopAccess() }
+        let text = try await transcribeFile(source.url)
+        source.removeScratch()
+        return .result(value: text)
     }
 
-    static func materialize(_ file: IntentFile) throws -> (url: URL, scoped: Bool) {
-        if let url = file.fileURL {
-            return (url, url.startAccessingSecurityScopedResource())
+    /// A file this intent wrote for a Shortcut that passed data: it goes once a run has succeeded, so nothing may keep pointing at it by then.
+    public static func isIntentScratch(_ url: URL) -> Bool {
+        let folder = url.deletingLastPathComponent()
+        return folder.lastPathComponent.hasPrefix("parola-intent-")
+            && folder.deletingLastPathComponent().resolvingSymlinksInPath().path
+            == FileManager.default.temporaryDirectory.resolvingSymlinksInPath().path
+    }
+
+    struct Materialized: Sendable {
+        let url: URL
+        let scoped: Bool
+        let scratchDirectory: URL?
+
+        func release() {
+            stopAccess()
+            removeScratch()
         }
-        let dir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("parola-intent-\(UUID().uuidString)", isDirectory: true)
-        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        let url = dir.appendingPathComponent(file.filename)
-        try file.data.write(to: url)
-        return (url, false)
+
+        func stopAccess() {
+            if scoped { url.stopAccessingSecurityScopedResource() }
+        }
+
+        /// Only after a run succeeds: a failed run's Retry, Reveal and player still point at the file.
+        func removeScratch() {
+            guard let scratchDirectory else { return }
+            DispatchQueue.global(qos: .utility).async { try? FileManager.default.removeItem(at: scratchDirectory) }
+        }
+    }
+
+    static func materialize(_ file: IntentFile) async throws -> Materialized {
+        if let url = file.fileURL {
+            return Materialized(url: url, scoped: url.startAccessingSecurityScopedResource(), scratchDirectory: nil)
+        }
+        let data = file.data
+        let filename = file.filename
+        return try await withCheckedThrowingContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                continuation.resume(with: Result {
+                    let dir = FileManager.default.temporaryDirectory
+                        .appendingPathComponent("parola-intent-\(UUID().uuidString)", isDirectory: true)
+                    try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+                    let url = dir.appendingPathComponent(filename)
+                    try data.write(to: url)
+                    return Materialized(url: url, scoped: false, scratchDirectory: dir)
+                })
+            }
+        }
     }
 }

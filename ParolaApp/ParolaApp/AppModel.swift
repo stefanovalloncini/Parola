@@ -612,6 +612,7 @@ final class AppModel {
     }
 
     func noteRecentFile(_ url: URL) {
+        guard !TranscribeFileIntent.isIntentScratch(url) else { return }
         var list = RecentFilesList(capacity: 10)
         list.decode(recentFilesRaw)
         list.note(url)

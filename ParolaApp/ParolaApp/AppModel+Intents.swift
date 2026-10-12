@@ -110,10 +110,15 @@ extension AppModel {
             if let failure = fileRunFailure, failure.runToken == runToken { throw IntentActionError.failed(failure.message) }
             throw IntentActionError.cancelled
         }
+        let entry: LibraryEntry
         do {
-            _ = try await landing.entry.value
+            entry = try await landing.entry.value
         } catch {
             throw IntentActionError.failed(error.localizedDescription)
+        }
+        await awaitLandingSteps()
+        if let audio = try? await library.load(entry.id).document.audioURL, sourceFileURL == url {
+            movePlayback(to: audio)
         }
         return landing.text
     }
