@@ -3,10 +3,10 @@ import SwiftUI
 import ParolaCore
 
 extension AppModel {
-    func refreshModelList() {
+    func refreshModelList(listing: @escaping @Sendable () -> [ModelInfo] = { ModelStore.shared.listedCatalog() }) {
         modelListTask?.cancel()
         modelListTask = Task { [weak self] in
-            let listed = await Task.detached(priority: .utility) { ModelStore.shared.listedCatalog() }.value
+            let listed = await Task.detached(priority: .utility, operation: listing).value
             guard !Task.isCancelled else { return }
             self?.installModelList(listed)
         }

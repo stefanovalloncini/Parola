@@ -50,9 +50,16 @@ struct AppModelModelsTests {
     @Test("a refresh superseded by a newer one never installs its list")
     func supersededRefreshDropped() async throws {
         let model = try makeModel()
-        model.refreshModelList()
-        model.refreshModelList()
+        let full = ModelStore.shared.listedCatalog()
+        let stale = Array(full.prefix(1))
+        try #require(stale != full)
+        model.refreshModelList {
+            Thread.sleep(forTimeInterval: 0.1)
+            return stale
+        }
+        model.refreshModelList { full }
         await model.modelListTask?.value
-        #expect(model.availableModels == ModelStore.shared.listedCatalog())
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(model.availableModels == full)
     }
 }

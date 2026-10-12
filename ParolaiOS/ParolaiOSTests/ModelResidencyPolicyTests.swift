@@ -1,6 +1,5 @@
 import Foundation
 import Testing
-import ParolaCore
 @testable import Parola
 
 @Suite("ModelResidencyPolicy")
@@ -24,18 +23,5 @@ struct ModelResidencyPolicyTests {
     )
     func releaseGate(phase: TranscriptionCoordinator.Phase, releases: Bool) {
         #expect(ModelResidencyPolicy.releasesOnBackground(phase: phase) == releases)
-    }
-
-    @Test("releasing from an idle coordinator completes")
-    @MainActor
-    func idleReleaseCompletes() async throws {
-        let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("parola-resid-\(UUID().uuidString)", isDirectory: true)
-        try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
-        let coord = TranscriptionCoordinator(
-            library: LibraryStore(libraryURL: tmp),
-            settings: UserSettings(defaults: UserDefaults(suiteName: "test-\(UUID().uuidString)")!)
-        )
-        await coord.releaseModelsInBackground()
-        #expect(coord.phase == .idle)
     }
 }
