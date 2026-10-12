@@ -262,6 +262,7 @@ public actor LibrarySearchIndex {
     private(set) var entriesEncoded = 0
     private(set) var vocabularySorts = 0
     private(set) var entriesDecoded = 0
+    private(set) var flushesAwaitingIndexing = 0
 
     /// `indexDirectory` holds the snapshot: a `manifest.json`, one file per entry under `entries/` and its body under `bodies/`.
     public init(
@@ -324,6 +325,7 @@ public actor LibrarySearchIndex {
         ticketCounter &+= 1
         let ticket = ticketCounter
         indexTickets[id] = ticket
+        pendingFingerprints[id] = nil
         let request = RebuildEntry(
             id: id, title: title, text: text, auxiliaryText: auxiliaryText,
             boundaries: boundaries, fingerprint: fingerprint
@@ -521,7 +523,11 @@ public actor LibrarySearchIndex {
         let task = pendingSaveTask
         pendingSaveTask = nil
         task?.cancel()
-        while let indexing = inFlightIndexes.values.first { await indexing.value }
+        while let indexing = inFlightIndexes.values.first {
+            flushesAwaitingIndexing += 1
+            await indexing.value
+            flushesAwaitingIndexing -= 1
+        }
         guard persists, isLoaded else { return }
         await saveSnapshot()
         await drainWrites()
@@ -567,7 +573,7 @@ public actor LibrarySearchIndex {
     }
 
     private func applyFingerprint(_ fingerprint: String, for id: String) {
-        guard let existing = entries[id], existing.fingerprint != fingerprint else { return }
+        guard let existing = entries[id], existing.fingerprint != fingerprint, !unsoundBodies.contains(id) else { return }
         entries[id] = IndexedEntry(
             title: existing.title,
             tokens: existing.tokens,
@@ -597,6 +603,7 @@ public actor LibrarySearchIndex {
         dirtyBodyIDs.removeAll()
         pendingBodies.removeAll()
         indexTickets.removeAll()
+        pendingFingerprints.removeAll()
         sortedTokens = nil
         for entry in prepared {
             install(entry.entry, body: entry.body, for: entry.id)
@@ -660,8 +667,7 @@ public actor LibrarySearchIndex {
         return true
     }
 
-    /// An entry whose body is missing, or is not the one it was indexed with, is left out. The owner marks it
-    /// stale so the next catch-up reads the bundle again.
+    /// An entry whose body is missing or is not the one it was indexed with is left out, and the owner marks it stale.
     private func bodies(for captured: [String: IndexedEntry]) async -> [String: String] {
         var found: [String: String] = [:]
         var onDisk: [String: IndexedEntry] = [:]
@@ -670,13 +676,16 @@ public actor LibrarySearchIndex {
         }
         guard !onDisk.isEmpty else { return found }
         let directory = Self.bodiesDirectory(in: indexDirectory)
+        let wanted = onDisk
         let read = await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
-                continuation.resume(returning: Self.readBodies(onDisk, in: directory))
+                continuation.resume(returning: Self.readBodies(wanted, in: directory))
             }
         }
         if persists {
-            for id in read.unsound where entries[id]?.revision == captured[id]?.revision { markUnsound(id) }
+            for id in read.unsound where !unsoundBodies.contains(id) && entries[id]?.revision == captured[id]?.revision {
+                markUnsound(id)
+            }
         }
         return found.merging(read.found) { memory, _ in memory }
     }

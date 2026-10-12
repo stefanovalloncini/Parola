@@ -40,7 +40,7 @@ private final class TokenizeGate: Sendable {
             state.entered += 1
             return true
         }
-        if hold { release.wait() }
+        if hold { _ = release.wait(timeout: .now() + 30) }
     }
 }
 
@@ -942,6 +942,7 @@ final class LibrarySearchIndexTests {
         let slow = Task { await index.index(id: "e1", title: "Slow", text: "alpha bravo", createdAt: Date()) }
         #expect(await eventually { gate.entered == 1 })
         let flushing = Task { await index.flush() }
+        #expect(await eventually { await index.flushesAwaitingIndexing == 1 })
         gate.open()
         await flushing.value
         await slow.value
@@ -968,6 +969,7 @@ final class LibrarySearchIndexTests {
     func fingerprintRefreshWaitsForIndexing() async throws {
         let gate = TokenizeGate()
         let (index, _) = makeGatedIndex(gate)
+        await index.rebuild(entries: [])
         await index.index(id: "e1", title: "One", text: "alpha", fingerprint: "f1", createdAt: Date())
         gate.arm()
         let slow = Task { await index.index(id: "e1", title: "One", text: "alpha bravo", fingerprint: "f2", createdAt: Date()) }
@@ -976,7 +978,24 @@ final class LibrarySearchIndexTests {
         gate.open()
         await slow.value
 
-        #expect(await index.staleness(matching: ["e1": "f3"]).changed.isEmpty)
+        #expect(await index.staleness(matching: ["e1": "f3"]).isCurrent)
+    }
+
+    @Test("a fingerprint stashed during one index call is dropped when a later call supersedes it")
+    func supersedingIndexCallDropsTheStash() async throws {
+        let gate = TokenizeGate()
+        let (index, _) = makeGatedIndex(gate)
+        await index.rebuild(entries: [])
+        await index.index(id: "e1", title: "One", text: "alpha", fingerprint: "f1", createdAt: Date())
+        gate.arm()
+        let first = Task { await index.index(id: "e1", title: "One", text: "alpha bravo", fingerprint: "f2", createdAt: Date()) }
+        #expect(await eventually { gate.entered == 1 })
+        await index.refreshFingerprint("f3", for: "e1")
+        await index.index(id: "e1", title: "One", text: "alpha charlie", fingerprint: "f4", createdAt: Date())
+        gate.open()
+        await first.value
+
+        #expect(await index.staleness(matching: ["e1": "f4"]).isCurrent)
     }
 
     @Test("a body that is missing or is not the entry's is left out and the entry is read again")
@@ -1254,7 +1273,7 @@ final class LibrarySearchIndexTests {
         await owner.flush()
         let reader = LibrarySearchIndex(readingSnapshotIn: url)
         _ = await reader.search("beta")
-        await reader.index(id: "e2", title: "Two", text: "beta old words", fingerprint: "f1", createdAt: Date())
+        await reader.index(id: "e2", title: "Two", text: "beta reader words", fingerprint: "f1", createdAt: Date())
 
         await owner.index(id: "e2", title: "Two", text: "beta new words", fingerprint: "f2", createdAt: Date())
         await owner.flush()
@@ -1514,7 +1533,7 @@ final class LibrarySearchIndexTests {
         let (index, attempts, failing, url) = makeFailingIndex(debounce: .milliseconds(250), clock: clock)
         func step(_ wait: Duration, expecting expected: Int) async -> Bool {
             guard await nextSleeper(on: clock) else { return false }
-            await clock.advance(by: wait)
+            clock.advance(by: wait)
             return await eventually { attempts.withLock { $0 } == expected }
         }
 
@@ -1523,13 +1542,13 @@ final class LibrarySearchIndexTests {
         #expect(await step(.milliseconds(250), expecting: 2), "the first retry waits the debounce")
 
         #expect(await nextSleeper(on: clock))
-        await clock.advance(by: .milliseconds(250))
-        #expect(attempts.withLock { $0 } == 2, "the second waits twice that")
+        clock.advance(by: .milliseconds(250))
+        #expect(clock.sleeperCount == 1, "the second waits twice that")
         #expect(await step(.milliseconds(250), expecting: 3))
 
         #expect(await nextSleeper(on: clock))
-        await clock.advance(by: .milliseconds(500))
-        #expect(attempts.withLock { $0 } == 3, "the third waits four times")
+        clock.advance(by: .milliseconds(500))
+        #expect(clock.sleeperCount == 1, "the third waits four times")
         #expect(await step(.milliseconds(500), expecting: 4))
 
         var last = 4
@@ -1540,7 +1559,8 @@ final class LibrarySearchIndexTests {
         failing.withLock { $0 = false }
         #expect(await step(.seconds(30), expecting: last + 3), "the body, the entry file and the manifest")
         let manifestPath = manifestURL(in: url).path
-        #expect(FileManager.default.fileExists(atPath: manifestPath))
+        let manifestLanded = await eventually { FileManager.default.fileExists(atPath: manifestPath) }
+        #expect(manifestLanded)
 
         failing.withLock { $0 = true }
         await index.index(id: "e2", title: "Two", text: "retro feedback", createdAt: Date())
@@ -1554,13 +1574,13 @@ final class LibrarySearchIndexTests {
         let (index, attempts, _, _) = makeFailingIndex(debounce: .seconds(60), clock: clock)
         await index.index(id: "e1", title: "One", text: "sprint planning", createdAt: Date())
         #expect(await nextSleeper(on: clock))
-        await clock.advance(by: .seconds(60))
+        clock.advance(by: .seconds(60))
         #expect(await eventually { attempts.withLock { $0 } == 1 })
 
         #expect(await nextSleeper(on: clock))
-        await clock.advance(by: .seconds(30))
-        #expect(attempts.withLock { $0 } == 1)
-        await clock.advance(by: .seconds(30))
+        clock.advance(by: .seconds(30))
+        #expect(clock.sleeperCount == 1, "the retry still waits out the debounce")
+        clock.advance(by: .seconds(30))
         #expect(await eventually { attempts.withLock { $0 } == 2 })
     }
 
