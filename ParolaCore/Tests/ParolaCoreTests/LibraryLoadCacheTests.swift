@@ -283,4 +283,103 @@ struct LibraryLoadCacheTests {
         #expect(stored.segments.first?.text == "edited")
         #expect(stored.language == "it")
     }
+
+    private func orderedMutations(
+        firstWrites first: @escaping @Sendable (LibraryStore, LibraryEntry.ID) async throws -> Void,
+        thenWrites second: @escaping @Sendable (LibraryStore, LibraryEntry.ID) async throws -> Void
+    ) async throws -> Transcript {
+        let decodes = OSAllocatedUnfairLock(initialState: 0)
+        let release = DispatchSemaphore(value: 0)
+        let armed = OSAllocatedUnfairLock(initialState: false)
+        let (store, tmp) = try makeStore(didDecodeDocument: {
+            guard armed.withLock({ $0 }) else { return }
+            if decodes.withLock({ count -> Int in count += 1; return count }) == 1 { _ = release.wait(timeout: .now() + 30) }
+        })
+        defer { try? FileManager.default.removeItem(at: tmp) }
+        let entry = try await store.add(transcript: makeTranscript("original"), audioSource: nil)
+        try await store.setSummary(Summary(text: "start"), for: entry.id)
+        armed.withLock { $0 = true }
+
+        let a = Task { try await first(store, entry.id) }
+        await pollUntil("the first decode to start") { decodes.withLock { $0 } >= 1 }
+        let b = Task { try await second(store, entry.id) }
+        await pollUntil("the second call to queue or decode") {
+            await store.queuedMutationCount == 1 || decodes.withLock { $0 } >= 2
+        }
+        if decodes.withLock({ $0 }) >= 2 { try await b.value }
+        release.signal()
+        try await a.value
+        try await b.value
+        return try await store.load(entry.id).document.transcript
+    }
+
+    @Test("two summary writes to one bundle apply in the order they were issued")
+    func summaryWritesApplyInOrder() async throws {
+        let stored = try await orderedMutations(
+            firstWrites: { store, id in try await store.setSummary(Summary(text: "recap"), for: id) },
+            thenWrites: { store, id in try await store.setSummary(nil, for: id) }
+        )
+        #expect(stored.summary == nil)
+    }
+
+    @Test("two transcript mutations of one bundle apply in the order they were issued")
+    func mutationsApplyInOrder() async throws {
+        let stored = try await orderedMutations(
+            firstWrites: { store, id in try await store.mutateTranscript(for: id) { $0.language = "it" } },
+            thenWrites: { store, id in try await store.mutateTranscript(for: id) { $0.language = "fr" } }
+        )
+        #expect(stored.language == "fr")
+    }
+
+    @Test("a mutation that throws inside its turn leaves the queue free", .timeLimit(.minutes(1)))
+    func mutationQueueSurvivesFailures() async throws {
+        let (store, tmp) = try makeStore()
+        defer { try? FileManager.default.removeItem(at: tmp) }
+        let entry = try await store.add(transcript: makeTranscript("original"), audioSource: nil)
+        let transcriptURL = entry.bundleURL.appendingPathComponent("transcript.json")
+        let good = try Data(contentsOf: transcriptURL)
+
+        try Data("not json".utf8).write(to: transcriptURL)
+        await #expect(throws: (any Error).self) {
+            try await store.mutateTranscript(for: entry.id) { $0.language = "it" }
+        }
+        let heldAfterMutate = await store.heldMutationTurnCount
+        #expect(heldAfterMutate == 0)
+        guard heldAfterMutate == 0 else { return }
+        await #expect(throws: (any Error).self) {
+            try await store.setSummary(Summary(text: "recap"), for: entry.id)
+        }
+        #expect(await store.heldMutationTurnCount == 0)
+
+        try good.write(to: transcriptURL)
+        try await store.setSummary(Summary(text: "recap"), for: entry.id)
+        #expect(try await store.load(entry.id).document.transcript.summary?.text == "recap")
+        #expect(await store.heldMutationTurnCount == 0)
+        #expect(await store.queuedMutationCount == 0)
+    }
+
+    @Test("a bundle purged while a mutation waits for its turn reports notFound", .timeLimit(.minutes(1)))
+    func purgedWhileWaiting() async throws {
+        let decodes = OSAllocatedUnfairLock(initialState: 0)
+        let release = DispatchSemaphore(value: 0)
+        let armed = OSAllocatedUnfairLock(initialState: false)
+        let (store, tmp) = try makeStore(didDecodeDocument: {
+            guard armed.withLock({ $0 }) else { return }
+            if decodes.withLock({ count -> Int in count += 1; return count }) == 1 { _ = release.wait(timeout: .now() + 30) }
+        })
+        defer { try? FileManager.default.removeItem(at: tmp) }
+        let entry = try await store.add(transcript: makeTranscript("original"), audioSource: nil)
+        armed.withLock { $0 = true }
+
+        let first = Task { try await store.mutateTranscript(for: entry.id) { $0.language = "it" } }
+        await pollUntil("the first decode to start") { decodes.withLock { $0 } >= 1 }
+        let second = Task { try await store.mutateTranscript(for: entry.id) { $0.language = "fr" } }
+        await pollUntil("the second call to queue") { await store.queuedMutationCount == 1 }
+        try FileManager.default.removeItem(at: entry.bundleURL)
+        release.signal()
+        _ = try? await first.value
+
+        await #expect(throws: LibraryStore.LibraryError.self) { try await second.value }
+        #expect(await store.heldMutationTurnCount == 0)
+    }
 }

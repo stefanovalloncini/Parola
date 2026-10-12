@@ -106,6 +106,8 @@ public actor LibraryStore {
     private var listCacheEpoch = 0
     /// Moves with a write to one bundle, so a decode of another entry isn't thrown away; `storeGeneration` moves with a write that names no entry.
     private var bundleGenerations: [LibraryEntry.ID: Int] = [:]
+    /// A key is a bundle whose turn is held; its value is the calls waiting for it, in order.
+    private var mutationTurns: [LibraryEntry.ID: [CheckedContinuation<Void, Never>]] = [:]
     private var storeGeneration = 0
     /// The library folder's modification date as of the last scan or this store's own last add or removal.
     private var folderStamp: Date?
@@ -842,6 +844,11 @@ public actor LibraryStore {
         guard FileManager.default.fileExists(atPath: bundleURL.path) else {
             throw LibraryError.notFound(id)
         }
+        await beginMutation(of: id)
+        defer { endMutation(of: id) }
+        guard FileManager.default.fileExists(atPath: bundleURL.path) else {
+            throw LibraryError.notFound(id)
+        }
         let stored = try await storedTranscript(id: id, at: bundleURL)
         var transcript = stored
         transform(&transcript)
@@ -849,6 +856,29 @@ public actor LibraryStore {
         try await updateTranscript(transcript, for: id, reindex: reindex)
         return transcript
     }
+
+    /// The decode happens off the actor, so mutations of one bundle queue here to apply in the order they were issued.
+    private func beginMutation(of id: LibraryEntry.ID) async {
+        guard mutationTurns[id] != nil else {
+            mutationTurns[id] = []
+            return
+        }
+        await withCheckedContinuation { mutationTurns[id, default: []].append($0) }
+    }
+
+    private func endMutation(of id: LibraryEntry.ID) {
+        guard var waiting = mutationTurns[id], !waiting.isEmpty else {
+            mutationTurns[id] = nil
+            return
+        }
+        let next = waiting.removeFirst()
+        mutationTurns[id] = waiting
+        next.resume()
+    }
+
+    var heldMutationTurnCount: Int { mutationTurns.count }
+
+    var queuedMutationCount: Int { mutationTurns.values.reduce(0) { $0 + $1.count } }
 
     /// Not cancellable, so a write the caller asked for still lands; reads again when this bundle was written meanwhile.
     private func storedTranscript(id: LibraryEntry.ID, at bundleURL: URL) async throws -> Transcript {
@@ -985,6 +1015,11 @@ public actor LibraryStore {
     /// `chapters`, when given, replaces the entry's chapter list in the same write, so the two never disagree on disk.
     public func setSummary(_ summary: Summary?, chapters: [Chapter]? = nil, for id: LibraryEntry.ID) async throws {
         let bundleURL = libraryURL.appendingPathComponent("\(id).parola", isDirectory: true)
+        guard FileManager.default.fileExists(atPath: bundleURL.path) else {
+            throw LibraryError.notFound(id)
+        }
+        await beginMutation(of: id)
+        defer { endMutation(of: id) }
         guard FileManager.default.fileExists(atPath: bundleURL.path) else {
             throw LibraryError.notFound(id)
         }
