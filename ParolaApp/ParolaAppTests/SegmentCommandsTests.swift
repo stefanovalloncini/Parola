@@ -90,7 +90,7 @@ struct SegmentCommandsTests {
 
     private func hostCard(_ index: Int) throws -> HostedWindow {
         let segment = try #require(model.transcript?.segments[index])
-        let card = SegmentCard(segment: segment, translation: nil, translationSideBySide: false)
+        let card = SegmentCard(segment: segment, isCurrent: false, translation: nil, translationSideBySide: false)
             .environment(model)
             .frame(width: 600)
         return HostedWindow(card, width: 600, height: 200)

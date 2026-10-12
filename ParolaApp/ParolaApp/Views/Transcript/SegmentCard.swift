@@ -3,7 +3,7 @@ import ParolaCore
 
 struct SegmentCard: View {
     let segment: TranscriptSegment
-    var isCurrent: Bool = false
+    let isCurrent: Bool
     var hoveredSpeaker: Binding<String?> = .constant(nil)
     var confidenceBucket: SegmentConfidence.Bucket? = nil
     var qcIssues: [SubtitleQC.Issue] = []
@@ -28,7 +28,7 @@ struct SegmentCard: View {
     private var isEditing: Bool { inlineEdit.isEditing }
 
     var body: some View {
-        BodyProbe.hit("SegmentCard")
+        BodyProbe.hit("SegmentCard", model)
         // Read once: the star shows in the meta cluster, the action strip and the ••• menu.
         let isFavorite = model.isSegmentFavorite(segment.id)
         return VStack(alignment: .leading, spacing: DS.Spacing.small) {
@@ -541,6 +541,7 @@ struct SegmentCard: View {
             draftAssignSpeakerName = ""
             assigningSpeaker = true
         }
+        .equatable()
     }
 
     private func splitSegment() {
@@ -731,9 +732,13 @@ extension SegmentCard: Equatable {
 }
 
 /// Its own view so the people lists are read when the menu is built, not on every pass of the card.
-private struct SegmentAssignMenu: View {
+private struct SegmentAssignMenu: View, Equatable {
     let segment: TranscriptSegment
     let onNewPerson: () -> Void
+
+    nonisolated static func == (lhs: SegmentAssignMenu, rhs: SegmentAssignMenu) -> Bool {
+        lhs.segment == rhs.segment
+    }
 
     @Environment(AppModel.self) private var model
 

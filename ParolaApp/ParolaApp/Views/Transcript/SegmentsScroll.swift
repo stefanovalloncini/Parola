@@ -53,7 +53,7 @@ struct SegmentsScroll: View {
 
     var body: some View {
         ScrollViewReader { proxy in
-            let _ = BodyProbe.hit("SegmentsScroll")
+            let _ = BodyProbe.hit("SegmentsScroll", model)
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: DS.Spacing.small) {
                     if model.transcript != nil {
@@ -223,7 +223,7 @@ struct SegmentsScroll: View {
     }
 }
 
-/// Reads the playhead so the scroll's own body doesn't: the cards re-run only for the one segment that changes.
+/// Reads the playhead so the scroll's own body doesn't; only the two cards whose current flag flips re-run.
 private struct CurrentSegmentCard: View {
     let segment: TranscriptSegment
     let hoveredSpeaker: Binding<String?>

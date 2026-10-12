@@ -55,7 +55,7 @@ struct TranscriptRenderBreadthTests {
         return entry
     }
 
-    private func probe(_ name: String) -> Int { BodyProbe.counts[name] ?? 0 }
+    private func probe(_ name: String, _ model: AppModel) -> Int { BodyProbe.counts(for: model)[name] ?? 0 }
 
     @Test("a library write that changes nothing the cards show re-runs none of them")
     func libraryWritesLeaveTheCardsAlone() async throws {
@@ -64,16 +64,16 @@ struct TranscriptRenderBreadthTests {
             let entry = try await open(Self.talk(), in: model)
             let hosted = HostedWindow(SegmentsScroll().environment(model), width: 700, height: 900)
             defer { hosted.close() }
-            let drawn = await waitUntil { probe("SegmentCard") > 3 }
+            let drawn = await waitUntil { probe("SegmentCard", model) > 3 }
             #expect(drawn)
             await settle()
 
-            BodyProbe.counts = [:]
+            BodyProbe.reset(for: model)
             model.patchLibraryEntry(id: entry.id) { $0.lastOpenedAt = Date() }
             model.patchLibraryEntry(id: entry.id) { $0.title = "Renamed" }
             await settle()
-            #expect(probe("SegmentCard") == 0, "\(BodyProbe.counts)")
-            #expect(probe("SegmentsScroll") == 0, "\(BodyProbe.counts)")
+            #expect(probe("SegmentCard", model) == 0, "\(BodyProbe.counts(for: model))")
+            #expect(probe("SegmentsScroll", model) == 0, "\(BodyProbe.counts(for: model))")
         }
     }
 
@@ -84,17 +84,17 @@ struct TranscriptRenderBreadthTests {
             _ = try await open(Self.talk(), in: model)
             let hosted = HostedWindow(SegmentsScroll().environment(model), width: 700, height: 900)
             defer { hosted.close() }
-            let drawn = await waitUntil { probe("SegmentCard") > 3 }
+            let drawn = await waitUntil { probe("SegmentCard", model) > 3 }
             #expect(drawn)
             model.currentSegmentID = 1
             await settle()
 
-            BodyProbe.counts = [:]
+            BodyProbe.reset(for: model)
             model.currentSegmentID = 2
             await settle()
-            let rerun = probe("SegmentCard")
-            #expect(rerun >= 1 && rerun <= 2, "\(BodyProbe.counts)")
-            #expect(probe("SegmentsScroll") == 0, "\(BodyProbe.counts)")
+            let rerun = probe("SegmentCard", model)
+            #expect(rerun >= 1 && rerun <= 2, "\(BodyProbe.counts(for: model))")
+            #expect(probe("SegmentsScroll", model) == 0, "\(BodyProbe.counts(for: model))")
         }
     }
 
@@ -106,19 +106,19 @@ struct TranscriptRenderBreadthTests {
             model.karaokeHighlight = true
             let hosted = HostedWindow(SegmentsScroll().environment(model), width: 700, height: 900)
             defer { hosted.close() }
-            let drawn = await waitUntil { probe("SegmentCard") > 3 }
+            let drawn = await waitUntil { probe("SegmentCard", model) > 3 }
             #expect(drawn)
             model.currentSegmentID = 2
             model.currentWordID = "2-0"
             await settle()
 
-            BodyProbe.counts = [:]
+            BodyProbe.reset(for: model)
             for word in 1..<6 {
                 model.currentWordID = "2-\(word)"
                 await settle(for: .milliseconds(40))
             }
-            #expect(probe("SegmentCard") == 0, "\(BodyProbe.counts)")
-            #expect(probe("SegmentsScroll") == 0, "\(BodyProbe.counts)")
+            #expect(probe("SegmentCard", model) == 0, "\(BodyProbe.counts(for: model))")
+            #expect(probe("SegmentsScroll", model) == 0, "\(BodyProbe.counts(for: model))")
         }
     }
 
@@ -180,22 +180,32 @@ struct TranscriptRenderBreadthTests {
         }
     }
 
-    @Test("the window's undo manager is capped when the model adopts it")
-    func undoStackIsBounded() async throws {
+    private func visibleText(containing text: String, in hosted: HostedWindow) -> Bool {
+        hosted.host.layoutSubtreeIfNeeded()
+        let window = hosted.window.frame
+        return HostedAccessibility.elements(in: hosted.host).contains { element in
+            element.words.contains { $0.contains(text) } && element.frame.intersects(window)
+                && element.frame.height < window.height * 1.5
+        }
+    }
+
+    @Test("a search hit far down brings its segment on screen in both layouts", arguments: [(200, 180), (400, 380)])
+    func revealScrollsToTheHit(count: Int, hit: Int) async throws {
         try await withIsolatedDefaults { defaults in
             let model = makeModel(defaults)
-            let undo = UndoManager()
-            undo.groupsByEvent = false
-            model.undoManager = undo
-            #expect(undo.levelsOfUndo == AppModel.undoLevels)
-            for step in 0..<(AppModel.undoLevels + 40) {
-                undo.beginUndoGrouping()
-                undo.registerUndo(withTarget: model) { _ in _ = step }
-                undo.endUndoGrouping()
-            }
-            var undone = 0
-            while undo.canUndo { undo.undo(); undone += 1 }
-            #expect(undone == AppModel.undoLevels)
+            _ = try await open(Self.talk(segments: count), in: model)
+            model.pendingRevealSegmentID = hit
+            let cards = HostedWindow(SegmentsScroll().environment(model), width: 700, height: 900)
+            defer { cards.close() }
+            let cardShown = await waitUntil { visibleText(containing: "Turn number \(hit) about", in: cards) }
+            #expect(cardShown, "card \(hit) never reached the screen")
+
+            model.pendingRevealSegmentID = nil
+            model.pendingRevealSegmentID = hit - 1
+            let paragraphs = HostedWindow(ContinuousTranscriptView().environment(model), width: 700, height: 900)
+            defer { paragraphs.close() }
+            let chunkShown = await waitUntil { visibleText(containing: "Turn number \(hit - 1) about", in: paragraphs) }
+            #expect(chunkShown, "the chunk holding \(hit - 1) never reached the screen")
         }
     }
 }

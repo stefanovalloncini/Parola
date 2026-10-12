@@ -69,7 +69,6 @@ struct ContinuousChunks: View {
 
     var body: some View {
         LazyVStack(alignment: .leading, spacing: DS.Spacing.regular) {
-            let _ = BodyProbe.hit("ContinuousChunks")
             TranscriptTitleHeading()
             ForEach(chunks) { chunk in
                 chunkRow(chunk)
