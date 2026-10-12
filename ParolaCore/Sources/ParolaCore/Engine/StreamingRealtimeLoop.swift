@@ -387,9 +387,13 @@ actor StreamingRealtimeLoop {
         guard !buffer.isEmpty, !paused.withLock({ $0 }) else { return false }
         let avgEnergy = AudioProcessor.calculateEnergy(of: buffer).avg
         levelMeter.record(AudioLevel.normalised(rms: avgEnergy))
-        let rel = inbox.withLock { box -> Float in
-            let baseline = box.energies.suffix(20).map(\.avg).min() ?? .infinity
-            let rel = AudioProcessor.calculateRelativeEnergy(of: buffer, relativeTo: baseline)
+        let baseline = inbox.withLock { box -> Float in
+            var lowest = Float.infinity
+            for entry in box.energies.suffix(20) { lowest = min(lowest, entry.avg) }
+            return lowest
+        }
+        let rel = AudioProcessor.calculateRelativeEnergy(of: buffer, relativeTo: baseline)
+        inbox.withLock { box in
             box.pending.append(contentsOf: buffer)
             if let limit = box.limit, box.pending.count > limit.trimAbove {
                 let excess = box.pending.count - limit.keep
@@ -400,7 +404,6 @@ actor StreamingRealtimeLoop {
             if box.energies.count > Self.maxEnergyEntries {
                 box.energies.removeFirst(box.energies.count - Self.maxEnergyEntries)
             }
-            return rel
         }
         onEnergy(rel)
         return true

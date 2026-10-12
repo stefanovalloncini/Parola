@@ -45,7 +45,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
                     try processor.startRecordingLive(inputDeviceID: deviceID) { buffer in
                         onBuffer(buffer)
                         // Runs on the tap thread, serialized with processBuffer's appends, so this purge can't race them.
-                        processor.purgeAudioSamples(keepingLast: 0)
+                        processor.purgeAudioSamples(keepingLast: 1)
                     }
                 },
                 stop: { processor.stopRecording() }
