@@ -159,7 +159,9 @@ struct SpeakerPersonRow: View {
         Divider()
         Button("Manage People…") { model.showingPeopleSheet = true }
             .axLeaf("Inspector.MenuItem.ManagePeople")
-        if person != nil {
+        if let person {
+            Button("Unassign \(person.name)") { Task { await model.unassignSpeaker(label: label) } }
+                .axLeaf("Inspector.MenuItem.UnassignPerson")
             Button("No Speaker") { Task { await model.clearSpeaker(label: label) } }
                 .axLeaf("Inspector.MenuItem.ClearSpeaker")
         }

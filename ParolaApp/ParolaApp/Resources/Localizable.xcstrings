@@ -18018,6 +18018,40 @@
         }
       }
     },
+    "Unassign %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unassign %@"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rimuovi l'assegnazione a %@"
+          }
+        }
+      }
+    },
+    "Unassign Speaker": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unassign Speaker"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rimuovi assegnazione"
+          }
+        }
+      }
+    },
     "Unavailable": {
       "extractionState": "manual",
       "localizations": {

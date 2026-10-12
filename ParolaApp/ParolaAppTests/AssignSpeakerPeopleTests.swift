@@ -139,6 +139,30 @@ struct AssignSpeakerPeopleTests {
         #expect(model.speakerAssignments.isEmpty)
     }
 
+    @Test("unassigning keeps the label on its segments and drops the person, as one undo step")
+    func unassignKeepsTheLabel() async throws {
+        let model = PeopleTestSupport.makeModel("assignunassign")
+        let entry = try await PeopleTestSupport.openSeededEntry(model)
+        await model.assignSpeaker(label: "SPEAKER_00", toNewPersonNamed: "Ada")
+        let ada = try #require(model.person(forSpeaker: "Ada"))
+        let undo = UndoManager()
+        undo.groupsByEvent = false
+        model.undoManager = undo
+
+        await model.unassignSpeaker(label: "Ada")
+
+        #expect(model.transcript?.segments.map(\.speaker) == ["Ada", "SPEAKER_01", "Ada"])
+        #expect(model.speakerAssignments.isEmpty)
+        #expect(model.person(forSpeaker: "Ada") == nil)
+        #expect(try await model.library.load(entry.id).entry.speakerAssignments.isEmpty)
+        #expect(undo.undoActionName == "Unassign Speaker")
+
+        undo.undo()
+        #expect(model.speakerAssignments == ["Ada": ada.id])
+        undo.redo()
+        #expect(model.speakerAssignments.isEmpty)
+    }
+
     @Test("an assignment outside the library rewrites the transcript and records nothing")
     func assignWithoutAnEntry() async throws {
         let model = PeopleTestSupport.makeModel("assignnoentry")

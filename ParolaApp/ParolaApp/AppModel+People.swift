@@ -267,6 +267,24 @@ extension AppModel {
         await awaitSpeakerAssignmentWrites()
     }
 
+    /// Takes the person off a label and leaves the label on its segments, as one undo step.
+    func unassignSpeaker(label: String) async {
+        let trimmed = label.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard speakerAssignments[trimmed] != nil else { return }
+        applyAssignmentEditWithUndo(SpeakerAssignmentEdit(clear: [trimmed]), actionName: String(localized: "Unassign Speaker"))
+        await awaitSpeakerAssignmentWrites()
+    }
+
+    private func applyAssignmentEditWithUndo(_ edit: SpeakerAssignmentEdit, actionName: String) {
+        let inverse = edit.inverse(of: speakerAssignments)
+        let entryID = selectedEntryID
+        applySpeakerAssignmentEdit(edit)
+        registerUndoStep(actionName: actionName) { model in
+            guard model.selectedEntryID == entryID else { return }
+            model.applyAssignmentEditWithUndo(inverse, actionName: actionName)
+        }
+    }
+
     /// Applies one edit to the open entry: to the cached map now, to the bundle next.
     func applySpeakerAssignmentEdit(_ edit: SpeakerAssignmentEdit) {
         guard !edit.isEmpty, let id = selectedEntryID else { return }
