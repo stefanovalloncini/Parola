@@ -101,7 +101,7 @@ final class DictationController {
     @ObservationIgnored private(set) var monitorWork: Task<Void, Never>?
 
     /// The coordinator actor is reentrant, so an unordered stop can complete while a
-    /// startMonitoring is still mid-install and orphan live NSEvent monitors. Chaining
+    /// startMonitoring is still mid-install and orphan a live hotkey registration. Chaining
     /// every monitor operation behind the previous one keeps teardown and install ordered.
     private func enqueueMonitorWork(_ op: @escaping @Sendable () async -> Void) {
         let previous = monitorWork

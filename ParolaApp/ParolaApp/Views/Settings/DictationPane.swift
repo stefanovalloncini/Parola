@@ -80,8 +80,7 @@ struct DictationPane: View {
             }
             SettingRow("Activation key",
                        descriptionVerbatim: activationDescription) {
-                // Paused while recording: the armed dictation monitor sees the recorded
-                // keystroke first and would start a session the rebind then tears down mid-flight.
+                // A take already running would be torn down mid-flight by the rebind.
                 HotkeyRecorder(
                     keyCode: $model.dictationKeyCode,
                     modifierRawValue: $model.dictationKeyModifiers,
@@ -220,7 +219,7 @@ struct DictationPermissionsSection: View {
         SettingsSection("Permissions") {
             PermissionRow(
                 title: String(localized: "Accessibility"),
-                detail: String(localized: "Lets Parola watch the hotkey outside the app and insert text. The near-field indicator also uses it to find your text field."),
+                detail: String(localized: "Lets Parola type dictated text into other apps. The near-field indicator also uses it to find your text field."),
                 granted: permissions.accessibilityGranted,
                 axID: "Dictation.Button.GrantAccessibility",
                 action: { permissions.openAccessibilitySettings() },

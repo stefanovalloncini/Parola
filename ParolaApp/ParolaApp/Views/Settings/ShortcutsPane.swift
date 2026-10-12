@@ -31,7 +31,7 @@ struct ShortcutsPane: View {
             SettingsSection {
                 PermissionRow(
                     title: String(localized: "Accessibility"),
-                    detail: String(localized: "Lets these shortcuts work while another app is in front."),
+                    detail: String(localized: "Lets Parola type dictated text into other apps. The shortcuts work without it."),
                     granted: model.dictationPermissions.accessibilityGranted,
                     axID: "Shortcuts.Button.GrantAccessibility",
                     action: { model.dictationPermissions.openAccessibilitySettings() },

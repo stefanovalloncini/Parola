@@ -7142,6 +7142,78 @@
         }
       }
     },
+    "Hotkey.Refused.System": {
+      "comment": "Shown next to a saved shortcut the system refused to register.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "macOS won't reserve this combination, so it may not work. Pick one with ⌘ or ⌃, or an F key."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "macOS non riserva questa combinazione, quindi potrebbe non funzionare. Scegline una con ⌘ o ⌃, oppure un tasto F."
+          }
+        }
+      }
+    },
+    "Hotkey.Reject.NeedsModifier": {
+      "comment": "Shown under the shortcut recorder when the pressed combination is rejected.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A shortcut needs ⌘ or ⌃, or must be an F key. Press another combination."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Una scorciatoia richiede ⌘ o ⌃, oppure deve essere un tasto F. Premi un'altra combinazione."
+          }
+        }
+      }
+    },
+    "Hotkey.Reject.OptionOnly": {
+      "comment": "Shown under the shortcut recorder when the pressed combination is rejected.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "macOS doesn't allow shortcuts that use only ⌥ or ⌥⇧. Add ⌘ or ⌃, or use an F key."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "macOS non consente scorciatoie con solo ⌥ o ⌥⇧. Aggiungi ⌘ o ⌃, oppure usa un tasto F."
+          }
+        }
+      }
+    },
+    "Hotkey.Reject.Reserved": {
+      "comment": "Shown under the shortcut recorder when the pressed combination is rejected (for example ⌘Q).",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This combination is used by every app. Press another one."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questa combinazione è usata da tutte le app. Premine un'altra."
+          }
+        }
+      }
+    },
     "How Parola checks for new versions.": {
       "extractionState": "manual",
       "localizations": {
@@ -8171,13 +8243,31 @@
         }
       }
     },
-    "Lets Parola watch the hotkey outside the app and insert text. The near-field indicator also uses it to find your text field.": {
+    "Lets Parola type dictated text into other apps. The near-field indicator also uses it to find your text field.": {
       "extractionState": "manual",
       "localizations": {
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Permette a Parola di sentire il tasto di attivazione fuori dall'app e di inserire il testo. Serve anche all'indicatore accanto al campo per trovare dove stai scrivendo."
+            "value": "Permette a Parola di scrivere il testo dettato in altre app. Serve anche all'indicatore accanto al campo per trovare dove stai scrivendo."
+          }
+        }
+      }
+    },
+    "Lets Parola type dictated text into other apps. The shortcuts work without it.": {
+      "comment": "Accessibility row detail in Settings > Shortcuts.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lets Parola type dictated text into other apps. The shortcuts work without it."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Permette a Parola di scrivere il testo dettato in altre app. Le scorciatoie funzionano anche senza."
           }
         }
       }
@@ -8189,17 +8279,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Permette a parola-mcp di pilotare l'app (trascrivere, cambiare modello, controllare la registrazione…). Ascolta solo su 127.0.0.1."
-          }
-        }
-      }
-    },
-    "Lets these shortcuts work while another app is in front.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Permette a queste scorciatoie di funzionare quando un'altra app è in primo piano."
           }
         }
       }
