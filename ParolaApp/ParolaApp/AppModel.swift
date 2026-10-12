@@ -736,9 +736,6 @@ final class AppModel {
     }
 
     private(set) var batchBuckets = BatchJobBuckets()
-    @ObservationIgnored var libraryBrowseDisplays = LibraryRowDisplayCache()
-    @ObservationIgnored var librarySearchDisplays = LibraryRowDisplayCache()
-    @ObservationIgnored var recentlyDeletedDisplays = LibraryRowDisplayCache()
     @ObservationIgnored let batchProgress = BatchProgressBoard()
     struct UnsavedBatchJob {
         let jobID: BatchJob.ID
@@ -1874,6 +1871,9 @@ final class AppModel {
         didSet { libraryExcerptsVersion &+= 1 }
     }
     private(set) var libraryExcerptsVersion: Int = 0
+    /// On the model so the formatted rows outlive their list; every other page re-opens to the same entries.
+    @ObservationIgnored var libraryBrowseDisplays = LibraryRowDisplayCache()
+    @ObservationIgnored var librarySearchDisplays = LibraryRowDisplayCache()
     @ObservationIgnored var libraryExcerptsTask: Task<Void, Never>?
     @ObservationIgnored var libraryExcerptsGeneration = 0
     @ObservationIgnored var searchTask: Task<Void, Never>?

@@ -212,11 +212,11 @@ struct LibraryEntryDisplayTests {
         cache.prune(keeping: [entry.id])
         #expect(cache.displays.count == 1)
 
-        cache.prune(keeping: [entry.id], formatting: "it_IT|Europe/Rome|h23")
+        cache.prune(keeping: [entry.id], formatting: "other")
         #expect(cache.displays.isEmpty)
 
         _ = cache.display(for: entry)
-        cache.prune(keeping: [entry.id], formatting: "it_IT|Europe/Rome|h23")
+        cache.prune(keeping: [entry.id], formatting: "other")
         #expect(cache.displays.count == 1)
     }
 

@@ -179,8 +179,7 @@ struct LibraryRowDisplayCache {
         return "\(locale.identifier)|\(TimeZone.current.identifier)|\(locale.hourCycle)"
     }
 
-    /// Drops everything written under other formatting, then the entries that left the kept set.
-    /// The rest stay, since `display(for:)` checks each row itself.
+    /// Drops rows written under other formatting, then the entries that left `ids`.
     mutating func prune(
         keeping ids: some Collection<LibraryEntry.ID>,
         formatting current: String = LibraryRowDisplayCache.currentFormatting
