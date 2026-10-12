@@ -190,6 +190,13 @@ struct MainWindowTests {
         #expect(italian.localizedString(forKey: key, value: "MISSING", table: nil) != "MISSING")
     }
 
+    @Test("both rename alerts keep Rename off while the title is empty")
+    func renameNeedsATitle() throws {
+        let guardText = #".disabled(renameDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)"#
+        #expect(try source("Views/LibraryRowList").contains(#"Button("Rename") { if let id = renamingEntry?.id { model.renameEntry(id, to: renameDraft) } renamingEntry = nil } "# + guardText))
+        #expect(try source("Views/Transcript/TranscriptTitle").contains(#"Button("Rename") { model.renameOpenTranscript(to: renameDraft) } "# + guardText))
+    }
+
     @Test("the chat sender filter names have Italian")
     func chatSenderFilterHasItalian() throws {
         let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))

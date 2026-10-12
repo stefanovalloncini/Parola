@@ -85,6 +85,7 @@ struct TranscriptMenuPopovers: ViewModifier {
                 Button("Cancel", role: .cancel) {}
                     .accessibilityIdentifier("alert.rename.cancel")
                 Button("Rename") { model.renameOpenTranscript(to: renameDraft) }
+                    .disabled(renameDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     .accessibilityIdentifier("alert.rename.confirm")
             }
     }

@@ -457,6 +457,7 @@ struct LibraryListAlerts: ViewModifier {
                     }
                     renamingEntry = nil
                 }
+                .disabled(renameDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 .accessibilityIdentifier("alert.rename.confirm")
             }
     }
