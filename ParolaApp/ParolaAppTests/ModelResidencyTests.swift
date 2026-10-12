@@ -102,6 +102,17 @@ private actor ListeningRecorder: DictationRecorder {
     }
 }
 
+private actor SlowFinalRecorder: DictationRecorder {
+    let gate: Gate
+    init(gate: Gate) { self.gate = gate }
+    func start() async throws {}
+    func stopAndTranscribe() async throws -> String {
+        await gate.wait()
+        return ""
+    }
+    func stopAndDiscard() async {}
+}
+
 @MainActor
 @Suite("Model residency")
 struct ModelResidencyTests {
@@ -127,15 +138,18 @@ struct ModelResidencyTests {
         fileLoaded: String? = nil,
         fileBusy: Bool = false,
         fileWarmGate: Gate? = nil,
+        dictationLoaded: String? = nil,
+        dictationBusy: Bool = false,
+        fileWarmWait: Duration = .seconds(30),
         onEvict: (@Sendable (String) -> Void)? = nil
     ) -> Rig {
         let model = makeModel()
         let log = EventLog()
         let streaming = FakeStreaming(log: log, warmGate: warmGate, resident: resident, onEvict: onEvict)
         let file = FakeHolder("file", log: log, loaded: fileLoaded, busy: fileBusy, warmGate: fileWarmGate)
-        let dictation = FakeHolder("dictation", log: log)
-        model.modelResidency = ModelResidencyCoordinator(streaming: streaming)
-        model.modelResidency.attach(fileSession: file, dictationSession: dictation)
+        let dictation = FakeHolder("dictation", log: log, loaded: dictationLoaded, busy: dictationBusy)
+        model.modelResidency = ModelResidencyCoordinator(streaming: streaming, fileWarmWait: fileWarmWait)
+        model.modelResidency.attach(fileSession: file) { dictation }
         return Rig(model: model, log: log, streaming: streaming, file: file, dictation: dictation)
     }
 
@@ -307,11 +321,117 @@ struct ModelResidencyTests {
             filesWereThere.withLock { $0 = FileManager.default.fileExists(atPath: live.path) }
         }
 
-        await rig.model.deleteModel(Self.turbo, in: store)?.value
+        await rig.model.beginDeletingModel(Self.turbo, in: store)?.value
 
         #expect(rig.log.events == ["evict \(Self.turbo)", "file unloaded \(Self.turbo)"])
         #expect(filesWereThere.withLock { $0 })
         #expect(!FileManager.default.fileExists(atPath: live.path))
+    }
+
+    @Test("turning dictation off, then on, keeps the model the new arm warms")
+    func offThenOnKeepsTheWarm() async throws {
+        let rig = makeRig()
+        let model = rig.model
+        model.useStreaming = true
+        model.selectedModel = "openai_whisper-tiny"
+        model.modelResidency.isInstalled = { _ in true }
+        model.dictationController.recorderFactory = { [log = rig.log] _ in ListeningRecorder(log: log) }
+        model.dictationEnabled = true
+        await model.dictationController.monitorWork?.value
+        rig.log.clear()
+
+        model.dictationEnabled = false
+        model.dictationEnabled = true
+        await model.dictationController.monitorWork?.value
+
+        #expect(!rig.log.events.contains("release"), "the release was queued before the arm that wants the model")
+        model.abortDictation()
+    }
+
+    @Test("dictation turned off while a final is transcribing unloads the fallback model once that run ends")
+    func fallbackModelFollowsTheRunThatHoldsIt() async {
+        let gate = Gate()
+        let rig = makeRig(dictationLoaded: "fallback-model", dictationBusy: true)
+        let model = rig.model
+        model.dictationController.recorderFactory = { _ in SlowFinalRecorder(gate: gate) }
+        model.dictationEnabled = true
+        await model.dictationController.monitorWork?.value
+        model.dictationController.simulatePress()
+        await waitUntil { model.dictationState == .listening }
+        model.dictationController.simulateRelease()
+        await waitUntil { model.dictationState == .transcribing }
+
+        model.turnOffDictation()
+        await model.dictationController.monitorWork?.value
+        #expect(rig.log.events.contains("dictation skipped, busy"))
+        #expect(model.modelResidency.pendingUnloadCount == 1)
+
+        await rig.dictation.finishRun()
+        model.modelResidency.retryPendingUnloads()
+        await model.modelResidency.awaitRetry()
+        #expect(rig.log.events.last == "dictation unloaded fallback-model")
+        #expect(model.modelResidency.pendingUnloadCount == 0)
+        await gate.release()
+    }
+
+    @Test("turning dictation off with nothing running unloads the fallback model at once")
+    func idleFallbackModelUnloadsOnTurnOff() async {
+        let rig = makeRig(dictationLoaded: "fallback-model")
+        let model = rig.model
+        model.dictationController.recorderFactory = { [log = rig.log] _ in ListeningRecorder(log: log) }
+        model.dictationEnabled = true
+        await model.dictationController.monitorWork?.value
+        rig.log.clear()
+
+        model.turnOffDictation()
+        await model.dictationController.monitorWork?.value
+
+        #expect(rig.log.events.contains("dictation unloaded fallback-model"))
+        #expect(model.modelResidency.pendingUnloadCount == 0)
+    }
+
+    @Test("a pick that a newer pick supersedes while queued never loads")
+    func supersededFileWarmIsSkipped() async {
+        let gate = Gate()
+        let rig = makeRig(fileWarmGate: gate)
+        let residency = rig.model.modelResidency
+
+        residency.warmFileSession("model-a")
+        await waitUntil { rig.log.events == ["file prewarm model-a"] }
+        residency.warmFileSession("model-b")
+        residency.warmFileSession("model-c")
+        await gate.release()
+        await residency.awaitFileWarm()
+
+        #expect(rig.log.events == ["file prewarm model-a", "file prewarm model-c"])
+    }
+
+    @Test("a delete does not wait forever for a warm that hangs")
+    func freeStopsWaitingForAHungWarm() async {
+        let gate = Gate()
+        let rig = makeRig(fileWarmGate: gate, fileWarmWait: .milliseconds(50))
+        rig.model.modelResidency.warmFileSession(Self.turbo)
+        await waitUntil { rig.log.events == ["file prewarm \(Self.turbo)"] }
+
+        await rig.model.modelResidency.free(Self.turbo)
+
+        #expect(rig.log.events.first == "file prewarm \(Self.turbo)")
+        await gate.release()
+    }
+
+    @Test("a model deleted while a run is in flight stays pending even before it reads as loaded")
+    func busyHolderKeepsTheNamePending() async {
+        let rig = makeRig()
+        let residency = rig.model.modelResidency
+
+        residency.sessionRunBegan()
+        await residency.free(Self.turbo)
+        #expect(residency.pendingUnloadCount == 1)
+
+        residency.sessionRunEnded()
+        await residency.awaitRetry()
+        #expect(residency.pendingUnloadCount == 0)
+        #expect(residency.activeRunCount == 0)
     }
 
     // MARK: - Bridge
@@ -325,18 +445,65 @@ struct ModelResidencyTests {
         #expect(names == ["openai_whisper-base", Self.turbo].sorted())
     }
 
-    @Test("getState carries models.resident")
-    func stateCarriesResidentModels() throws {
-        let model = makeModel()
-        let server = try ParolaAutomationServer(model: model)
+    @Test("getState replies with the resident names the caches report")
+    func stateCarriesResidentModels() async throws {
+        let rig = makeRig(resident: ["openai_whisper-base"], fileLoaded: Self.turbo)
+        let server = try ParolaAutomationServer(model: rig.model)
+        let context = AutomationContext(model: rig.model, server: server)
+        let getState = try #require(server.coreCommands().first { $0.name == "getState" })
 
-        guard case .object(let state) = server.snapshotState(residentModels: [Self.turbo]),
-              case .object(let models)? = state["models"] else {
+        let reply = try await getState.handler(try getState.validate(AutomationArgs([:])), context)
+
+        guard case .object(let state) = reply, case .object(let models)? = state["models"] else {
             Issue.record("getState has no models object")
             return
         }
+        #expect(models["resident"] == .array([.string("openai_whisper-base"), .string(Self.turbo)].sorted { "\($0)" < "\($1)" }))
+    }
 
-        #expect(models["resident"] == .array([.string(Self.turbo)]))
+    @Test("the test-mode bridge commands refuse a normal launch and a non-positive timeout")
+    func bridgeCommandGuards() async throws {
+        let normal = AppModel(bootstrap: AppBootstrap(
+            mode: .normal, library: makeTempLibraryURL("residency-normal"), defaultsOverride: temporaryDefaults(),
+            sideEffects: [], filePicker: TestFilePicker()
+        ))
+        let normalServer = try ParolaAutomationServer(model: normal)
+        let normalContext = AutomationContext(model: normal, server: normalServer)
+        for name in ["setStreamingIdleTimeout", "warmStreamingModel"] {
+            let command = try #require(normalServer.mockCommands().first { $0.name == name })
+            let args: [String: AutomationValue] = name == "warmStreamingModel" ? ["name": .string(Self.turbo)] : ["seconds": .double(5)]
+            await #expect(throws: AutomationError.self) {
+                _ = try await command.handler(try command.validate(AutomationArgs(args)), normalContext)
+            }
+        }
+
+        let rig = makeRig()
+        let testMode = AppModel(bootstrap: AppBootstrap(
+            mode: .test, library: makeTempLibraryURL("residency-test-mode"), defaultsOverride: temporaryDefaults(),
+            sideEffects: [], filePicker: TestFilePicker()
+        ))
+        testMode.modelResidency = rig.model.modelResidency
+        let server = try ParolaAutomationServer(model: testMode)
+        let context = AutomationContext(model: testMode, server: server)
+        let timeout = try #require(server.mockCommands().first { $0.name == "setStreamingIdleTimeout" })
+        await #expect(throws: AutomationError.self) {
+            _ = try await timeout.handler(try timeout.validate(AutomationArgs(["seconds": .double(0)])), context)
+        }
+        _ = try await timeout.handler(try timeout.validate(AutomationArgs(["seconds": .double(5)])), context)
+        #expect(rig.streaming.idleTimeouts == [.seconds(5)])
+    }
+
+    @Test("selectModel selects without loading unless warm is asked for")
+    func selectModelWarmsOnlyOnRequest() async throws {
+        let rig = makeRig()
+        let server = try ParolaAutomationServer(model: rig.model)
+        let context = AutomationContext(model: rig.model, server: server)
+        let select = try #require(server.modelCommands().first { $0.name == "selectModel" })
+
+        _ = try await select.handler(try select.validate(AutomationArgs(["name": .string("openai_whisper-base")])), context)
+        await rig.model.modelResidency.awaitFileWarm()
+        #expect(rig.model.selectedModel == "openai_whisper-base")
+        #expect(rig.log.events.isEmpty)
     }
 
     @Test("the idle timeout reaches the streaming cache")
@@ -372,6 +539,59 @@ extension TranscriberMockSuites {
                 try await recorder.start()
                 await waitUntil { warmed.withLock { $0 } == ["openai_whisper-large-v3_turbo"] }
                 await recorder.stopAndDiscard()
+            }
+        }
+
+        @Test("a finished fallback transcription tells the app its run ended")
+        func fallbackRunEndIsReported() async throws {
+            let audio = try makeTakeWAV("fallback-run-end", seconds: 0.3)
+            defer { try? FileManager.default.removeItem(at: audio) }
+            try await withMocksCleared([.audioSource, .transcriber]) {
+                await MockAudioSourceRegistry.shared.install(kind: .mic, fixtureURL: audio)
+                await MockTranscriberRegistry.shared.install(
+                    engineID: nil,
+                    response: MockTranscriberResponse(segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "hello")])
+                )
+                let ended = OSAllocatedUnfairLock(initialState: 0)
+                let recorder = MicDictationRecorder(
+                    model: nil,
+                    language: nil,
+                    streamingEnabled: false,
+                    session: TranscriptionSession(),
+                    onRunEnded: { ended.withLock { $0 += 1 } },
+                    warmFallbackModel: { _ in }
+                )
+                try await recorder.start()
+                let text = try await recorder.stopAndTranscribe()
+
+                let reported = ended.withLock { $0 }
+                #expect(text.contains("hello"))
+                #expect(reported == 1)
+            }
+        }
+
+        @Test("a file transcription counts as a run of the shared session until it ends")
+        func fileRunIsCounted() async throws {
+            let audio = try makeTakeWAV("run-counted", seconds: 0.3)
+            defer { try? FileManager.default.removeItem(at: audio) }
+            try await withMocksCleared([.transcriber]) {
+                await MockTranscriberRegistry.shared.clear()
+                await MockTranscriberRegistry.shared.install(
+                    engineID: nil,
+                    response: MockTranscriberResponse(
+                        segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "counted")],
+                        delayMs: 600
+                    )
+                )
+                let model = AppModel(bootstrap: AppBootstrap(
+                    mode: .test, library: makeTempLibraryURL("run-counted"), defaultsOverride: temporaryDefaults(),
+                    sideEffects: [], filePicker: TestFilePicker()
+                ))
+
+                model.transcribe(fileURL: audio)
+                await waitUntil { model.modelResidency.activeRunCount == 1 }
+                await waitUntil { model.phase == .ready }
+                await waitUntil { model.modelResidency.activeRunCount == 0 }
             }
         }
 

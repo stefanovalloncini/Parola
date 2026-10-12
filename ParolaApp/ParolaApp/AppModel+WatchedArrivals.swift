@@ -309,6 +309,7 @@ extension AppModel {
         runningArrivalNotice = ArrivalNotice(running: arrival.url)
         watchedLaneTask = Task { [weak self, session] in
             do {
+                self?.modelResidency.sessionRunBegan()
                 defer { self?.modelResidency.sessionRunEnded() }
                 let result = try await session.transcribe(source: FileAudioSource(url: arrival.url), options: options)
                 try Task.checkCancellation()

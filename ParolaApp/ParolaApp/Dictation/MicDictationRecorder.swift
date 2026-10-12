@@ -18,6 +18,7 @@ actor MicDictationRecorder: DictationRecorder {
     private let clock: any Clock<Duration>
     private let makeStreamingSession: @Sendable () -> any StreamingTranscriber
     private let warmFallbackModel: @Sendable (String) async -> Void
+    private let onRunEnded: (@Sendable () -> Void)?
 
     private var streamingSession: (any StreamingTranscriber)?
     private var streamingConsumer: Task<Void, Never>?
@@ -32,6 +33,7 @@ actor MicDictationRecorder: DictationRecorder {
         deviceUID: String? = nil,
         streamingEnabled: Bool = true,
         session: TranscriptionSession? = nil,
+        onRunEnded: (@Sendable () -> Void)? = nil,
         workflowResolver: (@Sendable () async -> DictationWorkflow?)? = nil,
         downloadProgress: (@Sendable (Double) -> Void)? = nil,
         clock: any Clock<Duration> = ContinuousClock(),
@@ -46,6 +48,7 @@ actor MicDictationRecorder: DictationRecorder {
         self.streamingEnabled = streamingEnabled
         let fallbackSession = session ?? TranscriptionSession()
         self.fallbackSession = fallbackSession
+        self.onRunEnded = onRunEnded
         self.warmFallbackModel = warmFallbackModel ?? { await fallbackSession.prewarm(modelName: $0) }
         self.workflowResolver = workflowResolver
         self.downloadProgress = downloadProgress
@@ -214,7 +217,10 @@ actor MicDictationRecorder: DictationRecorder {
             Self.discardScratch(cut.url)
             throw cut
         }
-        defer { Self.discardScratch(url) }
+        defer {
+            Self.discardScratch(url)
+            onRunEnded?()
+        }
         let transcript = try await fallbackSession.transcribe(
             source: FileAudioSource(url: url),
             options: transcriptionOptions(),

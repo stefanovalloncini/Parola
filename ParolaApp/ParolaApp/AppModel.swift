@@ -2226,6 +2226,7 @@ final class AppModel {
 
     func unloadTranscriptionSession() async {
         await session.unloadModel()
+        await dictationController.fallbackSession.unloadModel()
     }
 
     @ObservationIgnored private var testBridge: ParolaAutomationServer?
@@ -2402,7 +2403,7 @@ final class AppModel {
         loadPendingRecovery()
         sweepInflightRecordings()
         if bootstrap.mode != .test { startTakeFileHeartbeat() }
-        modelResidency.attach(fileSession: session, dictationSession: dictationController.fallbackSession)
+        modelResidency.attach(fileSession: session) { [weak self] in self?.dictationController.fallbackSession }
         if features.isEnabled(.dictation) {
             wireDictationController()
         }
@@ -2599,8 +2600,12 @@ final class AppModel {
         }
     }
 
+    func deleteModel(_ name: String) {
+        beginDeletingModel(name)
+    }
+
     @discardableResult
-    func deleteModel(_ name: String, in store: ModelStore? = nil) -> Task<Void, Never>? {
+    func beginDeletingModel(_ name: String, in store: ModelStore? = nil) -> Task<Void, Never>? {
         guard !isDeletingModel(name) else { return nil }
         modelsBeingDeleted.insert(name)
         let store = store ?? self.store
@@ -2934,6 +2939,7 @@ final class AppModel {
                         ? .loadingModel(name: selectedModel)
                         : .downloadingModel(name: selectedModel, progress: 0)
                 }
+                modelResidency.sessionRunBegan()
                 defer { modelResidency.sessionRunEnded() }
                 let result = try await session.transcribe(
                     source: FileAudioSource(url: fileURL),
@@ -5053,6 +5059,7 @@ final class AppModel {
             if !meeting { meeting = await isMeetingStereo(url, source: source) }
             if meeting, engineFile == nil, engineNeedsMonoMix() { engineFile = try await meetingEngineInput(for: url) }
             let handlers = take.map { makeTakeHandlers(run: run, takeID: $0) } ?? TranscribeHandlers()
+            modelResidency.sessionRunBegan()
             defer { modelResidency.sessionRunEnded() }
             let result = try await session.transcribe(
                 source: FileAudioSource(url: engineFile ?? url),

@@ -246,16 +246,13 @@ extension AppModel {
     func turnOffDictation() {
         pendingDictationRestart?.cancel()
         pendingDictationRestart = nil
+        let mayBeTranscribing = dictationController.state != .idle
         dictationController.discardAndStop()
-        releaseDictationModelsAfterTeardown()
-    }
-
-    private func releaseDictationModelsAfterTeardown() {
         let residency = modelResidency
-        let fallback = dictationController.fallbackSession
+        let epoch = residency.warmEpoch
         dictationController.afterTeardown {
-            await residency.releaseStreamingModels()
-            if let loaded = await fallback.currentModel() { await fallback.unloadModel(ifLoaded: loaded) }
+            await residency.releaseStreamingModels(ifUnchangedSince: epoch)
+            await residency.releaseDictationSession(mayBeRunning: mayBeTranscribing)
         }
     }
 
@@ -288,17 +285,17 @@ extension AppModel {
     /// Warms the streaming model as soon as the dictation hotkey is armed, so the first press
     /// doesn't lose speech to the model load. Gated to real launches: test runs wire no hotkey.
     func prewarmDictationModel() {
+        let residency = modelResidency
         guard let name = AppModel.streamingPrewarmCandidate(
             model: selectedModel,
             useStreaming: useStreaming,
-            isInstalled: { ModelStore.shared.isInstalled($0) }
+            isInstalled: { residency.isInstalled($0) }
         ) else {
-            let residency = modelResidency
-            dictationController.afterTeardown { await residency.releaseStreamingModels() }
+            let epoch = residency.warmEpoch
+            dictationController.afterTeardown { await residency.releaseStreamingModels(ifUnchangedSince: epoch) }
             return
         }
-        guard activeSideEffects.contains(.dictationHotkey) else { return }
-        modelResidency.warmStreaming(name)
+        modelResidency.requestWarm(name, start: activeSideEffects.contains(.dictationHotkey))
     }
 
     /// Non-blocking advisories for the Dictation pane: dictation follows the selected

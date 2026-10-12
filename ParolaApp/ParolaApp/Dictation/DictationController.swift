@@ -57,7 +57,7 @@ final class DictationController {
     @ObservationIgnored var recorderFactory: ((Configuration) -> any DictationRecorder)?
     @ObservationIgnored var inserterFactory: (() -> any TextInserter)?
     @ObservationIgnored private var pasteGate = PasteGate()
-    @ObservationIgnored let fallbackSession = TranscriptionSession()
+    @ObservationIgnored private(set) var fallbackSession = TranscriptionSession()
     private(set) var currentAnchor: FieldAnchor?
 
     var configuration: Configuration?
@@ -131,9 +131,9 @@ final class DictationController {
         let hotkey = hotkeyFactory?(configuration.hotkeyKeyCode, configuration.hotkeyModifiers)
             ?? Self.hotkeyMonitor(for: configuration)
         let workflows = configuration.workflows
-        // Own session, not appModel.session: the shared one serializes whole transcribe
-        // runs, so a fallback dictation stop would queue for minutes behind a long
-        // file/YouTube job. Costs a second loaded model only while both run at once.
+        // Own session, not appModel.session: the shared one serializes whole transcribe runs, so a
+        // fallback stop would queue behind a long file job. It outlives restarts to keep its model
+        // warm; rearm() starts a new one so nothing queues behind an abandoned final.
         let recorder = recorderFactory?(configuration) ?? MicDictationRecorder(
             model: configuration.modelName,
             language: configuration.language,
@@ -141,6 +141,9 @@ final class DictationController {
             deviceUID: configuration.deviceUID,
             streamingEnabled: configuration.streamingEnabled,
             session: fallbackSession,
+            onRunEnded: { [weak self] in
+                Task { @MainActor in self?.appModel?.modelResidency.retryPendingUnloads() }
+            },
             workflowResolver: { @Sendable in
                 await Self.resolveWorkflow(in: workflows)
             },
@@ -358,6 +361,11 @@ final class DictationController {
     private func rearm() {
         guard let configuration else { return }
         stop()
+        let abandoned = fallbackSession
+        fallbackSession = TranscriptionSession()
+        Task {
+            if let name = await abandoned.currentModel() { await abandoned.unloadModel(ifLoaded: name) }
+        }
         start(configuration: configuration)
     }
 
@@ -384,7 +392,6 @@ final class DictationController {
         modelDownloadProgress = nil
         switch state {
         case .idle:
-            appModel?.modelResidency.sessionRunEnded()
             stopWatchingEscape()
             hideHUD()
         case .listening:

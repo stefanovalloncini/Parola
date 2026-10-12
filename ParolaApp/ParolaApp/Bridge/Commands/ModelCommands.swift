@@ -7,14 +7,19 @@ extension ParolaAutomationServer {
             AutomationCommand(
                 name: "selectModel",
                 area: .model,
-                summary: "Selects the active transcription model, with the same side effects as the model picker: an installed model is warmed, and a model that isn't installed is selected without a download.",
+                summary: "Selects the active transcription model without loading it. With warm: true it also warms an installed model, the way the model picker does; a model that isn't installed is selected without a download.",
                 kind: .mutating,
                 args: [
                     .init(name: "name", kind: .string(), required: true, summary: "Model name (e.g. openai_whisper-tiny)"),
+                    .init(name: "warm", kind: .boolean, required: false, summary: "Also load an installed model into the file session, as the picker does"),
                 ],
                 handler: { args, ctx in
                     let name = try args.string("name")
-                    ctx.model.pickModel(name, isInstalled: ModelStore.shared.isInstalled(name)) { _ in }
+                    if try args.optionalBool("warm") == true {
+                        ctx.model.pickModel(name, isInstalled: ModelStore.shared.isInstalled(name)) { _ in }
+                    } else {
+                        ctx.model.activateModel(name)
+                    }
                     return .object(["selectedModel": .string(name)])
                 }
             ),

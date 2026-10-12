@@ -30,48 +30,64 @@ extension TranscriptionSession: LoadedModelHolder {
 @MainActor
 final class ModelResidencyCoordinator {
     private let streaming: any StreamingModelResidency
+    private let fileWarmWait: Duration
     private var fileSession: (any LoadedModelHolder)?
-    private var holders: [any LoadedModelHolder] = []
+    private var dictationSession: (@MainActor () -> (any LoadedModelHolder)?)?
     private var fileWarmTask: Task<Void, Never>?
+    private var fileWarmGeneration = 0
     private var warmTask: Task<Void, Never>?
-    private(set) var warmingModel: String?
-    private var pendingUnloads: Set<String> = []
+    private var pendingUnloads: [Int: Set<String>] = [:]
     private var retry: Task<Void, Never>?
+    private var activeFileRuns = 0
+    var isInstalled: @MainActor (String) -> Bool = { ModelStore.shared.isInstalled($0) }
+    private(set) var warmingModel: String?
+    private(set) var warmEpoch = 0
 
-    init(streaming: any StreamingModelResidency) {
+    private static let fileHolder = 0
+    private static let dictationHolder = 1
+
+    init(streaming: any StreamingModelResidency, fileWarmWait: Duration = .seconds(30)) {
         self.streaming = streaming
+        self.fileWarmWait = fileWarmWait
     }
 
-    func attach(fileSession: any LoadedModelHolder, dictationSession: any LoadedModelHolder) {
+    func attach(fileSession: any LoadedModelHolder, dictationSession: @escaping @MainActor () -> (any LoadedModelHolder)?) {
         self.fileSession = fileSession
-        holders = [fileSession, dictationSession]
+        self.dictationSession = dictationSession
     }
 
-    var isWarming: Bool { warmTask != nil }
+    private var holders: [any LoadedModelHolder] {
+        [fileSession, dictationSession?() ?? nil].compactMap { $0 }
+    }
 
-    func warmStreaming(_ name: String) {
+    func requestWarm(_ name: String, start: Bool) {
+        warmEpoch += 1
+        guard start else { return }
         if warmingModel == name, warmTask != nil { return }
         warmTask?.cancel()
         warmingModel = name
         let streaming = streaming
-        warmTask = Task { [weak self] in
+        warmTask = Task(priority: .medium) { [weak self] in
             await streaming.warm(name)
             guard !Task.isCancelled else { return }
             self?.warmFinished(name)
         }
     }
 
-    func warmFileSession(_ name: String) {
-        guard let fileSession else { return }
-        let previous = fileWarmTask
-        fileWarmTask = Task {
-            await previous?.value
-            await fileSession.prewarm(modelName: name)
-        }
+    func warmStreaming(_ name: String) {
+        requestWarm(name, start: true)
     }
 
-    func awaitFileWarm() async {
-        await fileWarmTask?.value
+    func warmFileSession(_ name: String) {
+        guard let fileSession else { return }
+        fileWarmGeneration += 1
+        let generation = fileWarmGeneration
+        let previous = fileWarmTask
+        fileWarmTask = Task(priority: .medium) { [weak self] in
+            await previous?.value
+            guard self?.fileWarmGeneration == generation else { return }
+            await fileSession.prewarm(modelName: name)
+        }
     }
 
     func cancelWarm() {
@@ -84,7 +100,8 @@ final class ModelResidencyCoordinator {
         await warmTask?.value
     }
 
-    func releaseStreamingModels() async {
+    func releaseStreamingModels(ifUnchangedSince epoch: Int) async {
+        guard epoch == warmEpoch else { return }
         cancelWarm()
         await streaming.releaseIdleModels()
     }
@@ -104,22 +121,39 @@ final class ModelResidencyCoordinator {
     func free(_ name: String) async {
         if warmingModel == name { cancelWarm() }
         await streaming.evict(name)
-        await fileWarmTask?.value
-        await unloadFromHolders(name)
+        if let warm = fileWarmTask {
+            _ = await AsyncTimeout.run(fileWarmWait) { await warm.value }
+        }
+        await unload(name, fromHolder: Self.fileHolder, mayBeRunning: activeFileRuns > 0)
+        await unload(name, fromHolder: Self.dictationHolder, mayBeRunning: false)
+    }
+
+    func releaseDictationSession(mayBeRunning: Bool) async {
+        guard let holder = dictationSession?() ?? nil else { return }
+        if let name = await holder.loadedModelName() {
+            await unload(name, fromHolder: Self.dictationHolder, mayBeRunning: mayBeRunning)
+        }
+    }
+
+    func sessionRunBegan() {
+        activeFileRuns += 1
     }
 
     func sessionRunEnded() {
+        activeFileRuns = max(0, activeFileRuns - 1)
+        retryPendingUnloads()
+    }
+
+    func retryPendingUnloads() {
         guard !pendingUnloads.isEmpty else { return }
         let previous = retry
         retry = Task { [weak self] in
             await previous?.value
             guard let self else { return }
-            for name in Array(pendingUnloads) { await unloadFromHolders(name) }
+            for (index, names) in pendingUnloads {
+                for name in names { await unload(name, fromHolder: index, mayBeRunning: false) }
+            }
         }
-    }
-
-    func awaitRetry() async {
-        await retry?.value
     }
 
     private func warmFinished(_ name: String) {
@@ -128,13 +162,31 @@ final class ModelResidencyCoordinator {
         warmingModel = nil
     }
 
-    private func unloadFromHolders(_ name: String) async {
-        pendingUnloads.remove(name)
-        for holder in holders {
-            await holder.unloadModel(ifLoaded: name)
-            if await holder.loadedModelName() == name { pendingUnloads.insert(name) }
+    private func unload(_ name: String, fromHolder index: Int, mayBeRunning: Bool) async {
+        pendingUnloads[index]?.remove(name)
+        let all = holders
+        guard index < all.count else { return }
+        let holder = all[index]
+        await holder.unloadModel(ifLoaded: name)
+        let stillLoaded = await holder.loadedModelName() == name
+        if mayBeRunning || stillLoaded {
+            pendingUnloads[index, default: []].insert(name)
         }
     }
+
+#if DEBUG
+    var isWarming: Bool { warmTask != nil }
+    var activeRunCount: Int { activeFileRuns }
+    var pendingUnloadCount: Int { pendingUnloads.values.reduce(0) { $0 + $1.count } }
+
+    func awaitFileWarm() async {
+        await fileWarmTask?.value
+    }
+
+    func awaitRetry() async {
+        await retry?.value
+    }
+#endif
 }
 
 extension AppModel {
