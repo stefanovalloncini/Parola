@@ -99,4 +99,17 @@ struct LibraryLoadGenerationTests {
         #expect(loaded.document.transcript.durationSeconds == 12.5)
         #expect(loaded.document.manifest.durationSeconds == 12.5)
     }
+
+    @Test("a cached load carries the manifest duration a later correction wrote")
+    func cachedLoadFollowsADurationCorrection() async throws {
+        let (store, tmp) = try makeStore()
+        defer { try? FileManager.default.removeItem(at: tmp) }
+        let entry = try await store.add(transcript: transcript("timed", duration: 100), audioSource: nil)
+        _ = try await store.load(entry.id)
+        try await store.setDurationSeconds(12.5, for: entry.id)
+
+        let loaded = try await store.load(entry.id)
+
+        #expect(loaded.document.transcript.durationSeconds == 12.5)
+    }
 }

@@ -39,7 +39,11 @@ public actor LibraryStore {
         /// A manifest edit refreshes the entry in place; it is not a use, so it leaves recency alone.
         mutating func patch(_ entry: LibraryEntry) {
             guard let index = slots.firstIndex(where: { $0.id == entry.id }) else { return }
-            slots[index].value = LoadedEntry(entry: entry, document: slots[index].value.document)
+            var document = slots[index].value.document
+            if let measured = entry.manifest.durationSeconds, measured > 0 {
+                document.transcript.durationSeconds = measured
+            }
+            slots[index].value = LoadedEntry(entry: entry, document: document)
         }
 
         mutating func remove(_ id: LibraryEntry.ID) {
@@ -542,7 +546,7 @@ public actor LibraryStore {
         return loaded
     }
 
-    /// Off the actor because a long transcript is megabytes of JSON; a mutation landing mid-decode would hand back pre-mutation content, so retry under the new epoch as `primeCaches` does, with the same on-actor last resort to terminate.
+    /// Off the actor because a long transcript is megabytes of JSON; a mutation landing mid-decode would hand back pre-mutation content, so retry when this bundle's generation moved, as `primeCaches` does with the epoch, with the same on-actor last resort to terminate.
     private func decodedDocument(id: LibraryEntry.ID, at bundleURL: URL) async throws -> ParolaDocument {
         for _ in 0..<8 {
             let generation = (storeGeneration, bundleGenerations[id, default: 0])
