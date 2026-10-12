@@ -1,6 +1,63 @@
 import AppKit
 import Foundation
+import os
 import ParolaCore
+
+/// The queue's file on disk: the latest snapshot is encoded and written on a utility queue a moment after the last change.
+final class WatchedArrivalsFile: Sendable {
+    private struct Pending {
+        var latest: [WatchedArrival]?
+        var scheduled = false
+    }
+
+    private let url: URL
+    private let delay: DispatchTimeInterval
+    private let queue = DispatchQueue(label: "app.parola.watched-arrivals", qos: .utility)
+    private let pending = OSAllocatedUnfairLock(initialState: Pending())
+
+    init(url: URL, delay: DispatchTimeInterval = .milliseconds(250)) {
+        self.url = url
+        self.delay = delay
+    }
+
+    /// An urgent save skips the wait but stays on the same queue, so it still lands after every write before it.
+    func save(_ arrivals: [WatchedArrival], urgent: Bool = false) {
+        let arm = pending.withLock { state in
+            state.latest = arrivals
+            guard urgent || !state.scheduled else { return false }
+            state.scheduled = true
+            return true
+        }
+        guard arm else { return }
+        if urgent {
+            queue.async { self.writePending() }
+        } else {
+            queue.asyncAfter(deadline: .now() + delay) { self.writePending() }
+        }
+    }
+
+    func flush() {
+        queue.sync { writePending() }
+    }
+
+    private func writePending() {
+        let arrivals = pending.withLock { state in
+            state.scheduled = false
+            defer { state.latest = nil }
+            return state.latest
+        }
+        guard let arrivals else { return }
+        do {
+            if arrivals.isEmpty {
+                if FileManager.default.fileExists(atPath: url.path) { try FileManager.default.removeItem(at: url) }
+            } else {
+                try JSONEncoder().encode(arrivals).write(to: url, options: .atomic)
+            }
+        } catch {
+            ParolaLog.error(.library, "watched-folder queue could not be saved", [.error: .error(error)])
+        }
+    }
+}
 
 /// A watched-folder file waiting its turn in the lane.
 struct WatchedArrival: Codable, Equatable, Identifiable, Sendable {
@@ -562,17 +619,19 @@ extension AppModel {
         library.libraryURL.appendingPathComponent("watched-arrivals.json")
     }
 
-    func saveWatchedArrivals() {
-        let url = watchedArrivalsFileURL
-        do {
-            if watchedArrivals.isEmpty {
-                if FileManager.default.fileExists(atPath: url.path) { try FileManager.default.removeItem(at: url) }
-            } else {
-                try JSONEncoder().encode(watchedArrivals).write(to: url, options: .atomic)
-            }
-        } catch {
-            ParolaLog.error(.library, "watched-folder queue could not be saved", [.error: .error(error)])
-        }
+    func saveWatchedArrivals(urgent: Bool = false) {
+        watchedArrivalsFile.save(watchedArrivals, urgent: urgent)
+    }
+
+    /// A new arrival or a landing that has begun must reach the disk at once: a crash after it would otherwise restore a line that forgets the file or runs a saved one twice.
+    nonisolated static func needsPromptSave(from old: [WatchedArrival], to new: [WatchedArrival]) -> Bool {
+        if new.count > old.count { return true }
+        let wasLanding = Set(old.filter(\.isLanding).map(\.id))
+        return new.contains { $0.isLanding && !wasLanding.contains($0.id) }
+    }
+
+    func flushWatchedArrivals() {
+        watchedArrivalsFile.flush()
     }
 
     /// The files may have changed while Parola was closed, so each add takes its own digest.

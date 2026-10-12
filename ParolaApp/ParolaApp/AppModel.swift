@@ -1071,13 +1071,14 @@ final class AppModel {
     @ObservationIgnored var watchedArrivals: [WatchedArrival] = [] {
         didSet {
             guard watchedArrivals != oldValue else { return }
-            saveWatchedArrivals()
+            saveWatchedArrivals(urgent: Self.needsPromptSave(from: oldValue, to: watchedArrivals))
             if !unsavedLandings.isEmpty {
                 let waiting = Set(watchedArrivals.map(\.id))
                 unsavedLandings = unsavedLandings.filter { waiting.contains($0.key) }
             }
         }
     }
+    @ObservationIgnored lazy var watchedArrivalsFile = WatchedArrivalsFile(url: watchedArrivalsFileURL)
     /// Transcripts whose save failed, kept so Retry saves them again instead of transcribing; this launch only.
     @ObservationIgnored var unsavedLandings: [WatchedArrival.ID: UnsavedLanding] = [:]
     /// Test seam: when set, replaces telling the watchers that a file they handed over couldn't be used.

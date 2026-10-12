@@ -210,6 +210,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         model?.meetingNotifier?.withdraw()
         let diagnostics = DiagnosticsInstaller.current
         diagnostics?.stopPeriodicFlush()
+        model?.flushWatchedArrivals()
         let pending = model?.cancelAndDrainPendingTranscriptSave()
         let library = model?.library
         let flushBaselines = model?.watchedFolderBaselineFlush()

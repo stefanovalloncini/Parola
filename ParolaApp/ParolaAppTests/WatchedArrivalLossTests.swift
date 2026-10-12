@@ -1,4 +1,5 @@
 import Foundation
+import os
 import Testing
 @testable import Parola
 import ParolaCore
@@ -81,8 +82,31 @@ extension TranscriberMockSuites {
         }
 
         private func savedQueue(_ model: AppModel) throws -> [URL] {
+            model.flushWatchedArrivals()
             let data = try Data(contentsOf: model.watchedArrivalsFileURL)
             return try JSONDecoder().decode([WatchedArrival].self, from: data).map(\.url)
+        }
+
+        @Test("a burst of changes is written once, later, with the latest queue; a flush writes at once")
+        func queueFileIsDebounced() async throws {
+            let folder = try makeFolder("debounce")
+            defer { try? FileManager.default.removeItem(at: folder) }
+            let url = folder.appendingPathComponent("watched-arrivals.json")
+            let file = WatchedArrivalsFile(url: url, delay: .milliseconds(80))
+            let one = WatchedArrival(url: URL(fileURLWithPath: "/tmp/one.wav"))
+            let two = WatchedArrival(url: URL(fileURLWithPath: "/tmp/two.wav"))
+
+            file.save([one])
+            file.save([one, two])
+            #expect(!FileManager.default.fileExists(atPath: url.path))
+            let written = await waitUntil { FileManager.default.fileExists(atPath: url.path) }
+            #expect(written)
+            let saved = try JSONDecoder().decode([WatchedArrival].self, from: Data(contentsOf: url))
+            #expect(saved.map(\.url.lastPathComponent) == ["one.wav", "two.wav"])
+
+            file.save([])
+            file.flush()
+            #expect(!FileManager.default.fileExists(atPath: url.path))
         }
 
         @Test("files waiting behind a run when Parola quits come back at the next launch and land")
@@ -112,6 +136,7 @@ extension TranscriberMockSuites {
                 #expect(watchedLaneIsIdleWait)
                 let afterLibraryHasTwo = await waitUntil(timeoutMs: 10_000) { await after.library.list().count == 2 }
                 #expect(afterLibraryHasTwo)
+                after.flushWatchedArrivals()
                 #expect(!FileManager.default.fileExists(atPath: after.watchedArrivalsFileURL.path))
             }
         }
@@ -202,6 +227,45 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("a landing that has begun is on disk before its entry starts saving, and a new arrival before anything else")
+        func landingAndArrivalReachTheDiskAtOnce() async throws {
+            try await withMocksCleared(.transcriber) {
+                let gate = MockTranscriberGate()
+                await install(gate)
+                await gate.open()
+                let folder = try makeFolder("urgent")
+                defer { try? FileManager.default.removeItem(at: folder) }
+                let model = makeModel(library: makeTempLibraryURL("urgent"), defaults: temporaryDefaults())
+                let queueFile = model.watchedArrivalsFileURL
+                model.watchedArrivalsFile = WatchedArrivalsFile(url: queueFile, delay: .seconds(30))
+                let seen = OSAllocatedUnfairLock<Bool?>(initialState: nil)
+                let queueIsLanding: @Sendable () -> Bool = {
+                    guard let data = try? Data(contentsOf: queueFile),
+                          let saved = try? JSONDecoder().decode([WatchedArrival].self, from: data)
+                    else { return false }
+                    return saved.first?.isLanding == true
+                }
+                model.beforeLandingSave = {
+                    for _ in 0..<100 where !queueIsLanding() {
+                        try await Task.sleep(for: .milliseconds(10))
+                    }
+                    seen.withLock { $0 = queueIsLanding() }
+                    throw CancellationError()
+                }
+                _ = try await openOwnEntry(model, in: folder)
+                let file = try makeWAV("Urgent", in: folder)
+                arrive(model, [file])
+                let arrivedOnDisk = await waitUntil(timeoutMs: 800) {
+                    (try? Data(contentsOf: queueFile)).flatMap { try? JSONDecoder().decode([WatchedArrival].self, from: $0) }?.isEmpty == false
+                }
+                #expect(arrivedOnDisk, "the 30 s wait the debounce would have kept")
+                let reported = await waitUntil(timeoutMs: 10_000) { seen.withLock { $0 } != nil }
+                #expect(reported)
+                let landedBeforeSave = seen.withLock { $0 }
+                #expect(landedBeforeSave == true)
+            }
+        }
+
         @Test("a file whose entry is still being saved when Parola quits runs again at the next launch")
         func landingArrivalSurvivesAQuit() async throws {
             try await withMocksCleared(.transcriber) {
@@ -263,6 +327,7 @@ extension TranscriberMockSuites {
                     var saved = WatchedArrival(url: file)
                     saved.isLanding = interrupted
                     before.watchedArrivals = [saved]
+                    before.flushWatchedArrivals()
                 }
 
                 let after = makeModel(library: library, defaults: defaults)
