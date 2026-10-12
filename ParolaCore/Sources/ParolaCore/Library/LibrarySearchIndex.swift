@@ -133,20 +133,6 @@ public actor LibrarySearchIndex {
         var revision = 0
     }
 
-    private struct SnapshotEntry: Codable, Sendable {
-        let id: String
-        let title: String
-        let excerpt: String?
-        let bodyBytes: Int
-        let bodyHash: UInt64
-        let tokens: [String]
-        let counts: [UInt32]
-        let offsets: [Int32]
-        let boundaryOffsets: [Int32]
-        let boundaryCentiseconds: [UInt32]
-        let fingerprint: String
-    }
-
     /// The authority on what the snapshot holds: an entry file with no row here is ignored and pruned.
     private struct Manifest: Codable, Sendable {
         let version: Int
@@ -1095,16 +1081,26 @@ public actor LibrarySearchIndex {
             nonisolated(unsafe) let slots = buffer
             DispatchQueue.concurrentPerform(iterations: ids.count) { position in
                 guard let data = try? Data(contentsOf: entryURL(ids[position], in: entriesDirectory)) else { return }
-                slots[position] = try? JSONDecoder().decode(SnapshotEntry.self, from: data)
+                guard let entry = SnapshotEntry.decode(data), isAscending(entry.tokens) else { return }
+                slots[position] = entry
             }
         }
         var entries: [SnapshotEntry] = []
         entries.reserveCapacity(ids.count)
         for entry in decoded {
-            guard let entry, zip(entry.tokens, entry.tokens.dropFirst()).allSatisfy({ $0 < $1 }) else { return nil }
+            guard let entry else { return nil }
             entries.append(entry)
         }
         return entries
+    }
+
+    private static func isAscending(_ tokens: [String]) -> Bool {
+        var previous: String?
+        for token in tokens {
+            if let previous, previous >= token { return false }
+            previous = token
+        }
+        return true
     }
 
     private static func tokenizeOffActor(_ rebuilt: [RebuildEntry], before: (@Sendable () -> Void)? = nil) async -> [PreparedEntry] {
