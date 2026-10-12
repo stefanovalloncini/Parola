@@ -294,6 +294,33 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("a microphone first heard while the take pauses is placed where the pause began")
+        func micFirstHeardInAPause() async throws {
+            try await withMocksCleared(.audioSource) {
+                let model = makeModel()
+                let files = try meetingFiles(model)
+                let mic = ScriptedTrack(file: files.mic)
+                try await startMeeting(model, mac: ScriptedTrack(file: files.mac), mic: mic)
+                let micUp = await waitForMicTrack(model)
+                #expect(micUp)
+                try await Task.sleep(for: .milliseconds(300))
+                #expect(model.pauseTake())
+                let atPause = try #require(model.recording?.elapsed(at: Date()))
+                try await Task.sleep(for: .milliseconds(300))
+
+                mic.levelMeter.record(0.3, capturedAt: .now)
+                try await Task.sleep(for: .milliseconds(700))
+                #expect(model.resumeTake())
+
+                let placed = await waitUntil { model.micTrack?.offset != nil }
+                #expect(placed)
+                let offset = try #require(model.micTrack?.offset)
+                #expect(abs(offset - atPause) < 0.1, "placed at \(offset) s; the pause began at \(atPause) s")
+                #expect(model.liveCompanionStartOffset == offset)
+                await model.discardTake()
+            }
+        }
+
         @Test("pausing and resuming a meeting take reach its microphone as they reach the Mac audio, in order")
         func pauseReachesTheMic() async throws {
             try await withMocksCleared(.audioSource) {

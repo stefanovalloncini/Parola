@@ -5316,14 +5316,17 @@ final class AppModel {
 
     @discardableResult
     func resumeTake() -> Bool {
-        guard let take = controlledTake else { return false }
+        guard let take = controlledTake, recording?.isPaused == true else { return false }
+        let meter = takeReadoutsOwner == take.id ? recordingLevelMeter : nil
+        // A tick while the take still pauses: a microphone first heard in the pause is placed where the pause began, and the meters' peaks from it go.
+        if let meter { sampleTake(meter, take: take) }
         var resumed = false
         updateSession(of: take.id) { resumed = $0.resume(at: Date()) }
         guard resumed else { return false }
         setCapturePaused(false)
         startSilenceWatch()
         runRecordingAutoStop()
-        resumeTakeSampler(take)
+        if let meter { startTakeSampler(meter: meter, take: take) }
         return true
     }
 
@@ -5332,14 +5335,6 @@ final class AppModel {
         stopTakeSampler()
         guard takeReadoutsOwner == take.id, let meter = recordingLevelMeter else { return }
         sampleTake(meter, take: take)
-    }
-
-    /// Drops what the meters heard while the take paused, so the first level after it is the take's again.
-    private func resumeTakeSampler(_ take: TakeContext) {
-        guard takeReadoutsOwner == take.id, let meter = recordingLevelMeter else { return }
-        _ = meter.takePeak()
-        if micTrack?.takeID == take.id { _ = micTrack?.capture?.levelMeter.takePeak() }
-        startTakeSampler(meter: meter, take: take)
     }
 
     /// One change after another, so a quick pause and resume reach the capture in the order they were made.
