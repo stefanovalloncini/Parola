@@ -64,7 +64,7 @@ public enum MeetingTakeMixer {
             try file.read(into: chunk, frameCount: AVAudioFrameCount(chunkFrames))
             let frames = Int(chunk.frameLength)
             guard frames > 0, let source = chunk.floatChannelData, let sink = mixed.floatChannelData?[0] else { break }
-            Self.average(source, channels: channels, frames: frames, into: sink, dividingBy: true)
+            Self.average(source, channels: channels, frames: frames, into: sink)
             mixed.frameLength = AVAudioFrameCount(frames)
             try target.write(from: mixed)
         }
@@ -75,26 +75,20 @@ public enum MeetingTakeMixer {
         (try? AVAudioFile(forReading: url))?.fileFormat.channelCount == 2
     }
 
-    /// Averages the channels into `sink`; dividing and multiplying by the reciprocal are not the same float, so the caller picks the one it always used.
+    /// Averages the channels into `sink`, adding from a zero so a negative zero reads as positive, as the scalar sum did.
     static func average(
         _ channels: UnsafePointer<UnsafeMutablePointer<Float>>,
         channels count: Int,
         frames: Int,
-        into sink: UnsafeMutablePointer<Float>,
-        dividingBy divides: Bool
+        into sink: UnsafeMutablePointer<Float>
     ) {
         let length = vDSP_Length(frames)
         var zero: Float = 0
         vDSP_vsadd(channels[0], 1, &zero, sink, 1, length)
         guard count > 1 else { return }
         for channel in 1..<count { vDSP_vadd(sink, 1, channels[channel], 1, sink, 1, length) }
-        if divides {
-            var divisor = Float(count)
-            vDSP_vsdiv(sink, 1, &divisor, sink, 1, length)
-        } else {
-            var scale = 1 / Float(count)
-            vDSP_vsmul(sink, 1, &scale, sink, 1, length)
-        }
+        var scale = 1 / Float(count)
+        vDSP_vsmul(sink, 1, &scale, sink, 1, length)
     }
 
     static let limiterKnee: Float = 0.9
@@ -176,7 +170,7 @@ struct MonoFileReader {
                 try file.read(into: buffer, frameCount: AVAudioFrameCount(min(MeetingTakeMixer.chunkFrames, count - filled)))
                 let frames = Int(buffer.frameLength)
                 guard frames > 0, let data = buffer.floatChannelData, let base = destination.baseAddress else { break }
-                MeetingTakeMixer.average(data, channels: channels, frames: frames, into: base + filled, dividingBy: false)
+                MeetingTakeMixer.average(data, channels: channels, frames: frames, into: base + filled)
                 filled += frames
             }
         }
@@ -206,7 +200,7 @@ struct StretchedReader {
         }
         let nextFrame = Double(first + count)
         if nextFrame > plan.micFirstOutputFrame {
-            forget(before: Int(plan.micFirstSourceFrame + (nextFrame - plan.micFirstOutputFrame) * plan.micFramesPerOutputFrame))
+            forget(before: Int(plan.position(ofOutputFrame: first + count)))
         }
         return out
     }
@@ -234,11 +228,6 @@ struct StretchedReader {
             window.append(contentsOf: try source.next(count))
             read += count
         }
-    }
-
-    private func sample(_ frame: Int) -> Float {
-        let index = frame - windowStart
-        return index >= 0 && index < window.count ? window[index] : 0
     }
 
     private mutating func forget(before frame: Int) {
@@ -289,7 +278,12 @@ struct MixWriter {
                 var rightPeak: Float = 0
                 vDSP_maxmgv(leftSamples.baseAddress!, 1, &leftPeak, vDSP_Length(frames))
                 vDSP_maxmgv(rightSamples.baseAddress!, 1, &rightPeak, vDSP_Length(frames))
-                if leftPeak <= MeetingTakeMixer.limiterKnee, rightPeak <= MeetingTakeMixer.limiterKnee {
+                var leftSquares: Float = 0
+                var rightSquares: Float = 0
+                vDSP_svesq(leftSamples.baseAddress!, 1, &leftSquares, vDSP_Length(frames))
+                vDSP_svesq(rightSamples.baseAddress!, 1, &rightSquares, vDSP_Length(frames))
+                let hasNaN = (leftSquares + rightSquares).isNaN
+                if !hasNaN, leftPeak <= MeetingTakeMixer.limiterKnee, rightPeak <= MeetingTakeMixer.limiterKnee {
                     channels[0].update(from: leftSamples.baseAddress!, count: frames)
                     channels[1].update(from: rightSamples.baseAddress!, count: frames)
                     if mono != nil {

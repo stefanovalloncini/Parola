@@ -358,6 +358,32 @@ struct MeetingTakeMixerTests {
         }
     }
 
+    @Test("a NaN anywhere in a chunk, on either side, comes out as the scalar limiter would write it")
+    func nanAnywhereTakesTheScalarPath() throws {
+        let dir = try folder()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        var index = 0
+        for length in [1, 3, 17, 4097, 32768] {
+            for position in Set([0, 1, length - 1]) where position < length {
+                for nanOnLeft in [true, false] {
+                    var left = (0..<length).map { Float($0 % 7) * 0.1 - 0.3 }
+                    var right = (0..<length).map { Float($0 % 5) * 0.1 - 0.2 }
+                    if nanOnLeft { left[position] = .nan } else { right[position] = .nan }
+                    let stereo = dir.appendingPathComponent("stereo\(index).wav")
+                    let mono = dir.appendingPathComponent("mono\(index).wav")
+                    try MixWriter(stereo: stereo, mono: mono, rate: 16_000).write(left: left, right: right)
+                    let file = try AVAudioFile(forReading: mono)
+                    let buffer = try #require(AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: AVAudioFrameCount(length)))
+                    try file.read(into: buffer)
+                    let written = Array(UnsafeBufferPointer(start: try #require(buffer.floatChannelData)[0], count: Int(buffer.frameLength)))
+                    let expected = zip(left, right).map { (MeetingTakeMixer.limited($0) + MeetingTakeMixer.limited($1)) / 2 }
+                    #expect(written.map(\.bitPattern) == expected.map(\.bitPattern), "length \(length), NaN at \(position), left \(nanOnLeft)")
+                    index += 1
+                }
+            }
+        }
+    }
+
     @Test("the limiter curve is identity below 0.9, monotonic, and keeps extreme bursts inside full scale")
     func limiterCurveShapesOnlyAboveThreshold() {
         #expect(MeetingTakeMixer.limited(0.5) == 0.5)
