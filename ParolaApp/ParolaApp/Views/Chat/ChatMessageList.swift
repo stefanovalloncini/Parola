@@ -15,13 +15,14 @@ struct ChatMessageList: View {
                 LazyVStack(alignment: .leading, spacing: 4) {
                     let visible = filteredHistory
                     let trimmedQuery = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
-                    if history.isEmpty && live.replyID == nil {
+                    let liveShows = live.replyID != nil && senderFilter.matches(.assistant)
+                    if history.isEmpty && !liveShows {
                         ChatHint()
                             .padding(.top, DS.Spacing.xlarge)
-                    } else if visible.isEmpty && live.replyID == nil && !trimmedQuery.isEmpty {
+                    } else if visible.isEmpty && !liveShows && !trimmedQuery.isEmpty {
                         ContentUnavailableView.search(text: trimmedQuery)
                             .padding(.top, DS.Spacing.xlarge)
-                    } else if visible.isEmpty && live.replyID == nil && hasActiveFilter {
+                    } else if visible.isEmpty && !liveShows && hasActiveFilter {
                         ContentUnavailableView("No Messages", systemImage: "line.3.horizontal.decrease.circle")
                             .padding(.top, DS.Spacing.xlarge)
                     }
