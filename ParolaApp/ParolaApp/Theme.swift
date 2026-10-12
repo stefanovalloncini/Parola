@@ -1,10 +1,11 @@
 import SwiftUI
 import AppKit
+import os
 
 /// An sRGB color with separate light/dark values, or a reference to a system semantic color.
 /// `color` resolves through a dynamic `NSColor` so a single value repaints when the effective
 /// appearance flips, without any view reading `colorScheme`.
-enum ThemeColor: Sendable, Codable, Equatable {
+enum ThemeColor: Sendable, Codable, Hashable {
     case dynamic(light: RGBA, dark: RGBA)
     case system(SystemColor)
 
@@ -15,7 +16,7 @@ enum ThemeColor: Sendable, Codable, Equatable {
         case .system(let semantic):
             return semantic.color
         case .dynamic:
-            return Color(nsColor: nsColor)
+            return ThemeColorMemo.shared.resolved(self).color
         }
     }
 
@@ -24,16 +25,44 @@ enum ThemeColor: Sendable, Codable, Equatable {
         switch self {
         case .system(let semantic):
             return semantic.nsColor
-        case .dynamic(let light, let dark):
-            return NSColor(name: nil) { appearance in
-                let isDark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
-                return (isDark ? dark : light).nsColor
-            }
+        case .dynamic:
+            return ThemeColorMemo.shared.resolved(self).nsColor
+        }
+    }
+
+    fileprivate var makeDynamicNSColor: NSColor {
+        guard case .dynamic(let light, let dark) = self else { return nsColor }
+        return NSColor(name: nil) { appearance in
+            let isDark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+            return (isDark ? dark : light).nsColor
         }
     }
 }
 
-struct RGBA: Sendable, Codable, Equatable {
+/// One dynamic NSColor and Color per value, so a lamp read every second doesn't build a new closure-backed color each time.
+private final class ThemeColorMemo: @unchecked Sendable { // the lock guards the table; the colors are immutable
+    struct Resolved {
+        let color: Color
+        let nsColor: NSColor
+    }
+
+    static let shared = ThemeColorMemo()
+    private static let limit = 512
+    private let table = OSAllocatedUnfairLock(initialState: [ThemeColor: Resolved]())
+
+    func resolved(_ value: ThemeColor) -> Resolved {
+        table.withLockUnchecked { table in
+            if let hit = table[value] { return hit }
+            let nsColor = value.makeDynamicNSColor
+            let made = Resolved(color: Color(nsColor: nsColor), nsColor: nsColor)
+            if table.count >= Self.limit { table.removeAll() }
+            table[value] = made
+            return made
+        }
+    }
+}
+
+struct RGBA: Sendable, Codable, Hashable {
     var r: Double
     var g: Double
     var b: Double
@@ -181,7 +210,7 @@ struct RGBA: Sendable, Codable, Equatable {
 
 /// System semantic colors that adapt to appearance and accessibility settings on their own.
 /// Only `textPrimary` still uses one: every other token needs a value the app can measure.
-enum SystemColor: String, Sendable, Codable {
+enum SystemColor: String, Sendable, Codable, Hashable {
     case primary
     case secondary
     case red

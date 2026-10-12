@@ -67,14 +67,13 @@ final class RecordingStatusItem: NSObject {
         Control(title: String(localized: "Show Recording", bundle: bundle), isEnabled: true, action: #selector(showParola))
     }
 
+    private nonisolated(unsafe) static let menuBarFont = NSFont.menuBarFont(ofSize: 0)
+    private nonisolated(unsafe) static let clockFont = NSFont.monospacedDigitSystemFont(ofSize: menuBarFont.pointSize, weight: .regular)
+
     /// The dot in the take's colour, the clock in digits that hold their width as they turn over; a failed take shows a warning sign and the word for it.
     nonisolated static func attributedTitle(clock: String, lamp: TakeRemote.Lamp) -> NSAttributedString {
-        let font = NSFont.menuBarFont(ofSize: 0)
-        let title = NSMutableAttributedString(attributedString: glyph(for: lamp, font: font))
-        title.append(NSAttributedString(
-            string: " " + clock,
-            attributes: [.font: NSFont.monospacedDigitSystemFont(ofSize: font.pointSize, weight: .regular)]
-        ))
+        let title = NSMutableAttributedString(attributedString: glyph(for: lamp, font: menuBarFont))
+        title.append(NSAttributedString(string: " " + clock, attributes: [.font: clockFont]))
         return title
     }
 
