@@ -63,7 +63,11 @@ final class ModelResidencyCoordinator {
 
     func warmFileSession(_ name: String) {
         guard let fileSession else { return }
-        fileWarmTask = Task { await fileSession.prewarm(modelName: name) }
+        let previous = fileWarmTask
+        fileWarmTask = Task {
+            await previous?.value
+            await fileSession.prewarm(modelName: name)
+        }
     }
 
     func awaitFileWarm() async {
@@ -100,6 +104,7 @@ final class ModelResidencyCoordinator {
     func free(_ name: String) async {
         if warmingModel == name { cancelWarm() }
         await streaming.evict(name)
+        await fileWarmTask?.value
         await unloadFromHolders(name)
     }
 

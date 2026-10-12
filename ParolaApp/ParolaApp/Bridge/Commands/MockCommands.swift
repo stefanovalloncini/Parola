@@ -261,6 +261,26 @@ extension ParolaAutomationServer {
             ),
 
             AutomationCommand(
+                name: "warmStreamingModel",
+                area: .test,
+                summary: "Loads an installed model into the streaming cache the way arming dictation does, without arming it. Test-mode only.",
+                kind: .mutating,
+                args: [
+                    .init(name: "name", kind: .string(), required: true, summary: "Installed model name"),
+                ],
+                handler: { args, ctx in
+                    try requireTestMode(ctx)
+                    let name = try args.string("name")
+                    guard ModelStore.shared.isInstalled(name) else {
+                        throw AutomationError.precondition("\(name) is not installed")
+                    }
+                    ctx.model.modelResidency.warmStreaming(name)
+                    await ctx.model.modelResidency.awaitWarm()
+                    return .object(["resident": .array(await ctx.model.modelResidency.residentModelNames().map { .string($0) })])
+                }
+            ),
+
+            AutomationCommand(
                 name: "setStreamingIdleTimeout",
                 area: .test,
                 summary: "Sets how long a streaming model nothing holds stays loaded. Test-mode only.",

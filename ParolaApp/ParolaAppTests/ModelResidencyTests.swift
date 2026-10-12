@@ -64,12 +64,14 @@ private actor FakeHolder: LoadedModelHolder {
     let log: EventLog
     private var loaded: String?
     private var busy = false
+    private let warmGate: Gate?
 
-    init(_ label: String, log: EventLog, loaded: String? = nil, busy: Bool = false) {
+    init(_ label: String, log: EventLog, loaded: String? = nil, busy: Bool = false, warmGate: Gate? = nil) {
         self.label = label
         self.log = log
         self.loaded = loaded
         self.busy = busy
+        self.warmGate = warmGate
     }
 
     func finishRun() { busy = false }
@@ -82,7 +84,11 @@ private actor FakeHolder: LoadedModelHolder {
         log.add("\(label) unloaded \(name)")
     }
 
-    func prewarm(modelName: String) async { log.add("\(label) prewarm \(modelName)") }
+    func prewarm(modelName: String) async {
+        log.add("\(label) prewarm \(modelName)")
+        await warmGate?.wait()
+        loaded = modelName
+    }
 }
 
 private actor ListeningRecorder: DictationRecorder {
@@ -120,12 +126,13 @@ struct ModelResidencyTests {
         resident: [String] = [],
         fileLoaded: String? = nil,
         fileBusy: Bool = false,
+        fileWarmGate: Gate? = nil,
         onEvict: (@Sendable (String) -> Void)? = nil
     ) -> Rig {
         let model = makeModel()
         let log = EventLog()
         let streaming = FakeStreaming(log: log, warmGate: warmGate, resident: resident, onEvict: onEvict)
-        let file = FakeHolder("file", log: log, loaded: fileLoaded, busy: fileBusy)
+        let file = FakeHolder("file", log: log, loaded: fileLoaded, busy: fileBusy, warmGate: fileWarmGate)
         let dictation = FakeHolder("dictation", log: log)
         model.modelResidency = ModelResidencyCoordinator(streaming: streaming)
         model.modelResidency.attach(fileSession: file, dictationSession: dictation)
@@ -257,6 +264,24 @@ struct ModelResidencyTests {
         residency.sessionRunEnded()
         await residency.awaitRetry()
         #expect(rig.log.events.filter { $0.hasPrefix("file unloaded") }.count == 1, "the retry is spent")
+    }
+
+    @Test("freeing a model waits for a warm of it that is still loading, then unloads it")
+    func freeWaitsForTheFileWarm() async {
+        let gate = Gate()
+        let rig = makeRig(fileWarmGate: gate)
+        let residency = rig.model.modelResidency
+        residency.warmFileSession(Self.turbo)
+        await waitUntil { rig.log.events == ["file prewarm \(Self.turbo)"] }
+
+        let freeing = Task { await residency.free(Self.turbo) }
+        await settle()
+        #expect(!rig.log.events.contains { $0.hasPrefix("file unloaded") }, "the load is still running")
+
+        await gate.release()
+        await freeing.value
+
+        #expect(rig.log.events.last == "file unloaded \(Self.turbo)")
     }
 
     @Test("a run ending with nothing pending does not touch the sessions")

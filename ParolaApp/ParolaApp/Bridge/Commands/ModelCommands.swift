@@ -1,4 +1,5 @@
 import Foundation
+import ParolaCore
 
 extension ParolaAutomationServer {
     func modelCommands() -> [AutomationCommand] {
@@ -6,14 +7,14 @@ extension ParolaAutomationServer {
             AutomationCommand(
                 name: "selectModel",
                 area: .model,
-                summary: "Selects the active transcription model, with the same side effects as the model picker.",
+                summary: "Selects the active transcription model, with the same side effects as the model picker: an installed model is warmed, and a model that isn't installed is selected without a download.",
                 kind: .mutating,
                 args: [
                     .init(name: "name", kind: .string(), required: true, summary: "Model name (e.g. openai_whisper-tiny)"),
                 ],
                 handler: { args, ctx in
                     let name = try args.string("name")
-                    ctx.model.activateModel(name)
+                    ctx.model.pickModel(name, isInstalled: ModelStore.shared.isInstalled(name)) { _ in }
                     return .object(["selectedModel": .string(name)])
                 }
             ),
