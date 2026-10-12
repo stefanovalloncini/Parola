@@ -973,23 +973,10 @@ final class AppModel {
     /// The directory in the order every list shows it: most assigned, then most recently used.
     private(set) var peopleByUse: [Person] = []
     @ObservationIgnored private(set) var peopleByName: [Person] = []
-#if DEBUG
+    #if DEBUG
     @ObservationIgnored private(set) var peopleOrderBuilds = 0
-#endif
+    #endif
 
-    private func rebuildPeopleOrder() {
-#if DEBUG
-        peopleOrderBuilds &+= 1
-#endif
-        let counts = personUsageCounts
-        let byUse = people.sorted {
-            let left = counts[$0.id] ?? 0
-            let right = counts[$1.id] ?? 0
-            return left == right ? $0.lastUsedAt > $1.lastUsedAt : left > right
-        }
-        if byUse != peopleByUse { peopleByUse = byUse }
-        peopleByName = people.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
-    }
     /// Which person the library list is filtered to, set from the sidebar, the filter bar or the bridge.
     var personFilter: UUID?
     /// Bumped when a sidebar pick opens nothing; @Observable skips the same-value writes such a pick makes, so this makes the list look again.
@@ -1657,6 +1644,20 @@ final class AppModel {
     private(set) var personUsageCounts: [UUID: Int] = [:] {
         didSet { rebuildPeopleOrder() }
     }
+
+    private func rebuildPeopleOrder() {
+        #if DEBUG
+        peopleOrderBuilds &+= 1
+        #endif
+        let counts = personUsageCounts
+        let byUse = people.sorted {
+            let left = counts[$0.id] ?? 0
+            let right = counts[$1.id] ?? 0
+            return left == right ? $0.lastUsedAt > $1.lastUsedAt : left > right
+        }
+        if byUse != peopleByUse { peopleByUse = byUse }
+        peopleByName = people.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+    }
     /// How many transcripts stand for each person, for the sidebar's badges.
     private(set) var personTranscriptCounts: [UUID: Int] = [:]
     /// The sidebar's counts, set only when one moves, so a rename or an open repaints no badge.
@@ -1745,7 +1746,7 @@ final class AppModel {
             dropTakeSavedOnceLeft()
         }
     }
-    /// The menus read this rather than `favoriteSegmentIDs`, which would tie them to every library write.
+    /// The menus read this rather than the whole library, so a library write doesn't rebuild them.
     private(set) var selectedEntryHasFavorites = false
     /// The open entry's favorites, notes and speaker map, copied out of the library so a card reads them without tying itself to every library write.
     private(set) var selectedEntryFavorites: Set<Int> = []
