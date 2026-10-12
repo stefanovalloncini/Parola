@@ -1085,6 +1085,22 @@ final class LibrarySearchIndexTests {
         #expect(await keyed(reader.search("delta")) == keyed(fresh.search("delta")))
     }
 
+    @Test("a reader that refreshes an entry drops the body it held for the older one")
+    func refreshDropsTheReadersOwnBody() async throws {
+        let (owner, url) = makeTempIndex()
+        await owner.index(id: "e2", title: "Two", text: "beta old words", fingerprint: "f1", createdAt: Date())
+        await owner.flush()
+        let reader = LibrarySearchIndex(readingSnapshotIn: url)
+        _ = await reader.search("beta")
+        await reader.index(id: "e2", title: "Two", text: "beta old words", fingerprint: "f1", createdAt: Date())
+
+        await owner.index(id: "e2", title: "Two", text: "beta new words", fingerprint: "f2", createdAt: Date())
+        await owner.flush()
+        #expect(await reader.refreshFromSnapshot())
+
+        #expect(await reader.search("new").first?.snippet == "beta new words")
+    }
+
     @Test("an entry file stamped in the same instant as the manifest the reader read is decoded again")
     func readerRefreshTakesATiedEntry() async throws {
         let (owner, url) = makeTempIndex()

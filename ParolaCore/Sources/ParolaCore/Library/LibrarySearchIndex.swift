@@ -601,6 +601,7 @@ public actor LibrarySearchIndex {
         }
         for entry in changes.decoded {
             removeFromIndex(entry.id)
+            discardBody(of: entry.id)
             install(entry.entry, body: nil, for: entry.id)
         }
         entriesDecoded &+= changes.decoded.count
