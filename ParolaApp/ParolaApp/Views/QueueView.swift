@@ -30,7 +30,7 @@ struct QueueView: View {
         .background(DS.Color.surface)
         .toolbarSearch(text: $searchText, for: .queue)
         .background(QueueListMenusPublisher(sort: $sortOption))
-        .confirmationDialog(QueueCopy.cancelAllTitle(QueueCount.count(for: model.batchJobs)), isPresented: $confirmingCancelAll) {
+        .confirmationDialog(QueueCopy.cancelAllTitle(QueueCount.count(for: model.batchBuckets.all)), isPresented: $confirmingCancelAll) {
             Button("Cancel All", role: .destructive) { model.cancelAllInFlightBatchJobs() }
             Button("Keep Transcribing", role: .cancel) {}
         } message: {
@@ -42,7 +42,7 @@ struct QueueView: View {
     private var toolbar: some View {
         PageHeader(
             title: "Queue",
-            subtitle: QueueCount.label(for: model.batchJobs),
+            subtitle: QueueCount.label(for: model.batchBuckets.all),
             trailing: {
                 sortMenu
                 Button {

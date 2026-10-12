@@ -49,11 +49,21 @@ extension BatchJob {
 }
 
 /// The queue sorted into its statuses in one pass, shared by every list that groups the jobs by status.
-struct BatchJobBuckets {
+/// Holds only what a row draws, so a change to anything else (the saved entry, the dropped transcript) is equal.
+struct BatchJobBuckets: Equatable {
     private var byStatus: [BatchJob.Status: [BatchJob]] = [:]
+    private(set) var all: [BatchJob] = []
 
     init(_ jobs: [BatchJob] = []) {
-        for job in jobs { byStatus[job.status, default: []].append(job) }
+        all.reserveCapacity(jobs.count)
+        for job in jobs {
+            let shown = BatchJob(
+                id: job.id, url: job.url, status: job.status, error: job.error,
+                segmentCount: job.segmentCount ?? job.transcript?.segments.count
+            )
+            all.append(shown)
+            byStatus[job.status, default: []].append(shown)
+        }
     }
 
     /// In queue order.

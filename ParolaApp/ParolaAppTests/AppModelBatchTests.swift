@@ -1006,6 +1006,44 @@ struct AppModelBatchTests {
         #expect(model.batchProgress.fraction(for: running) == 0.3)
     }
 
+    @Test("a landing that changes nothing a row shows leaves the queue page's inputs alone")
+    func batchLandingLeavesRowsAlone() {
+        let model = makeModel()
+        var done = Self.makeJob("a", status: .done)
+        done.transcript = Self.makeTranscript()
+        done.segmentCount = 1
+        model.batchJobs = [done, Self.makeJob("b")]
+        let moved = BatchObservationFlag()
+        withObservationTracking {
+            _ = model.batchBuckets
+        } onChange: {
+            moved.fired = true
+        }
+
+        model.landBatchJobEntry("entry-a", jobID: done.id)
+
+        #expect(model.batchJobs[0].entryID == "entry-a")
+        #expect(model.batchJobs[0].transcript == nil)
+        #expect(!moved.fired)
+    }
+
+    @Test("a status change reaches the queue page's inputs")
+    func batchStatusChangeReachesRows() async {
+        let model = makeModel()
+        model.batchJobs = [Self.makeJob("a", status: .transcribing)]
+        let moved = BatchObservationFlag()
+        withObservationTracking {
+            _ = model.batchBuckets
+        } onChange: {
+            moved.fired = true
+        }
+
+        await model.handleBatchEvent(.failed(jobID: model.batchJobs[0].id, reason: "no"))
+
+        #expect(moved.fired)
+        #expect(model.batchBuckets.jobs(.failed).first?.error == "no")
+    }
+
     @Test("progress for a cancelled job is ignored")
     func batchProgressSkipsCancelledJob() async {
         let model = makeModel()
