@@ -136,7 +136,7 @@ struct LibraryRowList<Top: View>: View {
         .tint(DS.Color.accentFill)
         .focused(focus, equals: focusKey)
         .focusedValue(\.libraryRows, LibraryRowsTarget(
-            entries: LibraryRowsTarget.selectedEntries(selection, in: items), rename: rename, delete: deleteSelection
+            entries: LibraryRowsTarget.selectedEntries(selection, in: items), rename: rename, delete: delete
         ))
         .onDeleteCommand(perform: deleteSelection)
         .dragContainer(for: LibraryEntryDragItem.self) { ids in

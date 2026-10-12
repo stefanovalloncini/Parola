@@ -52,10 +52,22 @@ struct LibraryRowCommandsTests {
         #expect(picked.map(\.id) == ["a", "c"])
     }
 
+    @Test("a pass that leaves the selection alone hands the menu an equal target")
+    func targetIgnoresItsClosures() {
+        func target(_ entries: [LibraryEntry], rename: @escaping (LibraryEntry) -> Void = { _ in }) -> LibraryRowsTarget {
+            LibraryRowsTarget(entries: entries, rename: rename, delete: { _ in })
+        }
+
+        #expect(target([entry("a"), entry("b")]) == target([entry("a"), entry("b")], rename: { _ in print("other") }))
+        #expect(target([entry("a")]) != target([entry("b")]))
+        #expect(target([entry("a"), entry("b")]) != target([entry("a")]))
+        #expect(target([entry("a"), entry("b")]) != target([entry("a", pinned: true), entry("b", pinned: true)]))
+    }
+
     @Test("Pin pins a mixed selection, Unpin needs every row pinned, Rename needs one row")
     func targetNamesItsCommands() {
         func target(_ entries: [LibraryEntry]) -> LibraryRowsTarget {
-            LibraryRowsTarget(entries: entries, rename: { _ in }, delete: {})
+            LibraryRowsTarget(entries: entries, rename: { _ in }, delete: { _ in })
         }
 
         let mixed = target([entry("a", pinned: true), entry("b")])
@@ -64,8 +76,8 @@ struct LibraryRowCommandsTests {
 
         #expect(mixed.pins)
         #expect(!pinned.pins)
-        #expect(mixed.renameTarget == nil)
-        #expect(one.renameTarget?.id == "a")
+        #expect(mixed.renameTargetID == nil)
+        #expect(one.renameTargetID == "a")
     }
 
     @Test("Delete takes one row at once and asks first for several")
@@ -145,7 +157,7 @@ struct LibraryRowCommandsTests {
         let app = try Self.source("ParolaApp")
 
         #expect(rows.contains(".onDeleteCommand(perform: deleteSelection)"))
-        #expect(rows.contains(".focusedValue(\\.libraryRows"))
+        #expect(rows.contains(".focusedValue(\\.libraryRows, LibraryRowsTarget("))
         #expect(trash.contains(".onDeleteCommand(perform: confirmPurgeSelection)"))
         #expect(app.contains("CommandGroup(after: .newItem) {\n                LibraryRowCommands(model: model)"))
     }
