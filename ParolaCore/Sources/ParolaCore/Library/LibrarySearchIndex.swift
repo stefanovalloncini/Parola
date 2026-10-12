@@ -196,7 +196,6 @@ public actor LibrarySearchIndex {
             }
         }
 
-        func ordinal(of id: String) -> UInt32? { ordinals[id] }
         func entry(at ordinal: UInt32) -> IndexedEntry? { slots[Int(ordinal)] }
         func id(at ordinal: UInt32) -> String { ids[Int(ordinal)] }
 
@@ -255,7 +254,7 @@ public actor LibrarySearchIndex {
         }
     }
 
-    /// Ordinals in ascending order, so a posting list is found by bisection and merged by walking.
+    /// Ordinals in ascending order, so a posting list is found or placed by bisection.
     enum Postings {
         static func insert(_ ordinal: UInt32, into list: inout [UInt32]) {
             guard let last = list.last, last >= ordinal else {
@@ -293,14 +292,7 @@ public actor LibrarySearchIndex {
         private var ids: [String: UInt32] = [:]
         private var freeIDs: [UInt32] = []
 
-        func id(of word: String) -> UInt32? { ids[word] }
         var liveIDs: Dictionary<String, UInt32>.Values { ids.values }
-
-        mutating func reserveCapacity(_ capacity: Int) {
-            ids.reserveCapacity(capacity)
-            words.reserveCapacity(capacity)
-            postings.reserveCapacity(capacity)
-        }
 
         mutating func intern(_ word: String) -> (id: UInt32, isNew: Bool) {
             if let existing = ids[word] { return (existing, false) }
@@ -522,7 +514,6 @@ public actor LibrarySearchIndex {
         indexTickets[id] = nil
         let unchanged = !unsoundBodies.contains(id)
             && entries[id].map { $0.bodyBytes == prepared.entry.bodyBytes && $0.bodyHash == prepared.entry.bodyHash } == true
-        removeFromIndex(id)
         install(prepared.entry, words: prepared.words, body: unchanged ? nil : prepared.body, for: id)
         if let fingerprint = pendingFingerprints.removeValue(forKey: id) { applyFingerprint(fingerprint, for: id) }
         scheduleSave()
@@ -557,7 +548,6 @@ public actor LibrarySearchIndex {
             bodyBytes: entry.bodyBytes,
             bodyHash: entry.bodyHash
         )
-        removeFromIndex(id)
         install(replaced, words: tokens, body: nil, for: id)
         scheduleSave()
         return true
@@ -817,7 +807,6 @@ public actor LibrarySearchIndex {
             if excerptsByEntry.removeValue(forKey: id) != nil { excerptsGeneration &+= 1 }
         }
         for entry in prepared {
-            removeFromIndex(entry.id)
             install(entry.entry, words: entry.words, body: entry.body, for: entry.id)
         }
         scheduleSave()
@@ -842,7 +831,6 @@ public actor LibrarySearchIndex {
             if excerptsByEntry.removeValue(forKey: id) != nil { excerptsGeneration &+= 1 }
         }
         for entry in changes.decoded {
-            removeFromIndex(entry.id)
             discardBody(of: entry.id)
             install(entry.entry, words: entry.words, body: nil, for: entry.id)
         }
@@ -1180,6 +1168,7 @@ public actor LibrarySearchIndex {
 
     /// A nil `body` leaves the one already held or on disk as it is.
     private func install(_ entry: IndexedEntry, words: [String], body: String?, for id: String) {
+        removeFromIndex(id)
         var entry = entry
         var vocabularyGrew = false
         entry.tokens = words.map { word in
@@ -1210,7 +1199,9 @@ public actor LibrarySearchIndex {
         guard let (entry, ordinal) = entries.removeValue(forKey: id) else { return }
         dirtyEntryIDs.remove(id)
         var vocabularyShrank = false
-        for tokenID in entry.tokens where vocabulary.remove(ordinal, from: tokenID) { vocabularyShrank = true }
+        for tokenID in entry.tokens {
+            if vocabulary.remove(ordinal, from: tokenID) { vocabularyShrank = true }
+        }
         if vocabularyShrank { sortedTokenIDs = nil }
         isDirty = true
     }

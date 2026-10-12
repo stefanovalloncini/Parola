@@ -272,3 +272,22 @@ struct LibrarySearchVocabularyIDTests {
         #expect(Set(await reader.search("gamma", snippets: false).map(\.entryID)) == ["e2"])
     }
 }
+
+@Suite("LibrarySearchIndex repeated ids")
+struct LibrarySearchRepeatedIDTests {
+    @Test("a rebuild that lists an id twice leaves no postings behind for the first copy")
+    func duplicateIDInRebuild() async {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("parola-dup-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let index = LibrarySearchIndex(indexDirectory: url)
+        await index.rebuild(entries: [
+            .init(id: "e1", title: "One", text: "alpha"),
+            .init(id: "e1", title: "One", text: "beta"),
+        ])
+        await index.remove("e1")
+        await index.index(id: "e2", title: "Two", text: "gamma", createdAt: Date())
+        #expect(await index.search("alpha", snippets: false).isEmpty)
+        #expect(await index.search("beta", snippets: false).isEmpty)
+        #expect(await index.search("gamma", snippets: false).map(\.entryID) == ["e2"])
+    }
+}
