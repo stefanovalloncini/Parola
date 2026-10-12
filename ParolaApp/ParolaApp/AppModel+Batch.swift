@@ -400,9 +400,11 @@ extension AppModel {
         batchRunCancelled = true
         cancelAndTrack(&batchTask)
         stopBatchRun()
-        for idx in batchJobs.indices where batchJobs[idx].status == .pending || batchJobs[idx].status == .transcribing {
-            batchJobs[idx].status = .cancelled
+        var jobs = batchJobs
+        for idx in jobs.indices where jobs[idx].status == .pending || jobs[idx].status == .transcribing {
+            jobs[idx].status = .cancelled
         }
+        batchJobs = jobs
     }
 
     func retryBatchJob(_ id: BatchJob.ID) {
@@ -412,17 +414,19 @@ extension AppModel {
     /// One run for all of them: a run per job would cancel the one before it.
     func retryBatchJobs(_ ids: Set<BatchJob.ID>) {
         var retried: [BatchJob] = []
-        for idx in batchJobs.indices where ids.contains(batchJobs[idx].id) {
-            batchJobs[idx].status = .pending
-            batchJobs[idx].error = nil
-            batchJobs[idx].transcript = nil
-            batchJobs[idx].entryID = nil
-            batchJobs[idx].segmentCount = nil
+        var jobs = batchJobs
+        for idx in jobs.indices where ids.contains(jobs[idx].id) {
+            jobs[idx].status = .pending
+            jobs[idx].error = nil
+            jobs[idx].transcript = nil
+            jobs[idx].entryID = nil
+            jobs[idx].segmentCount = nil
             // The file may have changed since it was hashed; the add takes its own digest.
-            batchJobs[idx].sourceDigest = nil
-            batchProgress.reset(batchJobs[idx].id)
-            retried.append(batchJobs[idx])
+            jobs[idx].sourceDigest = nil
+            batchProgress.reset(jobs[idx].id)
+            retried.append(jobs[idx])
         }
+        batchJobs = jobs
         // Don't tear down a live batch to retry — runBatchTask cancels the running queue and
         // strands the in-flight job. Reset to .pending; the running batch's .finished resume picks them up.
         if !batchIsRunning, !retried.isEmpty {
@@ -477,9 +481,11 @@ extension AppModel {
         guard !pendingIndices.isEmpty else { return }
         var pending = pendingIndices.map { batchJobs[$0] }
         pending.move(fromOffsets: source, toOffset: destination)
+        var jobs = batchJobs
         for (pendingPosition, originalIndex) in pendingIndices.enumerated() {
-            batchJobs[originalIndex] = pending[pendingPosition]
+            jobs[originalIndex] = pending[pendingPosition]
         }
+        batchJobs = jobs
     }
 
     func moveBatchJobToTop(_ id: BatchJob.ID) {
