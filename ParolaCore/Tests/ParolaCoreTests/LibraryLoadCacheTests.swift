@@ -272,7 +272,7 @@ struct LibraryLoadCacheTests {
         let mutation = Task {
             try await store.mutateTranscript(for: entry.id) { $0.language = "it" }
         }
-        while decodes.withLock({ $0 }) < 1 { try await Task.sleep(for: .milliseconds(1)) }
+        await pollUntil("the first decode to start") { decodes.withLock { $0 } >= 1 }
         try await store.updateTranscript(makeTranscript("edited"), for: entry.id)
         edited.signal()
 

@@ -829,9 +829,9 @@ public actor LibraryStore {
         }
     }
 
-    /// Changes the entry's transcript in place and returns what it holds afterwards. The transform
-    /// runs between the read and the write with nothing suspended in between, so an edit that lands
-    /// alongside it is not reverted; a transform that changes nothing writes nothing.
+    /// Changes the entry's transcript in place and returns what it holds afterwards. The read is repeated
+    /// when an edit lands during its decode, and the transform and the write run with nothing suspended
+    /// between them, so no edit is reverted; a transform that changes nothing writes nothing.
     @discardableResult
     public func mutateTranscript(
         for id: LibraryEntry.ID,
@@ -850,20 +850,17 @@ public actor LibraryStore {
         return transcript
     }
 
-    /// Not cancellable, as the on-actor read it replaces was: a write the caller asked for still lands. Decoded off the actor, and read again when a write to this bundle landed meanwhile, so the caller transforms the latest content; the last attempt reads on the actor to terminate.
+    /// Not cancellable, so a write the caller asked for still lands; reads again when this bundle was written meanwhile.
     private func storedTranscript(id: LibraryEntry.ID, at bundleURL: URL) async throws -> Transcript {
         for _ in 0..<8 {
             let generation = (storeGeneration, bundleGenerations[id, default: 0])
-            let stored = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Transcript, any Error>) in
-                DispatchQueue.global(qos: .userInitiated).async { [didDecodeDocument] in
-                    continuation.resume(with: Result {
-                        let decoded = try Self.readStoredTranscript(at: bundleURL)
-                        didDecodeDocument?()
-                        return decoded
-                    })
-                }
+            let stored = await offActorIO { [didDecodeDocument] in
+                let decoded = Result { try Self.readStoredTranscript(at: bundleURL) }
+                didDecodeDocument?()
+                return decoded
             }
-            if generation == (storeGeneration, bundleGenerations[id, default: 0]) { return stored }
+            let transcript = try stored.get()
+            if generation == (storeGeneration, bundleGenerations[id, default: 0]) { return transcript }
         }
         return try Self.readStoredTranscript(at: bundleURL)
     }
