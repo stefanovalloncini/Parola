@@ -178,8 +178,8 @@ struct TranscribingPane: View {
     }
 
     private var transcriptBox: some View {
-        ScrollViewReader { proxy in
-            OfferedSize {
+        TranscribingBox(textHeight: streamedTextHeight) {
+            ScrollViewReader { proxy in
                 ScrollView {
                     VStack(alignment: .leading, spacing: DS.Spacing.regular) {
                         if hasText {
@@ -201,22 +201,16 @@ struct TranscribingPane: View {
                     )
                 }
                 .scrollBounceBehavior(.basedOnSize)
-            }
-            .onChange(of: partial) { _, newValue in
-                updateBodyText(for: newValue)
-                withAnimation(.easeOut(duration: 0.3)) {
-                    proxy.scrollTo(Self.tailID, anchor: .bottom)
+                .onChange(of: partial) { _, newValue in
+                    updateBodyText(for: newValue)
+                    withAnimation(.easeOut(duration: 0.3)) {
+                        proxy.scrollTo(Self.tailID, anchor: .bottom)
+                    }
                 }
+                .mask { topFadeMask }
             }
-            .mask { topFadeMask }
+            .onPreferenceChange(StreamedTextHeight.self) { streamedTextHeight = $0 }
         }
-        .onPreferenceChange(StreamedTextHeight.self) { streamedTextHeight = $0 }
-        // maxHeight tracks the text so the box grows with the run, still clamped by what height is left.
-        .frame(
-            maxWidth: .infinity,
-            minHeight: DS.Size.liveTranscriptMinHeight,
-            maxHeight: max(DS.Size.liveTranscriptMinHeight, streamedTextHeight)
-        )
         .animation(reduceMotion ? nil : DS.Motion.resize, value: streamedTextHeight)
         .cardBackground(radius: DS.Radius.large)
         .background(WindowShownReader { isOnScreen = $0 })
@@ -249,6 +243,21 @@ struct TranscribingText: View {
             .contentTransition(.interpolate)
             .accessibilityLabel(spoken)
             .liveCaret(font: DS.Font.transcript, blinks: blinks)
+    }
+}
+
+/// The box the run's words scroll in: it grows with them up to the height the pane has left, and answers the window's size checks without laying them out.
+struct TranscribingBox<Content: View>: View {
+    let textHeight: CGFloat
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        OfferedSize { content }
+            .frame(
+                maxWidth: .infinity,
+                minHeight: DS.Size.liveTranscriptMinHeight,
+                maxHeight: max(DS.Size.liveTranscriptMinHeight, textHeight)
+            )
     }
 }
 

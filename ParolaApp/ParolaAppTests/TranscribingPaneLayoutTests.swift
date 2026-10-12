@@ -26,7 +26,12 @@ private struct Asking: Layout {
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
         MainActor.assumeIsolated {
             let before = measures?.asked.count ?? 0
-            answers.sizes = proposals.map { subviews[0].sizeThatFits($0) }
+            answers.sizes = proposals.map { proposal in
+                let dimensions = subviews[0].dimensions(in: proposal)
+                // A stack placing the box reads its guides too.
+                _ = (dimensions[.leading], dimensions[.top])
+                return CGSize(width: dimensions.width, height: dimensions.height)
+            }
             if let measures { measures.duringChecks += measures.asked[before...] }
         }
         return proposal.replacingUnspecifiedDimensions()
@@ -63,26 +68,25 @@ struct TranscribingPaneLayoutTests {
         ProposedViewSize(width: 640, height: nil), ProposedViewSize(width: nil, height: 400),
     ]
 
-    /// The pane's scroll box with its frame, with or without `OfferedSize` around the scroll view.
+    /// The pane's own box around a scroll view of words, or the scroll view in the frame the box had before `OfferedSize`.
     @ViewBuilder
     private static func box(offered: Bool, measures: Measures = Measures()) -> some View {
         let scroll = ScrollView {
             VStack(alignment: .leading, spacing: DS.Spacing.regular) {
-                Text(words)
-                    .font(DS.Font.transcript)
-                    .lineSpacing(DS.Spacing.transcriptLeading)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                Counting(measures: measures) {
+                    Text(words)
+                        .font(DS.Font.transcript)
+                        .lineSpacing(DS.Spacing.transcriptLeading)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
             }
             .padding(DS.Spacing.large)
         }
-        Group {
-            if offered {
-                OfferedSize { Counting(measures: measures) { scroll } }
-            } else {
-                scroll
-            }
+        if offered {
+            TranscribingBox(textHeight: 300) { scroll }
+        } else {
+            scroll.frame(maxWidth: .infinity, minHeight: DS.Size.liveTranscriptMinHeight, maxHeight: 300)
         }
-        .frame(maxWidth: .infinity, minHeight: DS.Size.liveTranscriptMinHeight, maxHeight: 300)
     }
 
     private func answers(offered: Bool) -> [CGSize] {
