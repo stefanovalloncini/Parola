@@ -1061,7 +1061,7 @@ struct AppModelBatchTests {
         await model.handleBatchEvent(.failed(jobID: model.batchJobs[0].id, reason: "no"))
 
         #expect(moved.fired)
-        #expect(model.batchBuckets.jobs(.failed).first?.error == "no")
+        #expect(model.batchBuckets.rows(.failed).first?.error == "no")
     }
 
     @Test("progress for a cancelled job is ignored")

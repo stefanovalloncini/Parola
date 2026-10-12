@@ -30,7 +30,7 @@ struct QueueView: View {
         .background(DS.Color.surface)
         .toolbarSearch(text: $searchText, for: .queue)
         .background(QueueListMenusPublisher(sort: $sortOption))
-        .confirmationDialog(QueueCopy.cancelAllTitle(QueueCount.count(for: model.batchBuckets.all)), isPresented: $confirmingCancelAll) {
+        .confirmationDialog(QueueCopy.cancelAllTitle(QueueCount.count(for: model.batchBuckets.allRows)), isPresented: $confirmingCancelAll) {
             Button("Cancel All", role: .destructive) { model.cancelAllInFlightBatchJobs() }
             Button("Keep Transcribing", role: .cancel) {}
         } message: {
@@ -42,7 +42,7 @@ struct QueueView: View {
     private var toolbar: some View {
         PageHeader(
             title: "Queue",
-            subtitle: QueueCount.label(for: model.batchBuckets.all),
+            subtitle: QueueCount.label(for: model.batchBuckets.allRows),
             trailing: {
                 sortMenu
                 Button {
@@ -174,7 +174,7 @@ struct QueueView: View {
         let buckets = model.batchBuckets
         let query = searchText.trimmingCharacters(in: .whitespaces)
         return Self.layout.compactMap { layout in
-            let jobs = layout.statuses.flatMap { sorted(matching(buckets.jobs($0), query: query)) }
+            let jobs = layout.statuses.flatMap { sorted(matching(buckets.rows($0), query: query)) }
             return jobs.isEmpty ? nil : JobSection(id: layout.id, title: layout.title, jobs: jobs)
         }
     }

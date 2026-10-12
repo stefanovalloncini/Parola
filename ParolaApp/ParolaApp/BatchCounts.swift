@@ -48,26 +48,25 @@ extension BatchJob {
     }
 }
 
-/// The queue sorted into its statuses in one pass, shared by every list that groups the jobs by status.
-/// Holds only what a row draws, so a change to anything else (the saved entry, the dropped transcript) is equal.
+/// The queue's rows by status in one pass, holding only what a row draws, so a landing that changes nothing it shows is equal.
 struct BatchJobBuckets: Equatable {
     private var byStatus: [BatchJob.Status: [BatchJob]] = [:]
-    private(set) var all: [BatchJob] = []
+    private(set) var allRows: [BatchJob] = []
 
     init(_ jobs: [BatchJob] = []) {
-        all.reserveCapacity(jobs.count)
+        allRows.reserveCapacity(jobs.count)
         for job in jobs {
             let shown = BatchJob(
                 id: job.id, url: job.url, status: job.status, error: job.error,
                 segmentCount: job.segmentCount ?? job.transcript?.segments.count
             )
-            all.append(shown)
+            allRows.append(shown)
             byStatus[job.status, default: []].append(shown)
         }
     }
 
     /// In queue order.
-    func jobs(_ status: BatchJob.Status) -> [BatchJob] {
+    func rows(_ status: BatchJob.Status) -> [BatchJob] {
         byStatus[status] ?? []
     }
 

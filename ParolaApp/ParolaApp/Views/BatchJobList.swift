@@ -52,13 +52,13 @@ struct BatchJobList: View {
             .padding(.bottom, DS.Spacing.regular)
         }
         .onAppear { refreshFileSizes() }
-        .onChange(of: model.batchJobs.count) { _, _ in refreshFileSizes() }
+        .onChange(of: model.batchBuckets.allRows.count) { _, _ in refreshFileSizes() }
     }
 
     // Cached once per queue change: statting every file inside the sort would hit the disk
     // for the whole queue on every per-job progress tick.
     private func refreshFileSizes() {
-        let urls = Set(model.batchJobs.map(\.url))
+        let urls = Set(model.batchBuckets.allRows.map(\.url))
         guard urls != Set(fileSizes.keys) else { return }
         var sizes: [URL: Int] = [:]
         for url in urls {
@@ -151,7 +151,7 @@ struct BatchJobList: View {
     }
 
     private var filteredJobs: [BatchJob] {
-        matching(model.batchJobs)
+        matching(model.batchBuckets.allRows)
     }
 
     private func matching(_ jobs: [BatchJob]) -> [BatchJob] {
@@ -185,7 +185,7 @@ struct BatchJobList: View {
         let buckets = model.batchBuckets
         let order: [BatchJob.Status] = [.transcribing, .pending, .done, .failed, .cancelled]
         return order.compactMap { status in
-            let bucket = matching(buckets.jobs(status))
+            let bucket = matching(buckets.rows(status))
             guard !bucket.isEmpty else { return nil }
             return BatchStatusGroup(status: status, jobs: bucket)
         }

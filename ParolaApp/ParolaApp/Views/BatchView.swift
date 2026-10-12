@@ -27,7 +27,7 @@ struct BatchView: View {
     }
 
     private var header: some View {
-        let caption = BatchProgress.headerLabel(for: model.batchJobs)
+        let caption = BatchProgress.headerLabel(for: model.batchBuckets.allRows)
         return PageHeader(
             title: "Batch",
             subtitle: caption?.text,
@@ -68,7 +68,7 @@ struct BatchView: View {
 
     private var queuePane: some View {
         ZStack {
-            if model.batchJobs.isEmpty {
+            if model.batchIsEmpty {
                 // The notice above says what is happening; an empty state would invite a second drop.
                 if model.batchFilesBeingChecked == 0 { BatchEmptyState() }
             } else {

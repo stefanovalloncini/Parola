@@ -58,10 +58,10 @@ struct BatchProgressTests {
             Self.makeJob("d", .transcribing), Self.makeJob("e", .pending),
         ]
         let buckets = BatchJobBuckets(jobs)
-        #expect(buckets.jobs(.done).map(\.displayName) == ["a", "c"])
-        #expect(buckets.jobs(.pending).map(\.displayName) == ["b", "e"])
-        #expect(buckets.jobs(.transcribing).map(\.displayName) == ["d"])
-        #expect(buckets.jobs(.failed).isEmpty)
+        #expect(buckets.rows(.done).map(\.displayName) == ["a", "c"])
+        #expect(buckets.rows(.pending).map(\.displayName) == ["b", "e"])
+        #expect(buckets.rows(.transcribing).map(\.displayName) == ["d"])
+        #expect(buckets.rows(.failed).isEmpty)
         #expect(buckets.hasFinished)
         #expect(!buckets.holdsOnlyRunningJobs)
     }

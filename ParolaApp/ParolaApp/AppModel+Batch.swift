@@ -331,7 +331,7 @@ extension AppModel {
     }
 
     var canResumeBatch: Bool {
-        batchTask == nil && !batchIsRunning && !batchBuckets.jobs(.pending).isEmpty
+        batchTask == nil && !batchIsRunning && !batchBuckets.rows(.pending).isEmpty
     }
 
     func resumePendingBatchJobs() {
