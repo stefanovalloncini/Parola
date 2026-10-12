@@ -14,6 +14,7 @@ struct MacRecentlyDeletedView: View {
     @State private var rows: [LibraryRowDisplay] = []
     @State private var displayCache = LibraryRowDisplayCache()
     @State private var now = Date()
+    @State private var groups: [BucketGroup] = []
 
     private var selection: Set<LibraryEntry.ID> { model.recentlyDeletedSelection }
 
@@ -29,7 +30,7 @@ struct MacRecentlyDeletedView: View {
             Divider()
             if model.deletedEntries.isEmpty {
                 empty
-            } else if filtered.isEmpty {
+            } else if groups.isEmpty {
                 noMatches
             } else {
                 list
@@ -50,11 +51,14 @@ struct MacRecentlyDeletedView: View {
         .onChange(of: model.showAITitles) { recomputeRows() }
         // The one input that moves with the active library, which nothing else on this page watches.
         .onChange(of: model.usualLanguage) { recomputeRows() }
+        .onChange(of: searchText) { recomputeGroups() }
+        .onChange(of: categoryFilter) { recomputeGroups() }
+        .onChange(of: sortOption) { recomputeGroups() }
         .task(id: searchText.isEmpty ? "" : categoryFilter.rawValue) { await loadPreviewsForSearch() }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(DS.Color.surface)
         .toolbarSearch(text: $searchText, for: .recentlyDeleted)
-        .focusedSceneValue(\.pageListMenus, .recentlyDeleted(sort: $sortOption, kind: $categoryFilter))
+        .background(RecentlyDeletedListMenusPublisher(sort: $sortOption, kind: $categoryFilter))
         .confirmationDialog(
             "Delete permanently?",
             isPresented: isPurgingSingle
@@ -106,7 +110,7 @@ struct MacRecentlyDeletedView: View {
     private var list: some View {
         @Bindable var model = model
         return List(selection: $model.recentlyDeletedSelection) {
-            ForEach(sections) { group in
+            ForEach(groups) { group in
                 Section {
                     ForEach(group.rows) { row in
                         self.row(row)
@@ -130,12 +134,13 @@ struct MacRecentlyDeletedView: View {
         }
     }
 
-    private func row(_ display: LibraryRowDisplay) -> some View {
+    private func row(_ shown: ShownRow) -> some View {
+        let display = shown.display
         let entry = display.entry
         return RecentlyDeletedRow(
             display: display,
-            daysLeft: daysLeft(for: entry),
-            timeLeft: timeLeft(for: entry),
+            daysLeft: shown.daysLeft,
+            timeLeft: shown.timeLeft,
             isSelected: selection.contains(entry.id),
             onRestore: { restore([entry.id]) },
             onPurge: { confirmingPurge = entry.id }
@@ -193,14 +198,28 @@ struct MacRecentlyDeletedView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private var filtered: [LibraryRowDisplay] {
-        rows.filter { row in
+    private func recomputeGroups() {
+        let shown = sortedRows().map { display in
+            ShownRow(
+                display: display,
+                daysLeft: daysLeft(for: display.entry),
+                timeLeft: RecentlyDeletedCopy.timeLeftLabel(
+                    deletedAt: display.entry.deletedAt, now: now, retentionDays: AppModel.trashRetentionDays
+                )
+            )
+        }
+        guard sortOption.groupsByDate else {
+            groups = shown.isEmpty ? [] : [BucketGroup(bucket: nil, rows: shown)]
+            return
+        }
+        groups = RecentlyDeletedCopy.grouped(shown, daysLeft: \.daysLeft).map { BucketGroup(bucket: $0.bucket, rows: $0.items) }
+    }
+
+    private func sortedRows() -> [LibraryRowDisplay] {
+        let filtered = rows.filter { row in
             categoryFilter.matches(row.entry.category)
                 && RecentlyDeletedCopy.matches(query: searchText, title: row.title, preview: previews[row.id])
         }
-    }
-
-    private var sorted: [LibraryRowDisplay] {
         switch sortOption {
         case .recentlyDeleted:
             return filtered.sorted { lhs, rhs in
@@ -217,28 +236,21 @@ struct MacRecentlyDeletedView: View {
         }
     }
 
-    private var sections: [BucketGroup] {
-        guard sortOption.groupsByDate else { return [BucketGroup(bucket: nil, rows: sorted)] }
-        return RecentlyDeletedCopy.grouped(sorted) { daysLeft(for: $0.entry) }
-            .map { BucketGroup(bucket: $0.bucket, rows: $0.items) }
+    private struct ShownRow: Identifiable {
+        let display: LibraryRowDisplay
+        let daysLeft: Int?
+        let timeLeft: String
+        var id: String { display.id }
     }
 
     private struct BucketGroup: Identifiable {
         let bucket: RecentlyDeletedCopy.ExpiryBucket?
-        let rows: [LibraryRowDisplay]
+        let rows: [ShownRow]
         var id: String { bucket?.rawValue ?? "" }
     }
 
     private func daysLeft(for entry: LibraryEntry) -> Int? {
         RecentlyDeletedCopy.daysLeft(
-            deletedAt: entry.deletedAt,
-            now: now,
-            retentionDays: AppModel.trashRetentionDays
-        )
-    }
-
-    private func timeLeft(for entry: LibraryEntry) -> String {
-        RecentlyDeletedCopy.timeLeftLabel(
             deletedAt: entry.deletedAt,
             now: now,
             retentionDays: AppModel.trashRetentionDays
@@ -288,6 +300,7 @@ struct MacRecentlyDeletedView: View {
             )
         }
         displayCache = cache
+        recomputeGroups()
     }
 
     private var isPurgingSingle: Binding<Bool> {
@@ -302,5 +315,14 @@ struct MacRecentlyDeletedView: View {
             get: { !confirmingPurgeBulk.isEmpty },
             set: { if !$0 { confirmingPurgeBulk = [] } }
         )
+    }
+}
+
+struct RecentlyDeletedListMenusPublisher: View {
+    @Binding var sort: RecentlyDeletedSort
+    @Binding var kind: RecentlyDeletedCategoryFilter
+
+    var body: some View {
+        Color.clear.focusedSceneValue(\.pageListMenus, .recentlyDeleted(sort: $sort, kind: $kind))
     }
 }

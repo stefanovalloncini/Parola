@@ -211,7 +211,7 @@ struct PageCommandsTests {
         let deleted = try Self.source("Views/MacRecentlyDeletedView")
         let queue = try Self.source("Views/QueueView")
         #expect(library.contains(".background { LibraryListMenusPublisher(listShows: pageCount > 0) }"))
-        #expect(deleted.contains(".focusedSceneValue(\\.pageListMenus, .recentlyDeleted(sort: $sortOption, kind: $categoryFilter))"))
-        #expect(queue.contains(".focusedSceneValue(\\.pageListMenus, .queue(sort: $sortOption))"))
+        #expect(deleted.contains(".background(RecentlyDeletedListMenusPublisher(sort: $sortOption, kind: $categoryFilter))"))
+        #expect(queue.contains(".background(QueueListMenusPublisher(sort: $sortOption))"))
     }
 }

@@ -29,7 +29,7 @@ struct QueueView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(DS.Color.surface)
         .toolbarSearch(text: $searchText, for: .queue)
-        .focusedSceneValue(\.pageListMenus, .queue(sort: $sortOption))
+        .background(QueueListMenusPublisher(sort: $sortOption))
         .confirmationDialog(QueueCopy.cancelAllTitle(QueueCount.count(for: model.batchJobs)), isPresented: $confirmingCancelAll) {
             Button("Cancel All", role: .destructive) { model.cancelAllInFlightBatchJobs() }
             Button("Keep Transcribing", role: .cancel) {}
@@ -271,5 +271,13 @@ enum QueueCopy {
         count == 1
             ? String(localized: "Cancel 1 transcription?", bundle: bundle)
             : String(localized: "Cancel \(count) transcriptions?", bundle: bundle)
+    }
+}
+
+struct QueueListMenusPublisher: View {
+    @Binding var sort: QueueView.SortOption
+
+    var body: some View {
+        Color.clear.focusedSceneValue(\.pageListMenus, .queue(sort: $sort))
     }
 }
