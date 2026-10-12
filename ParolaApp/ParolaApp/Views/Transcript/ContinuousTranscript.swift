@@ -69,6 +69,7 @@ struct ContinuousChunks: View {
 
     var body: some View {
         LazyVStack(alignment: .leading, spacing: DS.Spacing.regular) {
+            let _ = BodyProbe.hit("ContinuousChunks")
             TranscriptTitleHeading()
             ForEach(chunks) { chunk in
                 chunkRow(chunk)
@@ -88,12 +89,16 @@ struct ContinuousChunks: View {
         .onAppear { rebuildChunks() }
         .onChange(of: model.transcriptVersion) { _, _ in rebuildChunks() }
         .onChange(of: model.favoritesOnly) { _, _ in rebuildChunks() }
-        .onChange(of: model.favoriteSegmentIDs) { _, _ in rebuildChunks() }
-        .onChange(of: model.currentSegmentID) { _, _ in
-            applyHighlight()
-            followCurrentSegment()
+        .onChange(of: model.selectedEntryFavorites) { _, _ in rebuildChunks() }
+        .background {
+            ChunkFollower(
+                moveHighlight: {
+                    applyHighlight()
+                    followCurrentSegment()
+                },
+                reveal: { await revealPendingSegment() }
+            )
         }
-        .task(id: model.pendingRevealSegmentID) { await revealPendingSegment() }
         .alert("Rename speaker", isPresented: isRenamingSpeaker, presenting: renamingSpeaker) { current in
             TextField("Name", text: $draftSpeakerName)
             Button("Cancel", role: .cancel) { renamingSpeaker = nil }
@@ -184,7 +189,7 @@ struct ContinuousChunks: View {
         let useSpeakerColor = model.transcriptSpeakers.count >= 2
         let speakerColorIndices = useSpeakerColor ? model.speakerColorIndices : [:]
         let favoritesOnly = model.favoritesOnly
-        let favorites = model.favoriteSegmentIDs
+        let favorites = model.selectedEntryFavorites
         let segments = favoritesOnly ? transcript.segments.filter { favorites.contains($0.id) } : transcript.segments
         let translations = transcript.translation?.segments ?? [:]
         // transcriptVersion also bumps for mutations that can't change the rendered text
@@ -502,5 +507,20 @@ private struct ChunkSpeakerAssignment: ViewModifier {
         } else {
             content
         }
+    }
+}
+
+/// Reads the playhead so the chunk list's own body doesn't; the highlight moves and the scroll follows from here.
+private struct ChunkFollower: View {
+    let moveHighlight: () -> Void
+    let reveal: () async -> Void
+
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        Color.clear
+            .frame(width: 0, height: 0)
+            .onChange(of: model.currentSegmentID) { _, _ in moveHighlight() }
+            .task(id: model.pendingRevealSegmentID) { await reveal() }
     }
 }

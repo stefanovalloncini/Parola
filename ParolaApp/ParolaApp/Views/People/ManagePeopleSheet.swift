@@ -148,13 +148,10 @@ struct PeopleDirectoryList: View {
                     renaming = person
                 }
                 .axLeaf("People.MenuItem.Rename.\(person.name)")
-                Menu("Merge Into") {
-                    ForEach(people.filter { $0.id != person.id }) { target in
-                        Button(target.name) { merging = MergePair(source: person, target: target) }
-                            .axLeaf("People.MenuItem.MergeInto.\(target.name)")
-                    }
+                MergeIntoMenu(person: person, people: people) { target in
+                    merging = MergePair(source: person, target: target)
                 }
-                .disabled(people.count < 2)
+                .equatable()
                 Toggle("This Is Me", isOn: isMe(person))
                     .axLeaf("People.MenuItem.ThisIsMe.\(person.name)")
                 Divider()
@@ -247,5 +244,25 @@ struct PeopleDirectoryList: View {
 
     private var isDeleting: Binding<Bool> {
         Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } })
+    }
+}
+
+private struct MergeIntoMenu: View, Equatable {
+    let person: Person
+    let people: [Person]
+    let merge: (Person) -> Void
+
+    nonisolated static func == (lhs: MergeIntoMenu, rhs: MergeIntoMenu) -> Bool {
+        lhs.person == rhs.person && lhs.people == rhs.people
+    }
+
+    var body: some View {
+        Menu("Merge Into") {
+            ForEach(people.filter { $0.id != person.id }) { target in
+                Button(target.name) { merge(target) }
+                    .axLeaf("People.MenuItem.MergeInto.\(target.name)")
+            }
+        }
+        .disabled(people.count < 2)
     }
 }

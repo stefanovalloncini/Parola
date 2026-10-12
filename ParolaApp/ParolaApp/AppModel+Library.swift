@@ -461,20 +461,13 @@ extension AppModel {
     }
 
     func currentSegmentNote(for segmentID: Int) -> String? {
-        guard let id = selectedEntryID, let entry = libraryEntry(id: id) else { return nil }
-        return entry.note(forSegment: segmentID)
+        selectedEntryNotes[String(segmentID)]
     }
 
-    var favoriteSegmentIDs: Set<Int> {
-        guard let id = selectedEntryID, let entry = libraryEntry(id: id) else { return [] }
-        return entry.favoriteSegments
-    }
+    var favoriteSegmentIDs: Set<Int> { selectedEntryFavorites }
 
-    /// Reads the stored array: `favoriteSegmentIDs` builds a `Set` per call, and the cards ask this
-    /// several times a row.
     func isSegmentFavorite(_ id: Int) -> Bool {
-        guard let entryID = selectedEntryID, let entry = libraryEntry(id: entryID) else { return false }
-        return entry.manifest.favoriteSegments.contains(id)
+        selectedEntryFavorites.contains(id)
     }
 
     /// The single write path for a segment's favorite, shared by the UI toggle and the bridge; nil means no entry is selected.

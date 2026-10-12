@@ -65,16 +65,6 @@ extension AppModel {
         return people.first { Person.normalizedName($0.name) == key }
     }
 
-    /// The directory in the order every list shows it: most assigned, then most recently used.
-    var peopleByUse: [Person] {
-        let counts = personUsageCounts
-        return people.sorted {
-            let left = counts[$0.id] ?? 0
-            let right = counts[$1.id] ?? 0
-            return left == right ? $0.lastUsedAt > $1.lastUsedAt : left > right
-        }
-    }
-
     /// The labels that stand for this person right now, rather than every assignment ever made.
     func usageCount(of person: Person) -> Int {
         personUsageCounts[person.id] ?? 0
@@ -113,9 +103,10 @@ extension AppModel {
 
     /// A people menu's first `limit` by use, and everyone past them by name, so no one drops off a long directory.
     func personMenuChoices(excluding names: Set<String> = [], limit: Int) -> (top: [Person], more: [Person]) {
-        let offered = peopleByUse.filter { !names.contains($0.name) }
-        let more = offered.dropFirst(limit).sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
-        return (Array(offered.prefix(limit)), more)
+        let top = Array(peopleByUse.lazy.filter { !names.contains($0.name) }.prefix(limit))
+        let topIDs = Set(top.map(\.id))
+        let more = peopleByName.filter { !names.contains($0.name) && !topIDs.contains($0.id) }
+        return (top, more)
     }
 
     /// A segment's speaker menu: this transcript's speakers, then the people who aren't one of them.
@@ -125,10 +116,7 @@ extension AppModel {
     }
 
     /// The open entry's speaker map. A transcript that isn't in the library carries none.
-    var speakerAssignments: [String: UUID] {
-        guard let id = selectedEntryID else { return [:] }
-        return libraryEntry(id: id)?.speakerAssignments ?? [:]
-    }
+    var speakerAssignments: [String: UUID] { selectedEntrySpeakerAssignments }
 
     func person(forSpeaker label: String) -> Person? {
         guard let id = speakerAssignments[label] else { return nil }

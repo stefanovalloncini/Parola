@@ -3,6 +3,7 @@ import ParolaCore
 
 struct SegmentCard: View {
     let segment: TranscriptSegment
+    var isCurrent: Bool = false
     var hoveredSpeaker: Binding<String?> = .constant(nil)
     var confidenceBucket: SegmentConfidence.Bucket? = nil
     var qcIssues: [SubtitleQC.Issue] = []
@@ -24,11 +25,10 @@ struct SegmentCard: View {
 
     private let radius: CGFloat = DS.Radius.regular
 
-    /// Read here rather than passed in: the scroll's ForEach would otherwise re-walk every segment on each playback tick.
-    private var isCurrent: Bool { model.currentSegmentID == segment.id }
     private var isEditing: Bool { inlineEdit.isEditing }
 
     var body: some View {
+        BodyProbe.hit("SegmentCard")
         // Read once: the star shows in the meta cluster, the action strip and the ••• menu.
         let isFavorite = model.isSegmentFavorite(segment.id)
         return VStack(alignment: .leading, spacing: DS.Spacing.small) {
@@ -300,7 +300,7 @@ struct SegmentCard: View {
                 .lineSpacing(DS.Spacing.transcriptLeading)
                 .textSelection(.enabled)
         } else if showsWordKaraoke, let words = segment.words {
-            karaoke(words: words)
+            WordKaraoke(words: words)
                 .font(DS.Font.transcript)
                 .lineSpacing(DS.Spacing.transcriptLeading)
                 .textSelection(.enabled)
@@ -537,36 +537,9 @@ struct SegmentCard: View {
 
     /// The ••• menu carries it too: a right-click over selectable text can land on the system editing menu instead.
     private var assignSegmentMenu: some View {
-        let choices = model.segmentSpeakerChoices(peopleLimit: 10)
-        return Menu("Assign This Segment to") {
-            ForEach(choices.speakers, id: \.self) { name in
-                Button {
-                    model.assignSpeaker(name, toSegmentID: segment.id)
-                } label: {
-                    if name == segment.speaker {
-                        Label(name, systemImage: "checkmark")
-                    } else {
-                        Text(name)
-                    }
-                }
-                .axLeaf("Card.MenuItem.AssignSpeaker.\(name)")
-            }
-            if !choices.speakers.isEmpty { Divider() }
-            ForEach(choices.people.top) { person in
-                Button(person.name) { model.assignSpeaker(person.name, toSegmentID: segment.id) }
-                    .axLeaf("Card.MenuItem.AssignPerson.\(person.name)")
-            }
-            MorePeopleMenu(people: choices.people.more) { model.assignSpeaker($0.name, toSegmentID: segment.id) }
-            Button("New Person…") {
-                draftAssignSpeakerName = ""
-                assigningSpeaker = true
-            }
-            .axLeaf("Card.MenuItem.AssignNewPerson")
-            if segment.speaker != nil {
-                Divider()
-                Button("No Speaker") { model.assignSpeaker(nil, toSegmentID: segment.id) }
-                    .axLeaf("Card.MenuItem.NoSpeaker")
-            }
+        SegmentAssignMenu(segment: segment) {
+            draftAssignSpeakerName = ""
+            assigningSpeaker = true
         }
     }
 
@@ -644,10 +617,6 @@ struct SegmentCard: View {
             matches: segmentMatches,
             currentMatchID: model.currentMatch?.id
         ))
-    }
-
-    private func karaoke(words: [WordTiming]) -> Text {
-        Text(Self.karaokeText(words: words, activeWordID: model.currentWordID))
     }
 
     static func karaokeText(words: [WordTiming], activeWordID: WordTiming.ID?) -> AttributedString {
@@ -747,5 +716,76 @@ private struct SyntheticKaraokeLine: View, Equatable {
 
     var body: some View {
         Text(SegmentCard.syntheticKaraokeText(tokens: tokens, spokenIndex: spokenIndex))
+    }
+}
+
+extension SegmentCard: Equatable {
+    nonisolated static func == (lhs: SegmentCard, rhs: SegmentCard) -> Bool {
+        lhs.segment == rhs.segment
+            && lhs.isCurrent == rhs.isCurrent
+            && lhs.confidenceBucket == rhs.confidenceBucket
+            && lhs.qcIssues == rhs.qcIssues
+            && lhs.translation == rhs.translation
+            && lhs.translationSideBySide == rhs.translationSideBySide
+    }
+}
+
+/// Its own view so the people lists are read when the menu is built, not on every pass of the card.
+private struct SegmentAssignMenu: View {
+    let segment: TranscriptSegment
+    let onNewPerson: () -> Void
+
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        let choices = model.segmentSpeakerChoices(peopleLimit: 10)
+        Menu("Assign This Segment to") {
+            ForEach(choices.speakers, id: \.self) { name in
+                Button {
+                    model.assignSpeaker(name, toSegmentID: segment.id)
+                } label: {
+                    if name == segment.speaker {
+                        Label(name, systemImage: "checkmark")
+                    } else {
+                        Text(name)
+                    }
+                }
+                .axLeaf("Card.MenuItem.AssignSpeaker.\(name)")
+            }
+            if !choices.speakers.isEmpty { Divider() }
+            ForEach(choices.people.top) { person in
+                Button(person.name) { model.assignSpeaker(person.name, toSegmentID: segment.id) }
+                    .axLeaf("Card.MenuItem.AssignPerson.\(person.name)")
+            }
+            MorePeopleMenu(people: choices.people.more) { model.assignSpeaker($0.name, toSegmentID: segment.id) }
+            Button("New Person…", action: onNewPerson)
+                .axLeaf("Card.MenuItem.AssignNewPerson")
+            if segment.speaker != nil {
+                Divider()
+                Button("No Speaker") { model.assignSpeaker(nil, toSegmentID: segment.id) }
+                    .axLeaf("Card.MenuItem.NoSpeaker")
+            }
+        }
+    }
+}
+
+/// Owns the current word so the card doesn't re-render for every word spoken.
+private struct WordKaraoke: View {
+    let words: [WordTiming]
+
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        WordKaraokeLine(words: words, activeWordID: model.currentWordID)
+            .equatable()
+    }
+}
+
+private struct WordKaraokeLine: View, Equatable {
+    let words: [WordTiming]
+    let activeWordID: WordTiming.ID?
+
+    var body: some View {
+        Text(SegmentCard.karaokeText(words: words, activeWordID: activeWordID))
     }
 }

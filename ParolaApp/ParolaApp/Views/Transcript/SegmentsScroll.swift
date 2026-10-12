@@ -24,7 +24,6 @@ struct SegmentsScroll: View {
     }
 
     @Environment(AppModel.self) private var model
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var hoveredSpeaker: String?
     @State private var derived = Derived()
     @State private var qcByID: [Int: [SubtitleQC.Issue]] = [:]
@@ -54,6 +53,7 @@ struct SegmentsScroll: View {
 
     var body: some View {
         ScrollViewReader { proxy in
+            let _ = BodyProbe.hit("SegmentsScroll")
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: DS.Spacing.small) {
                     if model.transcript != nil {
@@ -65,7 +65,7 @@ struct SegmentsScroll: View {
                                 .padding(.bottom, DS.Spacing.tight)
                         }
                         ForEach(derived.visible) { seg in
-                            SegmentCard(
+                            CurrentSegmentCard(
                                 segment: seg,
                                 hoveredSpeaker: $hoveredSpeaker,
                                 confidenceBucket: derived.confidenceByID[seg.id],
@@ -86,24 +86,19 @@ struct SegmentsScroll: View {
                 .padding(.vertical, DS.Spacing.regular)
                 .frame(maxWidth: .infinity)
             }
-            .onChange(of: model.currentSegmentID) { _, id in
-                guard let id, model.player?.timeControlStatus == .playing || model.findIsOpen else { return }
-                withAnimation(DS.Motion.follow(reduceMotion: reduceMotion)) {
-                    proxy.scrollTo(id, anchor: .center)
+            .background {
+                PlaybackFollower(proxy: proxy, speakerFilter: speakerFilterBinding) { id in
+                    derived.visible.contains { $0.id == id }
                 }
             }
             .onChange(of: speakerFilter) { _, newValue in
                 if newValue != nil, model.findIsOpen { model.toggleFind() }
-            }
-            .onChange(of: model.findIsOpen) { _, isOpen in
-                if isOpen { speakerFilterBinding.wrappedValue = nil }
             }
             .onChange(of: model.transcriptSpeakers) { _, speakers in
                 if let current = speakerFilter, !speakers.contains(current) {
                     speakerFilterBinding.wrappedValue = nil
                 }
             }
-            .task(id: model.pendingRevealSegmentID) { await revealPendingSegment(proxy) }
             // Synchronous so a short transcript commits in the same pass the key changed in, not a frame later.
             .onChange(of: derivedKey, initial: true) { _, key in recomputeDerived(for: key) }
             .onChange(of: qcKey, initial: true) { _, key in recomputeQC(for: key) }
@@ -122,7 +117,7 @@ struct SegmentsScroll: View {
             favoritesOnly: model.favoritesOnly,
             // With the filter off the set cannot change the result, and carrying it would re-derive
             // the whole transcript on every star click.
-            favorites: model.favoritesOnly ? model.favoriteSegmentIDs : []
+            favorites: model.favoritesOnly ? model.selectedEntryFavorites : []
         )
     }
 
@@ -133,21 +128,6 @@ struct SegmentsScroll: View {
             enabled: model.showSubtitleQC,
             captionLength: model.subtitleCaptionLength
         )
-    }
-
-    /// A search result writes its segment before this view is built, so the jump is read here rather
-    /// than watched on `currentSegmentID`; the row it names exists only once the derive lands, which
-    /// is a detached hop for a long transcript.
-    private func revealPendingSegment(_ proxy: ScrollViewProxy) async {
-        guard let id = model.pendingRevealSegmentID else { return }
-        for _ in 0..<30 {
-            try? await Task.sleep(for: .milliseconds(16))
-            if derived.visible.contains(where: { $0.id == id }) { break }
-        }
-        guard derived.visible.contains(where: { $0.id == id }) else { return }
-        withAnimation(DS.Motion.follow(reduceMotion: reduceMotion)) {
-            proxy.scrollTo(id, anchor: .center)
-        }
     }
 
     private func recomputeDerived(for key: DerivedKey) {
@@ -240,5 +220,70 @@ struct SegmentsScroll: View {
     private func opacity(for segment: TranscriptSegment) -> Double {
         guard let hoveredSpeaker else { return 1.0 }
         return segment.speaker == hoveredSpeaker ? 1.0 : 0.35
+    }
+}
+
+/// Reads the playhead so the scroll's own body doesn't: the cards re-run only for the one segment that changes.
+private struct CurrentSegmentCard: View {
+    let segment: TranscriptSegment
+    let hoveredSpeaker: Binding<String?>
+    let confidenceBucket: SegmentConfidence.Bucket?
+    let qcIssues: [SubtitleQC.Issue]
+    let translation: String?
+    let translationSideBySide: Bool
+
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        SegmentCard(
+            segment: segment,
+            isCurrent: model.currentSegmentID == segment.id,
+            hoveredSpeaker: hoveredSpeaker,
+            confidenceBucket: confidenceBucket,
+            qcIssues: qcIssues,
+            translation: translation,
+            translationSideBySide: translationSideBySide
+        )
+        .equatable()
+    }
+}
+
+/// Scrolls to the playing segment and to a search hit; a zero-size view so these reads leave the scroll's body alone.
+private struct PlaybackFollower: View {
+    let proxy: ScrollViewProxy
+    let speakerFilter: Binding<String?>
+    let isShown: (TranscriptSegment.ID) -> Bool
+
+    @Environment(AppModel.self) private var model
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        Color.clear
+            .frame(width: 0, height: 0)
+            .onChange(of: model.currentSegmentID) { _, id in
+                guard let id, model.player?.timeControlStatus == .playing || model.findIsOpen else { return }
+                withAnimation(DS.Motion.follow(reduceMotion: reduceMotion)) {
+                    proxy.scrollTo(id, anchor: .center)
+                }
+            }
+            .onChange(of: model.findIsOpen) { _, isOpen in
+                if isOpen { speakerFilter.wrappedValue = nil }
+            }
+            .task(id: model.pendingRevealSegmentID) { await revealPendingSegment() }
+    }
+
+    /// A search result writes its segment before this view is built, so the jump is read here rather
+    /// than watched on `currentSegmentID`; the row it names exists only once the derive lands, which
+    /// is a detached hop for a long transcript.
+    private func revealPendingSegment() async {
+        guard let id = model.pendingRevealSegmentID else { return }
+        for _ in 0..<30 {
+            try? await Task.sleep(for: .milliseconds(16))
+            if isShown(id) { break }
+        }
+        guard isShown(id) else { return }
+        withAnimation(DS.Motion.follow(reduceMotion: reduceMotion)) {
+            proxy.scrollTo(id, anchor: .center)
+        }
     }
 }

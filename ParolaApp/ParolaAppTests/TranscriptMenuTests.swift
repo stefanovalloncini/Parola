@@ -58,9 +58,9 @@ struct TranscriptMenuTests {
     func oneSpeakerMenuPerSegment() throws {
         let card = try source("Views/Transcript/SegmentCard")
         #expect(card.components(separatedBy: "Menu(\"").count == 2, "one titled submenu: the speaker menu")
-        #expect(card.contains(#"return Menu("Assign This Segment to")"#))
+        #expect(card.contains(#"Menu("Assign This Segment to")"#))
         #expect(card.components(separatedBy: "assignSegmentMenu").count == 6)
-        #expect(card.contains(#"Button("New Person…")"#))
+        #expect(card.contains(#"Button("New Person…", action: onNewPerson)"#))
         #expect(card.contains(#"Button("No Speaker") { model.assignSpeaker(nil, toSegmentID: segment.id) }"#))
         let inspector = try source("Views/Transcript/OverviewPeople")
         #expect(inspector.contains(#"Button("No Speaker") { Task { await model.clearSpeaker(label: label) } }"#))

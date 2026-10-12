@@ -967,7 +967,29 @@ final class AppModel {
     /// What the directory asks first when it opens: set from a sidebar person's menu, taken by the sheet.
     var peopleSheetRequest: PeopleSheetRequest?
     /// The people directory, mirrored from the store so views read it without awaiting the actor.
-    var people: [Person] = []
+    var people: [Person] = [] {
+        didSet { rebuildPeopleOrder() }
+    }
+    /// The directory in the order every list shows it: most assigned, then most recently used.
+    private(set) var peopleByUse: [Person] = []
+    @ObservationIgnored private(set) var peopleByName: [Person] = []
+#if DEBUG
+    @ObservationIgnored private(set) var peopleOrderBuilds = 0
+#endif
+
+    private func rebuildPeopleOrder() {
+#if DEBUG
+        peopleOrderBuilds &+= 1
+#endif
+        let counts = personUsageCounts
+        let byUse = people.sorted {
+            let left = counts[$0.id] ?? 0
+            let right = counts[$1.id] ?? 0
+            return left == right ? $0.lastUsedAt > $1.lastUsedAt : left > right
+        }
+        if byUse != peopleByUse { peopleByUse = byUse }
+        peopleByName = people.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+    }
     /// Which person the library list is filtered to, set from the sidebar, the filter bar or the bridge.
     var personFilter: UUID?
     /// Bumped when a sidebar pick opens nothing; @Observable skips the same-value writes such a pick makes, so this makes the list look again.
@@ -1624,7 +1646,7 @@ final class AppModel {
             if usual != usualLanguage { usualLanguage = usual }
             let recent = LanguageChoices.recent(in: libraryEntries)
             if recent != recentLanguages { recentLanguages = recent }
-            updateSelectedEntryHasFavorites()
+            updateSelectedEntryMirrors()
         }
     }
     /// The language most of the library is in, as a code; a row names its own language only when it differs.
@@ -1632,7 +1654,9 @@ final class AppModel {
     /// The library's last few languages, newest first, for the language pickers to lead with.
     private(set) var recentLanguages: [String] = []
     /// How many speaker labels across the library stand for each person. Read off the maps, so an assignment an undo takes back stops counting.
-    private(set) var personUsageCounts: [UUID: Int] = [:]
+    private(set) var personUsageCounts: [UUID: Int] = [:] {
+        didSet { rebuildPeopleOrder() }
+    }
     /// How many transcripts stand for each person, for the sidebar's badges.
     private(set) var personTranscriptCounts: [UUID: Int] = [:]
     /// The sidebar's counts, set only when one moves, so a rename or an open repaints no badge.
@@ -1717,12 +1741,16 @@ final class AppModel {
         didSet {
             guard oldValue != selectedEntryID else { return }
             transcriptPaneMode = .transcript
-            updateSelectedEntryHasFavorites()
+            updateSelectedEntryMirrors()
             dropTakeSavedOnceLeft()
         }
     }
     /// The menus read this rather than `favoriteSegmentIDs`, which would tie them to every library write.
     private(set) var selectedEntryHasFavorites = false
+    /// The open entry's favorites, notes and speaker map, copied out of the library so a card reads them without tying itself to every library write.
+    private(set) var selectedEntryFavorites: Set<Int> = []
+    private(set) var selectedEntryNotes: [String: String] = [:]
+    private(set) var selectedEntrySpeakerAssignments: [String: UUID] = [:]
 
     // MARK: - Transcript windows
 
@@ -1744,10 +1772,15 @@ final class AppModel {
         libraryEntriesByID = Dictionary(uniqueKeysWithValues: libraryEntries.map { ($0.id, $0) })
     }
 
-    private func updateSelectedEntryHasFavorites() {
-        let hasFavorites = selectedEntryID
-            .flatMap { libraryEntriesByID[$0] }
-            .map { !$0.manifest.favoriteSegments.isEmpty } ?? false
+    private func updateSelectedEntryMirrors() {
+        let manifest = selectedEntryID.flatMap { libraryEntriesByID[$0] }?.manifest
+        let favorites = Set(manifest?.favoriteSegments ?? [])
+        if selectedEntryFavorites != favorites { selectedEntryFavorites = favorites }
+        let notes = manifest?.segmentNotes ?? [:]
+        if selectedEntryNotes != notes { selectedEntryNotes = notes }
+        let assignments = manifest?.speakerAssignments ?? [:]
+        if selectedEntrySpeakerAssignments != assignments { selectedEntrySpeakerAssignments = assignments }
+        let hasFavorites = !favorites.isEmpty
         if selectedEntryHasFavorites != hasFavorites { selectedEntryHasFavorites = hasFavorites }
     }
 
