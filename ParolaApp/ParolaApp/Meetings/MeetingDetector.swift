@@ -67,6 +67,8 @@ final class MeetingDetector {
     }
 
     private func startObserving() {
+        defer { if let display = runningApps().sorted().first { fire(appName: display) } }
+        guard !TestHostSandbox.isTestHost(ProcessInfo.processInfo.environment) else { return }
         let center = NSWorkspace.shared.notificationCenter
         for name in [NSWorkspace.didLaunchApplicationNotification, NSWorkspace.didActivateApplicationNotification] {
             let isLaunch = name == NSWorkspace.didLaunchApplicationNotification
@@ -94,7 +96,6 @@ final class MeetingDetector {
             Task { @MainActor in self?.quit(appName: display) }
         }
         observerTokens.append(quitToken)
-        if let display = runningApps().sorted().first { fire(appName: display) }
     }
 
     func fire(appName: String) {
