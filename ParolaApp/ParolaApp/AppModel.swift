@@ -993,6 +993,9 @@ final class AppModel {
     /// The person renames in flight, run in order so a quick undo and redo never interleave their rewrites.
     @ObservationIgnored var personRenameTask: Task<Void, Never>?
     @ObservationIgnored var personRenameCascadeHook: (@MainActor () async -> Void)?
+    @ObservationIgnored var speakerAssignmentWriteHook: (@MainActor () async -> Void)?
+    /// The newest speaker-map write queued per entry; an older write that lands after it must not patch the list.
+    @ObservationIgnored var speakerAssignmentWriteSerials: [LibraryEntry.ID: Int] = [:]
 
     // MARK: - Prompt library
 

@@ -474,14 +474,19 @@ extension AppModel {
         _ transform: @escaping @Sendable (inout [String: UUID]) -> Void
     ) {
         let previous = speakerAssignmentWriteTask
+        let serial = (speakerAssignmentWriteSerials[entryID] ?? 0) &+ 1
+        speakerAssignmentWriteSerials[entryID] = serial
         speakerAssignmentWriteTask = Task { [library] in
             await previous?.value
             do {
                 let updated = try await library.mutateSpeakerAssignments(for: entryID, transform)
-                patchLibraryEntry(id: entryID) { $0.speakerAssignments = updated }
+                if speakerAssignmentWriteSerials[entryID] == serial {
+                    patchLibraryEntry(id: entryID) { $0.speakerAssignments = updated }
+                }
             } catch {
                 ParolaLog.error(.library, "speaker assignments not written", Self.entryFields(entryID, error))
             }
+            await speakerAssignmentWriteHook?()
         }
     }
 

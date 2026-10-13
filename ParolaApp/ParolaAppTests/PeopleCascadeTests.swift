@@ -105,6 +105,42 @@ struct PeopleCascadeTests {
         #expect(model.people.map(\.name) == ["Ada"])
     }
 
+    @MainActor
+    private final class FirstWrite {
+        var landed = false
+    }
+
+    @Test("a cascade that reads the listing between two undo writes can't re-add the cleared assignment")
+    func cascadeReadingStaleListingAfterDoubleUndo() async throws {
+        let model = PeopleTestSupport.makeModel("cascadestale")
+        let entry = try await PeopleTestSupport.openSeededEntry(model)
+        let undo = UndoManager()
+        undo.groupsByEvent = false
+        model.undoManager = undo
+        await model.assignSpeaker(label: "SPEAKER_00", toNewPersonNamed: "Ada")
+        let ada = try #require(model.person(forSpeaker: "Ada"))
+        await model.renamePerson(ada.id, to: "Ada Lovelace")
+
+        let firstWrite = FirstWrite()
+        model.personRenameCascadeHook = { [unowned model] in
+            model.personRenameCascadeHook = nil
+            await waitUntil { firstWrite.landed }
+        }
+        model.speakerAssignmentWriteHook = { [unowned model] in
+            model.speakerAssignmentWriteHook = nil
+            firstWrite.landed = true
+            await waitUntil { model.people.map(\.name) == ["Ada"] }
+        }
+        undo.undo()
+        undo.undo()
+        await model.awaitSpeakerAssignmentWrites()
+        await model.personRenameTask?.value
+        await model.awaitSpeakerAssignmentWrites()
+
+        #expect(model.speakerAssignments.isEmpty)
+        #expect(try await model.library.load(entry.id).entry.speakerAssignments.isEmpty)
+    }
+
     @Test("undoing a rename puts an entry back under the label it carried, even when entries differed")
     func undoRestoresEachEntrysOwnLabel() async throws {
         let (model, _, other) = try await makeTwoAssignedEntries("cascadelabels")
