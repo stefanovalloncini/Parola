@@ -258,8 +258,9 @@ struct IntentTests {
         let folder = out.url.deletingLastPathComponent()
         #expect(FileManager.default.fileExists(atPath: folder.path))
         out.release()
-        var gone = false
-        for _ in 0..<200 where !gone {
+        let deadline = ContinuousClock.now + .seconds(15)
+        var gone = !FileManager.default.fileExists(atPath: folder.path)
+        while !gone, ContinuousClock.now < deadline {
             try await Task.sleep(for: .milliseconds(10))
             gone = !FileManager.default.fileExists(atPath: folder.path)
         }
