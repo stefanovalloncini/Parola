@@ -22,13 +22,9 @@ extension ScenarioSuite {
             defer { try? FileManager.default.removeItem(at: audioURL) }
             _ = try await client.send("transcribeFile", ["path": audioURL.path])
 
-            var reachedFailed = false
-            for _ in 0..<30 {
-                if try await client.send("getState")["phase"]?.stringValue == "failed" {
-                    reachedFailed = true; break
-                }
-                try await Task.sleep(for: .milliseconds(100))
-            }
+            let reachedFailed = try await ScenarioSuite.poll {
+                try await client.send("getState")["phase"]?.stringValue == "failed" ? true : nil
+            } ?? false
             #expect(reachedFailed, "precondition: app never reached the failed phase")
 
             _ = try await client.send("resetTestState")
@@ -60,13 +56,11 @@ extension ScenarioSuite {
             _ = try await client.send("waitForPhase", ["phase": "ready", "timeoutMs": 15000])
 
             // The entry persists asynchronously after `ready`; poll until it is selected.
-            var selectedBefore = ""
-            for _ in 0..<20 {
+            let selectedBefore = try await ScenarioSuite.poll { () async throws -> String? in
                 let loaded = try await client.send("waitForTranscriptLoaded", ["timeoutMs": 200])
-                selectedBefore = loaded["observed"]?["selectedEntryID"]?.stringValue ?? ""
-                if !selectedBefore.isEmpty { break }
-                try await Task.sleep(for: .milliseconds(100))
-            }
+                let id = loaded["observed"]?["selectedEntryID"]?.stringValue ?? ""
+                return id.isEmpty ? nil : id
+            } ?? ""
             #expect(!selectedBefore.isEmpty, "precondition: an entry should be selected after a transcribe")
 
             _ = try await client.send("resetTestState")

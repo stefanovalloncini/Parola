@@ -26,14 +26,8 @@ extension ScenarioSuite {
             let firstRun = try await client.send("waitForPhase", ["phase": "ready", "timeoutMs": 20000])
             #expect(firstRun["matched"]?.boolValue == true)
 
-            var firstEntryID: String?
-            for _ in 0..<40 {
-                let entries = try await client.send("listEntries", ["limit": 10])
-                if let first = entries.arrayValue?.first, let id = first["id"]?.stringValue {
-                    firstEntryID = id
-                    break
-                }
-                try await Task.sleep(for: .milliseconds(100))
+            let firstEntryID = try await ScenarioSuite.poll {
+                try await client.send("listEntries", ["limit": 10]).arrayValue?.first?["id"]?.stringValue
             }
             let existingID = try #require(firstEntryID, "the first run never reached the library")
 
@@ -66,12 +60,12 @@ extension ScenarioSuite {
             let secondRun = try await client.send("waitForPhase", ["phase": "ready", "timeoutMs": 20000])
             #expect(secondRun["matched"]?.boolValue == true)
 
-            var entries: [JSONValue] = []
-            for _ in 0..<40 {
-                entries = (try await client.send("listEntries", ["limit": 10])).arrayValue ?? []
-                if entries.count == 2 { break }
-                try await Task.sleep(for: .milliseconds(100))
+            let listed = try await ScenarioSuite.poll { () async throws -> [JSONValue]? in
+                let entries = try await client.send("listEntries", ["limit": 10]).arrayValue ?? []
+                return entries.count == 2 ? entries : nil
             }
+            let latest = try await client.send("listEntries", ["limit": 10]).arrayValue ?? []
+            let entries = listed ?? latest
             #expect(entries.count == 2, "Transcribe Again must write a second bundle")
             let models = Set(entries.compactMap { $0["modelName"]?.stringValue })
             #expect(models == ["openai_whisper-tiny", "apple-speech-analyzer"])

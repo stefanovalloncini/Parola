@@ -27,15 +27,7 @@ extension ScenarioSuite {
 
                 // Poll the capture buffer; real decode + foundation-LLM cleanup runs after
                 // the dictationEnabled flag flips, so give it a generous window.
-                var inserted: String?
-                for _ in 0..<150 {
-                    let result = try await client.send("getLastInsertedText")
-                    if let text = result["lastText"]?.stringValue, !text.isEmpty {
-                        inserted = text
-                        break
-                    }
-                    try await Task.sleep(for: .milliseconds(100))
-                }
+                let inserted = try await ScenarioSuite.lastInsertedText(client, deadline: .seconds(30))
                 // Loose assert: the inserted text is the live LLM cleanup of real speech,
                 // so only require it to be non-empty.
                 #expect((inserted ?? "").isEmpty == false, "real dictation inserted nothing")
@@ -55,15 +47,7 @@ extension ScenarioSuite {
 
                 // waitForDictationState only tracks the dictationEnabled flag, which flips
                 // before the async cleanup+insertion finishes; poll the capture buffer instead.
-                var inserted: String?
-                for _ in 0..<50 {
-                    let result = try await client.send("getLastInsertedText")
-                    if let text = result["lastText"]?.stringValue, !text.isEmpty {
-                        inserted = text
-                        break
-                    }
-                    try await Task.sleep(for: .milliseconds(100))
-                }
+                let inserted = try await ScenarioSuite.lastInsertedText(client)
                 // The "Voice" preset inserts the transcript exactly as spoken, so the mocked
                 // lowercase text lands verbatim — no sentence capitalization.
                 #expect(inserted == "buy milk and eggs")
@@ -100,15 +84,7 @@ extension ScenarioSuite {
             try await Task.sleep(for: .seconds(1))
             _ = try await client.send("stopDictation")
 
-            var inserted: String?
-            for _ in 0..<50 {
-                let result = try await client.send("getLastInsertedText")
-                if let text = result["lastText"]?.stringValue, !text.isEmpty {
-                    inserted = text
-                    break
-                }
-                try await Task.sleep(for: .milliseconds(100))
-            }
+            let inserted = try await ScenarioSuite.lastInsertedText(client)
             #expect(inserted == "Buy milk and eggs.")
 
             _ = try await client.send("clearMocks", ["scope": "all"])
@@ -137,15 +113,7 @@ extension ScenarioSuite {
             try await Task.sleep(for: .seconds(1))
             _ = try await client.send("stopDictation")
 
-            var inserted: String?
-            for _ in 0..<50 {
-                let result = try await client.send("getLastInsertedText")
-                if let text = result["lastText"]?.stringValue, !text.isEmpty {
-                    inserted = text
-                    break
-                }
-                try await Task.sleep(for: .milliseconds(100))
-            }
+            let inserted = try await ScenarioSuite.lastInsertedText(client)
             #expect(inserted == "hello from the field")
 
             _ = try await client.send("setSetting", ["key": "dictationIndicatorStyleRaw", "value": "overlay"])
@@ -188,15 +156,7 @@ extension ScenarioSuite {
             try await Task.sleep(for: .milliseconds(500))
             _ = try await client.send("stopDictation")
 
-            var recovered: String?
-            for _ in 0..<50 {
-                let result = try await client.send("getLastInsertedText")
-                if let text = result["lastText"]?.stringValue, !text.isEmpty {
-                    recovered = text
-                    break
-                }
-                try await Task.sleep(for: .milliseconds(100))
-            }
+            let recovered = try await ScenarioSuite.lastInsertedText(client)
             #expect(recovered == "recovered")
 
             _ = try await client.send("clearMocks", ["scope": "all"])

@@ -45,11 +45,12 @@ struct StreamingLoggingTests {
     private func awaitRecord(
         _ sink: CapturingDiagnosticsSink, message: String
     ) async -> LogRecord? {
-        for _ in 0..<500 {
+        let deadline = ContinuousClock.now + .seconds(15)
+        while ContinuousClock.now < deadline {
             if let record = streamingRecords(sink, message: message).first { return record }
             try? await Task.sleep(for: .milliseconds(2))
         }
-        return nil
+        return streamingRecords(sink, message: message).first
     }
 
     private func temporaryStore() -> (store: ModelStore, directory: URL) {

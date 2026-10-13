@@ -40,11 +40,7 @@ extension ScenarioSuite {
 
                 // performExport writes the file in a background Task with no completion
                 // signal — poll the filesystem until the atomic write lands.
-                var wrote = false
-                for _ in 0..<30 {
-                    if FileManager.default.fileExists(atPath: out.path) { wrote = true; break }
-                    try await Task.sleep(for: .milliseconds(100))
-                }
+                let wrote = try await ScenarioSuite.poll { FileManager.default.fileExists(atPath: out.path) ? true : nil } ?? false
                 #expect(wrote, "export never wrote \(format) to \(out.path)")
 
                 // md/html embed a title derived from the source filename; the fixture name is a
