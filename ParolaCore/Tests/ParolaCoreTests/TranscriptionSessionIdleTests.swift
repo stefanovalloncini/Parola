@@ -36,7 +36,9 @@ struct TranscriptionSessionIdleTests {
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let store = ModelStore(modelsDirectory: dir)
         try store.seedInstalledModel("openai_whisper-tiny")
-        let session = TranscriptionSession(modelStore: store, registry: registry, clock: clock)
+        let session = TranscriptionSession(
+            modelStore: store, registry: registry, clock: clock, observesMemoryPressure: false
+        )
         let audioURL = dir.appendingPathComponent("input.wav")
         try Data("RIFFstub".utf8).write(to: audioURL)
         return (session, audioURL)

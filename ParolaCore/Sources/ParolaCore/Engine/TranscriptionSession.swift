@@ -22,6 +22,7 @@ public actor TranscriptionSession {
     private var modelIdle = IdleUnloadTimer()
     private var diarizerIdle = IdleUnloadTimer()
     private var pressureSource: (any DispatchSourceMemoryPressure)?
+    private let observesMemoryPressure: Bool
     private var activeRun: Int?
     private var unloadWhenRunEnds = false
     private var lastRunID = 0
@@ -46,7 +47,8 @@ public actor TranscriptionSession {
         clock: any Clock<Duration> = ContinuousClock(),
         managedConfiguration: ManagedConfiguration = .shared,
         fileReadDeadline: Duration = FileReadDeadline.header,
-        abandonGrace: Duration = .seconds(5)
+        abandonGrace: Duration = .seconds(5),
+        observesMemoryPressure: Bool = true
     ) {
         self.init(
             modelStore: modelStore,
@@ -56,7 +58,8 @@ public actor TranscriptionSession {
             managedConfiguration: managedConfiguration,
             fileReadDeadline: fileReadDeadline,
             abandonGrace: abandonGrace,
-            fileReadClock: ContinuousClock()
+            fileReadClock: ContinuousClock(),
+            observesMemoryPressure: observesMemoryPressure
         )
     }
 
@@ -69,8 +72,10 @@ public actor TranscriptionSession {
         managedConfiguration: ManagedConfiguration = .shared,
         fileReadDeadline: Duration = FileReadDeadline.header,
         abandonGrace: Duration = .seconds(5),
-        fileReadClock: any Clock<Duration>
+        fileReadClock: any Clock<Duration>,
+        observesMemoryPressure: Bool = true
     ) {
+        self.observesMemoryPressure = observesMemoryPressure
         self.modelStore = modelStore
         self.registry = registry
         self.idleTimeout = idleTimeout
@@ -569,7 +574,7 @@ public actor TranscriptionSession {
     }
 
     private func installPressureSourceIfNeeded() {
-        guard pressureSource == nil else { return }
+        guard observesMemoryPressure, pressureSource == nil else { return }
         let source = DispatchSource.makeMemoryPressureSource(eventMask: [.warning, .critical], queue: .global())
         source.setEventHandler { [weak self] in
             guard let self else { return }
