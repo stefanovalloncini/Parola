@@ -87,7 +87,9 @@ import Testing
     }
 
     @Test func malformedFilesDoNotScan() throws {
-        let good = try #require(String(data: try JSONEncoder().encode(entry()), encoding: .utf8))
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+        let good = try #require(String(data: try encoder.encode(entry()), encoding: .utf8))
         let bad = [
             String(good.dropLast()),
             good + "x",
@@ -102,6 +104,7 @@ import Testing
             "[]",
         ]
         for text in bad {
+            #expect(text != good)
             #expect(SnapshotEntry(scanning: Data(text.utf8)) == nil, "\(text.prefix(80))")
             #expect(SnapshotEntry.decode(Data(text.utf8)) == (try? JSONDecoder().decode(SnapshotEntry.self, from: Data(text.utf8))))
         }
