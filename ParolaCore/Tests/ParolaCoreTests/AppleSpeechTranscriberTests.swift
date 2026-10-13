@@ -114,9 +114,13 @@ struct AppleSpeechTranscriberTests {
         let gate = SettleGate(duration: .milliseconds(100))
         gate.beginStop()
         gate.endStop()
-        let waiter = Task { await ContinuousClock().measure { await gate.waitUntilSettled() } }
+        let ended = ContinuousClock.now
+        let waiter = Task {
+            await gate.waitUntilSettled()
+            return ContinuousClock.now
+        }
         waiter.cancel()
-        #expect(await waiter.value >= .milliseconds(80))
+        #expect(ended.duration(to: await waiter.value) >= .milliseconds(80))
     }
 
     @Test("a stop that never returns holds new runs only up to the limit")
