@@ -43,6 +43,21 @@ public enum ExportGrouping: String, Sendable, Codable, Hashable, CaseIterable, I
         }
     }
 
+    /// The segments in the order they would merge, one array per resulting segment.
+    func runs(of segments: [TranscriptSegment]) -> [[TranscriptSegment]] {
+        guard self == .speakerParagraphs else { return segments.map { [$0] } }
+        var runs: [[TranscriptSegment]] = []
+        for segment in segments {
+            if let last = runs.last?.last,
+               Format.presentationSpeakerLabel(last.speaker) == Format.presentationSpeakerLabel(segment.speaker) {
+                runs[runs.count - 1].append(segment)
+            } else {
+                runs.append([segment])
+            }
+        }
+        return runs
+    }
+
     /// Merges runs of segments that share a speaker into one segment, keeping the first start and the last end.
     public func apply(to segments: [TranscriptSegment]) -> [TranscriptSegment] {
         apply(to: segments, translation: [:]).segments
