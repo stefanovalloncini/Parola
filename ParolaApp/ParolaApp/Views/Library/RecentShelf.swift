@@ -125,7 +125,7 @@ struct RecentTile: View {
     private var content: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .top) {
-                EntryTile(kind: row.sourceKind, side: 36, onAccent: onAccent)
+                EntryTile(kind: row.sourceKind, sourceAppBundleID: row.entry.sourceAppBundleID, side: 36, onAccent: onAccent)
                 Spacer(minLength: DS.Spacing.small)
                 if let duration = row.duration {
                     Text(verbatim: duration)

@@ -15,6 +15,32 @@ enum SourceAppIcon {
     static func workspaceIcon(forBundleID id: String) -> NSImage? {
         appURL(forBundleID: id).map { NSWorkspace.shared.icon(forFile: $0.path) }
     }
+
+    /// App icons carry transparent padding and a shadow inside their bounds; cropping to the solid part lets the icon fill a tile's frame like a kind tile does.
+    static func croppedToOpaqueBounds(_ image: NSImage, pixels: Int = 128, minimumAlpha: UInt8 = 128) -> NSImage {
+        guard let rep = NSBitmapImageRep(
+            bitmapDataPlanes: nil, pixelsWide: pixels, pixelsHigh: pixels, bitsPerSample: 8, samplesPerPixel: 4,
+            hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 32
+        ), let context = NSGraphicsContext(bitmapImageRep: rep) else { return image }
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = context
+        image.draw(in: NSRect(x: 0, y: 0, width: pixels, height: pixels), from: .zero, operation: .copy, fraction: 1)
+        NSGraphicsContext.restoreGraphicsState()
+
+        guard let data = rep.bitmapData else { return image }
+        var minX = pixels, minY = pixels, maxX = -1, maxY = -1
+        for y in 0..<pixels {
+            let row = data + y * rep.bytesPerRow
+            for x in 0..<pixels where row[x * 4 + 3] >= minimumAlpha {
+                minX = min(minX, x); maxX = max(maxX, x)
+                minY = min(minY, y); maxY = max(maxY, y)
+            }
+        }
+        guard maxX >= minX, maxY >= minY, let cg = rep.cgImage,
+              let cropped = cg.cropping(to: CGRect(x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1))
+        else { return image }
+        return NSImage(cgImage: cropped, size: NSSize(width: cropped.width, height: cropped.height))
+    }
 }
 
 /// App icons by bundle ID. A row asks for one while it draws, so the first ask only schedules the lookup and every later one reads the result.
@@ -48,7 +74,7 @@ final class SourceAppIconCache {
 
     private func finishLookup(of bundleID: String) {
         resolveCount += 1
-        lookups[bundleID] = resolve(bundleID).map(Lookup.icon) ?? .missing
+        lookups[bundleID] = resolve(bundleID).map { .icon(SourceAppIcon.croppedToOpaqueBounds($0)) } ?? .missing
     }
 }
 

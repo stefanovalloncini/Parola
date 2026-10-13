@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import ParolaCore
 
@@ -99,14 +100,41 @@ struct EntryBadge: View {
     }
 }
 
-/// A row's solid tile: the kind's own colour with a white glyph.
+/// A row's leading tile: the app a meeting came from when it is installed, otherwise the kind's own colour with a white glyph.
 struct EntryTile: View {
+    enum Face {
+        case kind
+        case appIcon(NSImage)
+    }
+
     let kind: EntrySourceKind
+    var sourceAppBundleID: String?
     var side: CGFloat = EntryRowMetrics.rowBadgeSide
     /// True where the tile sits on the accent fill, where its edge needs a line to stay a tile.
     var onAccent = false
 
+    @Environment(\.sourceAppIcons) private var injectedIcons
+
+    static func face(sourceAppBundleID: String?, in cache: SourceAppIconCache) -> Face {
+        cache.icon(for: sourceAppBundleID).map(Face.appIcon) ?? .kind
+    }
+
+    @ViewBuilder
     var body: some View {
+        switch Self.face(sourceAppBundleID: sourceAppBundleID, in: injectedIcons ?? .shared) {
+        case .appIcon(let image):
+            Image(nsImage: image)
+                .resizable()
+                .interpolation(.high)
+                .scaledToFit()
+                .frame(width: side, height: side)
+                .accessibilityHidden(true)
+        case .kind:
+            kindTile
+        }
+    }
+
+    private var kindTile: some View {
         RoundedRectangle(cornerRadius: DS.Radius.tile, style: .continuous)
             .fill(LinearGradient(
                 colors: [DS.KindTile.top(of: kind.tileFill).color, kind.tileFill.color], startPoint: .top, endPoint: .bottom
@@ -234,7 +262,7 @@ struct EntryRow<Accessory: View, Actions: View>: View {
     @ViewBuilder
     private var chromedRow: some View {
         let row = HStack(spacing: DS.Spacing.regular) {
-            EntryTile(kind: display.sourceKind, onAccent: onAccent)
+            EntryTile(kind: display.sourceKind, sourceAppBundleID: display.entry.sourceAppBundleID, onAccent: onAccent)
                 .help(rowHelp)
             VStack(alignment: .leading, spacing: 3) {
                 titleLine
