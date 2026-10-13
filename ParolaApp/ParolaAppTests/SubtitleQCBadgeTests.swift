@@ -26,10 +26,12 @@ struct SubtitleQCBadgeTests {
         let segments = [
             TranscriptSegment(id: 0, start: 0, end: 2, text: "A calm and easy line."),
             TranscriptSegment(id: 1, start: 2, end: 2.4, text: "Rushed."),
+            TranscriptSegment(id: 2, start: 2.4, end: 5, text: "And then it carries on."),
         ]
         let map = SegmentsScroll.subtitleQCIssues(segments: segments, captionLength: .medium)
         #expect(map[0] == nil)
         #expect(map[1] == [.tooShort])
+        #expect(map[2] == nil)
     }
 
     @Test("QC map honors the selected caption length")

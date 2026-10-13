@@ -29,6 +29,7 @@ struct SegmentsScroll: View {
     @State private var qcByID: [Int: [SubtitleQC.Issue]] = [:]
     @State private var deriveTask: Task<Void, Never>?
     @State private var qcTask: Task<Void, Never>?
+    @State private var qcEntryID: LibraryEntry.ID?
 
     private var speakerFilterBinding: Binding<String?> {
         Binding(
@@ -156,19 +157,19 @@ struct SegmentsScroll: View {
         qcTask?.cancel()
         guard key.enabled, let segments = model.transcript?.segments else {
             qcByID = [:]
+            qcEntryID = nil
             return
         }
         let captionLength = key.captionLength
-        guard segments.count > TranscriptDerive.synchronousCap else {
-            qcByID = Self.subtitleQCIssues(segments: segments, captionLength: captionLength)
-            return
-        }
+        let language = model.transcript?.language
         // Segment ids repeat across entries, so a kept-around map would badge the new entry's cards until the rebuild lands.
-        qcByID = [:]
+        if qcEntryID != key.entryID { qcByID = [:] }
+        qcEntryID = key.entryID
         qcTask = Task {
-            let computed = await Task.detached(priority: .userInitiated) {
-                Self.subtitleQCIssues(segments: segments, captionLength: captionLength)
-            }.value
+            let work = Task.detached(priority: .userInitiated) {
+                Self.subtitleQCIssues(segments: segments, captionLength: captionLength, language: language)
+            }
+            let computed = await withTaskCancellationHandler { await work.value } onCancel: { work.cancel() }
             guard !Task.isCancelled else { return }
             qcByID = computed
         }
@@ -196,14 +197,10 @@ struct SegmentsScroll: View {
 
     nonisolated static func subtitleQCIssues(
         segments: [TranscriptSegment],
-        captionLength: CaptionLength
+        captionLength: CaptionLength,
+        language: String? = nil
     ) -> [Int: [SubtitleQC.Issue]] {
-        var issuesByID: [Int: [SubtitleQC.Issue]] = [:]
-        for segment in segments {
-            let issues = SubtitleQC.issues(for: segment, captionLength: captionLength)
-            if !issues.isEmpty { issuesByID[segment.id] = issues }
-        }
-        return issuesByID
+        SubtitleQC.issues(forSegments: segments, captionLength: captionLength, language: language)
     }
 
     nonisolated static func visibleSegments(

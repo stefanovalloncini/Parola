@@ -86,7 +86,11 @@ struct SubtitleQCTests {
     @Test("a segment can trip every rule at once")
     func allRulesTogether() {
         let word40 = String(repeating: "a", count: 40)
-        let issues = SubtitleQC.issues(text: word40, duration: 0.5, captionLength: .short)
+        let neighbours = [
+            TranscriptSegment(id: 0, start: 0, end: 0.5, text: word40),
+            TranscriptSegment(id: 1, start: 0.5, end: 3, text: "Next."),
+        ]
+        let issues = SubtitleQC.issues(forSegments: neighbours, captionLength: .short)[0]
         #expect(issues == [
             .lineTooLong(limit: 32),
             .tooFast(charactersPerSecond: 80),
@@ -94,10 +98,67 @@ struct SubtitleQCTests {
         ])
     }
 
+    @Test("a lone segment is judged as the export would write it, held for the minimum cue time")
+    func loneSegmentIsHeld() {
+        let issues = SubtitleQC.issues(text: String(repeating: "a", count: 40), duration: 0.5, captionLength: .short)
+        #expect(issues == [.lineTooLong(limit: 32), .tooFast(charactersPerSecond: 40)])
+    }
+
+    @Test("the speaker label counts toward the line the export writes")
+    func labelIsJudged() {
+        let word = String(repeating: "a", count: 30)
+        let segment = TranscriptSegment(id: 0, start: 0, end: 10, text: word, speaker: "Ada")
+        #expect(SubtitleQC.issues(forSegments: [segment], captionLength: .short).isEmpty)
+        #expect(SubtitleQC.issues(forSegments: [segment], captionLength: .short, showsSpeakers: true)[0] == [.lineTooLong(limit: 32)])
+        #expect(SubtitleQC.issues(for: segment, captionLength: .short, speaker: "Ada") == [.lineTooLong(limit: 32)])
+    }
+
+    @Test("a translation shown beside the text is judged too")
+    func translationIsJudged() {
+        let segment = TranscriptSegment(id: 0, start: 0, end: 10, text: "Good morning.")
+        let wide = String(repeating: "b", count: 40)
+        #expect(SubtitleQC.issues(forSegments: [segment], captionLength: .short).isEmpty)
+        #expect(SubtitleQC.issues(forSegments: [segment], captionLength: .short, translations: [0: wide])[0] == [.lineTooLong(limit: 32)])
+    }
+
     @Test("the segment convenience uses text and duration")
     func segmentConvenience() {
         let segment = TranscriptSegment(id: 3, start: 10, end: 10.5, text: "Hi")
         let issues = SubtitleQC.issues(for: segment, captionLength: .none)
         #expect(issues == [.tooShort])
+    }
+
+    private let longText = "So the thing about building a transcription app is that every part of it looks simple until you try to make it work for a two hour meeting recorded on a laptop in a noisy café, and then the captions have to fit on a phone screen held upright."
+
+    @Test("a long segment is judged by the cues it splits into, not as one tall cue")
+    func judgedPerCue() {
+        let segment = TranscriptSegment(id: 0, start: 10, end: 28, text: longText)
+        #expect(SubtitleQC.issues(for: segment, captionLength: .medium).isEmpty)
+        #expect(SubtitleQC.issues(for: segment, captionLength: .short).isEmpty)
+    }
+
+    @Test("speech too fast for the cues is still flagged")
+    func hurriedSegment() {
+        let segment = TranscriptSegment(id: 0, start: 0, end: 3, text: longText)
+        #expect(SubtitleQC.issues(for: segment, captionLength: .medium).contains {
+            if case .tooFast = $0 { true } else { false }
+        })
+    }
+
+    @Test("a word too wide for the limit is flagged even when the rest breaks fine")
+    func wideWord() {
+        let word = String(repeating: "a", count: 50)
+        #expect(SubtitleQC.issues(text: "ok \(word)", duration: 20, captionLength: .medium) == [.lineTooLong(limit: 42)])
+    }
+
+    @Test("word timings set each cue's reading speed")
+    func wordTimings() {
+        let words = longText.split(separator: " ").enumerated().map { index, word in
+            WordTiming(id: "w\(index)", word: String(word), start: Double(index) * 0.2, end: Double(index) * 0.2 + 0.15, probability: 1)
+        }
+        let fast = TranscriptSegment(id: 0, start: 0, end: 20, text: longText, words: words)
+        #expect(SubtitleQC.issues(for: fast, captionLength: .medium).contains {
+            if case .tooFast = $0 { true } else { false }
+        })
     }
 }
