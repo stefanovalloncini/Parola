@@ -63,6 +63,10 @@ struct LibraryRowList<Top: View>: View {
     var rowAppeared: ((LibraryEntry.ID) -> Void)?
     /// The page's own top as the list's first row, so it scrolls away with the rows under it.
     var top: Top?
+    /// Entries the page shows above the list, which a selection, a drag and the File menu reach like rows.
+    var shelf: [LibraryRowDisplay] = []
+    /// The tile the keyboard is on; the list keeps the responder, and the arrows are read here while this is set.
+    @State private var shelfCursor: LibraryEntry.ID?
 
     init(
         items: [LibraryListItem],
@@ -74,6 +78,7 @@ struct LibraryRowList<Top: View>: View {
         focus: FocusState<LibraryListFocus?>.Binding,
         focusKey: LibraryListFocus,
         rowAppeared: ((LibraryEntry.ID) -> Void)? = nil,
+        shelf: [LibraryRowDisplay] = [],
         top: Top? = nil
     ) {
         self.items = items
@@ -86,6 +91,7 @@ struct LibraryRowList<Top: View>: View {
         self.focus = focus
         self.focusKey = focusKey
         self.rowAppeared = rowAppeared
+        self.shelf = shelf
         self.top = top
     }
 
@@ -103,12 +109,24 @@ struct LibraryRowList<Top: View>: View {
 
     var body: some View {
         List(selection: rowSelection) {
-            if let top {
-                top
-                    .listRowInsets(Self.titleInsets)
-                    .listRowSeparator(.hidden)
-                    .selectionDisabled()
-                    .id(LibraryListItem.pageTopID)
+            if top != nil || !shelf.isEmpty {
+                VStack(alignment: .leading, spacing: 0) {
+                    top
+                    if !shelf.isEmpty {
+                        RecentShelf(
+                            rows: shelf,
+                            selection: $selection,
+                            cursor: shelfCursor,
+                            rename: rename,
+                            delete: delete,
+                            choose: chooseTile
+                        )
+                    }
+                }
+                .listRowInsets(Self.titleInsets)
+                .listRowSeparator(.hidden)
+                .selectionDisabled()
+                .id(LibraryListItem.pageTopID)
             }
             ForEach(items) { item in
                 switch item {
@@ -138,11 +156,24 @@ struct LibraryRowList<Top: View>: View {
         .tint(DS.Color.accentFill)
         .focused(focus, equals: focusKey)
         .focusedValue(\.libraryRows, LibraryRowsTarget(
-            entries: LibraryRowsTarget.selectedEntries(selection, in: items), rename: rename, delete: delete
+            entries: LibraryRowsTarget.selectedEntries(selection, in: items, shelf: shelf), rename: rename, delete: delete
         ))
         .onDeleteCommand(perform: deleteSelection)
+        .background { ShelfKeyMonitor(isActive: !shelf.isEmpty, handle: handle) }
+        .onChange(of: selection) { _, new in
+            if let cursor = shelfCursor, new != [cursor] { shelfCursor = nil }
+        }
+        .onChange(of: focus.wrappedValue) { old, new in
+            if new != focusKey { shelfCursor = nil }
+            guard new == focusKey, old != focusKey, selection.isEmpty, Self.isTab(NSApp.currentEvent),
+                  let first = shelf.first else { return }
+            chooseTile(first.id)
+        }
+        .onChange(of: shelf.map(\.id)) { _, ids in
+            if let cursor = shelfCursor, !ids.contains(cursor) { shelfCursor = nil }
+        }
         .dragContainer(for: LibraryEntryDragItem.self) { ids in
-            LibraryRowsTarget.selectedEntries(Set(ids), in: items).map {
+            LibraryRowsTarget.selectedEntries(Set(ids), in: items, shelf: shelf).map {
                 LibraryEntryDragItem(entry: $0, showsAITitle: model.showAITitles)
             }
         }
@@ -165,6 +196,53 @@ struct LibraryRowList<Top: View>: View {
         let entries = LibraryListItem.entries(in: ids, items: items)
         guard let request = LibraryListContent.openRequest(for: entries, modifiers: NSEvent.modifierFlags) else { return }
         model.openEntryFromLibrary(request.id, inNewWindow: request.inNewWindow)
+    }
+
+    /// `keyCode` raises on an event that isn't a key event, so the type is read first.
+    private static func isTab(_ event: NSEvent?) -> Bool {
+        guard let event, event.type == .keyDown || event.type == .keyUp else { return false }
+        return event.keyCode == 48
+    }
+
+    private var firstRowID: LibraryEntry.ID? {
+        items.lazy.compactMap { item -> LibraryEntry.ID? in
+            if case .entry(let row) = item { return row.id }
+            return nil
+        }.first
+    }
+
+    private func chooseTile(_ id: LibraryEntry.ID) {
+        selection = [id]
+        shelfCursor = id
+        focus.wrappedValue = focusKey
+    }
+
+    private func perform(_ action: RecentShelfRules.KeyAction) {
+        switch action {
+        case .none:
+            break
+        case .moveTo(let index):
+            chooseTile(shelf[index].id)
+        case .leaveForList:
+            shelfCursor = nil
+            if let first = firstRowID { selection = [first] }
+        case .open(let index):
+            RecentTile.open(shelf[index].id, in: model)
+        case .delete(let index):
+            delete([shelf[index].id])
+        }
+    }
+
+    private func handle(_ key: RecentShelfRules.Key) -> Bool {
+        let cursorIndex = shelfCursor.flatMap { id in shelf.firstIndex { $0.id == id } }
+        let action = RecentShelfRules.action(
+            for: key,
+            cursor: cursorIndex,
+            tileCount: shelf.count,
+            firstRowIsOnlySelection: firstRowID.map { selection == [$0] } ?? false
+        )
+        perform(action)
+        return action != .none
     }
 
     private func deleteSelection() {
@@ -228,7 +306,7 @@ struct LibraryListRow: View, Equatable {
             .accessibilityLabel(Text(verbatim: LibraryRowFormat.spokenLabel(for: row, detail: spokenDetail)))
             // The list's context menu reaches VoiceOver too; these put its everyday items in the Actions rotor, in its order.
             .accessibilityActions {
-                if let model { actions(for: entry, model: model) }
+                if let model { LibraryRowActionButtons(model: model, entry: entry, rename: rename) }
             }
             .contentShape(Rectangle())
             .draggable(containerItemID: entry.id)
@@ -247,17 +325,6 @@ struct LibraryListRow: View, Equatable {
             if let count = match?.matchCount, count > 0 { parts.append(LibraryListContent.matchesLabel(count)) }
             return parts
         }
-    }
-
-    @ViewBuilder
-    private func actions(for entry: LibraryEntry, model: AppModel) -> some View {
-        Button("Open") { model.openEntryFromLibrary(entry.id, inNewWindow: false) }
-        Button("Open in New Window") { model.openEntryWindow(entry.id) }
-        Button("Export…") { model.exportEntryFromLibrary(entry.id) }
-        Button(entry.pinned ? "Unpin" : "Pin") { model.togglePinned(for: entry.id) }
-        Button("Rename…") { rename(entry) }
-        Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting([entry.bundleURL]) }
-        Button("Delete") { model.deleteEntry(entry.id) }
     }
 
     private var showsMenu: Bool { isHovering }
@@ -285,6 +352,23 @@ struct LibraryListRow: View, Equatable {
                 showsTimestamp: showsTimestamp
             )
         }
+    }
+}
+
+/// The everyday actions of a row, as VoiceOver's Actions rotor offers them.
+struct LibraryRowActionButtons: View {
+    let model: AppModel
+    let entry: LibraryEntry
+    let rename: (LibraryEntry) -> Void
+
+    var body: some View {
+        Button("Open") { model.openEntryFromLibrary(entry.id, inNewWindow: false) }
+        Button("Open in New Window") { model.openEntryWindow(entry.id) }
+        Button("Export…") { model.exportEntryFromLibrary(entry.id) }
+        Button(entry.pinned ? "Unpin" : "Pin") { model.togglePinned(for: entry.id) }
+        Button("Rename…") { rename(entry) }
+        Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting([entry.bundleURL]) }
+        Button("Delete") { model.deleteEntry(entry.id) }
     }
 }
 

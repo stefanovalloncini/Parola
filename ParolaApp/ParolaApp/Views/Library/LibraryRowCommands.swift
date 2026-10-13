@@ -26,11 +26,16 @@ struct LibraryRowsTarget: Equatable {
         entries.contains { !$0.pinned }
     }
 
-    static func selectedEntries(_ selection: Set<LibraryEntry.ID>, in items: [LibraryListItem]) -> [LibraryEntry] {
-        items.compactMap { item in
+    /// The shelf's entries come first, as they sit above the list.
+    static func selectedEntries(
+        _ selection: Set<LibraryEntry.ID>, in items: [LibraryListItem], shelf: [LibraryRowDisplay] = []
+    ) -> [LibraryEntry] {
+        let shelved = shelf.lazy.filter { selection.contains($0.id) }.map(\.entry)
+        let listed = items.lazy.compactMap { item -> LibraryEntry? in
             guard case .entry(let row) = item, selection.contains(row.id) else { return nil }
             return row.entry
         }
+        return Array(shelved) + Array(listed)
     }
 }
 

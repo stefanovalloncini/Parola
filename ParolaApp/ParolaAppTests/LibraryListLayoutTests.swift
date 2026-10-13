@@ -6,6 +6,10 @@ import ParolaCore
 @testable import Parola
 import ParolaTestSupport
 
+private final class KeyableWindow: NSWindow {
+    override var canBecomeKey: Bool { true }
+}
+
 @MainActor
 @Suite("Library list layout", .serialized)
 struct LibraryListLayoutTests {
@@ -72,17 +76,20 @@ struct LibraryListLayoutTests {
 
     /// Ordered in, far off screen and tall enough that every row is laid out.
     private func host(
-        _ entries: [LibraryEntry], groupsByDate: Bool = true, headerPasses: LibraryHeaderPasses? = nil
+        _ entries: [LibraryEntry], groupsByDate: Bool = true, headerPasses: LibraryHeaderPasses? = nil,
+        withShelf: Bool = false
     ) async -> Hosted {
         let model = AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("list-layout"))
         await model.libraryRefreshTask?.value
         model.libraryGroupsByDate = groupsByDate
+        // A filter that every test entry passes keeps the Recent shelf from taking three of the rows under test.
+        if !withShelf { model.languageFilter = "EN" }
         model.libraryEntries = entries
         model.route = .transcript
         let host = NSHostingView(rootView: AnyView(
             ContentRoutes().environment(model).environment(\.libraryHeaderPasses, headerPasses)
         ))
-        let window = NSWindow(
+        let window = KeyableWindow(
             contentRect: NSRect(x: -12_000, y: -12_000, width: 940, height: 1_200),
             styleMask: [.borderless],
             backing: .buffered,
@@ -135,6 +142,64 @@ struct LibraryListLayoutTests {
                 #expect(table.rect(ofRow: row).minY == table.rect(ofRow: row - 1).maxY, "row \(row) leaves a gap")
             }
         }
+    }
+
+    @Test("the Recent shelf takes the three newest entries out of the list, and a sort that hides it puts them back")
+    func shelfEntriesLeaveTheList() async throws {
+        let shown = entries(8)
+        let hosted = await host(shown, groupsByDate: false, withShelf: true)
+        defer { close(hosted) }
+        let table = try #require(table(hosted))
+        _ = await settled(hosted)
+        let shelved = table.numberOfRows
+        #expect(shelved == 1 + 5, "the page top with its shelf, then the five other entries: \(shelved)")
+
+        hosted.model.librarySortOrder = .oldest
+        #expect(await settled(hosted) { table.numberOfRows == 1 + 8 }, "rows: \(table.numberOfRows)")
+
+        hosted.model.librarySortOrder = .newest
+        #expect(await settled(hosted) { table.numberOfRows == shelved }, "rows: \(table.numberOfRows)")
+    }
+
+    @Test("the shelf's tiles read as one element each, inside a Recent group")
+    func shelfTilesAreElements() async throws {
+        let shown = entries(8)
+        let hosted = await host(shown, groupsByDate: false, withShelf: true)
+        defer { close(hosted) }
+        _ = await settled(hosted)
+        let elements = HostedAccessibility.elements(in: hosted.host)
+        for entry in shown.prefix(3) {
+            let tile = try #require(elements.first { $0.identifier == "library.shelf.\(entry.id)" }, "\(entry.id)")
+            #expect(tile.label?.hasPrefix("Take ") == true, "\(tile.label ?? "")")
+            for action in ["Open", "Open in New Window", "Pin", "Rename…", "Delete"] {
+                #expect(tile.actions.contains(action), "\(tile.actions)")
+            }
+        }
+        #expect(!elements.contains { $0.identifier == "library.shelf.\(shown[3].id)" })
+        #expect(elements.contains { $0.label == "Recent" })
+    }
+
+    @Test("Up from the first row climbs onto the shelf and Down comes back to it")
+    func keyboardMovesBetweenShelfAndList() async throws {
+        let hosted = await host(entries(8), groupsByDate: false, withShelf: true)
+        defer { close(hosted) }
+        let table = try #require(table(hosted))
+        hosted.window.makeKey()
+        hosted.window.makeFirstResponder(table)
+        table.selectRowIndexes([1], byExtendingSelection: false)
+        _ = await settled(hosted)
+
+        func send(_ keyCode: UInt16) throws {
+            let event = try #require(arrow(keyCode, 0, in: hosted.window))
+            NSApp.sendEvent(event)
+        }
+        try send(126)
+        #expect(await settled(hosted) { table.selectedRowIndexes.isEmpty }, "the first row gave the selection to a tile")
+        try send(124)
+        _ = await settled(hosted)
+        #expect(table.selectedRowIndexes.isEmpty, "Right moves between tiles and leaves the rows alone")
+        try send(125)
+        #expect(await settled(hosted) { table.selectedRowIndexes == [1] }, "Down puts the selection on the first row: \(table.selectedRowIndexes)")
     }
 
     @Test("the rows keep to the reading column and the margins beside it still belong to the scroll view")

@@ -367,6 +367,8 @@ private struct LibraryBrowseList: View, Equatable {
     @State private var showsHero = false
     @State private var libraryLoaded = false
     @State private var animatesRows = false
+    @State private var shelfRows: [LibraryRowDisplay] = []
+    @State private var shelfTiles = RecentShelfRules.maximumTiles
 
     private var activeFilters: LibraryListContent.ActiveFilters {
         LibraryListContent.ActiveFilters(
@@ -391,13 +393,13 @@ private struct LibraryBrowseList: View, Equatable {
     }
 
     @discardableResult
-    private func recomputeEntries() -> [LibraryRowDisplay] {
+    private func recomputeEntries() -> [LibraryEntry] {
         recomputeEntries(with: activeFilters)
     }
 
     /// Takes filters explicitly so a category switch can recompute with the ones it just dropped, not `@State` it just wrote.
     @discardableResult
-    private func recomputeEntries(with filters: LibraryListContent.ActiveFilters) -> [LibraryRowDisplay] {
+    private func recomputeEntries(with filters: LibraryListContent.ActiveFilters) -> [LibraryEntry] {
         recomputePasses?.note()
         let computed = LibraryListContent.rows(
             from: model.libraryEntries,
@@ -407,11 +409,16 @@ private struct LibraryBrowseList: View, Equatable {
             dateRange: filters.dateRange,
             personFilter: filters.person
         )
+        let pageCount = LibraryListContent.pageCount(of: model.libraryEntries, category: category, person: filters.person)
+        let shelved = RecentShelfRules.entries(
+            in: computed, pageCount: pageCount, sortOrder: model.librarySortOrder, filters: filters, tiles: shelfTiles
+        )
+        let shelvedIDs = Set(shelved.lazy.map(\.id))
         var cache = model.libraryBrowseDisplays
         cache.prune(keeping: model.libraryEntries.lazy.map(\.id))
         let headers = LibraryDateGroups.Headers(sortOrder: model.librarySortOrder, groupsByDate: model.libraryGroupsByDate)
         let usualLanguage = model.usualLanguage
-        let displays = computed.map { entry -> LibraryRowDisplay in
+        let displays = computed.lazy.filter { !shelvedIDs.contains($0.id) }.map { entry -> LibraryRowDisplay in
             cache.display(
                 for: entry, excerpt: model.libraryExcerpts[entry.id],
                 when: headers.when(for: entry), usualLanguage: usualLanguage,
@@ -419,18 +426,25 @@ private struct LibraryBrowseList: View, Equatable {
             )
         }
         model.libraryBrowseDisplays = cache
-        rowItems = LibraryListItem.items(for: headers.groups(for: displays))
+        shelfRows = shelved.map { entry in
+            LibraryRowDisplay(
+                entry: entry, excerpt: model.libraryExcerpts[entry.id],
+                when: LibraryRowFormat.when(entry.createdAt, under: nil, edges: headers.edges, locale: headers.locale),
+                usualLanguage: usualLanguage, showsAITitle: model.showAITitles, showsAISummary: model.showAISummaries
+            )
+        }
+        rowItems = LibraryListItem.items(for: headers.groups(for: Array(displays)))
         shownTotals = LibraryListContent.totals(of: computed, sizes: model.libraryBundleSizes)
-        pageCount = LibraryListContent.pageCount(of: model.libraryEntries, category: category, person: filters.person)
+        self.pageCount = pageCount
         libraryLoaded = model.libraryLoaded
         emptyKind = LibraryEmptyState.kind(
             entryCount: LibraryEmptyState.entryCount(in: model.libraryEntries, category: category),
-            visibleCount: displays.count,
+            visibleCount: computed.count,
             filtersActive: !filters.isEmpty,
             loaded: libraryLoaded
         )
         showsHero = LibraryEmptyState.showsHero(emptyKind, category: category, person: filters.person)
-        return displays
+        return computed
     }
 
     var body: some View {
@@ -449,6 +463,7 @@ private struct LibraryBrowseList: View, Equatable {
                         pendingBulkDelete: $pendingBulkDelete,
                         focus: focus,
                         focusKey: .browse,
+                        shelf: shelfRows,
                         top: pageTop(showsIntake: true)
                             .padding(.top, DS.Spacing.small)
                             .padding(.bottom, DS.Spacing.tight)
@@ -467,12 +482,19 @@ private struct LibraryBrowseList: View, Equatable {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onGeometryChange(for: Int.self) {
+            RecentShelfRules.tileCount(contentWidth: EntryRowMetrics.shelfWidth(paneWidth: $0.size.width))
+        } action: { tiles in
+            guard tiles != shelfTiles else { return }
+            shelfTiles = tiles
+            recomputeEntries()
+        }
         .onAppear { recomputeEntries(with: keepFiltersThatMatch(in: category)) }
         // Later than onAppear's first fill, so the rows the route opens with don't animate in.
         .task { animatesRows = true }
         .onChange(of: model.libraryVersion) { _, _ in
             let newEntries = recomputeEntries()
-            selection = selection.intersection(Set(newEntries.map(\.id)))
+            selection = selection.intersection(newEntries.lazy.map(\.id))
         }
         .onChange(of: model.labelFilter) { _, _ in recomputeEntries() }
         .onChange(of: model.languageFilter) { _, _ in recomputeEntries() }
@@ -488,7 +510,7 @@ private struct LibraryBrowseList: View, Equatable {
         }
         .onChange(of: category) { _, newCategory in
             let newEntries = recomputeEntries(with: keepFiltersThatMatch(in: newCategory))
-            selection = selection.intersection(Set(newEntries.map(\.id)))
+            selection = selection.intersection(newEntries.lazy.map(\.id))
         }
         // Headers and row times are written when the groups are built, so midnight has to rewrite them.
         .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in

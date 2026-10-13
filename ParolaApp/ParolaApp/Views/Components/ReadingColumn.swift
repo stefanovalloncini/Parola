@@ -7,6 +7,13 @@ extension EntryRowMetrics {
     }
 }
 
+extension EntryRowMetrics {
+    /// What a list row's content spans: the column, or the pane when it is narrower, less the list's own 24 pt inset each side.
+    static func shelfWidth(paneWidth: CGFloat) -> CGFloat {
+        min(paneWidth, columnWidth) - 2 * (DS.Spacing.medium + DS.Spacing.small)
+    }
+}
+
 /// Keeps a list's rows to a centred reading column. The scroll view stays full width, so a pointer in the margins still scrolls.
 private struct ReadingColumn: ViewModifier {
     @State private var paneWidth: CGFloat = 0

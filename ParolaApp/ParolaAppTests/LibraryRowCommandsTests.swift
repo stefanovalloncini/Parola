@@ -149,7 +149,7 @@ struct LibraryRowCommandsTests {
             #expect(found != nil, "\(item) after the one before it")
             if let found { cursor = found.upperBound }
         }
-        let actions = try #require(list.range(of: "private func actions(for entry"))
+        let actions = try #require(list.range(of: "struct LibraryRowActionButtons"))
         let export = try #require(list.range(of: #"Button("Export…")"#, range: actions.upperBound..<list.endIndex))
         let rename = try #require(list.range(of: #"Button("Rename…")"#, range: actions.upperBound..<list.endIndex))
         let reveal = try #require(list.range(of: #"Button("Reveal in Finder")"#, range: actions.upperBound..<list.endIndex))
