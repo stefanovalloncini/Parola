@@ -193,6 +193,7 @@ struct DownloadRefusalCorrectionTests {
         // Not a real catalog id, but a close enough match that ModelStore rejects it before any
         // network call — the async catch path this proves must fire the same way a real failure would.
         let pickedID = "whisper-large-v3_turbo"
+        await model.awaitModelListRefresh()
         model.availableModels = []
         model.activateModel(pickedID)
 

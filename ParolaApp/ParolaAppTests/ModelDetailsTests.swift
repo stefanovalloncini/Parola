@@ -102,6 +102,7 @@ struct ModelDetailsTests {
 
     private func checkBridgeCopy() async throws {
         let model = makeModel("details-bridge")
+        await model.awaitModelListRefresh()
         model.availableModels = [info(Self.turbo, installed: true, path: "/tmp/models/turbo")]
         model.modelSizes = [Self.turbo: 1_600_000_000]
         model.selectedModel = Self.turbo
