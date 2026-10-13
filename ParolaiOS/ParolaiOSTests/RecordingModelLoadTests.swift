@@ -141,6 +141,19 @@ struct RecordingModelLoadTests {
         #expect(await library.list().isEmpty)
     }
 
+    @Test("a saved take removes its working file once the library holds the audio", .timeLimit(.minutes(1)))
+    func savedTakeRemovesItsFile() async throws {
+        let audio = try makeAudio(bytes: 20_000)
+        defer { try? FileManager.default.removeItem(at: audio) }
+        let (coord, library) = try makeCoordinator(session: LoadingSession(load: .fails("unused")))
+        let segment = TranscriptSegment(id: 0, start: 0, end: 1, text: "Hello there")
+
+        coord.handleStreamingEvent(.finished(Transcript(segments: [segment], language: "en", modelName: "", sourceURL: audio)), generation: 0)
+
+        try await pollUntil { !FileManager.default.fileExists(atPath: audio.path) }
+        #expect(await library.list().count == 1)
+    }
+
     @Test("a model that fails to load after capture lands the audio as an entry and says so", .timeLimit(.minutes(1)))
     func loadFailureKeepsTheAudio() async throws {
         let audio = try makeAudio(bytes: 20_000)

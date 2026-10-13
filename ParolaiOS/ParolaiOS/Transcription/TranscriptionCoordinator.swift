@@ -262,6 +262,7 @@ final class TranscriptionCoordinator {
                     let entry = try await library.add(
                         transcript: processed, audioSource: final.sourceURL, source: .microphone
                     )
+                    if let audio = final.sourceURL { try? FileManager.default.removeItem(at: audio) }
                     guard generation != cancelledGeneration else {
                         if generation == recordingGeneration { phase = .idle }
                         return
