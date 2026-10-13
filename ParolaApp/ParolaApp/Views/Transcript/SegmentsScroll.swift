@@ -277,10 +277,10 @@ private struct PlaybackFollower: View {
     /// is a detached hop for a long transcript.
     private func revealPendingSegment() async {
         guard let id = model.pendingRevealSegmentID else { return }
-        for _ in 0..<30 {
+        let deadline = ContinuousClock.now + .seconds(10)
+        repeat {
             try? await Task.sleep(for: .milliseconds(16))
-            if isShown(id) { break }
-        }
+        } while !(isShown(id)) && !Task.isCancelled && ContinuousClock.now < deadline
         guard isShown(id) else { return }
         withAnimation(DS.Motion.follow(reduceMotion: reduceMotion)) {
             proxy.scrollTo(id, anchor: .center)

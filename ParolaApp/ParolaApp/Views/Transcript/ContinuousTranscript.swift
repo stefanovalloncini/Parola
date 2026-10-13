@@ -61,6 +61,7 @@ struct ContinuousChunks: View {
     @State private var chunks: [Chunk] = []
     @State private var chunkIndexBySegment: [TranscriptSegment.ID: Int] = [:]
     @State private var highlightedSegmentID: TranscriptSegment.ID?
+    @State private var revealAwaitingChunk: TranscriptSegment.ID?
     @State private var gate = BuildGate()
     @State private var buildTask: Task<Void, Never>?
     @State private var assigningChunkID: Chunk.ID?
@@ -87,6 +88,7 @@ struct ContinuousChunks: View {
         })
         .onAppear { rebuildChunks() }
         .onChange(of: model.transcriptVersion) { _, _ in rebuildChunks() }
+        .onChange(of: chunkIndexBySegment) { _, _ in scrollToPendingReveal() }
         .onChange(of: model.favoritesOnly) { _, _ in rebuildChunks() }
         .onChange(of: model.selectedEntryFavorites) { _, _ in rebuildChunks() }
         .background {
@@ -164,14 +166,22 @@ struct ContinuousChunks: View {
     /// than watched on `currentSegmentID`; the chunk holding it exists only once the build lands.
     private func revealPendingSegment() async {
         guard let id = model.pendingRevealSegmentID else { return }
-        for _ in 0..<30 {
+        revealAwaitingChunk = id
+        defer { if revealAwaitingChunk == id { revealAwaitingChunk = nil } }
+        let deadline = ContinuousClock.now + .seconds(10)
+        repeat {
             try? await Task.sleep(for: .milliseconds(16))
-            if chunkIndexBySegment[id] != nil { break }
-        }
-        guard let chunkID = chunkIndexBySegment[id] else { return }
+        } while chunkIndexBySegment[id] == nil && !Task.isCancelled && ContinuousClock.now < deadline
+        guard revealAwaitingChunk == id, let chunkID = chunkIndexBySegment[id] else { return }
         withAnimation(DS.Motion.follow(reduceMotion: reduceMotion)) {
             scrollProxy.scrollTo(chunkID, anchor: .center)
         }
+    }
+
+    private func scrollToPendingReveal() {
+        guard let id = revealAwaitingChunk, let chunkID = chunkIndexBySegment[id] else { return }
+        revealAwaitingChunk = nil
+        scrollProxy.scrollTo(chunkID, anchor: .center)
     }
 
     static let synchronousBuildCap = 200
