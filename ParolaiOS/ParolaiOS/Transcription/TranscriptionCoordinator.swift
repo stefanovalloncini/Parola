@@ -12,6 +12,7 @@ final class TranscriptionCoordinator {
         case loadingModel(name: String)
         case transcribing(file: URL)
         case recording
+        case finishing
         case failed(message: String)
     }
 
@@ -25,9 +26,17 @@ final class TranscriptionCoordinator {
 
     @ObservationIgnored private let library: LibraryStore
     @ObservationIgnored private let settings: UserSettings
+    @ObservationIgnored var makeStreamingSession: () -> any StreamingTranscriber = {
+        StreamingTranscriptionSession(persistAudio: true)
+    }
+    @ObservationIgnored var requestMicrophonePermission: () async -> Bool = {
+        await AVAudioApplication.requestRecordPermission()
+    }
+    @ObservationIgnored var onSalvage: (@MainActor () -> Void)?
     @ObservationIgnored private let session = TranscriptionSession(idleTimeout: ModelResidencyPolicy.idleTimeoutSeconds)
-    @ObservationIgnored private var streamingSession: StreamingTranscriptionSession?
-    @ObservationIgnored private var streamingTask: Task<Void, Never>?
+    @ObservationIgnored private var streamingSession: (any StreamingTranscriber)?
+    @ObservationIgnored private var finishingSession: (any StreamingTranscriber)?
+    @ObservationIgnored private(set) var streamingTask: Task<Void, Never>?
     @ObservationIgnored private var transcribeTask: Task<Void, Never>?
     @ObservationIgnored private var transcribeGeneration = 0
     @ObservationIgnored private var recordingGeneration: Int = 0
@@ -138,17 +147,17 @@ final class TranscriptionCoordinator {
     }
 
     func startRecording() {
-        guard streamingSession == nil else { return }
+        guard streamingSession == nil, finishingSession == nil else { return }
         liveSegments = []
         livePartialText = ""
         recordingGeneration &+= 1
         let generation = recordingGeneration
-        let session = StreamingTranscriptionSession(persistAudio: true)
+        let session = makeStreamingSession()
         streamingSession = session
         phase = .recording
 
         streamingTask = Task {
-            guard await AVAudioApplication.requestRecordPermission() else {
+            guard await requestMicrophonePermission() else {
                 streamingSession = nil
                 phase = .failed(message: "Microphone access is off. Turn it on in Settings to record.")
                 return
@@ -156,14 +165,30 @@ final class TranscriptionCoordinator {
             do {
                 let events = try await session.start(
                     options: currentOptions,
-                    downloadProgress: makeDownloadProgressHandler(resumingTo: { .recording })
+                    speakerLabeler: nil,
+                    downloadProgress: makeDownloadProgressHandler(resumingTo: {
+                        self.finishingSession == nil ? .recording : .finishing
+                    })
                 )
                 for await event in events {
                     handleStreamingEvent(event, generation: generation)
                 }
+                if generation == recordingGeneration {
+                    finishingSession = nil
+                    deactivateAudioSessionIfIdle()
+                }
             } catch {
+                guard generation == recordingGeneration else { return }
                 streamingSession = nil
-                phase = .failed(message: error.localizedDescription)
+                finishingSession = nil
+                if generation == cancelledGeneration {
+                    if let audio = await session.recordingAudioURL() { try? FileManager.default.removeItem(at: audio) }
+                    return
+                }
+                let message = await landInterruptedTake(from: session, reason: error.localizedDescription)
+                guard generation == recordingGeneration else { return }
+                deactivateAudioSessionIfIdle()
+                phase = .failed(message: message)
             }
         }
     }
@@ -173,21 +198,22 @@ final class TranscriptionCoordinator {
     func stopRecording() {
         guard let session = streamingSession else { return }
         streamingSession = nil
-        Task {
-            await session.stop()
-            deactivateAudioSession()
-        }
+        finishingSession = session
+        phase = .finishing
+        Task { await session.stop() }
     }
 
     func cancelRecording() {
         cancelledGeneration = recordingGeneration
-        guard let session = streamingSession else { return }
+        guard let session = streamingSession ?? finishingSession else { return }
         streamingSession = nil
+        finishingSession = nil
         streamingTask?.cancel()
         streamingTask = nil
+        let generation = recordingGeneration
         Task {
             await session.cancel()
-            deactivateAudioSession()
+            if generation == recordingGeneration { deactivateAudioSessionIfIdle() }
         }
     }
 
@@ -214,19 +240,22 @@ final class TranscriptionCoordinator {
             // The session tore itself down before emitting .failed; keeping the reference
             // would leave startRecording's guard tripped and the Record button dead.
             streamingSession = nil
+            finishingSession = nil
             streamingTask = nil
+            deactivateAudioSessionIfIdle()
             phase = .failed(message: msg)
         case .finished(let final):
             livePartialText = ""
             if generation == cancelledGeneration {
-                phase = .idle
+                if let audio = final.sourceURL { try? FileManager.default.removeItem(at: audio) }
+                if generation == recordingGeneration { phase = .idle }
                 return
             }
             Task { [generation] in
                 let processed = await postProcessed(final)
                 // A take stopped before capture came up (say, during the first model download) has nothing to keep.
                 guard !processed.segments.isEmpty || final.sourceURL != nil else {
-                    phase = .idle
+                    if generation == recordingGeneration { phase = .idle }
                     return
                 }
                 do {
@@ -234,16 +263,43 @@ final class TranscriptionCoordinator {
                         transcript: processed, audioSource: final.sourceURL, source: .microphone
                     )
                     guard generation != cancelledGeneration else {
-                        phase = .idle
+                        if generation == recordingGeneration { phase = .idle }
                         return
                     }
-                    phase = .idle
+                    if generation == recordingGeneration { phase = .idle }
                     onComplete?(entry)
                 } catch {
-                    phase = .failed(message: error.localizedDescription)
+                    if generation == recordingGeneration { phase = .failed(message: error.localizedDescription) }
                 }
             }
         }
+    }
+
+    /// What a take that captured audio before its model failed to load keeps: an entry with the audio and no words.
+    private func landInterruptedTake(from session: any StreamingTranscriber, reason: String) async -> String {
+        guard let audio = await session.recordingAudioURL() else { return reason }
+        let bytes = (try? audio.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+        guard bytes > RecordingScratch.emptyTakeBytes else {
+            try? FileManager.default.removeItem(at: audio)
+            return reason
+        }
+        let transcript = await StreamingTranscriptionSession.finishedTake(
+            segments: [], options: currentOptions, modelName: "", audioURL: audio
+        )
+        do {
+            _ = try await library.add(transcript: transcript, audioSource: audio, source: .microphone)
+        } catch {
+            return reason
+        }
+        try? FileManager.default.removeItem(at: audio)
+        onSalvage?()
+        return reason + " The recording was saved to your library."
+    }
+
+    /// A take started since owns the audio session; only an idle coordinator lets it go.
+    private func deactivateAudioSessionIfIdle() {
+        guard streamingSession == nil, finishingSession == nil else { return }
+        deactivateAudioSession()
     }
 
     private func deactivateAudioSession() {
@@ -262,7 +318,7 @@ final class TranscriptionCoordinator {
 
     // A live streaming event means the mic is up even if the download never reported 1.0.
     private func restoreRecordingPhaseIfDownloadStuck() {
-        if case .downloadingModel = phase { phase = .recording }
+        if case .downloadingModel = phase { phase = finishingSession == nil ? .recording : .finishing }
     }
 
     /// `ModelStore.download` calls the handler once per whole percent, never going backwards.
@@ -275,6 +331,7 @@ final class TranscriptionCoordinator {
                     if case .downloadingModel = self.phase { self.phase = resume() }
                     return
                 }
+                guard self.finishingSession == nil else { return }
                 self.phase = .downloadingModel(name: modelName, progress: fraction)
             }
         }

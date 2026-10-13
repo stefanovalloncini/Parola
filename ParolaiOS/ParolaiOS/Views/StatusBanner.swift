@@ -8,6 +8,8 @@ enum StatusBannerCopy {
             return nil
         case .downloadingModel(let name, let progress):
             return "Downloading \(modelLabel(name)) · \(Int(progress * 100))%"
+        case .finishing:
+            return "Finishing the recording…"
         case .loadingModel(let name):
             return "Loading \(modelLabel(name))…"
         case .transcribing(let file):

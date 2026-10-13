@@ -59,6 +59,7 @@ final class AppModel {
             self?.refreshModelList()
             self?.runAutoExports(for: entry)
         }
+        coordinator.onSalvage = { [weak self] in self?.refreshLibrary() }
         loadAutoExportRules()
         loadIgnoredSegmentRules()
         loadFindReplaceRules()

@@ -14,7 +14,9 @@ struct NewTranscriptionSheet: View {
                 case .idle:
                     actions
                 case .recording:
-                    LiveRecordingPane()
+                    LiveRecordingPane(finishing: false)
+                case .finishing:
+                    LiveRecordingPane(finishing: true)
                 case .failed:
                     VStack(spacing: 12) {
                         StatusBanner(phase: model.coordinator.phase)
@@ -92,6 +94,7 @@ struct NewTranscriptionSheet: View {
 
 private struct LiveRecordingPane: View {
     @Environment(AppModel.self) private var model
+    let finishing: Bool
 
     private func scrollToTail(_ proxy: ScrollViewProxy) {
         if !model.coordinator.livePartialText.isEmpty {
@@ -107,8 +110,16 @@ private struct LiveRecordingPane: View {
                 Image(systemName: "mic.fill").foregroundStyle(.red)
                 Text("newtranscription.recording").font(.headline)
                 Spacer()
-                Button("newtranscription.finish") { model.coordinator.stopRecording() }
-                    .buttonStyle(.borderedProminent)
+                if finishing {
+                    HStack(spacing: 8) {
+                        ProgressView().controlSize(.small)
+                        Text("newtranscription.finishing")
+                    }
+                    .foregroundStyle(.secondary)
+                } else {
+                    Button("newtranscription.finish") { model.coordinator.stopRecording() }
+                        .buttonStyle(.borderedProminent)
+                }
             }
             .padding(.horizontal)
 

@@ -8,7 +8,7 @@ enum ModelResidencyPolicy {
     static func releasesOnBackground(phase: TranscriptionCoordinator.Phase) -> Bool {
         switch phase {
         case .idle, .failed: true
-        case .downloadingModel, .loadingModel, .transcribing, .recording: false
+        case .downloadingModel, .loadingModel, .transcribing, .recording, .finishing: false
         }
     }
 }

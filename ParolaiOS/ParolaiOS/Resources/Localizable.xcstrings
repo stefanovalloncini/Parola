@@ -443,6 +443,13 @@
         "it" : { "stringUnit" : { "state" : "translated", "value" : "Registrazione" } }
       }
     },
+    "newtranscription.finishing" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Finishing…" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Chiusura…" } }
+      }
+    },
     "newtranscription.finish" : {
       "extractionState" : "manual",
       "localizations" : {
