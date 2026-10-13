@@ -1,0 +1,18 @@
+1
+00:00:10,000 --> 00:00:14,400
+So the thing about building a
+transcription app is that every
+
+2
+00:00:14,400 --> 00:00:19,550
+part of it looks simple until you try to make it work for
+
+3
+00:00:22,100 --> 00:00:27,300
+a two hour meeting recorded on a laptop in a noisy café, and
+
+4
+00:00:27,300 --> 00:00:32,050
+then the captions have to fit
+on a phone screen held upright.
+

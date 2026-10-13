@@ -1,0 +1,20 @@
+1
+00:00:00,000 --> 00:00:02,183
+The first segment runs a
+little past the start of
+
+2
+00:00:02,183 --> 00:00:04,000
+the second one and says a
+good deal more than fits.
+
+3
+00:00:04,000 --> 00:00:08,000
+The second begins before
+the first is done.
+
+4
+00:00:08,000 --> 00:00:12,000
+The third starts exactly
+where the second ends.
+

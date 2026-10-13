@@ -1,0 +1,34 @@
+1
+00:00:00,000 --> 00:00:02,877
+Ada: Thanks for
+joining everyone, I
+
+2
+00:00:02,877 --> 00:00:06,000
+know the schedule
+is tight this week.
+
+3
+00:00:06,000 --> 00:00:08,000
+First item is the
+export rewrite.
+
+4
+00:00:14,000 --> 00:00:17,563
+We shipped the new splitter on
+Monday and the captions finally
+
+5
+00:00:17,563 --> 00:00:20,954
+follow the speech instead of
+the segment, which means long
+
+6
+00:00:20,954 --> 00:00:24,000
+answers no longer sit on
+screen for fifteen seconds.
+
+7
+00:00:25,000 --> 00:00:27,000
+Grace: Great, thank you.
+

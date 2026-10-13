@@ -1,0 +1,24 @@
+1
+00:00:00,000 --> 00:00:01,908
+Today I will explain the
+今日は新しい字幕の分割について
+
+2
+00:00:01,908 --> 00:00:04,060
+new caption splitting. Long
+説明します。長い文章は読みやすい
+
+3
+00:00:04,060 --> 00:00:05,870
+sentences are cut to a
+長さに切り、話している間だけ
+
+4
+00:00:05,870 --> 00:00:07,630
+readable length and shown
+画面に表示されます。
+
+5
+00:00:07,630 --> 00:00:09,000
+only while they are spoken.
+

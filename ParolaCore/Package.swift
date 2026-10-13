@@ -82,6 +82,7 @@ let package = Package(
                 .copy("Resources/tiny.parola"),
                 .copy("Resources/expected"),
                 .copy("Resources/export-golden"),
+                .copy("Resources/caption-golden"),
                 .copy("Resources/obsidian-golden"),
             ]
         ),

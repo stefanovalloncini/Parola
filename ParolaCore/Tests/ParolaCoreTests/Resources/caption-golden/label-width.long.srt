@@ -1,0 +1,5 @@
+1
+00:00:00,000 --> 00:00:08,000
+Ada: I think we should ship the new captions
+on Friday morning before the board meeting
+

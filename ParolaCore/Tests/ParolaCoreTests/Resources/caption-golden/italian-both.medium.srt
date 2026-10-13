@@ -1,0 +1,39 @@
+1
+00:00:10,000 --> 00:00:12,275
+So the thing about building a
+La cosa che riguarda la costruzione di
+
+2
+00:00:12,275 --> 00:00:14,687
+transcription app is that every part
+un'app di trascrizione è che ogni
+
+3
+00:00:14,687 --> 00:00:17,234
+of it looks simple until you try to
+parte sembra semplice finché non provi
+
+4
+00:00:17,234 --> 00:00:19,781
+make it work for a two hour meeting
+a farla funzionare per una riunione di
+
+5
+00:00:19,781 --> 00:00:22,158
+recorded on a laptop in a noisy
+due ore registrata su un portatile in
+
+6
+00:00:22,158 --> 00:00:24,706
+café, and then the captions have to
+un caffè rumoroso, e poi i sottotitoli
+
+7
+00:00:24,706 --> 00:00:26,981
+fit on a phone screen held upright.
+devono stare su uno schermo di
+
+8
+00:00:26,981 --> 00:00:28,000
+telefono tenuto in verticale.
+

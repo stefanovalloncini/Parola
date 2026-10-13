@@ -1,0 +1,11 @@
+1
+00:00:05,000 --> 00:00:06,000
+So the thing about building a
+transcription app is that every
+part of it looks simple until
+you try to make it work for a
+two hour meeting recorded on a
+laptop in a noisy café, and
+then the captions have to fit
+on a phone screen held upright.
+

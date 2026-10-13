@@ -43,6 +43,8 @@ public protocol TranscriptExporter: Sendable {
     var spec: ExportSpec { get }
     /// The bytes for this format. Call ``render(_:)`` instead: it applies the spec's shared transforms first.
     func encode(_ transcript: Transcript) throws -> Data
+    /// The bytes for the transcript as the spec describes it.
+    func render(_ transcript: Transcript) throws -> Data
 }
 
 public extension TranscriptExporter {

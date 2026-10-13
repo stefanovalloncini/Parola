@@ -1,0 +1,15 @@
+1
+00:00:10,000 --> 00:00:13,894
+So the thing about building a transcription app is
+Sì.
+
+2
+00:00:13,894 --> 00:00:21,020
+that every part of it looks simple until you try
+to make it work for a two hour meeting recorded
+
+3
+00:00:21,020 --> 00:00:28,000
+on a laptop in a noisy café, and then the captions
+have to fit on a phone screen held upright.
+

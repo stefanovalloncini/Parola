@@ -1,0 +1,5 @@
+1
+00:00:00,000 --> 00:00:09,000
+Today I will explain the new caption splitting. Long sentences are cut to a readable length and shown only while they are spoken.
+今日は新しい字幕の分割について説明します。長い文章は読みやすい長さに切り、話している間だけ画面に表示されます。
+
