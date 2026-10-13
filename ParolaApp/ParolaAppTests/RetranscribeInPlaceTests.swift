@@ -462,6 +462,7 @@ extension TranscriberMockSuites {
                     language: "it", gate: gate
                 ))
                 let model = makeModel("retranscribe-same")
+                await model.awaitModelListRefresh()
                 model.availableModels = [appleSpeechInfo()]
                 let wav = try makeWAV("same")
                 defer { try? FileManager.default.removeItem(at: wav) }
@@ -505,6 +506,7 @@ extension TranscriberMockSuites {
         @Test("Transcribe Again names the stand-in when the entry's own model is gone, and skips a take never transcribed")
         func transcribeAgainFallsBackOrSkips() async throws {
             let model = makeModel("retranscribe-same-fallback")
+            await model.awaitModelListRefresh()
             model.availableModels = [appleSpeechInfo()]
             model.selectedModel = Self.appleSpeech
             let wav = try makeWAV("same-fallback")
