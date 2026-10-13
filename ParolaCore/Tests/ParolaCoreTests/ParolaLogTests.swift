@@ -127,7 +127,7 @@ struct ParolaLogTests {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("log-floor-\(UUID().uuidString)", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: dir) }
         let sink = FileDiagnosticsSink(directory: dir, minimumLevel: .info)
-        try ParolaLog.withSink(sink) {
+        ParolaLog.withSink(sink) {
             var builds = 0
             func token() -> ModelToken {
                 builds += 1
