@@ -217,7 +217,7 @@ struct LibraryListLayoutTests {
         #expect(scrollView.convert(scrollView.bounds, to: hosted.host).width == hosted.host.bounds.width, "the scroll view spans the pane, margins included")
     }
 
-    @Test("a date title is a plain 47 pt row the arrow keys pass over, and Select All leaves it out")
+    @Test("a date title is a 39 pt section header the arrow keys pass over, and Select All leaves it out")
     func titlesAreRowsTheKeyboardSkips() async throws {
         let hosted = await host(threeGroups())
         defer { close(hosted) }
@@ -229,9 +229,9 @@ struct LibraryListLayoutTests {
         let titles = [first, first + 2, first + 5]
         let takes = [first + 1, first + 3, first + 4, first + 6]
         for row in titles {
-            #expect(table.rect(ofRow: row).height == 47, "title row \(row): \(table.rect(ofRow: row))")
+            #expect(table.rect(ofRow: row).height == 39, "title row \(row): \(table.rect(ofRow: row))")
             let groupStyled = table.rowView(atRow: row, makeIfNecessary: true)?.isGroupRowStyle
-            #expect(groupStyled == false, "title row \(row) is drawn as a system section header")
+            #expect(groupStyled == true, "title row \(row) is a group row, so the list pins it under the toolbar")
         }
 
         hosted.window.makeFirstResponder(table)

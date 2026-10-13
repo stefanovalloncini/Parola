@@ -32,6 +32,7 @@ struct ContentView: View {
         } detail: {
             ContentRoutes()
                 .toolbar { ContentToolbar() }
+                .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
                 .modifier(HideToolbarTitleIfAvailable())
         }
         .modifier(TakeSidebarRelease())

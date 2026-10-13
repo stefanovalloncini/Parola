@@ -46,6 +46,27 @@ enum LibraryListItem: Identifiable, Equatable {
     }
 }
 
+/// A date group as the list's section: its title, which stays under the toolbar while the group scrolls, and its rows.
+struct LibraryListSection: Identifiable, Equatable {
+    let id: String
+    let title: String?
+    var rows: [LibraryRowDisplay]
+
+    static func sections(for items: [LibraryListItem]) -> [LibraryListSection] {
+        var sections: [LibraryListSection] = []
+        for item in items {
+            switch item {
+            case .header(let id, let title):
+                sections.append(LibraryListSection(id: id, title: title, rows: []))
+            case .entry(let row):
+                if sections.isEmpty { sections.append(LibraryListSection(id: "leading", title: nil, rows: [])) }
+                sections[sections.count - 1].rows.append(row)
+            }
+        }
+        return sections
+    }
+}
+
 /// The rows of one library page, with their menu, drag and open gesture. Browsing and search results each own one.
 struct LibraryRowList<Top: View>: View {
     @Environment(AppModel.self) private var model
@@ -53,6 +74,7 @@ struct LibraryRowList<Top: View>: View {
     let items: [LibraryListItem]
     /// Taken once with the items, since a click re-runs the body and the rows animate on their ids alone.
     private let itemIDs: [String]
+    private let sections: [LibraryListSection]
     @Binding var selection: Set<LibraryEntry.ID>
     let detail: LibraryListRow.Detail
     let animatesRows: Bool
@@ -65,6 +87,8 @@ struct LibraryRowList<Top: View>: View {
     var top: Top?
     /// Entries the page shows above the list, which a selection, a drag and the File menu reach like rows.
     var shelf: [LibraryRowDisplay] = []
+    /// Set while the page's own title has scrolled out of sight, so the toolbar can carry a compact one.
+    var titleScrolledAway: Binding<Bool>?
     /// The tile the keyboard is on; the list keeps the responder, and the arrows are read here while this is set.
     @State private var shelfCursor: LibraryEntry.ID?
 
@@ -79,10 +103,12 @@ struct LibraryRowList<Top: View>: View {
         focusKey: LibraryListFocus,
         rowAppeared: ((LibraryEntry.ID) -> Void)? = nil,
         shelf: [LibraryRowDisplay] = [],
+        titleScrolledAway: Binding<Bool>? = nil,
         top: Top? = nil
     ) {
         self.items = items
         itemIDs = items.map(\.id)
+        sections = LibraryListSection.sections(for: items)
         _selection = selection
         self.detail = detail
         self.animatesRows = animatesRows
@@ -92,12 +118,33 @@ struct LibraryRowList<Top: View>: View {
         self.focusKey = focusKey
         self.rowAppeared = rowAppeared
         self.shelf = shelf
+        self.titleScrolledAway = titleScrolledAway
         self.top = top
     }
 
     /// List(.inset) indents its rows by 16 pt of its own; this lands a title on the 24 pt gutter.
     private static var titleInsets: EdgeInsets {
         EdgeInsets(top: 0, leading: DS.Spacing.small, bottom: 0, trailing: DS.Spacing.small)
+    }
+
+    /// The page title is gone once the list has moved about as far as the title is tall.
+    private static var titleScrollThreshold: CGFloat { 56 }
+
+    private func rows(of section: LibraryListSection) -> some View {
+        ForEach(section.rows) { row in
+            LibraryListRow(
+                row: row,
+                detail: detail,
+                isSelected: selection.contains(row.id),
+                rename: rename,
+                delete: delete
+            )
+            .equatable()
+            .onAppear { rowAppeared?(row.id) }
+            // On the element, not in the row's body: behind `.equatable()` the list doesn't read them.
+            .listRowInsets(EdgeInsets())
+            .listRowSeparator(.hidden)
+        }
     }
 
     private var rowSelection: Binding<Set<LibraryEntry.ID>> {
@@ -128,30 +175,25 @@ struct LibraryRowList<Top: View>: View {
                 .selectionDisabled()
                 .id(LibraryListItem.pageTopID)
             }
-            ForEach(items) { item in
-                switch item {
-                case .header(_, let title):
-                    LibraryGroupHeader(title: title)
-                        .listRowInsets(Self.titleInsets)
-                        .listRowSeparator(.hidden)
-                        .selectionDisabled()
-                case .entry(let row):
-                    LibraryListRow(
-                        row: row,
-                        detail: detail,
-                        isSelected: selection.contains(row.id),
-                        rename: rename,
-                        delete: delete
-                    )
-                    .equatable()
-                    .onAppear { rowAppeared?(row.id) }
-                    // On the element, not in the row's body: behind `.equatable()` the list doesn't read them.
-                    .listRowInsets(EdgeInsets())
-                    .listRowSeparator(.hidden)
+            ForEach(sections) { section in
+                if let title = section.title {
+                    Section {
+                        rows(of: section)
+                    } header: {
+                        LibraryGroupHeader(title: title)
+                            .padding(.leading, DS.Spacing.small)
+                    }
+                } else {
+                    rows(of: section)
                 }
             }
         }
         .listStyle(.inset)
+        .onScrollGeometryChange(for: Bool.self) { geometry in
+            geometry.contentOffset.y + geometry.contentInsets.top > Self.titleScrollThreshold
+        } action: { _, scrolledAway in
+            titleScrolledAway?.wrappedValue = scrolledAway
+        }
         .readingColumn()
         .tint(DS.Color.accentFill)
         .focused(focus, equals: focusKey)
@@ -273,7 +315,7 @@ struct LibraryGroupHeader: View {
             .font(DS.Font.heading)
             .foregroundStyle(DS.Color.primaryText)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.top, 22)
+            .padding(.top, DS.Spacing.snug)
             .padding(.bottom, DS.Spacing.snug)
             .accessibilityAddTraits(.isHeader)
     }

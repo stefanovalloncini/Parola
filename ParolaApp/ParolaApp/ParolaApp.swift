@@ -102,7 +102,8 @@ struct ParolaApp: App {
                 }
                 .onOpenURL { url in handleParolaOpen(url, model: model) }
         }
-        .windowStyle(.hiddenTitleBar)
+        // .hiddenTitleBar draws no scroll edge effect under the toolbar; the toolbar style already hides the title.
+        .windowStyle(.automatic)
         .windowToolbarStyle(.unified(showsTitle: false))
         .windowResizability(.contentSize)
         .defaultSize(width: 1180, height: 760)

@@ -369,6 +369,7 @@ private struct LibraryBrowseList: View, Equatable {
     @State private var animatesRows = false
     @State private var shelfRows: [LibraryRowDisplay] = []
     @State private var shelfTiles = RecentShelfRules.maximumTiles
+    @State private var titleInToolbar = false
 
     private var activeFilters: LibraryListContent.ActiveFilters {
         LibraryListContent.ActiveFilters(
@@ -464,11 +465,22 @@ private struct LibraryBrowseList: View, Equatable {
                         focus: focus,
                         focusKey: .browse,
                         shelf: shelfRows,
+                        titleScrolledAway: $titleInToolbar,
                         top: pageTop(showsIntake: true)
                             .padding(.top, DS.Spacing.small)
                             .padding(.bottom, DS.Spacing.tight)
                     )
                     .scrollEdgeEffectStyle(.soft, for: .top)
+                    .toolbar {
+                        ToolbarItem(placement: .principal) {
+                            CompactPageTitle(
+                                title: LibraryPageHeader.title(category: category, personName: selectedPerson?.name),
+                                count: shownTotals.count,
+                                isShown: titleInToolbar
+                            )
+                        }
+                        .sharedBackgroundVisibility(.hidden)
+                    }
                     .background { FailureScroll(proxy: proxy) }
                 }
             } else {
@@ -626,6 +638,25 @@ private struct LibraryBrowseList: View, Equatable {
 
     private var selectedPerson: Person? {
         model.personFilter.flatMap(model.person(id:))
+    }
+}
+
+/// The page's name and count in the toolbar's centre once the big title has scrolled off; it fades with the title's return.
+struct CompactPageTitle: View {
+    let title: String
+    let count: Int
+    let isShown: Bool
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        Text(verbatim: "\(title) · \(AppFormat.integer(count))")
+            .font(DS.Font.heading)
+            .foregroundStyle(DS.Color.primaryText)
+            .lineLimit(1)
+            .opacity(isShown ? 1 : 0)
+            .animation(reduceMotion ? nil : DS.Motion.route, value: isShown)
+            .accessibilityHidden(!isShown)
     }
 }
 

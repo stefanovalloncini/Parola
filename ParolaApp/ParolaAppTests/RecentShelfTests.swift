@@ -168,4 +168,17 @@ struct RecentShelfTests {
         let items = LibraryListItem.items(for: LibraryDateGroups.ungrouped(rows))
         #expect(LibraryListItem.entries(in: ["e0", "e3"], items: items) == ["e3"])
     }
+
+    @Test("date groups become sections, and entries before any title keep a section of their own")
+    func sectionsFollowTheTitles() {
+        let rows = (0..<4).map { LibraryRowDisplay(entry: entry($0)) }
+        let items: [LibraryListItem] = [
+            .entry(rows[0]), .header(id: "a", title: "Today"), .entry(rows[1]), .entry(rows[2]),
+            .header(id: "b", title: "May"), .entry(rows[3]),
+        ]
+        let sections = LibraryListSection.sections(for: items)
+        #expect(sections.map(\.title) == [nil, "Today", "May"])
+        #expect(sections.map { $0.rows.map(\.id) } == [["e0"], ["e1", "e2"], ["e3"]])
+        #expect(LibraryListSection.sections(for: []).isEmpty)
+    }
 }
