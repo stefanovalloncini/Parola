@@ -87,6 +87,41 @@ struct DictationPermissionsTests {
         #expect(permissions.accessibilityGranted)
     }
 
+    private final class SleepLog: Sendable {
+        private let state = OSAllocatedUnfairLock(initialState: [Duration]())
+        var all: [Duration] { state.withLock { $0 } }
+        func append(_ d: Duration) { state.withLock { $0.append(d) } }
+    }
+
+    @Test("the poll asks every 2 s for two minutes, then every 15 s, until granted")
+    func pollBacksOff() async {
+        let box = Box()
+        let sleeps = SleepLog()
+        let permissions = DictationPermissions(
+            trustCheck: { box.trusted },
+            microphoneStatus: { box.mic },
+            grantPollSleep: { duration in
+                sleeps.append(duration)
+                if sleeps.all.count == 63 { box.trusted = true }
+                await Task.yield()
+            }
+        )
+        permissions.onAccessibilityGranted = { box.grantedFired += 1 }
+
+        permissions.beginWatchingForGrant()
+        var spins = 0
+        while box.grantedFired == 0, spins < 2000 {
+            try? await Task.sleep(for: .milliseconds(5))
+            spins += 1
+        }
+
+        let all = sleeps.all
+        #expect(box.grantedFired == 1)
+        #expect(all.count == 63)
+        #expect(all.prefix(60).allSatisfy { $0 == .seconds(2) })
+        #expect(all.dropFirst(60).allSatisfy { $0 == .seconds(15) })
+    }
+
     @Test("ending the watch stops the poll")
     func endWatchingStopsPoll() async {
         let box = Box()

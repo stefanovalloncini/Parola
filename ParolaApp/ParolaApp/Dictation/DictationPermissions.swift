@@ -18,6 +18,9 @@ final class DictationPermissions {
     @ObservationIgnored private var reads = 0
     @ObservationIgnored private var settled: Bool
     @ObservationIgnored private let grantPollInterval: Duration
+    @ObservationIgnored private let grantPollFastWindow: Duration
+    @ObservationIgnored private let grantPollSlowInterval: Duration
+    @ObservationIgnored private let grantPollSleep: @Sendable (Duration) async -> Void
     @ObservationIgnored private var activationObserver: NSObjectProtocol?
     @ObservationIgnored private var grantPollTask: Task<Void, Never>?
 
@@ -25,11 +28,17 @@ final class DictationPermissions {
         trustCheck: @escaping @Sendable () -> Bool = { AXIsProcessTrusted() },
         microphoneStatus: @escaping @Sendable () -> AVAuthorizationStatus = { AVCaptureDevice.authorizationStatus(for: .audio) },
         grantPollInterval: Duration = .seconds(2),
+        grantPollFastWindow: Duration = .seconds(120),
+        grantPollSlowInterval: Duration = .seconds(15),
+        grantPollSleep: @escaping @Sendable (Duration) async -> Void = { try? await Task.sleep(for: $0) },
         readsAtLaunch: Bool = true
     ) {
         self.trustCheck = trustCheck
         self.microphoneStatus = microphoneStatus
         self.grantPollInterval = grantPollInterval
+        self.grantPollFastWindow = grantPollFastWindow
+        self.grantPollSlowInterval = grantPollSlowInterval
+        self.grantPollSleep = grantPollSleep
         settled = readsAtLaunch
         let mic = readsAtLaunch ? microphoneStatus() : .notDetermined
         accessibilityGranted = readsAtLaunch && trustCheck()
@@ -57,13 +66,18 @@ final class DictationPermissions {
     /// so the armed-but-dead hotkey comes alive without an app activation.
     func beginWatchingForGrant() {
         guard grantPollTask == nil, !accessibilityGranted else { return }
-        let interval = grantPollInterval
+        let fast = grantPollInterval, window = grantPollFastWindow, slow = grantPollSlowInterval
+        let sleep = grantPollSleep
         grantPollTask = Task { @MainActor [weak self] in
+            var elapsed = Duration.zero
             while !Task.isCancelled {
-                try? await Task.sleep(for: interval)
+                let interval = elapsed < window ? fast : slow
+                await sleep(interval)
+                elapsed += interval
                 if Task.isCancelled { return }
                 guard let self else { return }
-                self.refresh()
+                await self.readInBackground(since: self.reads)
+                if Task.isCancelled { return }
                 if self.accessibilityGranted {
                     self.grantPollTask = nil
                     return
@@ -80,13 +94,15 @@ final class DictationPermissions {
     /// The checks are TCC round trips, so a launch or an app activation asks off the main thread and applies the answer unless a direct `refresh()` has landed since.
     func refreshInBackground() {
         let started = reads
+        Task { [weak self] in await self?.readInBackground(since: started) }
+    }
+
+    private func readInBackground(since started: Int) async {
         let trust = trustCheck
         let status = microphoneStatus
-        Task { [weak self] in
-            guard let answer = try? await AppModel.offMainIO(qos: .utility, { (trust(), status()) }) else { return }
-            guard let self, self.reads == started else { return }
-            self.apply(trusted: answer.0, microphone: answer.1)
-        }
+        guard let answer = try? await AppModel.offMainIO(qos: .utility, { (trust(), status()) }) else { return }
+        guard reads == started else { return }
+        apply(trusted: answer.0, microphone: answer.1)
     }
 
     func refresh() {
