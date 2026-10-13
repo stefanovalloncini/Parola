@@ -284,7 +284,7 @@ struct LibraryListContentTests {
         #expect(LibraryListContent.emptyActions(for: .transcription, features: .all).first == .recordMicrophone)
     }
 
-    @Test("empty-state actions drop the ones their feature is gated off, and leave Open Files to the intake strip")
+    @Test("empty-state actions drop the ones their feature is gated off, and leave Open Files to the toolbar and the File menu")
     func emptyActionsRespectFeatures() {
         let noCapture = FeatureSet(enabled: [.batch])
         #expect(LibraryListContent.emptyActions(for: .transcription, features: noCapture) == [])

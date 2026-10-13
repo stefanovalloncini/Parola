@@ -49,6 +49,8 @@ struct LibraryPageHeader: View {
     let filters: LibraryFilterBar
     /// An empty page has nothing to narrow or order; a filter already on stays so it can be cleared.
     let showsListControls: Bool
+    /// Whether the next run's settings chip sits in the control row.
+    var showsIntakeSettings = false
     /// Passed through unread, so a row click redraws the bulk actions and not the header around them.
     let selection: Binding<Set<LibraryEntry.ID>>
     @Binding var pendingBulkDelete: Bool
@@ -103,6 +105,10 @@ struct LibraryPageHeader: View {
 
     @ViewBuilder
     private func controls(folded: Bool) -> some View {
+        if showsIntakeSettings {
+            IntakeSettingsButton(iconOnly: folded)
+                .padding(.trailing, DS.Spacing.small)
+        }
         LibraryBulkActions(selection: selection, pendingBulkDelete: $pendingBulkDelete)
         if showsFilters, !folded {
             filters

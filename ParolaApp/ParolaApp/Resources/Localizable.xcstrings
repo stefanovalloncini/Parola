@@ -5792,17 +5792,6 @@
         }
       }
     },
-    "Drop audio or video": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Trascina audio o video"
-          }
-        }
-      }
-    },
     "Drop audio or video files.": {
       "extractionState": "manual",
       "localizations": {
@@ -5821,17 +5810,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Trascina audio o video, oppure incolla un link YouTube."
-          }
-        }
-      }
-    },
-    "Drop audio or video, or paste a link": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Trascina audio o video, oppure incolla un link"
           }
         }
       }
@@ -8038,7 +8016,7 @@
       }
     },
     "Intake.Option.Speakers": {
-      "comment": "An option named on the intake strip's settings button, after the model and the language.",
+      "comment": "An option named on the header's settings chip, after the model and the language.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -8056,7 +8034,7 @@
       }
     },
     "Intake.Option.Translate": {
-      "comment": "An option named on the intake strip's settings button, after the model and the language.",
+      "comment": "An option named on the header's settings chip, after the model and the language.",
       "extractionState": "manual",
       "localizations": {
         "en": {

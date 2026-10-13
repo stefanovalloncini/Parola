@@ -561,12 +561,10 @@ private struct LibraryBrowseList: View, Equatable {
                     peopleOptions: model.knownPeople(in: category)
                 ),
                 showsListControls: pageCount > 0,
+                showsIntakeSettings: showsIntake,
                 selection: $selection,
                 pendingBulkDelete: $pendingBulkDelete
             )
-            if showsIntake {
-                IntakeStrip()
-            }
             LibraryFailureBanner()
         }
     }

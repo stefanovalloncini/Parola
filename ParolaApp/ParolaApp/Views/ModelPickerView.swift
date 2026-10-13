@@ -60,7 +60,7 @@ struct ModelPickerView: View {
         return capped(replacements[displayName] ?? displayName)
     }
 
-    /// The catalog's own names all fit; an uncurated model id would push the intake strip's other controls aside.
+    /// The catalog's own names all fit; an uncurated model id would push the header's other controls aside.
     static let labelCharacterCap = 24
 
     static func capped(_ label: String) -> String {

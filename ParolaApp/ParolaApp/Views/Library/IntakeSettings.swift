@@ -1,47 +1,6 @@
 import SwiftUI
 import ParolaCore
 
-/// The whole window takes a drop; the strip says so, beside Open Files and the next run's settings.
-struct IntakeStrip: View {
-    static let height: CGFloat = 44
-
-    static func prompt(linksEnabled: Bool, bundle: Bundle = .main) -> String {
-        linksEnabled
-            ? String(localized: "Drop audio or video, or paste a link", bundle: bundle)
-            : String(localized: "Drop audio or video", bundle: bundle)
-    }
-
-    // Optional: AppKit can build a List cell after SwiftUI tore the List down, and a required read traps "No Observable object of type AppModel found".
-    @Environment(AppModel.self) private var model: AppModel?
-
-    var body: some View {
-        HStack(spacing: DS.Spacing.regular) {
-            Image(systemName: "arrow.down.doc")
-                .font(.system(size: 17))
-                .foregroundStyle(DS.Color.accentInk)
-                .accessibilityHidden(true)
-            Text(verbatim: Self.prompt(linksEnabled: model?.features.isEnabled(.youtube) == true))
-                .font(DS.Font.body)
-                .foregroundStyle(DS.Color.secondaryText)
-                .lineLimit(1)
-            Spacer(minLength: DS.Spacing.small)
-            Button("Open Files…") { model?.presentOpenPanel() }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .tint(nil)
-                .fixedSize()
-                .axLeaf("Intake.Button.OpenFiles")
-            IntakeSettingsButton()
-        }
-        .padding(.horizontal, DS.Spacing.medium)
-        .frame(height: Self.height)
-        .background(
-            RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous)
-                .fill(DS.Color.surfaceElevated)
-        )
-    }
-}
-
 /// What the next run will use, in the words the button shows.
 @MainActor
 enum IntakeSummary {
@@ -94,6 +53,18 @@ enum IntakeSummary {
         )
     }
 
+    /// The model's name without a trailing "(system)"-style note, which the header's capsule has no room for.
+    static func compactModelLabel(_ label: String) -> String {
+        label.replacing(/\s*\([^)]*\)\s*$/, with: "")
+    }
+
+    /// What the header's capsule says: the summary, with the engine's name kept short.
+    static func chipParts(for model: AppModel) -> [String] {
+        var parts = parts(for: model)
+        if !parts.isEmpty { parts[0] = compactModelLabel(parts[0]) }
+        return parts
+    }
+
     static func text(for model: AppModel) -> String {
         parts(for: model).joined(separator: " · ")
     }
@@ -119,14 +90,16 @@ enum IntakeSummary {
     }
 }
 
-/// "Whisper Turbo · Auto ›": opens the popover that sets up the next run. Accent in the strip, quiet under the hero.
+/// "Whisper Turbo · Auto": opens the popover that sets up the next run. A capsule in the library header, quiet under the hero.
 struct IntakeSettingsButton: View {
     enum Style {
-        case accent
+        case chip
         case quiet
     }
 
-    var style: Style = .accent
+    var style: Style = .chip
+    /// A header too narrow for the words keeps the control as an icon.
+    var iconOnly = false
     var leaf = "Intake.Button.Settings"
 
     // Optional: AppKit can build a List cell after SwiftUI tore the List down, and a required read traps "No Observable object of type AppModel found".
@@ -138,18 +111,9 @@ struct IntakeSettingsButton: View {
         Button {
             isPresented = true
         } label: {
-            HStack(spacing: 3) {
-                Text(verbatim: parts.joined(separator: " · "))
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 9, weight: .semibold))
-                    .accessibilityHidden(true)
-            }
-            .font(style == .accent ? DS.Font.secondary.weight(.medium) : DS.Font.secondary)
-            .foregroundStyle(style == .accent ? DS.Color.accentInk : DS.Color.secondaryText)
-            .lineLimit(1)
-            .contentShape(Rectangle())
+            label(parts)
         }
-        .buttonStyle(.plain)
+        .modifier(IntakeButtonChrome(style: style))
         .disabled(model == nil)
         .fixedSize()
         .popover(isPresented: $isPresented, arrowEdge: .bottom) {
@@ -159,6 +123,51 @@ struct IntakeSettingsButton: View {
         .accessibilityLabel(Text("Transcription settings"))
         .accessibilityValue(Text(verbatim: parts.joined(separator: ", ")))
         .axLeaf(leaf)
+    }
+}
+
+extension IntakeSettingsButton {
+    @ViewBuilder
+    fileprivate func label(_ parts: [String]) -> some View {
+        switch style {
+        case .chip where iconOnly:
+            Image(systemName: "slider.horizontal.3")
+        case .chip:
+            HStack(spacing: DS.Spacing.tight) {
+                Image(systemName: "waveform")
+                    .accessibilityHidden(true)
+                Text(verbatim: (model.map(IntakeSummary.chipParts(for:)) ?? parts).joined(separator: " · "))
+                    .lineLimit(1)
+            }
+        case .quiet:
+            HStack(spacing: 3) {
+                Text(verbatim: parts.joined(separator: " · "))
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 9, weight: .semibold))
+                    .accessibilityHidden(true)
+            }
+            .font(DS.Font.secondary)
+            .foregroundStyle(DS.Color.secondaryText)
+            .lineLimit(1)
+            .contentShape(Rectangle())
+        }
+    }
+}
+
+private struct IntakeButtonChrome: ViewModifier {
+    let style: IntakeSettingsButton.Style
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        switch style {
+        case .chip:
+            content
+                .buttonStyle(.bordered)
+                .buttonBorderShape(.capsule)
+                .controlSize(.small)
+        case .quiet:
+            content.buttonStyle(.plain)
+        }
     }
 }
 

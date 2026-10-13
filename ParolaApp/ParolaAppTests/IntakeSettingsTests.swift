@@ -7,8 +7,8 @@ import ParolaCore
 import ParolaTestSupport
 
 @MainActor
-@Suite("Intake strip")
-struct IntakeStripTests {
+@Suite("Intake settings chip")
+struct IntakeSettingsTests {
     @Test("the settings button names the model by its short name")
     func modelLabel() {
         #expect(IntakeSummary.modelLabel(id: "openai_whisper-large-v3_turbo", installedLabel: nil) == "Whisper Turbo")
@@ -108,26 +108,12 @@ struct IntakeStripTests {
     @Test("the popover shows the language notice, so it reaches more than Settings")
     func popoverShowsTheLanguageNotice() throws {
         let path = #filePath.replacingOccurrences(
-            of: "ParolaAppTests/IntakeStripTests.swift",
-            with: "ParolaApp/Views/Library/IntakeStrip.swift"
+            of: "ParolaAppTests/IntakeSettingsTests.swift",
+            with: "ParolaApp/Views/Library/IntakeSettings.swift"
         )
         let source = try String(contentsOfFile: path, encoding: .utf8).split(whereSeparator: \.isWhitespace).joined(separator: " ")
         #expect(source.contains(
             #"if let notice = IntakeSummary.languageNotice(for: model) { Label(notice, systemImage: "exclamationmark.triangle.fill")"#
         ))
-    }
-
-    @Test("the prompt offers links only when the build can fetch them")
-    func prompt() {
-        #expect(IntakeStrip.prompt(linksEnabled: true) == "Drop audio or video, or paste a link")
-        #expect(IntakeStrip.prompt(linksEnabled: false) == "Drop audio or video")
-    }
-
-    @Test("the prompt reads in Italian")
-    func italianPrompt() throws {
-        let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
-        let italian = try #require(Bundle(path: path))
-        #expect(IntakeStrip.prompt(linksEnabled: true, bundle: italian) == "Trascina audio o video, oppure incolla un link")
-        #expect(IntakeStrip.prompt(linksEnabled: false, bundle: italian) == "Trascina audio o video")
     }
 }

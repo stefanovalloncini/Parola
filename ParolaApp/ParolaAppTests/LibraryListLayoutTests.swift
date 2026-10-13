@@ -256,7 +256,7 @@ struct LibraryListLayoutTests {
         _ = await settled(hosted)
 
         #expect(table.numberOfRows == shown.count + 1)
-        #expect(table.rect(ofRow: 0).height > 100, "the title, the chips and the intake strip: \(table.rect(ofRow: 0))")
+        #expect(table.rect(ofRow: 0).height > 60, "the title and the chips: \(table.rect(ofRow: 0))")
 
         hosted.window.makeFirstResponder(table)
         table.selectRowIndexes([1], byExtendingSelection: false)
@@ -277,7 +277,7 @@ struct LibraryListLayoutTests {
         // Looked up each time: a phase change may hand the page a table of its own.
         func topRow() -> CGFloat { table(hosted)?.rect(ofRow: 0).height ?? 0 }
         let calm = topRow()
-        #expect(calm > 100)
+        #expect(calm > 60)
 
         hosted.model.phase = .failed(message: "The file couldn't be decoded.")
         let grew = await settled(hosted) { topRow() > calm + 20 }

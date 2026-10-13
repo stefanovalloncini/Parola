@@ -37,7 +37,7 @@ struct ListCellModelTests {
     func settingsButtonDisabledWithNoModel() throws {
         let path = #filePath.replacingOccurrences(
             of: "ParolaAppTests/ListCellModelTests.swift",
-            with: "ParolaApp/Views/Library/IntakeStrip.swift"
+            with: "ParolaApp/Views/Library/IntakeSettings.swift"
         )
         let source = try String(contentsOfFile: path, encoding: .utf8)
         #expect(source.contains(".disabled(model == nil)"))
@@ -51,7 +51,7 @@ struct ListCellModelTests {
         #expect(renders(RecentlyDeletedRow(display: display, daysLeft: 3, timeLeft: "3 days", onRestore: {}, onPurge: {})))
     }
 
-    @Test("the page's top row draws with no model: header, chips, bulk actions, intake strip and failure banner")
+    @Test("the page's top row draws with no model: header, chips, bulk actions, intake settings and failure banner")
     func pageTop() {
         let filters = LibraryFilterBar(
             labelFilter: .constant("Work"),
@@ -68,12 +68,12 @@ struct ListCellModelTests {
             subtitleHelp: nil,
             filters: filters,
             showsListControls: true,
+            showsIntakeSettings: true,
             selection: .constant(["a", "b"]),
             pendingBulkDelete: .constant(false)
         )
         #expect(renders(header))
         #expect(renders(LibraryBulkActions(selection: .constant(["a", "b"]), pendingBulkDelete: .constant(false))))
-        #expect(renders(IntakeStrip()))
         #expect(renders(IntakeSettingsButton()))
         #expect(renders(VStack { LibraryFailureBanner(); ErrorBanner(message: "The file couldn't be decoded.") }))
     }
