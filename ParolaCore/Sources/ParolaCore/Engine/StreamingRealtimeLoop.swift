@@ -101,7 +101,7 @@ actor StreamingRealtimeLoop {
 
     private struct Inbox: Sendable {
         var pending: [Float] = []
-        var energies: [(rel: Float, avg: Float)] = []
+        var energies: [(rel: Float, avg: Float, samples: Int)] = []
         var limit: PendingLimit?
         var dropped = 0
     }
@@ -332,7 +332,7 @@ actor StreamingRealtimeLoop {
     // suddenly decoded at stop — Whisper hallucinates on long silence.
     private func voiceDetectedInTail(_ newSeconds: Float) -> Bool {
         guard config.useVAD else { return true }
-        return voiceDetected(inNext: newSeconds)
+        return voiceDetected(inNext: newSeconds, wholeSpan: true)
     }
 
     /// Decided once, when the stop first shows during a decode: it is cut short only if the audio that arrived since the decode began holds speech, as the flush must decode that anyway; a silent tail lets the decode finish and be promoted.
@@ -342,13 +342,16 @@ actor StreamingRealtimeLoop {
         if let decided { return decided }
         let tailSamples = inbox.withLock { $0.pending.count }
         let tailSeconds = Float(tailSamples) / Float(config.sampleRate)
-        let interrupts = tailSeconds > 0.05 && (!config.useVAD || voiceDetected(inNext: tailSeconds))
+        let interrupts = tailSeconds > 0.05 && (!config.useVAD || voiceDetected(inNext: tailSeconds, wholeSpan: true))
         stopSignal.withLock { $0.interruptsDecode = interrupts }
         return interrupts
     }
 
-    nonisolated private func voiceDetected(inNext seconds: Float) -> Bool {
-        // isVoiceDetected only reads one entry per 100 ms of new audio off the end, so a longer snapshot would just hold the capture callback's lock for longer.
+    private static let minimumStopVoiceSeconds: Float = 0.2
+
+    /// `wholeSpan` is for the stop: isVoiceDetected ignores the newest second of a span over two seconds, where a last word sits; it wants 0.2 s of unbroken voiced buffers so the Stop click alone does not count.
+    nonisolated private func voiceDetected(inNext seconds: Float, wholeSpan: Bool = false) -> Bool {
+        if wholeSpan { return voicedRunLongEnough(inLast: seconds) }
         let considered = max(0, Int(seconds / 0.1))
         let energies = inbox.withLock { $0.energies.suffix(considered).map(\.rel) }
         return AudioProcessor.isVoiceDetected(
@@ -356,6 +359,21 @@ actor StreamingRealtimeLoop {
             nextBufferInSeconds: seconds,
             silenceThreshold: config.silenceThreshold
         )
+    }
+
+    nonisolated private func voicedRunLongEnough(inLast seconds: Float) -> Bool {
+        let covered = Int((seconds * Float(config.sampleRate)).rounded(.up))
+        let needed = Int(Self.minimumStopVoiceSeconds * Float(config.sampleRate))
+        return inbox.withLock { box in
+            var seen = 0
+            var run = 0
+            for entry in box.energies.reversed() where seen < covered {
+                seen += entry.samples
+                run = entry.rel > config.silenceThreshold ? run + entry.samples : 0
+                if run >= needed { return true }
+            }
+            return false
+        }
     }
 
     func stop() {
@@ -427,7 +445,7 @@ actor StreamingRealtimeLoop {
                 box.pending.removeFirst(excess)
                 box.dropped += excess
             }
-            box.energies.append((rel: rel, avg: avgEnergy))
+            box.energies.append((rel: rel, avg: avgEnergy, samples: buffer.count))
             if box.energies.count > Self.maxEnergyEntries {
                 box.energies.removeFirst(box.energies.count - Self.maxEnergyEntries)
             }

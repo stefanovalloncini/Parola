@@ -845,6 +845,59 @@ struct StreamingRealtimeLoopTests {
         #expect(recorder.batches.last?.segments.map(\.text) == ["b", "c"])
     }
 
+    @Test("stop decodes a last word spoken after a long pause and followed by stop within a second")
+    func stopDecodesLastWordAfterPause() async throws {
+        let (loop, capture, script, recorder) = makeLoop(
+            responses: [
+                [segment(0, 1, "a"), segment(1, 2, "b"), segment(2, 3, "c")],
+                [segment(1, 2, "b"), segment(2, 3, "c"), segment(3, 3.5, "last")],
+            ],
+            useVAD: true
+        )
+        let runTask = LoopRun(loop)
+        let installedWait = await eventually { capture.installed }
+        #expect(installedWait)
+
+        capture.pushBuffers(count: 1, secondsEach: 0.1, value: 0)
+        capture.push(seconds: 3, value: 0.5)
+        let oneBatchRecorded = await eventually { recorder.batches.count == 1 }
+        #expect(oneBatchRecorded)
+
+        capture.pushBuffers(count: 20, secondsEach: 0.1, value: 0)
+        capture.pushBuffers(count: 4, secondsEach: 0.1, value: 0.5)
+        await loop.stop()
+        _ = await runTask.outcome()
+
+        #expect(await script.callCount == 2, "the last word sits in the newest second, which isVoiceDetected ignores")
+        #expect(recorder.batches.last?.segments.map(\.text) == ["b", "c", "last"])
+    }
+
+    @Test("a one-window click at the end of a silent tail does not force the flush decode; two voiced windows do", arguments: [(1, 1), (2, 2)])
+    func stopClickVersusWord(voicedWindows: Int, expectedCalls: Int) async throws {
+        let (loop, capture, script, recorder) = makeLoop(
+            responses: [
+                [segment(0, 1, "a"), segment(1, 2, "b"), segment(2, 3, "c")],
+                [segment(1, 2, "b"), segment(2, 3, "c"), segment(3, 3.5, "last")],
+            ],
+            useVAD: true
+        )
+        let runTask = LoopRun(loop)
+        let installedWait = await eventually { capture.installed }
+        #expect(installedWait)
+
+        capture.pushBuffers(count: 1, secondsEach: 0.1, value: 0)
+        capture.push(seconds: 3, value: 0.5)
+        let oneBatchRecorded = await eventually { recorder.batches.count == 1 }
+        #expect(oneBatchRecorded)
+
+        capture.pushBuffers(count: 22, secondsEach: 0.1, value: 0)
+        capture.pushBuffers(count: voicedWindows, secondsEach: 0.1, value: 0.5)
+        await loop.stop()
+        _ = await runTask.outcome()
+
+        #expect(await script.callCount == expectedCalls)
+    }
+
     @Test("cancelling the run releases the mic and skips the flush decode")
     func cancellationStopsCapture() async throws {
         let (loop, capture, script, recorder) = makeLoop(responses: [
