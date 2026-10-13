@@ -133,4 +133,55 @@ struct BurnCueTests {
         untranslated.translation = nil
         #expect(SubtitleBurner.captionLanguage(of: untranslated, options: options) == "en")
     }
+
+    @Test("a speaker label opens the first cue of a segment only")
+    func labelOnFirstCue() throws {
+        var options = ExportSpec.standard(for: .srt).options
+        options.speakers = true
+        let built = try cues(
+            transcript([TranscriptSegment(id: 0, start: 0, end: 12, text: longText, speaker: "Ada")]), options: options
+        )
+        #expect(built.count > 1)
+        #expect(built[0].text.hasPrefix("Ada: "))
+        #expect(built.dropFirst().allSatisfy { !$0.text.contains("Ada:") })
+    }
+
+    @Test("a short segment is held for the minimum cue time, up to the next cue")
+    func shortSegmentIsHeld() throws {
+        let built = try cues(transcript([
+            TranscriptSegment(id: 0, start: 1, end: 1.2, text: "Yes."),
+            TranscriptSegment(id: 1, start: 1.5, end: 1.7, text: "Right."),
+        ]))
+        #expect(built.map(\.start) == [1, 1.5])
+        #expect(built[0].end == 1.5)
+        #expect(built[1].end == 1.5 + CaptionCues.minCueSeconds)
+    }
+
+    @Test("cues of one segment leave no flicker gap between them")
+    func noGapInsideASegment() throws {
+        let built = try cues(transcript([TranscriptSegment(id: 0, start: 10, end: 22, text: longText)]))
+        for (earlier, later) in zip(built, built.dropFirst()) { #expect(earlier.end == later.start) }
+    }
+
+    @Test("a long caption stays on screen past a shorter segment spoken inside it, through the real cue path")
+    func interjectionDoesNotClipTheLongCaption() throws {
+        let built = try cues(transcript([
+            TranscriptSegment(id: 0, start: 0, end: 20, text: longText),
+            TranscriptSegment(id: 1, start: 8, end: 8.6, text: "Mm-hmm."),
+        ]))
+        let size = CGSize(width: 1920, height: 1080)
+        let track = BurnCaptionTrack(
+            cues: built, language: "en",
+            metrics: SubtitleBurner.CaptionMetrics(style: SubtitleBurner.Style(), renderSize: size), renderSize: size
+        )
+        let inner = try #require(built.firstIndex { $0.text == "Mm-hmm." })
+        #expect(track.cueIndex(at: 8.2) == inner)
+        let afterwards = try #require(track.cueIndex(at: 9.9))
+        #expect(built[afterwards].text != "Mm-hmm.")
+        let outer = built.filter { $0.text != "Mm-hmm." }
+        #expect(outer.first?.start == 0)
+        #expect(outer.last?.end == 20)
+        for (earlier, later) in zip(outer, outer.dropFirst()) { #expect(earlier.end == later.start) }
+        #expect(built[inner].end - built[inner].start >= 0.6)
+    }
 }

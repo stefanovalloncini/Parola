@@ -2,7 +2,7 @@ import Foundation
 import CoreGraphics
 import CoreText
 
-/// One caption as the burn draws it: two lines at most.
+/// One caption as the burn draws it: two lines at most, unless its segment is too short to split.
 struct BurnCue: Sendable, Equatable {
     let start: Double
     let end: Double
@@ -10,30 +10,40 @@ struct BurnCue: Sendable, Equatable {
 }
 
 extension SubtitleBurner {
-    static let maxLinesPerCue = 2
-
-    /// An SRT export's cues, wrapped to the frame, with anything over two lines split into consecutive cues.
+    /// The cues an SRT export would write, packed by columns; Core Text checks each final line and a segment with one that is too wide is packed again by measured width.
     static func cues(
         from transcript: Transcript, options: ExportOptions, metrics: CaptionMetrics, renderSize: CGSize
     ) throws -> [BurnCue] {
-        let exporter = SrtExporter(spec: ExportSpec(style: .subtitles, format: .srt, options: options).changing(format: .srt))
-        let prepared = exporter.spec.prepared(transcript)
+        let spec = ExportSpec(style: .subtitles, format: .srt, options: options).changing(format: .srt)
         let font = Format.cascadingFont(
             name: metrics.fontName, size: metrics.fontSize, language: captionLanguage(of: transcript, options: options)
         )
         let maxWidth = renderSize.width - metrics.horizontalInset * 2
-        var cues: [(order: Int, cue: BurnCue)] = []
-        for segment in prepared.segments {
-            try Task.checkCancellation()
-            guard let text = exporter.cueText(for: segment, in: prepared) else { continue }
-            let start = max(segment.start, 0)
-            let end = max(segment.end, start + Format.minCaptionSeconds)
-            let lines = wrappedLines(text, font: font, maxWidth: maxWidth)
-            for cue in split(lines, start: start, end: end, words: segment.words, spokenText: segment.text) {
-                cues.append((cues.count, cue))
-            }
-        }
-        return cues.sorted { ($0.cue.start, $0.order) < ($1.cue.start, $1.order) }.map(\.cue)
+        let safeWidth = Double(maxWidth) * 0.97
+        let spaceAdvance = lineWidth("a a", font: font) - lineWidth("aa", font: font)
+        let columnWidth = lineWidth("abcdefghijklmnopqrstuvwxyz", font: font) / 26
+        let characterLimit = options.captionLength.maxCharsPerLine
+        let columns = characterLimit ?? max(8, Int(safeWidth / max(columnWidth, 1)))
+        let verification = CaptionCues.Verification(
+            fits: { line in
+                lineWidth(line, font: font) <= safeWidth || wrappedLines(line, font: font, maxWidth: maxWidth).count <= 1
+            },
+            fallback: .advances(
+                limit: safeWidth, characterLimit: characterLimit ?? .max, spaceAdvance: spaceAdvance,
+                advance: { lineWidth($0, font: font) }
+            )
+        )
+        let label: (String) -> String = { "\($0): " }
+        let cues = try CaptionCues.cues(
+            for: CaptionCues.sources(from: transcript, spec: spec), breaker: .characters(columns), speakerPrefix: label,
+            verifying: verification
+        )
+        return cues.map { BurnCue(start: $0.start, end: $0.end, text: $0.shownLines(speakerPrefix: label).joined(separator: "\n")) }
+    }
+
+    private static func lineWidth(_ text: String, font: CTFont) -> Double {
+        let attributed = captionText(text, font: font, color: CGColor(gray: 1, alpha: 1))
+        return CTLineGetTypographicBounds(CTLineCreateWithAttributedString(attributed), nil, nil, nil)
     }
 
     /// The language the cues are written in, which picks the fallback font for their script.
@@ -58,42 +68,5 @@ extension SubtitleBurner {
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             return piece.isEmpty ? nil : piece
         }
-    }
-
-    /// Word timings place the breaks only when the cue says exactly the spoken words, else characters do.
-    static func split(
-        _ lines: [String], start: Double, end: Double, words: [WordTiming]?, spokenText: String
-    ) -> [BurnCue] {
-        guard lines.count > maxLinesPerCue else {
-            return [BurnCue(start: start, end: end, text: lines.joined(separator: "\n"))]
-        }
-        let chunks = stride(from: 0, to: lines.count, by: maxLinesPerCue).map {
-            Array(lines[$0..<min($0 + maxLinesPerCue, lines.count)])
-        }
-        let tokenCounts = chunks.map { $0.joined(separator: " ").split(whereSeparator: \.isWhitespace).count }
-        let charCounts = chunks.map { $0.reduce(0) { $0 + $1.count } }
-        let spokenTokens = spokenText.split(whereSeparator: \.isWhitespace).count
-        let timed = words.flatMap { words in
-            words.count == spokenTokens && tokenCounts.reduce(0, +) == spokenTokens ? words : nil
-        }
-        let totalChars = max(1, charCounts.reduce(0, +))
-
-        var cues: [BurnCue] = []
-        var chunkStart = start
-        var tokensBefore = 0
-        var charsBefore = 0
-        for (index, chunk) in chunks.enumerated() {
-            var chunkEnd = end
-            if index < chunks.count - 1 {
-                tokensBefore += tokenCounts[index]
-                charsBefore += charCounts[index]
-                let boundary = timed.map { $0[tokensBefore].start }
-                    ?? start + (end - start) * Double(charsBefore) / Double(totalChars)
-                chunkEnd = min(max(boundary, chunkStart + Format.minCaptionSeconds), end)
-            }
-            cues.append(BurnCue(start: chunkStart, end: chunkEnd, text: chunk.joined(separator: "\n")))
-            chunkStart = chunkEnd
-        }
-        return cues
     }
 }
