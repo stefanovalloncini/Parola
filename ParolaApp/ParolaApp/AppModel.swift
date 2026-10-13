@@ -4318,6 +4318,20 @@ final class AppModel {
         updateSession(of: take.id) { $0.markCapturing(at: date) }
         // A live take has no capture-up of its own: its first audio is that moment too.
         if captureStart?.takeID != take.id { takeCaptureCameUp(take) }
+        checkpointStreamingAudio(of: take)
+    }
+
+    /// A live take's file exists from its first buffer, however long its model still compiles, so a crash then keeps the audio.
+    private func checkpointStreamingAudio(of take: TakeContext) {
+        guard let session = streamingSession, liveRecordingAudioURL == nil else { return }
+        Task { @MainActor [weak self] in
+            guard let audio = await session.recordingAudioURL() else { return }
+            guard let self, self.takeIsCurrent(take), self.streamingSession != nil, self.liveRecordingAudioURL == nil else { return }
+            self.liveRecordingAudioURL = audio
+            self.updateSession(of: take.id) { $0.audioURL = audio }
+            self.writeRecordingCheckpoint()
+            self.armTakeFileHeartbeat()
+        }
     }
 
     /// A buffer that came in since the sampler last looked still counts, so a Stop right after it keeps the take.

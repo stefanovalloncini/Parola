@@ -540,6 +540,29 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("a live take's audio is in its checkpoint from the first buffer, before its model finishes loading", .timeLimit(.minutes(1)))
+        func audioIsCheckpointedWhileTheModelLoads() async throws {
+            let wav = try makeTakeWAV("early-checkpoint")
+            defer { try? FileManager.default.removeItem(at: wav) }
+            try await withMocksCleared([.audioSource, .streaming]) {
+                await MockAudioSourceRegistry.shared.clear()
+                let model = makeModel()
+                await startStreamingTake(model, gate: MockTranscriberGate(), audio: wav)
+                await waitUntil { model.takeArming != nil }
+                #expect(model.liveRecordingAudioURL == nil)
+
+                model.recordingLevelMeter?.record(0.4)
+
+                await waitUntil { model.liveRecordingAudioURL == wav }
+                await model.pendingRecoveryWrite?.value
+                let file = try #require(model.activeRecoveryFileURL)
+                let checkpoint = try JSONDecoder().decode(RecoveryCheckpoint.self, from: try Data(contentsOf: file))
+                #expect(checkpoint.audioURL == wav)
+                #expect(model.takeFileIsHeld)
+                await model.discardTake()
+            }
+        }
+
         @Test("Cancel while a take arms goes home without a word, and Record works again at once", .timeLimit(.minutes(1)))
         func cancelWhileArmingIsQuiet() async throws {
             try await withMocksCleared([.audioSource, .streaming]) {
