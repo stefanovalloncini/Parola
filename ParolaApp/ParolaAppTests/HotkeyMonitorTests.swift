@@ -157,6 +157,32 @@ struct HotkeyMonitorTests {
         #expect(!registry.health.isRefused(keyCode: kVK_ANSI_D, modifiers: [.control]))
     }
 
+    @Test("a combination the system refuses on resume is reported and served by the fallback")
+    func refusedOnResume() async {
+        let backend = FakeBackend()
+        let registry = CarbonHotkeyRegistry(backend: backend)
+        let fallback = FakeFallback()
+        let monitor = makeMonitor(backend, registry: registry, code: kVK_ANSI_D, mods: [.control], fallback: fallback)
+        let log = EventLog()
+        await monitor.start { log.append($0) }
+        #expect(monitor.isRegistered)
+        #expect(!monitor.hasFallback)
+
+        registry.suspend()
+        backend.refuseWith = -9878
+        registry.resume()
+
+        #expect(!monitor.isRegistered)
+        #expect(monitor.hasFallback)
+        #expect(fallback.installs == [UInt16(kVK_ANSI_D)])
+        #expect(registry.health.refusal(keyCode: kVK_ANSI_D, modifiers: [.control]) == .bySystem)
+        fallback.send(down: true, flags: [.control])
+        fallback.send(down: false, flags: [])
+        #expect(log.all == [.press, .release])
+        await monitor.stop()
+        #expect(fallback.removals == 1)
+    }
+
     @Test("an option-only combination is never handed to Carbon and is served by the fallback")
     func optionOnlyUsesFallback() async {
         for mods: NSEvent.ModifierFlags in [[.option], [.option, .shift]] {

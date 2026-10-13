@@ -152,6 +152,7 @@ final class CarbonHotkeyRegistry {
         var status: OSStatus?
         var monitorOnly = false
         var handlers: [UUID: @Sendable (HotkeyEvent) -> Void]
+        var refusalHandlers: [UUID: @MainActor () -> Void] = [:]
         var isRegistered: Bool { status == noErr }
     }
 
@@ -168,7 +169,11 @@ final class CarbonHotkeyRegistry {
 
     var isSuspended: Bool { suspensions > 0 }
 
-    func add(_ key: CarbonHotkeyKey, handler: @escaping @Sendable (HotkeyEvent) -> Void) -> Addition {
+    func add(
+        _ key: CarbonHotkeyKey,
+        onRefusalOnResume: (@MainActor () -> Void)? = nil,
+        handler: @escaping @Sendable (HotkeyEvent) -> Void
+    ) -> Addition {
         guard key.isPermitted else {
             ParolaLog.notice(.dictation, "hotkey refused: key \(Int(key.keyCode)) with modifiers \(Int(key.modifiers)) is bare or reserved")
             health.set(key, .byParola)
@@ -177,6 +182,7 @@ final class CarbonHotkeyRegistry {
         let token = UUID()
         var entry = entries[key] ?? makeEntry(for: key)
         entry.handlers[token] = handler
+        entry.refusalHandlers[token] = onRefusalOnResume
         if key.isOptionOnly {
             entry.monitorOnly = true
             health.set(key, .monitorOnly)
@@ -190,6 +196,7 @@ final class CarbonHotkeyRegistry {
     func remove(_ key: CarbonHotkeyKey, token: UUID) {
         guard var entry = entries[key] else { return }
         entry.handlers[token] = nil
+        entry.refusalHandlers[token] = nil
         if entry.handlers.isEmpty {
             if entry.isRegistered { backend.unregister(id: entry.id) }
             entries[key] = nil
@@ -221,6 +228,9 @@ final class CarbonHotkeyRegistry {
         for (key, var entry) in entries where !entry.monitorOnly {
             attemptRegistration(of: key, entry: &entry)
             entries[key] = entry
+            if !entry.isRegistered {
+                for refused in entry.refusalHandlers.values { refused() }
+            }
         }
     }
 
@@ -404,7 +414,7 @@ final class GlobalHotkeyMonitor: HotkeyMonitor {
     private func register(handler: @escaping @Sendable (HotkeyEvent) -> Void) {
         unregister()
         self.handler = handler
-        let addition = registry.add(key) { [weak self] event in
+        let addition = registry.add(key, onRefusalOnResume: { [weak self] in self?.installFallback() }) { [weak self] event in
             MainActor.assumeIsolated { self?.process(event) }
         }
         token = addition.token
@@ -456,6 +466,7 @@ final class GlobalHotkeyMonitor: HotkeyMonitor {
     }
 
     private func installFallback() {
+        guard fallbackTokens.isEmpty else { return }
         let required = modifierMask
         fallbackTokens = fallbackSource.install(keyCode: UInt16(keyCode)) { [weak self] event in
             guard let self else { return }
