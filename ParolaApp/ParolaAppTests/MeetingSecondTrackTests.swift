@@ -1284,6 +1284,7 @@ extension TranscriberMockSuites {
             try repairMic(mic)
             let relaunched = makeModel(libraryURL: library)
             await relaunched.micTrackFolds?.value
+            await waitUntil(timeoutMs: 15_000) { !exists(mic) }
             let stored = try await relaunched.library.load(entry).document
             let audio = try #require(stored.audioURL)
             #expect(try channels(of: audio) == 2, "the next launch folds the mic in")
