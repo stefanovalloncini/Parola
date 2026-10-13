@@ -4993,7 +4993,7 @@ final class AppModel {
         if case .preparingModel = takeArming, let s = streamingSession {
             streamingSession = nil
             streamingConsumer = nil
-            Task { await s.stop() }
+            Task { await s.cancel() }
         }
         if let message {
             reportTakeFailure(message, take: take?.id)

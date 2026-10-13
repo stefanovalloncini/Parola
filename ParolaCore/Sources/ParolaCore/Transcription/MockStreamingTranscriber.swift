@@ -43,6 +43,7 @@ public actor MockStreamingTranscriber: StreamingTranscriber {
             case nil: break
             }
         }
+        if let failure = response.startFailure { throw failure.asError() }
         let (stream, cont) = AsyncStream<StreamingEvent>.makeStream(bufferingPolicy: .bufferingNewest(256))
         continuation = cont
         let response = self.response
@@ -91,6 +92,7 @@ public actor MockStreamingTranscriber: StreamingTranscriber {
     }
 
     public func stop() async {
+        await response.log?.recordEnding("stop")
         if isStarting, response.waitsForModelOnStop {
             endedWhileStarting = .stopAfterModel
             await withCheckedContinuation { stopsWaitingForModel.append($0) }
@@ -109,6 +111,7 @@ public actor MockStreamingTranscriber: StreamingTranscriber {
     }
 
     public func cancel() async {
+        await response.log?.recordEnding("cancel")
         if isStarting {
             releaseStopsWaitingForModel()
             endedWhileStarting = .cancel

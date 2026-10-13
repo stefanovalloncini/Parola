@@ -157,14 +157,21 @@ extension TranscriberMockSuites {
             gate: MockTranscriberGate? = nil,
             download: Double? = nil,
             segments: [TranscriptSegmentSeed] = [],
-            delayMs: Int = 5_000
+            delayMs: Int = 5_000,
+            audio: URL? = nil,
+            startFailure: MockTranscriberFailure? = nil,
+            log: MockTranscriberLog? = nil
         ) async {
             MockStreamingTranscriberRegistry.shared.install(MockTranscriberResponse(
                 segments: segments,
                 partials: ["hello"],
                 downloadFractions: download.map { [$0] } ?? [],
                 delayMs: delayMs,
-                gate: gate
+                startFailure: startFailure,
+                gate: gate,
+                recordedAudio: audio,
+                waitsForModelOnStop: true,
+                log: log
             ))
             model.useStreaming = true
             model.selectedModel = "openai_whisper-tiny"
@@ -515,6 +522,21 @@ extension TranscriberMockSuites {
                 await settle()
                 #expect(model.recording?.state == .failed(message: expected), "the load finishing later must not replace the message")
                 #expect(await model.library.list().isEmpty)
+            }
+        }
+
+        @Test("finishing a take before it captured cancels its session, so no empty recording is kept", .timeLimit(.minutes(1)))
+        func finishWhileArmingCancelsTheSession() async throws {
+            try await withMocksCleared([.audioSource, .streaming]) {
+                await MockAudioSourceRegistry.shared.clear()
+                let log = MockTranscriberLog()
+                let model = makeModel()
+                await startStreamingTake(model, gate: MockTranscriberGate(), download: 0.5, log: log)
+                await waitUntil { model.takeArming != nil }
+
+                model.stopRecordingAndTranscribe()
+
+                await waitUntil { await log.endings == ["cancel"] }
             }
         }
 

@@ -114,8 +114,14 @@ public actor MockTranscriberGate {
 /// The files a mock run was asked to transcribe, in the order it was asked.
 public actor MockTranscriberLog {
     public private(set) var urls: [URL] = []
+    /// How a streaming mock take was ended, in order: "stop" or "cancel".
+    public private(set) var endings: [String] = []
 
     public init() {}
+
+    func recordEnding(_ ending: String) {
+        endings.append(ending)
+    }
 
     func record(_ url: URL) {
         urls.append(url)
@@ -132,6 +138,8 @@ public struct MockTranscriberResponse: Sendable {
     public var modelName: String
     public var delayMs: Int
     public var failure: MockTranscriberFailure?
+    /// A streaming mock whose start throws this once its gate opens, as a model that fails to load does.
+    public var startFailure: MockTranscriberFailure?
     public var gate: MockTranscriberGate?
     public var log: MockTranscriberLog?
     /// The file a streaming mock says it records to: named while it runs, and carried by its final transcript.
@@ -149,6 +157,7 @@ public struct MockTranscriberResponse: Sendable {
         modelName: String = "mock",
         delayMs: Int = 0,
         failure: MockTranscriberFailure? = nil,
+        startFailure: MockTranscriberFailure? = nil,
         gate: MockTranscriberGate? = nil,
         recordedAudio: URL? = nil,
         waitsForModelOnStop: Bool = false,
@@ -163,6 +172,7 @@ public struct MockTranscriberResponse: Sendable {
         self.modelName = modelName
         self.delayMs = delayMs
         self.failure = failure
+        self.startFailure = startFailure
         self.gate = gate
         self.recordedAudio = recordedAudio
         self.waitsForModelOnStop = waitsForModelOnStop
