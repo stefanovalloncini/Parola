@@ -23,9 +23,9 @@ extension AppModel {
     }
 
     func startMeetingRecording(appName: String) {
-        if meetingCaptureAppOnly {
-            pendingCaptureBundleIDs = MeetingDetector.bundleIDs(forAppName: appName)
-        }
+        let bundleIDs = MeetingDetector.bundleIDs(forAppName: appName)
+        if meetingCaptureAppOnly { pendingCaptureBundleIDs = bundleIDs }
+        pendingSourceAppBundleID = installedBundleID(bundleIDs)
         meetingDetectedApp = nil
         pendingRecordingCategory = .meeting
         startRecording(source: .systemAudio)

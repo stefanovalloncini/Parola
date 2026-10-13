@@ -78,6 +78,7 @@ final class AppModel {
         /// Changes only while the take is the active one, through `setTakeCategory`.
         var category: EntryCategory
         let captureTargets: Set<String>
+        var sourceAppBundleID: String?
         /// The take's own checkpoint once it has one, so its end never touches whichever run is active by then.
         var recovery: Int?
         var recoveryStartedAt: Date?
@@ -92,6 +93,7 @@ final class AppModel {
         var generatedTitle: String?
         var typedTitle: String?
         var markers: [TimeInterval] = []
+        var sourceAppBundleID: String?
 
         /// The name the take showed, or one stamped now for a take that never had a session to show it.
         func title(for category: EntryCategory) -> String {
@@ -1603,6 +1605,8 @@ final class AppModel {
     /// Where the take in flight is listening, for the manifest a persist writes after the phase has moved on.
     @ObservationIgnored var pendingRecordingSource: EntrySource = .microphone
     @ObservationIgnored var pendingCaptureBundleIDs: Set<String>?
+    @ObservationIgnored var pendingSourceAppBundleID: String?
+    @ObservationIgnored var installedBundleID: @MainActor (Set<String>) -> String? = { SourceAppIcon.installedBundleID(among: $0) }
     /// Reading it starts it, and test mode leaves it off, so views read `detectedMeetingAppName` instead.
     @ObservationIgnored lazy var meetingDetector: MeetingDetector = startMeetingDetector()
     /// Test seam: whether anything has started the detector.
@@ -3779,7 +3783,11 @@ final class AppModel {
         let countIn = max(0, recordingCountInSeconds)
         // The count-in shows only in a main window Parola has in front; anywhere else it would delay the take unseen.
         let overlayVisible = appIsActive() && mainWindowShowsOverlay
-        let request = TakeRequest(category: requestedCategory(for: source), captureTargets: pendingCaptureBundleIDs ?? [])
+        let request = TakeRequest(
+            category: requestedCategory(for: source),
+            captureTargets: pendingCaptureBundleIDs ?? [],
+            sourceAppBundleID: sourceAppBundleID(for: source)
+        )
         forgetTakeRequest()
         if countIn > 0, overlayVisible {
             beginCountIn(seconds: countIn, source: source, category: request.category) { [weak self] showsStage, counted in
@@ -3795,12 +3803,22 @@ final class AppModel {
     private struct TakeRequest {
         let category: EntryCategory
         let captureTargets: Set<String>
+        let sourceAppBundleID: String?
+    }
+
+    /// The app a system-audio take is from: the meeting's own, or the one app its capture is limited to.
+    private func sourceAppBundleID(for source: RecordSource) -> String? {
+        guard source == .systemAudio else { return nil }
+        if let pendingSourceAppBundleID { return pendingSourceAppBundleID }
+        guard let targets = pendingCaptureBundleIDs, targets.count == 1 else { return nil }
+        return targets.first
     }
 
     /// A meeting's category and app targets belong to the request that set them, not to whatever take comes next.
     private func forgetTakeRequest() {
         pendingRecordingCategory = nil
         pendingCaptureBundleIDs = nil
+        pendingSourceAppBundleID = nil
     }
 
     /// The category a take from `source` starts in: the one its Record asked for, or its source's own.
@@ -4073,6 +4091,7 @@ final class AppModel {
             source: source,
             category: countIn?.category ?? request.category,
             captureTargets: request.captureTargets,
+            sourceAppBundleID: request.sourceAppBundleID,
             askedForMeeting: request.category == .meeting
         )
         activeTake = take
@@ -4090,6 +4109,7 @@ final class AppModel {
             titleDate: stamp
         )
         if let countIn, countIn.titleSource == .user { session.rename(countIn.title) }
+        session.sourceAppBundleID = take.sourceAppBundleID
         beginSession(session)
         if showsStage { showStage() }
         if source == .microphone { nameTakeDevice(take) }
@@ -5366,7 +5386,8 @@ final class AppModel {
             category: category,
             title: annotations.typedTitle ?? title,
             titleSource: annotations.typedTitle == nil ? nil : .user,
-            takeMarkers: annotations.markers
+            takeMarkers: annotations.markers,
+            sourceAppBundleID: annotations.sourceAppBundleID
         ))
         if let recovery { recoveryHeldByTake.insert(recovery) }
         if let audio { takeFilesBeingSaved[audio, default: 0] += 1 }
@@ -5572,7 +5593,8 @@ final class AppModel {
         return TakeAnnotations(
             generatedTitle: session.generatedTitle,
             typedTitle: session.titleSource == .user ? session.title : nil,
-            markers: session.markers
+            markers: session.markers,
+            sourceAppBundleID: session.sourceAppBundleID
         )
     }
 

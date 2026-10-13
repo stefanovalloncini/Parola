@@ -56,6 +56,7 @@ struct RecordingSession: Equatable, Sendable {
     /// The moment the generated name is stamped with: when the take began.
     let titleDate: Date
     var device: String?
+    var sourceAppBundleID: String?
     var isStreaming: Bool
     var audioURL: URL?
     /// Set with a failure that kept audio, for its Retry; it lasts as long as the session.
@@ -80,6 +81,7 @@ struct RecordingSession: Equatable, Sendable {
         self.titleSource = nil
         self.titleDate = titleDate
         self.device = nil
+        self.sourceAppBundleID = nil
         self.isStreaming = isStreaming
         self.audioURL = nil
         self.failure = nil

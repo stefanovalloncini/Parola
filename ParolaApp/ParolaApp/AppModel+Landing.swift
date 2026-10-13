@@ -36,6 +36,7 @@ struct RunLanding {
     var titleSource: TitleSource?
     /// A take's markers, kept in its entry so every transcript it gets makes their sentences favorites.
     var takeMarkers: [TimeInterval] = []
+    var sourceAppBundleID: String?
     var sourceDigest: String?
     var consumesAudio = false
     /// The job a `.batchJob` landing finishes.
@@ -212,7 +213,8 @@ extension AppModel {
                     sourceDigest: landing.sourceDigest,
                     source: landing.source,
                     consumesAudio: landing.consumesAudio,
-                    takeMarkers: landing.takeMarkers
+                    takeMarkers: landing.takeMarkers,
+                    sourceAppBundleID: landing.sourceAppBundleID
                 )
                 self?.place(entry, landing, navigation: navigation)
                 return entry
