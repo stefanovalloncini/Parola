@@ -294,7 +294,8 @@ struct WatchedFoldersStoreWatchingTests {
             defaults: rig.defaults,
             baselineDirectory: rig.baselineDirectory,
             watcherOptions: FolderWatcher.Options(settledInterval: .milliseconds(50)),
-            baselineWriteDelay: .seconds(60)
+            baselineWriteDelay: .seconds(60),
+            baselineMaxWait: .seconds(60)
         ) { url in
             arrivals.urls.append(url)
         }
@@ -348,7 +349,8 @@ struct WatchedFoldersStoreWatchingTests {
             defaults: rig.defaults,
             baselineDirectory: rig.baselineDirectory,
             watcherOptions: FolderWatcher.Options(settledInterval: .milliseconds(50)),
-            baselineWriteDelay: .seconds(60)
+            baselineWriteDelay: .seconds(60),
+            baselineMaxWait: .seconds(60)
         ) { url in
             arrivals.urls.append(url)
         }
@@ -376,7 +378,8 @@ struct WatchedFoldersStoreWatchingTests {
             defaults: rig.defaults,
             baselineDirectory: rig.baselineDirectory,
             watcherOptions: FolderWatcher.Options(settledInterval: .milliseconds(50)),
-            baselineWriteDelay: .seconds(60)
+            baselineWriteDelay: .seconds(60),
+            baselineMaxWait: .seconds(60)
         ) { _ in }
         await pollUntil("the folder's watcher to start") { store.watcher(for: rig.folderID) != nil }
         let before = store.watcher(for: rig.folderID)
