@@ -39,6 +39,12 @@ struct ExportSheet: View {
 
     private var spec: ExportSpec { model.exportSheetSpec }
 
+    private var previewSpec: ExportSpec {
+        var titled = spec
+        titled.options.documentTitle = model.currentTranscriptTitle
+        return titled
+    }
+
     private var contentBody: some View {
         HStack(alignment: .top, spacing: 0) {
             ScrollView {
@@ -56,7 +62,7 @@ struct ExportSheet: View {
 
             Group {
                 if let transcript = model.transcript {
-                    ExportPreview(spec: spec, transcript: transcript)
+                    ExportPreview(spec: previewSpec, transcript: transcript)
                 } else {
                     InlineEmptyText("No transcript loaded")
                 }
