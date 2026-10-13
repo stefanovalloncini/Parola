@@ -500,7 +500,7 @@ extension AppModel {
             do {
                 try await library.setSegmentNote(note, segmentID: segmentID, for: entryID)
             } catch {
-                phase = .failed(message: error.localizedDescription)
+                phase = .failed(message: FailureText.message(for: error))
             }
             refreshLibrary()
         }
@@ -528,7 +528,7 @@ extension AppModel {
             do {
                 try await library.setSegmentNotes(stored, for: entryID)
             } catch {
-                nonFatalWarning = error.localizedDescription
+                nonFatalWarning = FailureText.message(for: error)
             }
             refreshLibrary()
         }
@@ -562,7 +562,7 @@ extension AppModel {
             do {
                 try await setSegmentFavorite(id, isFavorite: makeFavorite)
             } catch {
-                nonFatalWarning = error.localizedDescription
+                nonFatalWarning = FailureText.message(for: error)
             }
         }
     }
@@ -585,7 +585,7 @@ extension AppModel {
             do {
                 try await library.setFavoriteSegments(ids, for: entryID)
             } catch {
-                nonFatalWarning = error.localizedDescription
+                nonFatalWarning = FailureText.message(for: error)
             }
             refreshLibrary()
         }
@@ -662,7 +662,7 @@ extension AppModel {
 
     /// Shows the failure as a dismissible strip over whatever page the user is on.
     private func noteLibraryFailure(_ action: String, _ error: Error) {
-        exportNotice = ExportNotice(message: "\(action): \(error.localizedDescription)", failures: [], folder: nil, tone: .failure)
+        exportNotice = ExportNotice(message: "\(action): \(FailureText.message(for: error))", failures: [], folder: nil, tone: .failure)
     }
 
     func clearLoadedEntry() {
@@ -728,7 +728,7 @@ extension AppModel {
                 failures.append(
                     ExportNotice.Failure(
                         name: LibraryEntryDisplay.listTitle(for: entry, showsAITitle: showAITitles),
-                        reason: error.localizedDescription
+                        reason: FailureText.message(for: error)
                     )
                 )
             }
@@ -796,7 +796,7 @@ extension AppModel {
                 return opened
             } catch {
                 guard generation == loadEntryGeneration else { throw error }
-                phase = .failed(message: error.localizedDescription)
+                phase = .failed(message: FailureText.message(for: error))
                 throw error
             }
         }

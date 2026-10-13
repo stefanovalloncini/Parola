@@ -93,7 +93,7 @@ final class LiveCaptionsController {
             } catch is CancellationError {
                 return
             } catch {
-                self?.handleError(error.localizedDescription)
+                self?.handleError(FailureText.message(for: error))
             }
         }
     }

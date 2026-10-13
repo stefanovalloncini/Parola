@@ -15,7 +15,7 @@ extension AppModel {
     /// `showsActivity` is false for files a finished run drains: the page it landed on stays.
     func startBatch(jobs: [BatchJob], showsActivity: Bool = true) {
         guard features.isEnabled(.batch) else {
-            phase = .failed(message: ParolaError.featureDisabled(.batch).description)
+            phase = .failed(message: FailureText.message(for: ParolaError.featureDisabled(.batch)))
             return
         }
         // Replacing batchJobs would strand the running job and the pending ones Resume waits on.
@@ -210,7 +210,7 @@ extension AppModel {
 
     func addBatchJobs(_ jobs: [BatchJob], showsActivity: Bool = true) {
         guard features.isEnabled(.batch) else {
-            phase = .failed(message: ParolaError.featureDisabled(.batch).description)
+            phase = .failed(message: FailureText.message(for: ParolaError.featureDisabled(.batch)))
             return
         }
         guard !jobs.isEmpty else { return }

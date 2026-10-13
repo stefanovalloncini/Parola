@@ -591,7 +591,7 @@ extension AppModel {
             arrivalNotice = ArrivalNotice(paused: arrival.url, reason: Self.transcriptionFailureMessage(for: error))
         }
         if unsaved {
-            arrivalNotice = ArrivalNotice(unsaved: arrival.url, reason: error.localizedDescription)
+            arrivalNotice = ArrivalNotice(unsaved: arrival.url, reason: FailureText.message(for: error))
         }
         if visibleArrivalID == arrival.id { visibleArrivalID = nil }
         if let index = watchedArrivals.firstIndex(where: { $0.id == arrival.id }) {

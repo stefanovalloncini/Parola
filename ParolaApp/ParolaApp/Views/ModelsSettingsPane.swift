@@ -136,7 +136,7 @@ struct ModelsSettingsPane: View {
             UsageRow(
                 icon: "tray.full",
                 label: "Library:",
-                value: "\(model.libraryEntries.count) entries · \(AppFormat.byteSize(totalBytes))"
+                value: AppModel.libraryUsageText(entries: model.libraryEntries.count, bytes: totalBytes)
             )
         }
     }

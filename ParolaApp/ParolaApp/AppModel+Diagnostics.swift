@@ -39,7 +39,7 @@ extension AppModel {
         for error: any Error,
         bundle: Bundle = .main
     ) -> String {
-        String(localized: "Couldn't export diagnostics: \(error.localizedDescription)", bundle: bundle)
+        String(localized: "Couldn't export diagnostics: \(FailureText.message(for: error, bundle: bundle))", bundle: bundle)
     }
 
     func revealDiagnostics(directory: URL = AppModel.diagnosticsDirectory) async {

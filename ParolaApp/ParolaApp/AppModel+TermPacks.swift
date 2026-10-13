@@ -26,7 +26,7 @@ extension AppModel {
             }
             findReplaceRules = TermPackIO.merge(pack: pack, into: findReplaceRules)
         } catch {
-            phase = .failed(message: "Couldn't import term pack: \(error.localizedDescription)")
+            phase = .failed(message: String(localized: "Couldn't import term pack: \(FailureText.message(for: error))"))
         }
     }
 

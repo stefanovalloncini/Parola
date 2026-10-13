@@ -99,7 +99,7 @@ final class WatchedFoldersStore {
             startWatcher(for: folder)
             lastError = nil
         } catch {
-            lastError = "Couldn't watch \(url.path): \(error.localizedDescription)"
+            lastError = String(localized: "Couldn't watch \(url.path): \(error.localizedDescription)")
         }
     }
 
@@ -150,7 +150,7 @@ final class WatchedFoldersStore {
             )
             lastError = nil
         } catch {
-            lastError = "Couldn't refresh \(url.path): \(error.localizedDescription)"
+            lastError = String(localized: "Couldn't refresh \(url.path): \(error.localizedDescription)")
         }
     }
 

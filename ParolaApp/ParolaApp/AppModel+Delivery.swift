@@ -210,7 +210,7 @@ extension AppModel {
             let receipt = try await destination.deliver(Self.sampleDeliveryPayload())
             return .written(receipt.location)
         } catch {
-            return .failed(error.localizedDescription)
+            return .failed(FailureText.message(for: error))
         }
     }
 
@@ -259,7 +259,7 @@ extension AppModel {
         switch outcome {
         case .delivered(let receipt): return .sent(receipt.location)
         case .queued(_, let nextAt): return .queued(nextAt)
-        case .skipped(let reason): return .failed(reason.message)
+        case .skipped(let reason): return .failed(FailureText.message(for: reason))
         }
     }
 }

@@ -2647,7 +2647,7 @@ final class AppModel {
             self.modelsBeingDeleted.remove(name)
             self.refreshModelList()
             if let failure {
-                let message = "Could not delete \(name): \(failure.localizedDescription)"
+                let message = String(localized: "Could not delete \(name): \(FailureText.message(for: failure))")
                 self.phase = .failed(message: message)
                 self.modelActionError = message
             }
@@ -2721,7 +2721,7 @@ final class AppModel {
             } catch {
                 if !Task.isCancelled {
                     let message = Self.offlineMessage(for: error)
-                        ?? "Download failed: \(error.localizedDescription)"
+                        ?? String(localized: "Download failed: \(FailureText.message(for: error))")
                     // A take or a run that took the page since keeps it, as does a transcript the bar was drawn past; Settings still says why.
                     if case .downloadingModel = phase { phase = transcript == nil ? .failed(message: message) : .ready }
                     modelActionError = message
@@ -2848,7 +2848,7 @@ final class AppModel {
         do {
             imported = try Self.parseSubtitleFile(at: fileURL)
         } catch {
-            phase = .failed(message: "Couldn't read \(fileURL.lastPathComponent): \(error.localizedDescription)")
+            phase = .failed(message: String(localized: "Couldn't read \(fileURL.lastPathComponent): \(FailureText.message(for: error))"))
             return
         }
         guard !imported.segments.isEmpty else {
@@ -3443,7 +3443,7 @@ final class AppModel {
     @discardableResult
     func transcribeYouTube(urlString: String) -> LinkHandoff {
         guard features.isEnabled(.youtube) else {
-            phase = .failed(message: ParolaError.featureDisabled(.youtube).description)
+            phase = .failed(message: FailureText.message(for: ParolaError.featureDisabled(.youtube)))
             return .rejected
         }
         guard let url = makeYouTubeURL(urlString) else { return .rejected }
@@ -3539,7 +3539,7 @@ final class AppModel {
     @discardableResult
     func fetchYouTubeSubs(urlString: String) -> LinkHandoff {
         guard features.isEnabled(.youtube) else {
-            phase = .failed(message: ParolaError.featureDisabled(.youtube).description)
+            phase = .failed(message: FailureText.message(for: ParolaError.featureDisabled(.youtube)))
             return .rejected
         }
         guard let url = makeYouTubeURL(urlString) else { return .rejected }
@@ -3639,17 +3639,8 @@ final class AppModel {
         if error is CancellationError {
             return String(localized: "Transcription stopped.", bundle: bundle)
         }
-        if case ParolaError.transcriptionFailed(let reason) = error {
-            return String(localized: "Transcription failed: \(reason)", bundle: bundle)
-        }
-        if case ParolaError.engineLoadFailed(let reason) = error {
-            return String(localized: "Transcription failed: \(reason)", bundle: bundle)
-        }
-        if case ParolaError.linkDownloadFailed(let failure) = error {
-            return linkFailureMessage(failure, bundle: bundle)
-        }
         if let offline = offlineMessage(for: error, bundle: bundle) { return offline }
-        return error.localizedDescription
+        return FailureText.message(for: error, bundle: bundle)
     }
 
     /// Model downloads are the only network dependency, so name them when the network is the problem.
@@ -3670,7 +3661,7 @@ final class AppModel {
     }
 
     nonisolated static func exportFailureMessage(for error: Error, bundle: Bundle = .main) -> String {
-        String(localized: "Export failed: \(error.localizedDescription)", bundle: bundle)
+        String(localized: "Export failed: \(FailureText.message(for: error, bundle: bundle))", bundle: bundle)
     }
 
     nonisolated static func recordingFailureMessage(
@@ -3763,7 +3754,7 @@ final class AppModel {
         let needed = source.feature
         guard features.isEnabled(needed) else {
             forgetTakeRequest()
-            phase = .failed(message: ParolaError.featureDisabled(needed).description)
+            phase = .failed(message: FailureText.message(for: ParolaError.featureDisabled(needed)))
             return
         }
         guard !recordingActive else {
@@ -6134,7 +6125,7 @@ final class AppModel {
             phase = .ready
             recomputeMatches()
         } catch {
-            phase = .failed(message: "Couldn't open document: \(error.localizedDescription)")
+            phase = .failed(message: String(localized: "Couldn't open document: \(FailureText.message(for: error))"))
         }
     }
 
@@ -6262,7 +6253,7 @@ final class AppModel {
     }
 
     nonisolated static func burnFailureMessage(for error: Error, bundle: Bundle = .main) -> String {
-        String(localized: "Burn failed: \(error.localizedDescription)", bundle: bundle)
+        String(localized: "Burn failed: \(FailureText.message(for: error, bundle: bundle))", bundle: bundle)
     }
 }
 

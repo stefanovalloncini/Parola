@@ -146,7 +146,7 @@ struct MicrophonePane: View {
                 let meter = try await controller.start()
                 if preview === controller { previewMeter = meter }
             } catch {
-                startError = error.localizedDescription
+                startError = FailureText.message(for: error)
             }
         }
     }

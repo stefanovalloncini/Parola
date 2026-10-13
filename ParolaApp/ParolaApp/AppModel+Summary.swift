@@ -35,7 +35,7 @@ extension AppModel {
             },
             fail: { [weak self] error, entryID in
                 guard let self else { return }
-                if isOnScreen(entryID, askedAt: artifacts) { summaryError = error.localizedDescription }
+                if isOnScreen(entryID, askedAt: artifacts) { summaryError = FailureText.message(for: error) }
                 refreshAIAvailability()
             }
         )

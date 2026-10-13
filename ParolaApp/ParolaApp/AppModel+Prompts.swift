@@ -12,7 +12,7 @@ extension AppModel {
     }
 
     nonisolated static func promptFailureMessage(_ kind: PromptFailure, error: Error, bundle: Bundle = .main) -> String {
-        let reason = error.localizedDescription
+        let reason = FailureText.message(for: error, bundle: bundle)
         switch kind {
         case .prompt:
             return String(localized: "Prompt failed: \(reason)", bundle: bundle)

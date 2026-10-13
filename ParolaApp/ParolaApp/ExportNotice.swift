@@ -82,7 +82,7 @@ struct ExportNotice: Equatable, Identifiable {
 
     static func autoExportFailed(_ error: Error) -> ExportNotice {
         ExportNotice(
-            message: String(localized: "Auto-export couldn't write to its folder: \(error.localizedDescription)"),
+            message: String(localized: "Auto-export couldn't write to its folder: \(FailureText.message(for: error))"),
             failures: [], folder: nil, tone: .failure, offersFolderChoice: true
         )
     }

@@ -209,7 +209,7 @@ struct ObsidianDestinationEditor: View {
             draft.vaultPath = url.path
             testNote = nil
         } catch {
-            testNote = .failed(error.localizedDescription)
+            testNote = .failed(FailureText.message(for: error))
         }
     }
 

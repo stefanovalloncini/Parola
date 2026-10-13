@@ -122,6 +122,28 @@
         }
       }
     },
+    "%@ failed mid-response: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ ha smesso di rispondere a metà: %@"
+          }
+        }
+      }
+    },
+    "%@ is disabled in this deployment.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Disattivato in questa installazione: %@."
+          }
+        }
+      }
+    },
     "%@ is forgotten and the transcripts stop pointing at them. The names already written into them stay, and that can't be undone.": {
       "extractionState": "manual",
       "localizations": {
@@ -217,6 +239,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@ ha rifiutato il download."
+          }
+        }
+      }
+    },
+    "%@ request failed (HTTP %lld).": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Richiesta a %@ non riuscita (HTTP %lld)."
+          }
+        }
+      }
+    },
+    "%@ returned a malformed response.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ ha restituito una risposta non valida."
           }
         }
       }
@@ -410,18 +454,43 @@
         }
       }
     },
-    "%lld entries · %@": {
+    "%lld entries": {
+      "extractionState": "manual",
       "localizations": {
         "en": {
-          "stringUnit": {
-            "state": "new",
-            "value": "%1$lld entries · %2$@"
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld entry"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld entries"
+                }
+              }
+            }
           }
         },
         "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld voci · %@"
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld voce"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld voci"
+                }
+              }
+            }
           }
         }
       }
@@ -1135,6 +1204,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Una destinazione scrive una nota Markdown quando le mandi una trascrizione. Attiva Invia automaticamente per scriverla appena la trascrizione è pronta. Un batch non viene inviato automaticamente."
+          }
+        }
+      }
+    },
+    "A downloaded file failed its integrity check. Download the model again.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Un file scaricato non ha superato il controllo di integrità. Scarica di nuovo il modello."
           }
         }
       }
@@ -2119,6 +2199,50 @@
         }
       }
     },
+    "Apple Intelligence is off. Turn it on in Settings to use this feature.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Intelligence è disattivata. Attivala nelle Impostazioni per usare questa funzione."
+          }
+        }
+      }
+    },
+    "Apple Intelligence is still preparing its model. Try again in a little while.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Intelligence sta ancora preparando il suo modello. Riprova tra poco."
+          }
+        }
+      }
+    },
+    "Apple Intelligence isn't available right now.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Intelligence non è disponibile al momento."
+          }
+        }
+      }
+    },
+    "Apple Intelligence needs macOS 26 or iOS 26 or newer.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Intelligence richiede macOS 26 o iOS 26, o versioni successive."
+          }
+        }
+      }
+    },
     "Apple Intelligence stays on this Mac. You can switch back to it at any time.": {
       "extractionState": "manual",
       "localizations": {
@@ -2362,6 +2486,17 @@
         }
       }
     },
+    "Audio capture unavailable: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Registrazione audio non disponibile: %@"
+          }
+        }
+      }
+    },
     "Audio duration": {
       "extractionState": "manual",
       "localizations": {
@@ -2549,6 +2684,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Gli aggiornamenti automatici non sono disponibili in questa build."
+          }
+        }
+      }
+    },
+    "Automation": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automazione"
           }
         }
       }
@@ -2792,6 +2938,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Lo usano i batch."
+          }
+        }
+      }
+    },
+    "Batch transcription": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trascrizione in batch"
           }
         }
       }
@@ -3505,6 +3662,17 @@
         }
       }
     },
+    "Chat failed: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chat non riuscita: %@"
+          }
+        }
+      }
+    },
     "Chat with this transcript": {
       "extractionState": "manual",
       "localizations": {
@@ -4012,6 +4180,17 @@
         }
       }
     },
+    "Cloud LLMs are disabled by your organization.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I modelli cloud sono disattivati dalla tua organizzazione."
+          }
+        }
+      }
+    },
     "Code": {
       "extractionState": "manual",
       "localizations": {
@@ -4461,6 +4640,17 @@
         }
       }
     },
+    "Couldn't import term pack: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossibile importare il term pack: %@"
+          }
+        }
+      }
+    },
     "Couldn't move": {
       "extractionState": "manual",
       "localizations": {
@@ -4468,6 +4658,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Impossibile spostare"
+          }
+        }
+      }
+    },
+    "Couldn't open document: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossibile aprire il documento: %@"
           }
         }
       }
@@ -4523,6 +4724,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Impossibile raggiungere il sito."
+          }
+        }
+      }
+    },
+    "Couldn't read %@: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossibile leggere %@: %@"
+          }
+        }
+      }
+    },
+    "Couldn't refresh %@: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossibile aggiornare %@: %@"
           }
         }
       }
@@ -4632,6 +4855,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Impossibile aggiornare le etichette"
+          }
+        }
+      }
+    },
+    "Couldn't watch %@: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossibile monitorare %@: %@"
           }
         }
       }
@@ -5492,6 +5726,17 @@
         }
       }
     },
+    "Download failed: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scaricamento non riuscito: %@"
+          }
+        }
+      }
+    },
     "Downloading %@": {
       "extractionState": "manual",
       "localizations": {
@@ -6282,6 +6527,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Errore"
+          }
+        }
+      }
+    },
+    "Failed to download model %@: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossibile scaricare il modello %@: %@"
           }
         }
       }
@@ -7483,6 +7739,17 @@
         }
       }
     },
+    "Import failed: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Importazione non riuscita: %@"
+          }
+        }
+      }
+    },
     "Import from File…": {
       "extractionState": "manual",
       "localizations": {
@@ -7791,6 +8058,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Traduzione"
+          }
+        }
+      }
+    },
+    "Invalid language code: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Codice lingua non valido: %@"
           }
         }
       }
@@ -8964,6 +9242,17 @@
         }
       }
     },
+    "Meeting recording": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Registrazione riunioni"
+          }
+        }
+      }
+    },
     "Meetings": {
       "extractionState": "manual",
       "localizations": {
@@ -9124,6 +9413,17 @@
         }
       }
     },
+    "Microphone recording": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Registrazione dal microfono"
+          }
+        }
+      }
+    },
     "Microphone stopped": {
       "extractionState": "manual",
       "localizations": {
@@ -9197,6 +9497,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Modello che userà una nuova trascrizione"
+          }
+        }
+      }
+    },
+    "Model downloads are disabled by a managed policy.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lo scaricamento dei modelli è disattivato da un criterio gestito."
           }
         }
       }
@@ -9743,6 +10054,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Segmento successivo"
+          }
+        }
+      }
+    },
+    "No API key configured for %@.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nessuna chiave API configurata per %@."
           }
         }
       }
@@ -11285,6 +11607,17 @@
         }
       }
     },
+    "Parola couldn't find %@.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parola non è riuscita a trovare %@."
+          }
+        }
+      }
+    },
     "Parola couldn't keep writing the recording to disk.": {
       "extractionState": "manual",
       "localizations": {
@@ -11292,6 +11625,61 @@
           "stringUnit": {
             "state": "translated",
             "value": "Parola non è riuscita a continuare a scrivere la registrazione su disco."
+          }
+        }
+      }
+    },
+    "Parola couldn't load the audio from %@.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parola non è riuscita a caricare l'audio da %@."
+          }
+        }
+      }
+    },
+    "Parola couldn't reach %@. Pick the folder again in Send To settings.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parola non riesce a raggiungere %@. Scegli di nuovo la cartella nelle impostazioni di Invia a."
+          }
+        }
+      }
+    },
+    "Parola couldn't read %@ in time.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parola non è riuscita a leggere %@ in tempo."
+          }
+        }
+      }
+    },
+    "Parola couldn't read %@.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parola non è riuscita a leggere %@."
+          }
+        }
+      }
+    },
+    "Parola couldn't read the transcript to send. %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parola non è riuscita a leggere la trascrizione da inviare. %@"
           }
         }
       }
@@ -11318,6 +11706,17 @@
         }
       }
     },
+    "Parola couldn't write to %@. %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parola non è riuscita a scrivere in %@. %@"
+          }
+        }
+      }
+    },
     "Parola didn't find any speech in this audio.": {
       "extractionState": "manual",
       "localizations": {
@@ -11325,6 +11724,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Parola non ha trovato parlato in questo audio."
+          }
+        }
+      }
+    },
+    "Parola is already sending that transcript to %@.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parola sta già inviando quella trascrizione a %@."
           }
         }
       }
@@ -11402,6 +11812,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Parola invia queste istruzioni al modello insieme al testo."
+          }
+        }
+      }
+    },
+    "Parola stopped trying to send to %@.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parola ha smesso di provare a inviare a %@."
           }
         }
       }
@@ -16078,6 +16499,17 @@
         }
       }
     },
+    "Summary failed: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Riepilogo non riuscito: %@"
+          }
+        }
+      }
+    },
     "Summary instructions": {
       "extractionState": "manual",
       "localizations": {
@@ -16316,6 +16748,61 @@
         }
       }
     },
+    "That destination is no longer in Send To settings.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questa destinazione non è più nelle impostazioni di Invia a."
+          }
+        }
+      }
+    },
+    "That destination is switched off.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questa destinazione è disattivata."
+          }
+        }
+      }
+    },
+    "That transcript isn't in your library.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questa trascrizione non è nella libreria."
+          }
+        }
+      }
+    },
+    "That transcript was deleted, so there is nothing to send.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questa trascrizione è stata eliminata, quindi non c'è nulla da inviare."
+          }
+        }
+      }
+    },
+    "The %@ engine is disabled by a managed policy.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il motore %@ è disattivato da un criterio gestito."
+          }
+        }
+      }
+    },
     "The Library page shows these same settings; a change in either place persists.": {
       "extractionState": "manual",
       "localizations": {
@@ -16382,6 +16869,17 @@
         }
       }
     },
+    "The conversation has to end with your message.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La conversazione deve finire con un tuo messaggio."
+          }
+        }
+      }
+    },
     "The dictation and recording shortcuts that work from any app.": {
       "extractionState": "manual",
       "localizations": {
@@ -16411,6 +16909,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Il download è rimasto fermo per %lld secondi."
+          }
+        }
+      }
+    },
+    "The file is empty.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il file è vuoto."
           }
         }
       }
@@ -16455,6 +16964,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "I messaggi non si potranno recuperare."
+          }
+        }
+      }
+    },
+    "The model %@ isn't downloaded yet. Download it in Settings › Local Models.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il modello %@ non è ancora scaricato. Scaricalo da Impostazioni › Modelli locali."
           }
         }
       }
@@ -16592,6 +17112,17 @@
         }
       }
     },
+    "The recording stopped saving partway (%@). What was saved is kept at %@.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La registrazione ha smesso di salvarsi a metà (%@). Quello che era già salvato si trova in %@."
+          }
+        }
+      }
+    },
     "The recording stopped saving to disk partway, so its audio ends early.": {
       "extractionState": "manual",
       "localizations": {
@@ -16654,6 +17185,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Gli speaker a cui dai un nome, il colore di ciascuno e dove compaiono."
+          }
+        }
+      }
+    },
+    "The speech model isn't loaded.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il modello vocale non è caricato."
           }
         }
       }
@@ -16982,6 +17524,17 @@
         }
       }
     },
+    "This device doesn't support Apple Intelligence.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questo dispositivo non supporta Apple Intelligence."
+          }
+        }
+      }
+    },
     "This is a test note from Parola.": {
       "extractionState": "manual",
       "localizations": {
@@ -17037,6 +17590,28 @@
         }
       }
     },
+    "This speech engine can't translate. Pick a Whisper model.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questo motore vocale non sa tradurre. Scegli un modello Whisper."
+          }
+        }
+      }
+    },
+    "This speech engine isn't available in this build.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questo motore vocale non è disponibile in questa build."
+          }
+        }
+      }
+    },
     "This transcript came in without its audio, so there is nothing to transcribe again.": {
       "extractionState": "manual",
       "localizations": {
@@ -17055,6 +17630,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Questa trascrizione è arrivata senza audio."
+          }
+        }
+      }
+    },
+    "This transcript has no audio to replace.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questa trascrizione non ha audio da sostituire."
           }
         }
       }
@@ -17092,6 +17678,17 @@
         }
       }
     },
+    "This transcript is in Recently Deleted. Restore it to open it.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questa trascrizione è in Eliminati di recente. Ripristinala per aprirla."
+          }
+        }
+      }
+    },
     "This transcript is no longer in your library.": {
       "extractionState": "manual",
       "localizations": {
@@ -17099,6 +17696,39 @@
           "stringUnit": {
             "state": "translated",
             "value": "Questa trascrizione non è più nella tua libreria."
+          }
+        }
+      }
+    },
+    "This transcript is too long for %@ (%lld tokens, limit %lld).": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La trascrizione è troppo lunga per %@ (%lld token, limite %lld)."
+          }
+        }
+      }
+    },
+    "This transcript is too short for a title and summary.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La trascrizione è troppo corta per un titolo e un riepilogo."
+          }
+        }
+      }
+    },
+    "This transcript was saved by a newer version of Parola.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questa trascrizione è stata salvata da una versione più recente di Parola."
           }
         }
       }
@@ -17121,6 +17751,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Questa versione ha più di 90 giorni. I download da YouTube e da altri siti potrebbero non riuscire finché non la aggiorni."
+          }
+        }
+      }
+    },
+    "This version of Parola can't send to a %@ destination.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questa versione di Parola non può inviare a una destinazione %@."
           }
         }
       }
@@ -18176,6 +18817,28 @@
         }
       }
     },
+    "Unknown model “%@”.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modello “%@” sconosciuto."
+          }
+        }
+      }
+    },
+    "Unknown model “%@”. Did you mean “%@”?": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modello “%@” sconosciuto. Intendevi “%@”?"
+          }
+        }
+      }
+    },
     "Unknown speaker, click to assign": {
       "extractionState": "manual",
       "localizations": {
@@ -18205,6 +18868,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Rimuovi pin"
+          }
+        }
+      }
+    },
+    "Unsupported audio format: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Formato audio non supportato: %@"
+          }
+        }
+      }
+    },
+    "Unsupported cloud provider: %@.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Servizio cloud non supportato: %@."
           }
         }
       }
@@ -18617,6 +19302,17 @@
       }
     },
     "Watched Folders": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cartelle monitorate"
+          }
+        }
+      }
+    },
+    "Watched folders": {
       "extractionState": "manual",
       "localizations": {
         "it": {
@@ -19237,6 +19933,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sottotitoli automatici YouTube"
+          }
+        }
+      }
+    },
+    "YouTube ingestion": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Importazione da YouTube"
           }
         }
       }

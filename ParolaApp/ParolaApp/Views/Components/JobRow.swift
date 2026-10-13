@@ -15,7 +15,7 @@ enum BatchJobStatus {
             return String(localized: "Cancelled")
         case .failed:
             guard let error, !error.isEmpty else { return String(localized: "Failed") }
-            return String(localized: "Failed: \(error)")
+            return String(localized: "Failed: \(FailureText.reason(error))")
         case .done:
             return String(localized: "Completed · \(SegmentCount.label(segmentCount))")
         }

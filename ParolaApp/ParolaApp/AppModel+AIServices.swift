@@ -447,7 +447,7 @@ extension AppModel {
                     )
                     return .answered(try await model.respond(to: AppModel.aiTestPrompt))
                 } catch {
-                    return .failed(error.localizedDescription)
+                    return .failed(FailureText.message(for: error))
                 }
             }
         }

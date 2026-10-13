@@ -28,6 +28,10 @@ struct ModelsDiskSummary: Equatable, Sendable {
 
 extension AppModel {
 
+    nonisolated static func libraryUsageText(entries: Int, bytes: Int64, bundle: Bundle = .main) -> String {
+        String(localized: "\(entries) entries", bundle: bundle) + " · " + AppFormat.byteSize(bytes)
+    }
+
     /// The Models pane and About both read this, so the two never disagree.
     var modelsOnDiskSummary: ModelsDiskSummary {
         Self.modelsDiskSummary(models: availableModels, sizes: modelSizes, earlier: supersededCopies)
@@ -116,7 +120,7 @@ extension AppModel {
             self.modelsBeingDeleted.subtract(keys)
             if let failure {
                 self.modelActionError = String(
-                    localized: "Could not delete \(first.displayName): \(failure.localizedDescription)"
+                    localized: "Could not delete \(first.displayName): \(FailureText.message(for: failure))"
                 )
             } else {
                 self.supersededCopies.removeAll { $0.variantID == variantID }

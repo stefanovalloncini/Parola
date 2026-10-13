@@ -392,7 +392,7 @@ struct ChatPane: View {
             return .ready(built, history: history)
         } catch {
             guard !Task.isCancelled, key == currentKey() else { return nil }
-            return .failed(error.localizedDescription)
+            return .failed(FailureText.message(for: error))
         }
     }
 
@@ -531,7 +531,7 @@ struct ChatPane: View {
             } catch {
                 guard !Task.isCancelled, entryID == model.selectedEntryID else { return }
                 liveReply.end()
-                turnError = error.localizedDescription
+                turnError = FailureText.message(for: error)
             }
         }
     }

@@ -81,7 +81,7 @@ extension AppModel {
         } catch is CancellationError {
             throw IntentActionError.cancelled
         } catch {
-            throw IntentActionError.failed(error.localizedDescription)
+            throw IntentActionError.failed(FailureText.message(for: error))
         }
     }
 
@@ -114,7 +114,7 @@ extension AppModel {
         do {
             entry = try await landing.entry.value
         } catch {
-            throw IntentActionError.failed(error.localizedDescription)
+            throw IntentActionError.failed(FailureText.message(for: error))
         }
         await awaitLandingSteps()
         if let audio = try? await library.load(entry.id).document.audioURL, sourceFileURL == url {

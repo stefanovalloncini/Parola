@@ -60,7 +60,7 @@ struct DiagnosticsSection: View {
             do {
                 try await model.exportDiagnostics(directory: directory)
             } catch {
-                diagnosticsFailure = error.localizedDescription
+                diagnosticsFailure = FailureText.message(for: error)
             }
             hasDiagnostics = await model.diagnosticsRecordsExist(directory: directory)
         }

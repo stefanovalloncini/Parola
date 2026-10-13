@@ -94,7 +94,7 @@ extension AppModel {
             try await library.setTranslation(translation, for: entryID)
         } catch {
             ParolaLog.error(.library, "translation could not be saved to the library", [.error: .error(error)])
-            nonFatalWarning = String(localized: "The translation is still on screen, but Parola couldn't save it to your library. \(error.localizedDescription)")
+            nonFatalWarning = String(localized: "The translation is still on screen, but Parola couldn't save it to your library. \(FailureText.message(for: error))")
         }
     }
 }

@@ -299,7 +299,7 @@ extension AppModel {
         let message: LogMessage = landing.rerunEntryID != nil
             ? "re-transcription could not be saved" : "transcript could not be saved to the library"
         ParolaLog.error(.library, message, [.error: .error(error)])
-        nonFatalWarning = Self.landingFailureMessage(landing, reason: error.localizedDescription)
+        nonFatalWarning = Self.landingFailureMessage(landing, reason: FailureText.message(for: error))
     }
 
     nonisolated static func landingFailureMessage(

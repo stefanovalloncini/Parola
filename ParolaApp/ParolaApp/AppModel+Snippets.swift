@@ -50,7 +50,7 @@ extension AppModel {
                 let existing = Set(self.snippets.map { $0.trigger.lowercased() })
                 self.snippets += imported.filter { !existing.contains($0.trigger.lowercased()) }
             } catch {
-                self?.phase = .failed(message: "Import failed: \(error.localizedDescription)")
+                self?.phase = .failed(message: String(localized: "Import failed: \(FailureText.message(for: error))"))
             }
         }
     }
