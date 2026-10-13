@@ -16,7 +16,7 @@ extension AppModel {
         do {
             try await library.updateTranscript(updated, for: entryID)
         } catch {
-            lastError = error.localizedDescription
+            lastError = FailureText.message(for: error)
         }
         return updated
     }

@@ -38,7 +38,7 @@ extension AppModel {
             do {
                 try await library.delete(id)
             } catch {
-                lastError = error.localizedDescription
+                lastError = FailureText.message(for: error)
             }
             refreshLibrary()
         }
@@ -49,7 +49,7 @@ extension AppModel {
             do {
                 try await library.restore(id)
             } catch {
-                lastError = error.localizedDescription
+                lastError = FailureText.message(for: error)
             }
             refreshLibrary()
         }
@@ -60,7 +60,7 @@ extension AppModel {
             do {
                 try await library.purge(id)
             } catch {
-                lastError = error.localizedDescription
+                lastError = FailureText.message(for: error)
             }
             refreshLibrary()
         }

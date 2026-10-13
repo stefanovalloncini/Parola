@@ -69,7 +69,7 @@ final class TranscriptionCoordinator {
                 try await FileCopier.copy(from: sourceURL, to: copy)
             } catch {
                 Self.removeImportCopy(copy)
-                phase = .failed(message: error.localizedDescription)
+                phase = .failed(message: FailureText.message(for: error))
                 return
             }
             runTranscription(audio: copy)
@@ -97,7 +97,7 @@ final class TranscriptionCoordinator {
     }
 
     func reportFileImportFailure(_ error: Error) {
-        phase = .failed(message: error.localizedDescription)
+        phase = .failed(message: FailureText.message(for: error))
     }
 
     private func runTranscription(audio: URL) {
@@ -124,7 +124,7 @@ final class TranscriptionCoordinator {
             } catch is CancellationError {
                 if generation == transcribeGeneration { phase = .idle }
             } catch {
-                if generation == transcribeGeneration { phase = .failed(message: error.localizedDescription) }
+                if generation == transcribeGeneration { phase = .failed(message: FailureText.message(for: error)) }
             }
         }
     }
@@ -185,7 +185,7 @@ final class TranscriptionCoordinator {
                     if let audio = await session.recordingAudioURL() { try? FileManager.default.removeItem(at: audio) }
                     return
                 }
-                let message = await landInterruptedTake(from: session, reason: error.localizedDescription)
+                let message = await landInterruptedTake(from: session, reason: FailureText.message(for: error))
                 guard generation == recordingGeneration else { return }
                 deactivateAudioSessionIfIdle()
                 phase = .failed(message: message)
@@ -270,7 +270,7 @@ final class TranscriptionCoordinator {
                     if generation == recordingGeneration { phase = .idle }
                     onComplete?(entry)
                 } catch {
-                    if generation == recordingGeneration { phase = .failed(message: error.localizedDescription) }
+                    if generation == recordingGeneration { phase = .failed(message: FailureText.message(for: error)) }
                 }
             }
         }

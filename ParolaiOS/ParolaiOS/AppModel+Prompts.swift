@@ -14,7 +14,7 @@ extension AppModel {
                 let result = try await PromptRunner.run(prompt, on: transcript, model: model, budget: .onDevice)
                 promptOutput = PromptOutput(promptName: prompt.name, text: result)
             } catch {
-                lastError = error.localizedDescription
+                lastError = FailureText.message(for: error)
             }
             isRunningPrompt = false
         }
@@ -31,7 +31,7 @@ extension AppModel {
                 let result = try await YouTubeChapters.generate(for: transcript, model: model, budget: .onDevice)
                 promptOutput = PromptOutput(promptName: "YouTube Chapters", text: result)
             } catch {
-                lastError = error.localizedDescription
+                lastError = FailureText.message(for: error)
             }
             isRunningPrompt = false
         }

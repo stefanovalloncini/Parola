@@ -140,7 +140,7 @@ struct TranscriptDetailView: View {
                     transcript: result.document.transcript
                 )
             } catch {
-                loadError = error.localizedDescription
+                loadError = FailureText.message(for: error)
             }
         }
         .onDisappear {

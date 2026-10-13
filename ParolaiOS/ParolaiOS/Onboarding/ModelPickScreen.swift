@@ -69,7 +69,7 @@ struct ModelPickScreen: View {
                 _ = try await ModelStore.shared.download(variant: variant)
                 model.refreshModelList()
             } catch {
-                model.lastError = error.localizedDescription
+                model.lastError = FailureText.message(for: error)
             }
         }
     }

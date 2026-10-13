@@ -175,7 +175,7 @@ struct ChatSheet: View {
             displayedHistory = history
         } catch {
             guard !Task.isCancelled else { return }
-            sessionError = error.localizedDescription
+            sessionError = FailureText.message(for: error)
         }
     }
 
@@ -224,11 +224,11 @@ struct ChatSheet: View {
                     // next save (reopened chat, speaker rename) erases this history on disk.
                     onSave?(saved)
                 } catch {
-                    model.lastError = error.localizedDescription
+                    model.lastError = FailureText.message(for: error)
                 }
                 isSending = false
             } catch {
-                turnError = error.localizedDescription
+                turnError = FailureText.message(for: error)
                 isSending = false
             }
         }

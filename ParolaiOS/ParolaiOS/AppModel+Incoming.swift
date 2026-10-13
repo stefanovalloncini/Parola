@@ -22,7 +22,7 @@ extension AppModel {
                 coordinator.startFileTranscriptionFromTrustedCopy(at: copy)
             }
         } catch {
-            lastError = error.localizedDescription
+            lastError = FailureText.message(for: error)
         }
     }
 }

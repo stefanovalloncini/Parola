@@ -96,7 +96,7 @@ struct LiveCaptionsSheet: View {
                 }
             } catch {
                 await MainActor.run {
-                    state.error = error.localizedDescription
+                    state.error = FailureText.message(for: error)
                     state.isActive = false
                     state.isLoading = false
                 }
