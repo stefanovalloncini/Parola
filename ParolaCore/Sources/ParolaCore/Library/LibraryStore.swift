@@ -610,7 +610,8 @@ public actor LibraryStore {
         sourceDigest: String? = nil,
         source: EntrySource? = nil,
         consumesAudio: Bool = false,
-        takeMarkers: [TimeInterval]? = nil
+        takeMarkers: [TimeInterval]? = nil,
+        sourceAppBundleID: String? = nil
     ) async throws -> LibraryEntry {
         let name = uniqueEntryName(at: Date())
         let bundleURL = libraryURL.appendingPathComponent(name)
@@ -632,7 +633,8 @@ public actor LibraryStore {
                     sourceDigest: digest,
                     entrySource: source,
                     movesAudio: consumesAudio,
-                    takeMarkers: takeMarkers
+                    takeMarkers: takeMarkers,
+                    sourceAppBundleID: sourceAppBundleID
                 )
                 didWriteBundle?()
             }

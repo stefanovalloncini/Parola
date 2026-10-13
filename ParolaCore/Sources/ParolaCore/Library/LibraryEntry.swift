@@ -33,6 +33,7 @@ public struct LibraryEntry: Identifiable, Hashable, Sendable {
     public var sourceDigest: String? { manifest.sourceDigest }
     public var transcriptionSeconds: Double? { manifest.transcriptionSeconds }
     public var wordCount: Int? { manifest.wordCount }
+    public var sourceAppBundleID: String? { manifest.sourceAppBundleID }
     public var aiTitle: String? { manifest.aiTitle }
     public var shortSummary: String? { manifest.shortSummary }
     public var deliveries: [DeliveryReceipt] { manifest.deliveries }
