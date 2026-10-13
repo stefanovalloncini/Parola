@@ -229,7 +229,9 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         if decoding { return stream }
         switch await streamerTask.value {
         case .cancelled: throw CancellationError()
-        case .modelFailed(let error): throw error
+        case .modelFailed(let error):
+            await stopFinished()
+            throw error
         case .stopped, .stoppedWithoutModel, .permissionDenied, .failed: return stream
         }
     }
@@ -383,6 +385,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         var modelRan = true
         switch outcome {
         case .modelFailed?:
+            await beforeKeepingFailedAudio?()
             // start() throws the load failure, so the audio waits in recordingAudioURL() rather than in a .finished nobody reads.
             if let kept = await persister?.finish() { failureAudioURL = kept }
             continuation?.finish()
@@ -472,6 +475,19 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
                 waiter.resume()
             }
         }
+    }
+
+    /// Test seam: runs in a waiting stop just before it finalizes a failed take's audio.
+    var beforeKeepingFailedAudio: (@Sendable () async -> Void)?
+
+    func setBeforeKeepingFailedAudio(_ hook: (@Sendable () async -> Void)?) {
+        beforeKeepingFailedAudio = hook
+    }
+
+    /// A stop that is waiting on the same failed load finalizes the audio; the caller must not see the failure before that.
+    private func stopFinished() async {
+        guard stoppingLoop != nil else { return }
+        await withCheckedContinuation { stopWaiters.append($0) }
     }
 
     private func endStopping() {

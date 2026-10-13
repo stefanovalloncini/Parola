@@ -1052,6 +1052,40 @@ struct StreamingCaptureFirstTests {
         #expect(await cache.leaseCount(for: Self.tiny) == 0)
     }
 
+    @Test("a start fails only once the waiting stop has finalized the audio")
+    func loadFailureAfterStopThrowsOnlyOnceTheAudioIsFinal() async throws {
+        let gate = LoadGate()
+        let loads = Awaitable(0)
+        let cache = Self.failingCache(gate: gate, loads: loads)
+        let mic = StandInMic()
+        let session = try Self.session(cache: cache, mic: mic, persistAudio: true)
+        let transcriber: any StreamingTranscriber = session
+        let held = TestSignal()
+        let finalizing = LoadGate()
+        await session.setBeforeKeepingFailedAudio {
+            held.fire()
+            await finalizing.wait("finalize")
+        }
+        let starting = GuardedTask { try await session.start(options: TranscriptionOptions(model: Self.tiny)) }
+        await loads.wait(atLeast: 1, "the model load to start")
+        mic.speak(seconds: 1)
+        let audio = try #require(await transcriber.recordingAudioURL())
+        defer { try? FileManager.default.removeItem(at: audio) }
+        let stopping = GuardedTask { await session.stop() }
+        await mic.captureStopped.wait("capture to stop at once")
+        await gate.open(Self.tiny)
+        await held.wait("the stop to reach the point before it finalizes the audio")
+
+        for _ in 0..<500 { await Task.yield() }
+        #expect(!starting.isFinished, "start must not throw before the stop has finalized the audio")
+
+        await finalizing.open("finalize")
+        await #expect(throws: ModelLoadFailure.self) { _ = try await starting.value("the start to fail") }
+        #expect(try AVAudioFile(forReading: audio).length == 17_600)
+        #expect(await transcriber.recordingAudioURL() == audio)
+        _ = try await stopping.value("the stop to finish")
+    }
+
     @Test("the pre-model buffer keeps at most 60 s")
     func preModelBufferIsBounded() async throws {
         let probe = CacheProbe()

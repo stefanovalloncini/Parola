@@ -36,6 +36,7 @@ public actor MockStreamingTranscriber: StreamingTranscriber {
                 releaseStopsWaitingForModel()
             }
             try await gate.wait()
+            if endedWhileStarting != .cancel, let failure = response.startFailure { throw failure.asError() }
             switch endedWhileStarting {
             case .cancel?: throw CancellationError()
             case .stop?: return Self.endedBeforeCapture(response)
@@ -43,7 +44,7 @@ public actor MockStreamingTranscriber: StreamingTranscriber {
             case nil: break
             }
         }
-        if let failure = response.startFailure { throw failure.asError() }
+        if response.gate == nil, let failure = response.startFailure { throw failure.asError() }
         let (stream, cont) = AsyncStream<StreamingEvent>.makeStream(bufferingPolicy: .bufferingNewest(256))
         continuation = cont
         let response = self.response

@@ -558,8 +558,76 @@ extension TranscriberMockSuites {
                 let file = try #require(model.activeRecoveryFileURL)
                 let checkpoint = try JSONDecoder().decode(RecoveryCheckpoint.self, from: try Data(contentsOf: file))
                 #expect(checkpoint.audioURL == wav)
-                #expect(model.takeFileIsHeld)
                 await model.discardTake()
+            }
+        }
+
+        @Test("a Stop that counts a just-metered buffer still checkpoints the audio", .timeLimit(.minutes(1)))
+        func stopRightAfterTheFirstBufferCheckpointsTheAudio() async throws {
+            let wav = try makeTakeWAV("stop-checkpoint")
+            defer { try? FileManager.default.removeItem(at: wav) }
+            try await withMocksCleared([.audioSource, .streaming]) {
+                await MockAudioSourceRegistry.shared.clear()
+                let model = makeModel()
+                await startStreamingTake(model, gate: MockTranscriberGate(), audio: wav)
+                await waitUntil { model.takeArming != nil }
+
+                model.recordingLevelMeter?.record(0.4)
+                model.stopRecordingAndTranscribe()
+
+                await waitUntil { model.liveRecordingAudioURL == wav }
+                await model.discardTake()
+            }
+        }
+
+        @Test("a model that fails to load after the take captured lands the audio as an interrupted entry", .timeLimit(.minutes(1)))
+        func loadFailureAfterCaptureKeepsTheAudio() async throws {
+            let wav = try makeTakeWAV("load-failure")
+            defer { try? FileManager.default.removeItem(at: wav) }
+            try await withMocksCleared([.audioSource, .streaming]) {
+                await MockAudioSourceRegistry.shared.clear()
+                let gate = MockTranscriberGate()
+                let model = makeModel()
+                await startStreamingTake(
+                    model, gate: gate, audio: wav,
+                    startFailure: MockTranscriberFailure(code: .engineLoadFailed, message: "the model would not load")
+                )
+                await waitUntil { model.takeArming != nil }
+                model.recordingLevelMeter?.record(0.4)
+                await waitUntil { model.liveRecordingAudioURL == wav }
+
+                await gate.open()
+
+                let saved = try #require(await entries(model, count: 1).first)
+                #expect(saved.title.hasSuffix("(interrupted)"))
+                #expect(try await model.library.load(saved.id).document.transcript.modelName.isEmpty)
+                #expect(!model.recordingActive)
+            }
+        }
+
+        @Test("a Stop that waits for the model, which then fails to load, still lands the captured audio", .timeLimit(.minutes(1)))
+        func stopThenLoadFailureKeepsTheAudio() async throws {
+            let wav = try makeTakeWAV("stop-load-failure")
+            defer { try? FileManager.default.removeItem(at: wav) }
+            try await withMocksCleared([.audioSource, .streaming]) {
+                await MockAudioSourceRegistry.shared.clear()
+                let gate = MockTranscriberGate()
+                let model = makeModel()
+                await startStreamingTake(
+                    model, gate: gate, audio: wav,
+                    startFailure: MockTranscriberFailure(code: .engineLoadFailed, message: "the model would not load")
+                )
+                await waitUntil { model.takeArming != nil }
+                model.recordingLevelMeter?.record(0.4)
+                await waitUntil { model.liveRecordingAudioURL == wav }
+
+                model.stopRecordingAndTranscribe()
+                await gate.open()
+
+                let saved = try #require(await entries(model, count: 1).first)
+                #expect(saved.title.hasSuffix("(interrupted)"))
+                await waitUntil { !model.recordingActive }
+                #expect(await model.library.list().count == 1)
             }
         }
 

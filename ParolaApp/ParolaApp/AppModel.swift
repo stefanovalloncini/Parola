@@ -4326,11 +4326,10 @@ final class AppModel {
         guard let session = streamingSession, liveRecordingAudioURL == nil else { return }
         Task { @MainActor [weak self] in
             guard let audio = await session.recordingAudioURL() else { return }
-            guard let self, self.takeIsCurrent(take), self.streamingSession != nil, self.liveRecordingAudioURL == nil else { return }
+            guard let self, self.takeIsCurrent(take), self.liveRecordingAudioURL == nil else { return }
             self.liveRecordingAudioURL = audio
             self.updateSession(of: take.id) { $0.audioURL = audio }
             self.writeRecordingCheckpoint()
-            self.armTakeFileHeartbeat()
         }
     }
 
@@ -4571,12 +4570,53 @@ final class AppModel {
             }
         } catch {
             // A cancelled load is not a failure, and the next take may already own the session this would tear down.
-            guard !(error is CancellationError), !Task.isCancelled, takeIsCurrent(take) else { return }
+            guard !(error is CancellationError), !Task.isCancelled else { return }
             let message = Self.transcriptionFailureMessage(for: error)
+            let captured = await s.recordingAudioURL()
+            let heard: URL? = if let captured, !(await Self.holdsNoAudio(captured)) { captured } else { nil }
+            guard takeIsCurrent(take) else {
+                guard let letGo = liveTakesFinishingAlone.removeValue(forKey: take.id) else { return }
+                if let heard {
+                    await landLetGoInterruptedTake(letGo, audio: heard)
+                } else {
+                    if let recovery = letGo.take.recovery {
+                        recoveryHeldByTake.remove(recovery)
+                        endRecovery(recovery)
+                    }
+                    if let captured { releaseTakeFile(captured) }
+                }
+                return
+            }
+            if heard != nil {
+                await keepFailedLiveTake(message, take: take, session: s)
+                return
+            }
             reportTakeFailure(message, take: take.id)
             teardownStreaming(take)
+            if let captured { releaseTakeFile(captured) }
             resolveRecordingOutcome(.failure(IntentActionError.failed(message)), take: take.id)
         }
+    }
+
+    /// A take stopped and then let go whose model failed to load keeps its audio as an interrupted entry, through the held checkpoint.
+    private func landLetGoInterruptedTake(_ letGo: FinishingAlone, audio: URL) async {
+        let take = letGo.take
+        let category = take.category
+        let finished = await StreamingTranscriptionSession.finishedTake(
+            segments: [], options: currentOptions, modelName: "", audioURL: audio
+        )
+        let processed = await postProcessDetached(finished)
+        saveTake(
+            processed,
+            audio: audio,
+            title: Self.takeTitle(letGo.annotations.title(for: category), suffix: .interrupted),
+            source: take.source.entrySource,
+            category: category,
+            landingAs: .salvagedTake,
+            recovery: take.recovery,
+            take: take.id,
+            annotations: letGo.annotations
+        )
     }
 
     /// The model download a live take waits on shows in its pane; the phase stays the take's.
@@ -5007,7 +5047,7 @@ final class AppModel {
         if case .preparingModel = takeArming, let s = streamingSession {
             streamingSession = nil
             streamingConsumer = nil
-            Task { await s.cancel() }
+            trackTakeWork { await s.cancel() }
         }
         if let message {
             reportTakeFailure(message, take: take?.id)
