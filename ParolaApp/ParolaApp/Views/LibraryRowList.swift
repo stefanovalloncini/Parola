@@ -133,6 +133,7 @@ struct LibraryRowList<Top: View>: View {
             }
         }
         .listStyle(.inset)
+        .readingColumn()
         .tint(DS.Color.accentFill)
         .focused(focus, equals: focusKey)
         .focusedValue(\.libraryRows, LibraryRowsTarget(
@@ -190,11 +191,11 @@ struct LibraryGroupHeader: View {
 
     var body: some View {
         Text(verbatim: title)
-            .font(DS.Font.body.weight(.semibold))
-            .foregroundStyle(DS.Color.secondaryText)
+            .font(DS.Font.heading)
+            .foregroundStyle(DS.Color.primaryText)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.top, DS.Spacing.regular)
-            .padding(.bottom, DS.Spacing.tight)
+            .padding(.top, 22)
+            .padding(.bottom, DS.Spacing.snug)
             .accessibilityAddTraits(.isHeader)
     }
 }

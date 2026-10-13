@@ -54,10 +54,15 @@ enum EntrySourceKind: Equatable {
 
 /// How tall every row of entries is, and where its parts sit.
 enum EntryRowMetrics {
-    static let height: CGFloat = 50
+    static let height: CGFloat = 64
+    /// The queue's own badge, which stays at the size its rows were drawn for.
     static let badgeSide: CGFloat = 28
-    /// Where a row's text starts, so what runs under a row lines up with its text instead of its badge.
+    static let rowBadgeSide: CGFloat = 32
+    /// The width a library list keeps its rows to, centred in a wider pane.
+    static let columnWidth: CGFloat = 820
+    /// Where a queue row's text starts, so what runs under a row lines up with its text instead of its badge.
     static let textInset: CGFloat = badgeSide + DS.Spacing.regular
+    static let rowTextInset: CGFloat = rowBadgeSide + DS.Spacing.regular
     /// Wide enough for h:mm:ss under ten hours, so the snippets of a mixed list start on the same column.
     static let timecodeWidth: CGFloat = 52
     /// Wide enough for "23 h 59 min", so every row's time sits on the same column.
@@ -151,6 +156,13 @@ struct EntryRow<Accessory: View, Actions: View>: View {
         onAccent ? DS.Color.onAccentSecondary : DS.Color.secondaryText
     }
 
+    /// A search hit keeps the secondary ink its highlight was tuned on; an excerpt reads as body text.
+    private var detailStyle: Color {
+        if onAccent { return DS.Color.onAccentSecondary }
+        if case .snippet = detail { return DS.Color.secondaryText }
+        return DS.Color.primaryText.opacity(0.72)
+    }
+
     private var onAccent: Bool {
         DS.onAccent(isSelected: isSelected, prominence: backgroundProminence)
     }
@@ -167,9 +179,9 @@ struct EntryRow<Accessory: View, Actions: View>: View {
     @ViewBuilder
     private var chromedRow: some View {
         let row = HStack(spacing: DS.Spacing.regular) {
-            EntryBadge(kind: display.sourceKind, onAccent: onAccent)
+            EntryBadge(kind: display.sourceKind, onAccent: onAccent, side: EntryRowMetrics.rowBadgeSide)
                 .help(rowHelp)
-            VStack(alignment: .leading, spacing: DS.Spacing.hair) {
+            VStack(alignment: .leading, spacing: 3) {
                 titleLine
                 detailLine
                     .help(rowHelp)
@@ -184,6 +196,13 @@ struct EntryRow<Accessory: View, Actions: View>: View {
         if drawsHover {
             row
                 .padding(.horizontal, DS.Spacing.small)
+                .overlay(alignment: .bottom) {
+                    Rectangle()
+                        .fill(DS.Palette.divider.opacity(isSelected ? 0 : 0.6))
+                        .frame(height: 0.5)
+                        .padding(.leading, DS.Spacing.small + EntryRowMetrics.rowTextInset)
+                        .padding(.trailing, DS.Spacing.small)
+                }
                 .rowChrome(selected: isSelected, hovered: isHovering, selection: .native)
         } else {
             row
@@ -193,7 +212,7 @@ struct EntryRow<Accessory: View, Actions: View>: View {
     private var titleLine: some View {
         HStack(alignment: .firstTextBaseline, spacing: DS.Spacing.snug) {
             Text(display.title)
-                .font(DS.Font.body.weight(.semibold))
+                .font(DS.Font.heading)
                 .foregroundStyle(onAccent ? DS.Color.onAccent : DS.Color.primaryText)
                 .lineLimit(1)
                 .help(rowHelp)
@@ -248,7 +267,7 @@ struct EntryRow<Accessory: View, Actions: View>: View {
             if let detailText {
                 Text(detailText)
                     .font(detailFont)
-                    .foregroundStyle(secondaryStyle)
+                    .foregroundStyle(detailStyle)
                     .lineLimit(1)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }

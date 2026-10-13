@@ -111,7 +111,7 @@ struct RecentlyDeletedRow: View {
                 fill: bucket.barFill(isSelected: isSelected, prominence: backgroundProminence),
                 height: Self.expiryBarHeight
             )
-            .padding(.leading, EntryRowMetrics.textInset)
+            .padding(.leading, EntryRowMetrics.rowTextInset)
             .accessibilityHidden(true)
         }
     }

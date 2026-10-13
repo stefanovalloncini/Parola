@@ -137,7 +137,22 @@ struct LibraryListLayoutTests {
         }
     }
 
-    @Test("a date title is a plain 32 pt row the arrow keys pass over, and Select All leaves it out")
+    @Test("the rows keep to the reading column and the margins beside it still belong to the scroll view")
+    func marginsStillScroll() async throws {
+        let hosted = await host(entries(6), groupsByDate: false)
+        defer { close(hosted) }
+        let table = try #require(table(hosted))
+        _ = await settled(hosted)
+
+        let margin = EntryRowMetrics.columnMargin(paneWidth: hosted.host.bounds.width)
+        #expect(margin > 0)
+        let entryRow = table.numberOfRows - 1
+        #expect(await settled(hosted) { table.rect(ofRow: entryRow).width <= EntryRowMetrics.columnWidth + 2 }, "rows span \(table.rect(ofRow: entryRow).width) pt of a \(hosted.host.bounds.width) pt pane")
+        let scrollView = try #require(table.enclosingScrollView)
+        #expect(scrollView.convert(scrollView.bounds, to: hosted.host).width == hosted.host.bounds.width, "the scroll view spans the pane, margins included")
+    }
+
+    @Test("a date title is a plain 47 pt row the arrow keys pass over, and Select All leaves it out")
     func titlesAreRowsTheKeyboardSkips() async throws {
         let hosted = await host(threeGroups())
         defer { close(hosted) }
@@ -149,7 +164,7 @@ struct LibraryListLayoutTests {
         let titles = [first, first + 2, first + 5]
         let takes = [first + 1, first + 3, first + 4, first + 6]
         for row in titles {
-            #expect(table.rect(ofRow: row).height == 32, "title row \(row): \(table.rect(ofRow: row))")
+            #expect(table.rect(ofRow: row).height == 47, "title row \(row): \(table.rect(ofRow: row))")
             let groupStyled = table.rowView(atRow: row, makeIfNecessary: true)?.isGroupRowStyle
             #expect(groupStyled == false, "title row \(row) is drawn as a system section header")
         }
@@ -372,7 +387,7 @@ struct LibraryListLayoutTests {
         #expect(table.numberOfRows == items.count + 1, "the page top, then every title and entry")
     }
 
-    @Test("no row draws a rule under it: not the page's top, not a date title, not an entry")
+    @Test("no row draws a system rule under it; an entry's own hairline starts at its text")
     func rowsDrawNoRule() async throws {
         let hosted = await host(threeGroups())
         defer { close(hosted) }
@@ -382,8 +397,13 @@ struct LibraryListLayoutTests {
         table.cacheDisplay(in: table.bounds, to: rep)
         let scale = CGFloat(rep.pixelsWide) / table.bounds.width
         let columns = Array(stride(from: Int(120 * scale), to: Int((table.bounds.width - 40) * scale), by: 2))
+        let margin = EntryRowMetrics.columnMargin(paneWidth: table.bounds.width)
+        let gutter = Array(stride(from: Int((margin + 2) * scale), to: Int((margin + 14) * scale), by: 2))
         func inked(row y: Int) -> Int {
             columns.count(where: { (rep.colorAt(x: $0, y: y)?.alphaComponent ?? 0) > 0.02 })
+        }
+        func gutterInked(row y: Int) -> Int {
+            gutter.count(where: { (rep.colorAt(x: $0, y: y)?.alphaComponent ?? 0) > 0.02 })
         }
 
         // Today, the take, …: the take's time and length sit inside the columns read.
@@ -394,7 +414,7 @@ struct LibraryListLayoutTests {
         var ruled: [Int] = []
         for row in 0..<(table.numberOfRows - 1) {
             let rect = table.rect(ofRow: row)
-            if (Int((rect.maxY - 2) * scale)..<Int(rect.maxY * scale)).contains(where: { inked(row: $0) > columns.count * 9 / 10 }) {
+            if (Int((rect.maxY - 1) * scale)..<Int(rect.maxY * scale)).contains(where: { gutterInked(row: $0) > gutter.count * 9 / 10 }) {
                 ruled.append(row)
             }
         }

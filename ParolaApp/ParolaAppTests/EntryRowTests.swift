@@ -290,3 +290,26 @@ struct JobRowTests {
         #expect(row.components(separatedBy: ".help(rowHelp)").count - 1 == 3)
     }
 }
+
+@Suite("Reading column")
+struct ReadingColumnTests {
+    @Test("a row keeps the proportions the library page was designed on")
+    func rowProportions() {
+        #expect(EntryRowMetrics.height == 64)
+        #expect(EntryRowMetrics.rowBadgeSide == 32)
+        #expect(EntryRowMetrics.columnWidth == 820)
+    }
+
+    @Test("a pane wider than the column splits the rest into equal margins")
+    func widePaneCentresTheColumn() {
+        #expect(EntryRowMetrics.columnMargin(paneWidth: 1_440 - 240) == 190)
+        #expect(EntryRowMetrics.columnMargin(paneWidth: 1_800 - 240) == 370)
+    }
+
+    @Test("a pane narrower than the column gets no margin")
+    func narrowPaneKeepsItsWidth() {
+        #expect(EntryRowMetrics.columnMargin(paneWidth: 700) == 0)
+        #expect(EntryRowMetrics.columnMargin(paneWidth: 820) == 0)
+        #expect(EntryRowMetrics.columnMargin(paneWidth: 0) == 0)
+    }
+}

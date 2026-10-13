@@ -460,6 +460,7 @@ private struct LibraryBrowseList: View, Equatable {
                 VStack(spacing: 0) {
                     pageTop(showsIntake: !showsHero)
                         .padding(.horizontal, DS.Spacing.large)
+                        .readingColumnMargins()
                         .padding(.top, DS.Spacing.medium)
                     emptyContent
                 }

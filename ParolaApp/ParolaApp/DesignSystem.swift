@@ -77,7 +77,7 @@ enum DS {
         /// Derived so the karaoke word under the playhead follows the transcript face wherever it goes.
         static let transcriptEmphasis = transcript.weight(.semibold)
         static let transcriptCompact = SwiftUI.Font.system(size: 15, design: .serif)
-        static let excerpt = SwiftUI.Font.system(size: 13, design: .serif)
+        static let excerpt = SwiftUI.Font.system(size: 14, design: .serif)
         static let timer = SwiftUI.Font.system(size: 22, weight: .light, design: .rounded).monospacedDigit()
     }
 
