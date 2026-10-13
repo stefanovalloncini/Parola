@@ -26,6 +26,7 @@ targets:
     type: application
     platform: iOS
     sources:
+      - path: ../Shared
       - path: ParolaiOS
     info:
       path: ParolaiOS/Info.plist

@@ -1,13 +1,13 @@
 import Foundation
 import ParolaCore
 
-/// The app's wording for the failures ParolaCore throws. Core keeps its English text for the CLI and MCP.
 /// A failure already worded for the person, for code in ParolaCore that shows `localizedDescription` as it is.
 struct PresentedFailure: LocalizedError {
     let message: String
     var errorDescription: String? { message }
 }
 
+/// The app's wording for the failures ParolaCore throws. Core keeps its English text for the CLI and MCP.
 enum FailureText {
     nonisolated static func presented(_ error: any Error) -> any Error {
         if error is CancellationError || error is PresentedFailure { return error }
@@ -72,7 +72,11 @@ enum FailureText {
     private nonisolated static func parola(_ error: ParolaError, bundle: Bundle) -> String {
         switch error {
         case .modelNotFound(let name):
+            #if os(macOS)
             return String(localized: "The model \(name) isn't downloaded yet. Download it in Settings › Local Models.", bundle: bundle)
+            #else
+            return String(localized: "The model \(name) isn't downloaded yet. Download it in Settings › Models on device.", bundle: bundle)
+            #endif
         case .unknownModel(let name, let suggestion):
             guard let suggestion else { return String(localized: "Unknown model “\(name)”.", bundle: bundle) }
             return String(localized: "Unknown model “\(name)”. Did you mean “\(suggestion)”?", bundle: bundle)
@@ -102,7 +106,11 @@ enum FailureText {
         case .captureUnavailable(let text):
             return String(localized: "Audio capture unavailable: \(reason(text, bundle: bundle))", bundle: bundle)
         case .linkDownloadFailed(let failure):
+            #if os(macOS)
             return AppModel.linkFailureMessage(failure, bundle: bundle)
+            #else
+            return error.localizedDescription
+            #endif
         case .invalidLanguage(let code):
             return String(localized: "Invalid language code: \(code)", bundle: bundle)
         case .ioError(let text), .unsupportedForEngine(let text):
@@ -216,7 +224,11 @@ enum FailureText {
         case FixedFailureText.appleIntelligenceNeedsNewerOS:
             return String(localized: "Apple Intelligence needs macOS 26 or iOS 26 or newer.", bundle: bundle)
         case FixedFailureText.microphoneUnavailable, FixedFailureText.microphoneNotStarted:
+            #if os(macOS)
             return String(localized: "The microphone isn't available. Check that Parola can use it in System Settings → Privacy & Security → Microphone.", bundle: bundle)
+            #else
+            return String(localized: "The microphone isn't available. Check that Parola can use it in Settings → Privacy & Security → Microphone.", bundle: bundle)
+            #endif
         case FixedFailureText.speakerModelUnavailable:
             return String(localized: "The speaker labelling model isn't available.", bundle: bundle)
         case "Apple Speech does not support translation":
