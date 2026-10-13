@@ -80,4 +80,51 @@ struct AppleSpeechTranscriberTests {
         let loaded = await engine.loadedModelName()
         #expect(loaded == nil)
     }
+
+    @Test("a run whose analyzers were cancelled reports it instead of returning what was analyzed")
+    func cancelledRunThrows() async throws {
+        guard #available(macOS 26.0, iOS 26.0, *) else { return }
+        let cancellation = AnalyzerCancellation()
+        try await cancellation.throwIfCancelled()
+        await cancellation.cancel()
+        await #expect(throws: CancellationError.self) { try await cancellation.throwIfCancelled() }
+    }
+
+    @Test("a run starting while a stop is in flight waits for it and then for the settle")
+    func gateHoldsNewRunsUntilSettled() async {
+        let idleGate = SettleGate(duration: .seconds(30))
+        let idle = await ContinuousClock().measure { await idleGate.waitUntilSettled() }
+        #expect(idle < .seconds(10))
+
+        let gate = SettleGate(duration: .milliseconds(150))
+
+        gate.beginStop()
+        let stopEnded = ContinuousClock.now + .milliseconds(100)
+        let ender = Task {
+            try? await Task.sleep(until: stopEnded)
+            gate.endStop()
+        }
+        let waited = await ContinuousClock().measure { await gate.waitUntilSettled() }
+        await ender.value
+        #expect(waited >= .milliseconds(240))
+    }
+
+    @Test("a cancelled caller still waits out the settle")
+    func gateWaitSurvivesCancellation() async {
+        let gate = SettleGate(duration: .milliseconds(100))
+        gate.beginStop()
+        gate.endStop()
+        let waiter = Task { await ContinuousClock().measure { await gate.waitUntilSettled() } }
+        waiter.cancel()
+        #expect(await waiter.value >= .milliseconds(80))
+    }
+
+    @Test("a stop that never returns holds new runs only up to the limit")
+    func gateGivesUpOnAHungStop() async {
+        let gate = SettleGate(duration: .milliseconds(100))
+        gate.beginStop()
+        let waited = await ContinuousClock().measure { await gate.waitUntilSettled(limit: .milliseconds(200)) }
+        #expect(waited >= .milliseconds(200))
+        #expect(waited < .seconds(10))
+    }
 }

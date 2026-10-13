@@ -83,6 +83,16 @@ actor AppleSpeechTranscriber: Transcriber {
     func loadedModelName() async -> String? { loadedModel }
 
     @available(macOS 26.0, iOS 26.0, *)
+    private static func tearDown(
+        _ collector: Task<(segments: [TranscriptSegment], confidence: Double?), any Error>,
+        cancellation: AnalyzerCancellation
+    ) async {
+        collector.cancel()
+        await cancellation.cancel()
+        _ = await collector.result
+    }
+
+    @available(macOS 26.0, iOS 26.0, *)
     private func runSpeechAnalyzer(
         url: URL,
         options: TranscriptionOptions,
@@ -121,6 +131,7 @@ actor AppleSpeechTranscriber: Transcriber {
             )
         }
 
+        await SettleGate.shared.waitUntilSettled()
         let analyzer = SpeechAnalyzer(modules: [transcriber])
         await cancellation.attach(analyzer: analyzer)
         let audioFile = try await Self.openBounded(url)
@@ -170,6 +181,7 @@ actor AppleSpeechTranscriber: Transcriber {
             run = try await withTaskCancellationHandler {
                 try Task.checkCancellation()
                 let lastAnalyzed = try await analyzer.analyzeSequence(from: audioFile)
+                try await cancellation.throwIfCancelled()
                 try await analyzer.finalizeAndFinishThroughEndOfInput()
                 let collected = try await collectorTask.value
                 return (lastAnalyzed?.seconds, collected.segments, collected.confidence)
@@ -178,10 +190,10 @@ actor AppleSpeechTranscriber: Transcriber {
                 Task { await cancellation.cancel() }
             }
         } catch is CancellationError {
-            collectorTask.cancel()
+            await Self.tearDown(collectorTask, cancellation: cancellation)
             throw CancellationError()
         } catch {
-            collectorTask.cancel()
+            await Self.tearDown(collectorTask, cancellation: cancellation)
             ParolaLog.error(
                 .engineAppleSpeech, "transcribe failed",
                 [
@@ -274,6 +286,7 @@ actor AppleSpeechTranscriber: Transcriber {
             reportingOptions: [],
             attributeOptions: [.transcriptionConfidence]
         )
+        await SettleGate.shared.waitUntilSettled()
         let analyzer = SpeechAnalyzer(modules: [transcriber])
         await cancellation.attach(analyzer: analyzer)
         let collector = Task { () async throws -> LanguageProbeOutcome in
@@ -299,7 +312,7 @@ actor AppleSpeechTranscriber: Transcriber {
             } onCancel: {
                 collector.cancel()
                 // analyzeSequence ignores task cancellation and never returns without this.
-                Task { await analyzer.cancelAndFinishNow() }
+                Task { await AnalyzerCancellation.stop(analyzer) }
             }
             await cancellation.detach(analyzer: analyzer)
             return outcome
@@ -431,30 +444,95 @@ private struct ConfidenceMeter {
     }
 }
 
+/// Keeps every new analyzer in the process from starting while a cancelled one is still being torn down.
+final class SettleGate: Sendable {
+    // Speech keeps tearing a cancelled analyzer down for ~10 ms after cancelAndFinishNow returns; one started sooner can transcribe differently (2 ms gap: 6 of 8 runs differed, 20 ms: 0 of 24).
+    static let shared = SettleGate(duration: .milliseconds(100))
+
+    private struct State {
+        var stopping = 0
+        var settledAt = ContinuousClock.now
+    }
+
+    private let duration: Duration
+    private let state = OSAllocatedUnfairLock(initialState: State())
+
+    init(duration: Duration) {
+        self.duration = duration
+    }
+
+    func beginStop() {
+        state.withLock { $0.stopping += 1 }
+    }
+
+    func endStop() {
+        state.withLock {
+            $0.stopping -= 1
+            $0.settledAt = ContinuousClock.now + duration
+        }
+    }
+
+    /// Returns when no stop is running and the last one has settled, or after `limit` so a stop that never returns can't
+    /// hold every later run; sleeps in a fresh task so a cancelled caller still waits.
+    func waitUntilSettled(limit: Duration = .seconds(2)) async {
+        await Task {
+            let deadline = ContinuousClock.now + limit
+            while true {
+                let (stopping, settledAt) = state.withLock { ($0.stopping, $0.settledAt) }
+                if stopping == 0, ContinuousClock.now >= settledAt { return }
+                guard ContinuousClock.now < deadline else {
+                    ParolaLog.notice(.engineAppleSpeech, "analyzer settle wait gave up")
+                    return
+                }
+                let wait = stopping > 0 ? .milliseconds(5) : ContinuousClock.now.duration(to: settledAt)
+                try? await Task.sleep(for: min(wait, ContinuousClock.now.duration(to: deadline)))
+            }
+        }.value
+    }
+}
+
 @available(macOS 26.0, iOS 26.0, *)
 final actor AnalyzerCancellation {
     private var analyzers: [ObjectIdentifier: SpeechAnalyzer] = [:]
     private var cancelled = false
+    private var stopping: Task<Void, Never>?
+
+    static func stop(_ analyzer: SpeechAnalyzer, gate: SettleGate = .shared) async {
+        gate.beginStop()
+        await analyzer.cancelAndFinishNow()
+        gate.endStop()
+        await gate.waitUntilSettled()
+    }
 
     func attach(analyzer: SpeechAnalyzer) async {
         if cancelled {
-            await analyzer.cancelAndFinishNow()
+            await Self.stop(analyzer)
             return
         }
         analyzers[ObjectIdentifier(analyzer)] = analyzer
+    }
+
+    func throwIfCancelled() throws {
+        if cancelled || Task.isCancelled { throw CancellationError() }
     }
 
     func detach(analyzer: SpeechAnalyzer) {
         analyzers[ObjectIdentifier(analyzer)] = nil
     }
 
+    /// Returns once every analyzer it stopped, now or in an earlier call, has settled.
     func cancel() async {
         cancelled = true
-        let running = analyzers.values
+        let running = Array(analyzers.values)
         analyzers = [:]
-        for analyzer in running {
-            await analyzer.cancelAndFinishNow()
+        if !running.isEmpty {
+            let earlier = stopping
+            stopping = Task {
+                await earlier?.value
+                for analyzer in running { await Self.stop(analyzer) }
+            }
         }
+        await stopping?.value
     }
 }
 #else

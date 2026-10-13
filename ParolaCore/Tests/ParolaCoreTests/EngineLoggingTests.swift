@@ -158,8 +158,9 @@ struct EngineLoggingTests {
             #"ParolaLog.error(.engineAppleSpeech, "analyzer setup failed", [.error: .error(error)])"#,
             #"ParolaLog.error( .engineAppleSpeech, "transcribe failed", [ .audioSeconds: .seconds(durationSeconds), .elapsed: .duration(startedAt.duration(to: .now)), .error: .error(error), ]"#,
             #"ParolaLog.notice( .engineAppleSpeech, "analyzer returned nothing for the tail", [ .audioSeconds: .seconds(duration), .analyzed: .seconds(analyzedThrough ?? 0), .offset: .seconds(lastResultEnd ?? 0), .count: .int(Int(tail.rounded())), ]"#,
+            #"ParolaLog.notice(.engineAppleSpeech, "analyzer settle wait gave up")"#,
         ], in: source)
-        #expect(source.components(separatedBy: "ParolaLog.").count - 1 == 4)
+        #expect(source.components(separatedBy: "ParolaLog.").count - 1 == 5)
     }
 
     private func callArguments(startingAt text: String) -> String {
