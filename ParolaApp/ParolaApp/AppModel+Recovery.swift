@@ -1026,8 +1026,7 @@ extension AppModel {
         return files.first { RecordingScratch.takeNames(pairedWith: $0.url).contains(name) }?.url
     }
 
-    /// A WAV header and next to nothing after it: nothing was recorded.
-    nonisolated static let emptyTakeBytes = 8_192
+    nonisolated static let emptyTakeBytes = RecordingScratch.emptyTakeBytes
 
     /// The regular .wav files in the folder; anything else there is left alone.
     nonisolated static func inflightFiles(in dir: URL) -> [(url: URL, modified: Date)] {

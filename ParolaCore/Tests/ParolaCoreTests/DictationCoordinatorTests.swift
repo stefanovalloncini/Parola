@@ -529,6 +529,76 @@ struct DictationCoordinatorTests {
         #expect(running == false, "recorder must be stopped, not orphaned, after abort races startup")
     }
 
+    @Test("aborting mid-startup discards at once, without waiting for the recorder to come up")
+    func abortDuringStartupDiscardsAtOnce() async throws {
+        let recorder = GatedRecorder()
+        let coord = DictationCoordinator(hotkey: MockHotkey(), recorder: recorder, inserter: MockInserter())
+        await coord.startMonitoring()
+        let press = Task { await coord.simulatePress() }
+        var spins = 0
+        while await recorder.gateArmed == false, spins < 100_000 {
+            await Task.yield()
+            spins += 1
+        }
+
+        await coord.abortMonitoring()
+
+        #expect(await recorder.discardCalls == 1)
+        await recorder.openGate()
+        await press.value
+        #expect(await recorder.discardCalls == 2, "the start that returned late discards again")
+    }
+
+    private actor CancellableRecorder: DictationRecorder {
+        private var parked: CheckedContinuation<Void, Never>?
+        private(set) var isParked = false
+        private(set) var discardCalls = 0
+
+        func start() async throws {
+            await withCheckedContinuation { parked = $0; isParked = true }
+            throw CancellationError()
+        }
+
+        func stopAndTranscribe() async throws -> String { "" }
+
+        func stopAndDiscard() async {
+            discardCalls += 1
+            parked?.resume()
+            parked = nil
+        }
+    }
+
+    @Test("aborting mid-startup of a recorder that cancels leaves the media session and rests idle, never failed", .timeLimit(.minutes(1)))
+    func abortDuringCancellableStartupExitsMedia() async throws {
+        let muter = SpyMuter()
+        let player = SpyPlayer()
+        let recorder = CancellableRecorder()
+        let states = StateRecorder()
+        let coord = DictationCoordinator(
+            hotkey: MockHotkey(),
+            recorder: recorder,
+            inserter: MockInserter(),
+            mediaSession: MediaSession(muter: muter, player: player),
+            mediaConfigProvider: { MediaSessionConfig(muteSystemAudio: true, pausePlayback: true) }
+        ) { await states.record($0) }
+        await coord.startMonitoring()
+        let press = Task { await coord.simulatePress() }
+        var spins = 0
+        while await recorder.isParked == false, spins < 100_000 {
+            await Task.yield()
+            spins += 1
+        }
+
+        await coord.abortMonitoring()
+        await press.value
+
+        #expect(await muter.current == false)
+        #expect(await player.playCalls == 1)
+        #expect(await coord.state == .idle)
+        let seen = await states.captured
+        #expect(!seen.contains { if case .failed = $0 { true } else { false } })
+    }
+
     @Test("a release that races recorder startup is deferred, then transcribes once it is up")
     func releaseDuringStartupIsDeferredNotDropped() async throws {
         let hotkey = MockHotkey()
@@ -604,7 +674,7 @@ struct DictationCoordinatorTests {
 
         let discards = await recorder.discardCalls
         let stops = await recorder.stopCalls
-        #expect(discards == 1, "the rolled-back start must release the mic via the discard path")
+        #expect(discards == 2, "the rolled-back start must release the mic via the discard path")
         #expect(stops == 0, "the rolled-back start must not transcribe audio nobody wants")
     }
 

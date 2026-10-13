@@ -154,6 +154,8 @@ public actor DictationCoordinator {
         if case .listening = state {
             await mediaSession?.exitRecording()
             await recorder.stopAndDiscard()
+        } else if startInFlight {
+            await recorder.stopAndDiscard()
         }
         await setState(.idle)
     }
@@ -299,17 +301,27 @@ public actor DictationCoordinator {
         if let session = mediaSession {
             let config = await mediaConfigProvider?() ?? .none
             await session.enterRecording(config: config)
+            if myGeneration != generation {
+                startInFlight = false
+                await session.exitRecording()
+                return
+            }
         }
         do {
             try await recorder.start()
         } catch {
-            ParolaLog.error(
-                .dictation, "dictation recorder failed to start in \(mode)",
-                [.error: .error(error)]
-            )
+            if error is CancellationError {
+                ParolaLog.info(.dictation, "dictation start was cancelled in \(mode)")
+            } else {
+                ParolaLog.error(
+                    .dictation, "dictation recorder failed to start in \(mode)",
+                    [.error: .error(error)]
+                )
+            }
             startInFlight = false
-            guard myGeneration == generation else { return }
+            // The media session was entered before the start, so it is left even when a teardown superseded this start.
             await mediaSession?.exitRecording()
+            guard myGeneration == generation else { return }
             await setState(.failed(error.localizedDescription))
             return
         }

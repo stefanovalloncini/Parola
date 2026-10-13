@@ -25,6 +25,8 @@ actor MicDictationRecorder: DictationRecorder {
     private var streamingSegments: [TranscriptSegment] = []
     private var streamingPartial: String = ""
     private var streamingFailure: String?
+    private var isStarting = false
+    private var discardRequested = false
 
     init(
         model: String?,
@@ -72,7 +74,11 @@ actor MicDictationRecorder: DictationRecorder {
     }
 
     func start() async throws {
+        isStarting = true
+        discardRequested = false
+        defer { isStarting = false }
         await resolveLanguageOverride()
+        if discardRequested { throw CancellationError() }
         if useStreaming {
             try await startStreaming()
         } else {
@@ -88,6 +94,8 @@ actor MicDictationRecorder: DictationRecorder {
     }
 
     func stopAndDiscard() async {
+        // Before any session or file exists, the start under way sees this and never opens the mic.
+        if isStarting, streamingSession == nil, fallbackSource == nil { discardRequested = true }
         if let session = streamingSession {
             await session.cancel()
             await streamingConsumer?.value
@@ -144,8 +152,17 @@ actor MicDictationRecorder: DictationRecorder {
         streamingPartial = ""
         streamingFailure = nil
 
-        let events = try await session.start(options: transcriptionOptions(), speakerLabeler: nil, downloadProgress: downloadProgress)
         streamingSession = session
+
+        let events: AsyncStream<StreamingEvent>
+        do {
+            events = try await session.start(options: transcriptionOptions(), speakerLabeler: nil, downloadProgress: downloadProgress)
+        } catch {
+            streamingSession = nil
+            throw error
+        }
+        // A discard that landed during the load already cancelled the session.
+        guard streamingSession != nil else { throw CancellationError() }
 
         streamingConsumer = Task { [weak self] in
             for await event in events {
@@ -202,7 +219,12 @@ actor MicDictationRecorder: DictationRecorder {
         let mic = await LiveAudioSourceFactory.makeMicrophone(
             deviceUID: deviceUID, clock: clock, filePrefix: RecordingScratch.dictationPrefix
         )
+        if discardRequested { throw CancellationError() }
         try await mic.start()
+        if discardRequested {
+            await mic.cancel()
+            throw CancellationError()
+        }
         fallbackSource = mic
     }
 

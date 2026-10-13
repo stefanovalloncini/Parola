@@ -17,6 +17,8 @@ public enum RecordingScratch {
 
     /// The prefixes of recorded takes; anything else left in the folder is dictation or preview scratch.
     public static let takePrefixes = ["parola-mic", "parola-system", "parola-recording"]
+    /// A WAV header and next to nothing after it: nothing was recorded.
+    public static let emptyTakeBytes = 8_192
     public static let dictationPrefix = "parola-dictation"
     public static let previewPrefix = "parola-preview"
     /// A meeting's microphone track: it belongs to its take, so it is never a take of its own.
