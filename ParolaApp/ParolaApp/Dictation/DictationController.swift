@@ -323,11 +323,19 @@ final class DictationController {
         }
         if let local = NSEvent.addLocalMonitorForEvents(matching: .keyDown, handler: { [weak self] event in
             guard Self.isPlainEscape(event) else { return event }
-            MainActor.assumeIsolated { self?.cancelDictation() }
-            return nil
+            let consumed = MainActor.assumeIsolated { self?.cancelByLocalEscape() ?? false }
+            return consumed ? nil : event
         }) {
             escapeMonitors.append(local)
         }
+    }
+
+    /// A failed HUD is dismissed by Escape but never consumes it, so a sheet or field in Parola's own windows still gets it.
+    func cancelByLocalEscape() -> Bool {
+        var isFailed = false
+        if case .failed = state { isFailed = true }
+        cancelDictation()
+        return !isFailed
     }
 
     static func isPlainEscape(_ event: NSEvent) -> Bool {
