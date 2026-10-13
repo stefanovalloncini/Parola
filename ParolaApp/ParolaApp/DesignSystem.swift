@@ -290,6 +290,16 @@ enum DS {
         }
     }
 
+    /// The solid tile a row's kind leads with: this colour at its foot, lightened by `highlight` at its top. A white glyph clears 3:1 on both ends in both appearances (`KindTileTests`).
+    enum KindTile {
+        static let highlight = 0.14
+        static let audio = ThemeColor.dynamic(light: RGBA(0.14, 0.56, 0.56), dark: RGBA(0.12, 0.52, 0.54))
+        static let meeting = ThemeColor.dynamic(light: RGBA(0.31, 0.36, 0.82), dark: RGBA(0.40, 0.44, 0.90))
+        static let dictation = ThemeColor.dynamic(light: RGBA(0.74, 0.42, 0.14), dark: RGBA(0.72, 0.41, 0.14))
+        static let video = ThemeColor.dynamic(light: RGBA(0.55, 0.32, 0.80), dark: RGBA(0.60, 0.38, 0.85))
+        static let web = ThemeColor.dynamic(light: RGBA(0.20, 0.50, 0.78), dark: RGBA(0.22, 0.50, 0.80))
+    }
+
     /// A label assigned to a person wears that person's colour; an unassigned one keeps its hash.
     static func speakerColor(for label: String, colorIndex: Int?) -> SwiftUI.Color {
         guard let colorIndex, speakerPalette.indices.contains(colorIndex) else {

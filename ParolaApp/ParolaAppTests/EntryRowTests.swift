@@ -296,7 +296,7 @@ struct ReadingColumnTests {
     @Test("a row keeps the proportions the library page was designed on")
     func rowProportions() {
         #expect(EntryRowMetrics.height == 64)
-        #expect(EntryRowMetrics.rowBadgeSide == 32)
+        #expect(EntryRowMetrics.rowBadgeSide == 30)
         #expect(EntryRowMetrics.columnWidth == 820)
     }
 

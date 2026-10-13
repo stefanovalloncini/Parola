@@ -122,7 +122,8 @@ struct LibraryRowList<Top: View>: View {
                         row: row,
                         detail: detail,
                         isSelected: selection.contains(row.id),
-                        rename: rename
+                        rename: rename,
+                        delete: delete
                     )
                     .equatable()
                     .onAppear { rowAppeared?(row.id) }
@@ -213,6 +214,8 @@ struct LibraryListRow: View, Equatable {
     let detail: Detail
     let isSelected: Bool
     let rename: (LibraryEntry) -> Void
+    let delete: (Set<LibraryEntry.ID>) -> Void
+    @State private var isHovering = false
 
     nonisolated static func == (lhs: LibraryListRow, rhs: LibraryListRow) -> Bool {
         lhs.row == rhs.row && lhs.detail == rhs.detail && lhs.isSelected == rhs.isSelected
@@ -257,11 +260,23 @@ struct LibraryListRow: View, Equatable {
         Button("Delete") { model.deleteEntry(entry.id) }
     }
 
+    private var showsMenu: Bool { isHovering }
+
     @ViewBuilder
     private var rowContent: some View {
         switch detail {
         case .excerpt:
-            EntryRow(display: row, detail: .excerpt(row.excerpt), isSelected: isSelected)
+            EntryRow(display: row, detail: .excerpt(row.excerpt), isSelected: isSelected, hidesTrailingMeta: showsMenu)
+                .overlay(alignment: .topTrailing) {
+                    if let model, showsMenu {
+                        RowMenuButton {
+                            LibraryRowMenu(model: model, entries: [row.entry], rename: rename, delete: delete)
+                        }
+                        .padding(.top, 14)
+                        .padding(.trailing, DS.Spacing.small)
+                    }
+                }
+                .onHover { isHovering = $0 }
         case .match(let showsTimestamp):
             SearchResultRow(
                 display: row,
@@ -270,6 +285,26 @@ struct LibraryListRow: View, Equatable {
                 showsTimestamp: showsTimestamp
             )
         }
+    }
+}
+
+/// The row's own right-click menu, one click away while the pointer is over it.
+struct RowMenuButton<Items: View>: View {
+    @ViewBuilder let items: () -> Items
+
+    var body: some View {
+        Menu(content: items) {
+            Image(systemName: "ellipsis")
+                .font(.system(size: 12, weight: .semibold))
+                .frame(width: 28, height: 22)
+                .background(Capsule().fill(DS.Palette.pillFill))
+        }
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("More")
+        .accessibilityLabel("More")
     }
 }
 

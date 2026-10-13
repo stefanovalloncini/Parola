@@ -41,6 +41,16 @@ enum EntrySourceKind: Equatable {
         }
     }
 
+    var tileFill: ThemeColor {
+        switch self {
+        case .meeting: return DS.KindTile.meeting
+        case .dictation: return DS.KindTile.dictation
+        case .audio: return DS.KindTile.audio
+        case .video: return DS.KindTile.video
+        case .web: return DS.KindTile.web
+        }
+    }
+
     var tint: Color {
         switch self {
         case .meeting: return DS.categoryTint(for: .meeting)
@@ -57,7 +67,7 @@ enum EntryRowMetrics {
     static let height: CGFloat = 64
     /// The queue's own badge, which stays at the size its rows were drawn for.
     static let badgeSide: CGFloat = 28
-    static let rowBadgeSide: CGFloat = 32
+    static let rowBadgeSide: CGFloat = 30
     /// The width a library list keeps its rows to, centred in a wider pane.
     static let columnWidth: CGFloat = 820
     /// Where a queue row's text starts, so what runs under a row lines up with its text instead of its badge.
@@ -89,6 +99,35 @@ struct EntryBadge: View {
     }
 }
 
+/// A row's solid tile: the kind's own colour with a white glyph.
+struct EntryTile: View {
+    let kind: EntrySourceKind
+    var side: CGFloat = EntryRowMetrics.rowBadgeSide
+    /// True where the tile sits on the accent fill, where its edge needs a line to stay a tile.
+    var onAccent = false
+
+    var body: some View {
+        let fill = kind.tileFill.color
+        RoundedRectangle(cornerRadius: side * 0.3, style: .continuous)
+            .fill(LinearGradient(
+                colors: [fill.mix(with: .white, by: DS.KindTile.highlight), fill], startPoint: .top, endPoint: .bottom
+            ))
+            .frame(width: side, height: side)
+            .overlay {
+                Image(systemName: kind.symbol)
+                    .font(.system(size: side * 0.46, weight: .semibold))
+                    .foregroundStyle(.white)
+            }
+            .overlay {
+                if onAccent {
+                    RoundedRectangle(cornerRadius: side * 0.3, style: .continuous)
+                        .strokeBorder(DS.Color.onAccent.opacity(0.5), lineWidth: 1)
+                }
+            }
+            .accessibilityHidden(true)
+    }
+}
+
 /// The line under a row's title: what the entry says, or where a search hit it.
 enum EntryRowDetail {
     case excerpt(String?)
@@ -103,6 +142,8 @@ struct EntryRow<Accessory: View, Actions: View>: View {
     var help: String?
     /// Off for a caller that draws something under the row and washes the two together.
     var drawsHover: Bool = true
+    /// Lets a row put its own control over the date and duration while it is hovered.
+    var hidesTrailingMeta: Bool = false
     let accessory: Accessory
     let trailingActions: Actions
 
@@ -118,6 +159,7 @@ struct EntryRow<Accessory: View, Actions: View>: View {
         isSelected: Bool = false,
         help: String? = nil,
         drawsHover: Bool = true,
+        hidesTrailingMeta: Bool = false,
         @ViewBuilder accessory: () -> Accessory,
         @ViewBuilder trailingActions: () -> Actions
     ) {
@@ -126,6 +168,7 @@ struct EntryRow<Accessory: View, Actions: View>: View {
         self.isSelected = isSelected
         self.help = help
         self.drawsHover = drawsHover
+        self.hidesTrailingMeta = hidesTrailingMeta
         self.accessory = accessory()
         self.trailingActions = trailingActions()
     }
@@ -179,7 +222,7 @@ struct EntryRow<Accessory: View, Actions: View>: View {
     @ViewBuilder
     private var chromedRow: some View {
         let row = HStack(spacing: DS.Spacing.regular) {
-            EntryBadge(kind: display.sourceKind, onAccent: onAccent, side: EntryRowMetrics.rowBadgeSide)
+            EntryTile(kind: display.sourceKind, onAccent: onAccent)
                 .help(rowHelp)
             VStack(alignment: .leading, spacing: 3) {
                 titleLine
@@ -240,12 +283,14 @@ struct EntryRow<Accessory: View, Actions: View>: View {
                 .foregroundStyle(secondaryStyle)
                 .lineLimit(1)
                 .fixedSize()
+                .opacity(hidesTrailingMeta ? 0 : 1)
             Text(verbatim: display.duration ?? "")
                 .font(DS.Font.secondary)
                 .monospacedDigit()
                 .foregroundStyle(secondaryStyle)
                 .lineLimit(1)
                 .frame(width: EntryRowMetrics.durationWidth, alignment: .trailing)
+                .opacity(hidesTrailingMeta ? 0 : 1)
                 .accessibilityLabel(Text(verbatim: display.spokenDuration ?? ""))
                 .accessibilityHidden(display.duration == nil)
         }
@@ -328,13 +373,15 @@ extension EntryRow where Accessory == EmptyView, Actions == EmptyView {
         display: LibraryRowDisplay,
         detail: EntryRowDetail = .excerpt(nil),
         isSelected: Bool = false,
-        help: String? = nil
+        help: String? = nil,
+        hidesTrailingMeta: Bool = false
     ) {
         self.init(
             display: display,
             detail: detail,
             isSelected: isSelected,
             help: help,
+            hidesTrailingMeta: hidesTrailingMeta,
             accessory: { EmptyView() },
             trailingActions: { EmptyView() }
         )
