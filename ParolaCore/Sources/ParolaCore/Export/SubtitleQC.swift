@@ -75,7 +75,7 @@ public enum SubtitleQC {
     }
 
     private static func asIsIssues(text: String, duration: Double) -> [Issue] {
-        let wrapped = CaptionWrapper.wrap(text, length: .none)
+        let wrapped = CaptionWrapper.asIs(text)
         guard !wrapped.isEmpty else { return [] }
         var found: [Issue] = []
         if duration > 0 {

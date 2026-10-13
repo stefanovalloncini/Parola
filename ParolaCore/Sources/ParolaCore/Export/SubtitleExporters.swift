@@ -34,13 +34,13 @@ public struct SrtExporter: TranscriptExporter {
         var out = ""
         var cueNumber = 1
         for seg in transcript.segments {
-            let body = CaptionWrapper.wrap(seg.text, length: .none)
+            let body = CaptionWrapper.asIs(seg.text)
             guard !body.isEmpty else { continue }
             let end = max(seg.end, seg.start + Format.minCaptionSeconds)
             out += "\(cueNumber)\n"
             out += "\(Self.srtTimestamp(seg.start)) --> \(Self.srtTimestamp(end))\n"
             let tail = translation(for: seg, in: transcript)
-                .map { "\n" + CaptionWrapper.wrap($0, length: .none) } ?? ""
+                .map { "\n" + CaptionWrapper.asIs($0) } ?? ""
             if options.speakers, let speaker = Format.presentationSpeakerLabel(seg.speaker) {
                 out += "\(speaker): \(body)\(tail)\n\n"
             } else {
@@ -92,12 +92,12 @@ public struct VttExporter: TranscriptExporter {
     private func asIs(_ transcript: Transcript) -> String {
         var out = "WEBVTT\n\n"
         for seg in transcript.segments {
-            let body = Format.escapeWebVTT(CaptionWrapper.wrap(seg.text, length: .none))
+            let body = Format.escapeWebVTT(CaptionWrapper.asIs(seg.text))
             guard !body.isEmpty else { continue }
             let end = max(seg.end, seg.start + Format.minCaptionSeconds)
             out += "\(Self.vttTimestamp(seg.start)) --> \(Self.vttTimestamp(end))\n"
             let tail = translation(for: seg, in: transcript)
-                .map { "\n" + Format.escapeWebVTT(CaptionWrapper.wrap($0, length: .none)) } ?? ""
+                .map { "\n" + Format.escapeWebVTT(CaptionWrapper.asIs($0)) } ?? ""
             if options.speakers, let speaker = Format.presentationSpeakerLabel(seg.speaker) {
                 out += "<v \(Format.escapeWebVTT(speaker))>\(body)\(tail)</v>\n\n"
             } else {

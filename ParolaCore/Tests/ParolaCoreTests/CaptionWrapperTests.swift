@@ -4,62 +4,17 @@ import Testing
 
 @Suite("Caption wrapper")
 struct CaptionWrapperTests {
-    @Test("none preset returns the text unchanged")
-    func nonePreset() {
+    @Test("as-is text comes back unchanged")
+    func asIsUnchanged() {
         let text = "This is a single line of dialogue without wrapping."
-        let wrapped = CaptionWrapper.wrap(text, length: .none)
-        #expect(wrapped == text)
+        #expect(CaptionWrapper.asIs(text) == text)
     }
 
-    @Test("short preset caps at 32 chars per line")
-    func shortPreset() {
-        let text = "The quick brown fox jumps over the lazy dog while the cat watches."
-        let wrapped = CaptionWrapper.wrap(text, length: .short)
-        for line in wrapped.split(separator: "\n", omittingEmptySubsequences: false) {
-            #expect(line.count <= 32)
-        }
-    }
-
-    @Test("medium preset caps at 42 chars per line")
-    func mediumPreset() {
-        let text = "The quick brown fox jumps over the lazy dog while the cat watches the show."
-        let wrapped = CaptionWrapper.wrap(text, length: .medium)
-        for line in wrapped.split(separator: "\n", omittingEmptySubsequences: false) {
-            #expect(line.count <= 42)
-        }
-    }
-
-    @Test("word boundaries are preserved")
-    func wordBoundaries() {
-        let text = "hello there partner sandwich"
-        let wrapped = CaptionWrapper.wrap(text, length: .short)
-        for line in wrapped.split(separator: "\n") {
-            for char in line {
-                #expect(char != "-" && char != "_")
-            }
-            let words = line.split(separator: " ")
-            #expect(words.allSatisfy { !$0.isEmpty })
-        }
-    }
-
-    @Test("a word longer than the limit is still emitted on its own line")
-    func oversizedWord() {
-        let text = "supercalifragilisticexpialidocious is fun"
-        let wrapped = CaptionWrapper.wrap(text, length: .short)
-        let lines = wrapped.split(separator: "\n").map(String.init)
-        #expect(lines.contains("supercalifragilisticexpialidocious"))
-    }
-
-    @Test("empty input produces empty output")
-    func emptyInput() {
-        #expect(CaptionWrapper.wrap("", length: .short).isEmpty)
-        #expect(CaptionWrapper.wrap("   \n  ", length: .short).isEmpty)
-    }
-
-    @Test("none preset drops a blank line that would split a subtitle cue")
-    func noneDropsBlankLine() {
-        #expect(CaptionWrapper.wrap("First part\n\nSecond part", length: .none) == "First part\nSecond part")
-        #expect(CaptionWrapper.wrap("First part\nSecond part", length: .none) == "First part\nSecond part")
+    @Test("as-is text drops a blank line that would split a subtitle cue")
+    func asIsDropsBlankLine() {
+        #expect(CaptionWrapper.asIs("First part\n\nSecond part") == "First part\nSecond part")
+        #expect(CaptionWrapper.asIs("First part\nSecond part") == "First part\nSecond part")
+        #expect(CaptionWrapper.asIs("  \n ").isEmpty)
     }
 
     @Test("srt keeps a segment whose text has a blank line as one cue")
@@ -83,49 +38,44 @@ struct CaptionWrapperTests {
         #expect(blocks[1].hasPrefix("2\n"))
     }
 
-    @Test("SRT exporter applies the preset to each segment body")
-    func exporterApplies() throws {
-        let transcript = Transcript(
-            schemaVersion: 1,
-            segments: [
-                TranscriptSegment(
-                    id: 1, start: 0, end: 2,
-                    text: "The quick brown fox jumps over the lazy dog while the cat watches."
-                )
-            ],
-            language: "en",
-            modelName: "x"
-        )
-        let exporter = SrtExporter(spec: .srt(captionLength: .short))
-        let raw = try exporter.render(transcript)
-        let output = String(data: raw, encoding: .utf8) ?? ""
-        let bodyLines = output
-            .split(separator: "\n", omittingEmptySubsequences: false)
-            .dropFirst(2)
-            .map(String.init)
-            .filter { !$0.isEmpty }
-        for line in bodyLines {
-            #expect(line.count <= 32)
+    private func lines(_ text: String, length: CaptionLength, format: ExportFormat = .srt) throws -> [[String]] {
+        let transcript = Transcript(segments: [TranscriptSegment(id: 1, start: 0, end: 4, text: text)], language: "en", modelName: "x")
+        let output = try Exporters.exporter(for: format == .srt ? .srt(captionLength: length) : .vtt(captionLength: length)).renderText(transcript)
+        return output.components(separatedBy: "\n\n").compactMap { block in
+            let rows = block.split(separator: "\n").map(String.init).filter { !$0.contains("-->") && $0 != "WEBVTT" && Int($0) == nil }
+            return rows.isEmpty ? nil : rows
         }
     }
 
-    @Test("wrapping balances lines instead of leaving an orphaned last word (short)")
-    func balancesShort() {
-        let wrapped = CaptionWrapper.wrap("Hello everyone welcome back today", length: .short)
-        #expect(wrapped == "Hello everyone\nwelcome back today")
+    @Test("lines stay inside the preset's limit")
+    func limits() throws {
+        let text = "The quick brown fox jumps over the lazy dog while the cat watches the show."
+        for (length, limit) in [(CaptionLength.short, 32), (.medium, 42), (.long, 60)] {
+            for cue in try lines(text, length: length) {
+                #expect(cue.count <= 2)
+                for line in cue { #expect(line.count <= limit) }
+            }
+        }
     }
 
-    @Test("wrapping balances lines instead of leaving an orphaned last word (medium)")
-    func balancesMedium() {
-        let wrapped = CaptionWrapper.wrap("The committee will reconvene tomorrow at noon", length: .medium)
-        #expect(wrapped == "The committee will\nreconvene tomorrow at noon")
+    @Test("a word longer than the limit is still emitted on its own line")
+    func oversizedWord() throws {
+        let cues = try lines("supercalifragilisticexpialidocious is fun", length: .short)
+        #expect(cues.flatMap { $0 }.contains("supercalifragilisticexpialidocious"))
     }
 
-    @Test("balancing never adds lines beyond the greedy minimum")
-    func balancingKeepsLineCount() {
-        let text = "The committee will reconvene tomorrow at noon"
-        let lineCount = CaptionWrapper.wrap(text, length: .medium)
-            .split(separator: "\n", omittingEmptySubsequences: false).count
-        #expect(lineCount == 2)
+    @Test("empty text writes no cue")
+    func emptyInput() throws {
+        #expect(try lines("   \n  ", length: .short).isEmpty)
+    }
+
+    @Test("lines are balanced instead of leaving an orphaned last word (short)")
+    func balancesShort() throws {
+        #expect(try lines("Hello everyone welcome back today", length: .short) == [["Hello everyone", "welcome back today"]])
+    }
+
+    @Test("lines are balanced instead of leaving an orphaned last word (medium)")
+    func balancesMedium() throws {
+        #expect(try lines("The committee will reconvene tomorrow at noon", length: .medium) == [["The committee will", "reconvene tomorrow at noon"]])
     }
 }
