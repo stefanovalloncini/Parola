@@ -22,6 +22,8 @@ enum DS {
         static let small: CGFloat = 6
         static let regular: CGFloat = 12
         static let large: CGFloat = 14
+        /// A kind's tile, in a row or on the shelf.
+        static let tile: CGFloat = 8
     }
 
     /// Durations for chrome that moves on its own; every site pairs these with `accessibilityReduceMotion`.
@@ -293,6 +295,15 @@ enum DS {
     /// The solid tile a row's kind leads with: this colour at its foot, lightened by `highlight` at its top. A white glyph clears 3:1 on both ends in both appearances (`KindTileTests`).
     enum KindTile {
         static let highlight = 0.14
+
+        /// The lighter top of the tile, blended in sRGB like the contrast test reads it.
+        static func top(of foot: ThemeColor) -> ThemeColor {
+            guard case .dynamic(let light, let dark) = foot else { return foot }
+            return .dynamic(
+                light: light.blended(toward: .white, amount: highlight),
+                dark: dark.blended(toward: .white, amount: highlight)
+            )
+        }
         static let audio = ThemeColor.dynamic(light: RGBA(0.14, 0.56, 0.56), dark: RGBA(0.12, 0.52, 0.54))
         static let meeting = ThemeColor.dynamic(light: RGBA(0.31, 0.36, 0.82), dark: RGBA(0.40, 0.44, 0.90))
         static let dictation = ThemeColor.dynamic(light: RGBA(0.74, 0.42, 0.14), dark: RGBA(0.72, 0.41, 0.14))

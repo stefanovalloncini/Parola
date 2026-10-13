@@ -53,7 +53,7 @@ enum LibraryListContent {
         action.recordSource.map { model.canStartTake($0) } ?? true
     }
 
-    /// Leads with the action that produces the kind of entry the category holds; Open Files is the intake strip's, above it.
+    /// Leads with the action that produces the kind of entry the category holds; Open Files is in the toolbar and the File menu.
     static func emptyActions(for category: EntryCategory, features: FeatureSet) -> [LibraryEmptyAction] {
         var actions: [LibraryEmptyAction] = []
         if category == .meeting, features.isEnabled(.meetings) { actions.append(.recordSystemAudio) }
@@ -347,6 +347,7 @@ extension EnvironmentValues {
 private struct LibraryBrowseList: View, Equatable {
     @Environment(AppModel.self) private var model
     @Environment(\.libraryRecomputePasses) private var recomputePasses
+    @Environment(\.showsRecentShelf) private var showsRecentShelf
     let category: EntryCategory?
     let focus: FocusState<LibraryListFocus?>.Binding
 
@@ -411,7 +412,7 @@ private struct LibraryBrowseList: View, Equatable {
             personFilter: filters.person
         )
         let pageCount = LibraryListContent.pageCount(of: model.libraryEntries, category: category, person: filters.person)
-        let shelved = RecentShelfRules.entries(
+        let shelved = !showsRecentShelf ? [] : RecentShelfRules.entries(
             in: computed, pageCount: pageCount, sortOrder: model.librarySortOrder, filters: filters, tiles: shelfTiles
         )
         let shelvedIDs = Set(shelved.lazy.map(\.id))
@@ -466,6 +467,7 @@ private struct LibraryBrowseList: View, Equatable {
                         focusKey: .browse,
                         shelf: shelfRows,
                         titleScrolledAway: $titleInToolbar,
+                        scrollToPageTop: { proxy.scrollTo(LibraryListItem.pageTopID, anchor: .top) },
                         top: pageTop(showsIntake: true)
                             .padding(.top, DS.Spacing.small)
                             .padding(.bottom, DS.Spacing.tight)
@@ -476,7 +478,8 @@ private struct LibraryBrowseList: View, Equatable {
                             CompactPageTitle(
                                 title: LibraryPageHeader.title(category: category, personName: selectedPerson?.name),
                                 count: shownTotals.count,
-                                isShown: titleInToolbar
+                                isShown: $titleInToolbar,
+                                hidden: model.hasSearchResults
                             )
                         }
                         .sharedBackgroundVisibility(.hidden)
@@ -553,7 +556,7 @@ private struct LibraryBrowseList: View, Equatable {
         }
     }
 
-    /// The hero on an empty library says what the intake strip would, so the strip stands aside for it.
+    /// The hero on an empty library says what the header's settings chip would, so the chip stands aside for it.
     private func pageTop(showsIntake: Bool) -> some View {
         @Bindable var model = model
         return VStack(alignment: .leading, spacing: DS.Spacing.regular) {
@@ -645,18 +648,25 @@ private struct LibraryBrowseList: View, Equatable {
 struct CompactPageTitle: View {
     let title: String
     let count: Int
-    let isShown: Bool
+    /// A binding, so the scroll threshold invalidates this leaf and not the page that owns the flag.
+    @Binding var isShown: Bool
+    /// True under search results, where the browse list is covered and its title would read over them.
+    let hidden: Bool
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    nonisolated static func isVisible(shown: Bool, hidden: Bool) -> Bool { shown && !hidden }
+
+    private var visible: Bool { Self.isVisible(shown: isShown, hidden: hidden) }
 
     var body: some View {
         Text(verbatim: "\(title) · \(AppFormat.integer(count))")
             .font(DS.Font.heading)
             .foregroundStyle(DS.Color.primaryText)
             .lineLimit(1)
-            .opacity(isShown ? 1 : 0)
-            .animation(reduceMotion ? nil : DS.Motion.route, value: isShown)
-            .accessibilityHidden(!isShown)
+            .opacity(visible ? 1 : 0)
+            .animation(reduceMotion ? nil : DS.Motion.route, value: visible)
+            .accessibilityHidden(!visible)
     }
 }
 

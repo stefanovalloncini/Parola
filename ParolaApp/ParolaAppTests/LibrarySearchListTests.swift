@@ -360,7 +360,7 @@ struct LibrarySearchListTests {
         let model = AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("match-row-label"))
         model.searchMatches = [entry.id: match]
         let hosted = HostedWindow(
-            LibraryListRow(row: display, detail: .match(showsTimestamp: true), isSelected: false, rename: { _ in }, delete: { _ in })
+            LibraryListRow(row: display, detail: .match(showsTimestamp: true), isSelected: false, rename: { _ in }, delete: { _ in }, menuEntries: { [$0] })
                 .environment(model)
                 .frame(width: 900)
         )
@@ -388,7 +388,7 @@ struct LibrarySearchListTests {
         #expect(before != after)
 
         func row(_ display: LibraryRowDisplay) -> LibraryListRow {
-            LibraryListRow(row: display, detail: .excerpt, isSelected: false, rename: { _ in }, delete: { _ in })
+            LibraryListRow(row: display, detail: .excerpt, isSelected: false, rename: { _ in }, delete: { _ in }, menuEntries: { [$0] })
         }
         #expect(row(before) != row(after))
         #expect(row(before) == row(LibraryRowDisplay(entry: entry)))

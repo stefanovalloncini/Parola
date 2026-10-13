@@ -26,6 +26,12 @@ struct LibraryRowsTarget: Equatable {
         entries.contains { !$0.pinned }
     }
 
+    /// The "…" menu acts on the selection when its row is part of it, as the right-click menu does; the ids are resolved against the library, not a list that may be a pass behind.
+    static func menuEntries(for entry: LibraryEntry, selection: Set<LibraryEntry.ID>, in entries: [LibraryEntry]) -> [LibraryEntry] {
+        guard selection.contains(entry.id) else { return [entry] }
+        return entries.filter { selection.contains($0.id) }
+    }
+
     /// The shelf's entries come first, as they sit above the list.
     static func selectedEntries(
         _ selection: Set<LibraryEntry.ID>, in items: [LibraryListItem], shelf: [LibraryRowDisplay] = []

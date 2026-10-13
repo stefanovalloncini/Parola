@@ -87,7 +87,7 @@ struct RecentShelfTests {
         #expect(shelf(rows, tiles: 2) == ["e0", "e1"])
     }
 
-    @Test("a shelf of a large library costs the three it takes, and leaves the rest alone")
+    @Test("a large library still gives just its three newest entries")
     func largeLibrary() {
         let rows = (0..<20_000).map { entry($0) }
         #expect(shelf(rows) == ["e0", "e1", "e2"])
@@ -130,9 +130,10 @@ struct RecentShelfTests {
         #expect(act(.down, cursor: nil, firstRow: true) == .none)
     }
 
-    @Test("Return opens the tile and Delete removes it")
+    @Test("Return opens the tile, Option-Return in a window of its own, and Delete removes it")
     func returnAndDelete() {
-        #expect(act(.return, cursor: 2) == .open(2))
+        #expect(act(.return, cursor: 2) == .open(2, inNewWindow: false))
+        #expect(act(.optionReturn, cursor: 2) == .open(2, inNewWindow: true))
         #expect(act(.delete, cursor: 0) == .delete(0))
         #expect(act(.return, cursor: nil) == .none)
     }
@@ -180,5 +181,50 @@ struct RecentShelfTests {
         #expect(sections.map(\.title) == [nil, "Today", "May"])
         #expect(sections.map { $0.rows.map(\.id) } == [["e0"], ["e1", "e2"], ["e3"]])
         #expect(LibraryListSection.sections(for: []).isEmpty)
+    }
+
+    @Test("a tile that is the whole selection gets the keyboard back, and nothing else does")
+    func focusRestore() {
+        #expect(RecentShelfRules.cursorToRestore(selection: ["e1"], shelfIDs: ["e0", "e1"]) == "e1")
+        #expect(RecentShelfRules.cursorToRestore(selection: ["e5"], shelfIDs: ["e0", "e1"]) == nil)
+        #expect(RecentShelfRules.cursorToRestore(selection: ["e0", "e1"], shelfIDs: ["e0", "e1"]) == nil)
+        #expect(RecentShelfRules.cursorToRestore(selection: [], shelfIDs: ["e0"]) == nil)
+    }
+
+    @Test("the pointer is on one row at a time, and each row has a flag of its own")
+    @MainActor
+    func rowHoverFollowsTheLastRowEntered() {
+        let hover = RowHover()
+        hover.enter("a")
+        #expect(hover.flag(for: "a").isOn && !hover.flag(for: "b").isOn)
+        hover.enter("b")
+        #expect(!hover.flag(for: "a").isOn && hover.flag(for: "b").isOn)
+        hover.leave("a")
+        #expect(hover.flag(for: "b").isOn, "a late leave from the row before changes nothing")
+        hover.leave("b")
+        #expect(!hover.flag(for: "b").isOn && hover.current == nil)
+    }
+
+    @Test("the \"…\" menu takes the selection when its row is in it, and its own row otherwise")
+    func menuEntriesFollowTheSelection() {
+        let all = (0..<4).map { entry($0) }
+        #expect(LibraryRowsTarget.menuEntries(for: all[1], selection: ["e1", "e3"], in: all).map(\.id) == ["e1", "e3"])
+        #expect(LibraryRowsTarget.menuEntries(for: all[2], selection: ["e1", "e3"], in: all).map(\.id) == ["e2"])
+        #expect(LibraryRowsTarget.menuEntries(for: all[1], selection: ["e1", "gone"], in: all).map(\.id) == ["e1"])
+    }
+
+    @Test("the compact title shows once the page title has scrolled away, and never over search results")
+    func compactTitleVisibility() {
+        #expect(CompactPageTitle.isVisible(shown: true, hidden: false))
+        #expect(!CompactPageTitle.isVisible(shown: true, hidden: true))
+        #expect(!CompactPageTitle.isVisible(shown: false, hidden: false))
+    }
+
+    @MainActor
+    @Test("the engine chip drops a trailing note from the model's name")
+    func compactModelLabel() {
+        #expect(IntakeSummary.compactModelLabel("Apple Speech (system)") == "Apple Speech")
+        #expect(IntakeSummary.compactModelLabel("Whisper Turbo") == "Whisper Turbo")
+        #expect(IntakeSummary.compactModelLabel("Model (a) (b)  ") == "Model (a)")
     }
 }

@@ -7,7 +7,9 @@ struct ShelfKeyMonitor: NSViewRepresentable {
     let handle: (RecentShelfRules.Key) -> Bool
 
     static func key(for event: NSEvent) -> RecentShelfRules.Key? {
-        guard event.modifierFlags.intersection([.command, .option, .control, .shift]).isEmpty else { return nil }
+        let modifiers = event.modifierFlags.intersection([.command, .option, .control, .shift])
+        if modifiers == .option, event.keyCode == 36 || event.keyCode == 76 { return .optionReturn }
+        guard modifiers.isEmpty else { return nil }
         switch event.keyCode {
         case 123: return .left
         case 124: return .right
@@ -56,7 +58,7 @@ struct ShelfKeyMonitor: NSViewRepresentable {
             monitor = nil
         }
 
-        /// The table of this list, not the covered one of another page: it sits under the same container as the monitor's view.
+        /// True when the window's first responder is a table inside one of the monitor view's nearest containers, which is the list it belongs to and not a covered one elsewhere.
         private func listHasKeyboard(in window: NSWindow, near view: NSView) -> Bool {
             guard let table = window.firstResponder as? NSTableView else { return false }
             var container: NSView? = view

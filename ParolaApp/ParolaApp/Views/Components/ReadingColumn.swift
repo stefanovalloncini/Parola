@@ -17,12 +17,20 @@ extension EntryRowMetrics {
 /// Keeps a list's rows to a centred reading column. The scroll view stays full width, so a pointer in the margins still scrolls.
 private struct ReadingColumn: ViewModifier {
     @State private var paneWidth: CGFloat = 0
+    @State private var relayouts = 0
 
+    /// A List that loses its side margins keeps the width it had with them and overflows the pane; a new identity makes it lay out again.
     func body(content: Content) -> some View {
         content
             .safeAreaPadding(.horizontal, EntryRowMetrics.columnMargin(paneWidth: paneWidth))
             .transaction(value: paneWidth) { $0.animation = nil }
-            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { paneWidth = $0 }
+            .id(relayouts)
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width in
+                if EntryRowMetrics.columnMargin(paneWidth: paneWidth) > 0, EntryRowMetrics.columnMargin(paneWidth: width) == 0 {
+                    relayouts += 1
+                }
+                paneWidth = width
+            }
     }
 }
 

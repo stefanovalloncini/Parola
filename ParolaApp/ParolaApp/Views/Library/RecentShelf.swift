@@ -17,7 +17,7 @@ struct RecentShelf: View {
                 .font(DS.Font.heading)
                 .foregroundStyle(DS.Color.primaryText)
                 .padding(.top, DS.Spacing.regular)
-                .accessibilityAddTraits(.isHeader)
+                .accessibilityHidden(true)
             HStack(alignment: .top, spacing: RecentShelfRules.tileSpacing) {
                 ForEach(rows) { row in
                     RecentTile(
@@ -30,9 +30,11 @@ struct RecentShelf: View {
                     )
                 }
             }
+            .fixedSize(horizontal: false, vertical: true)
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Recent")
+        .accessibilityAddTraits(.isHeader)
     }
 }
 
@@ -48,12 +50,15 @@ struct RecentTile: View {
     @Environment(AppModel.self) private var model: AppModel?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.controlActiveState) private var controlActiveState
+    @Environment(\.colorScheme) private var colorScheme
     @State private var isHovering = false
 
-    static func open(_ id: LibraryEntry.ID, in model: AppModel?) {
-        guard let request = LibraryListContent.openRequest(for: [id], modifiers: NSEvent.modifierFlags) else { return }
-        model?.openEntryFromLibrary(request.id, inNewWindow: request.inNewWindow)
+    static func open(_ id: LibraryEntry.ID, inNewWindow: Bool, in model: AppModel?) {
+        model?.openEntryFromLibrary(id, inNewWindow: inNewWindow)
     }
+
+    /// Option opens in a window of its own, as it does on a row.
+    private static var optionIsDown: Bool { NSEvent.modifierFlags.contains(.option) }
 
     private var look: RecentShelfRules.SelectionLook {
         RecentShelfRules.selectionLook(
@@ -65,6 +70,11 @@ struct RecentTile: View {
     private var primaryInk: Color { onAccent ? DS.Color.onAccent : DS.Color.primaryText }
     private var secondaryInk: Color { onAccent ? DS.Color.onAccentSecondary : DS.Color.secondaryText }
 
+    private var excerptInk: Color {
+        if onAccent { return DS.Color.onAccent }
+        return DS.Color.primaryText.opacity(colorScheme == .dark ? 0.66 : 0.78)
+    }
+
     private var fill: Color {
         switch look {
         case .none: return DS.Palette.surface
@@ -74,9 +84,10 @@ struct RecentTile: View {
     }
 
     var body: some View {
-        content
-            .padding(14)
-            .frame(maxWidth: .infinity, minHeight: RecentShelfRules.tileHeight, maxHeight: RecentShelfRules.tileHeight, alignment: .topLeading)
+        let lift: CGFloat = isHovering ? -2 : 0
+        return content
+            .padding(DS.Spacing.medium)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .background {
                 RoundedRectangle(cornerRadius: DS.Radius.large, style: .continuous)
                     .fill(fill)
@@ -87,11 +98,11 @@ struct RecentTile: View {
                     .strokeBorder(isHovering && look == .none ? DS.Color.primaryText.opacity(0.16) : DS.Palette.divider, lineWidth: 1)
             }
             .contentShape(RoundedRectangle(cornerRadius: DS.Radius.large, style: .continuous))
-            .offset(y: isHovering ? -2 : 0)
+            .visualEffect { content, _ in content.offset(y: lift) }
             .animation(reduceMotion ? nil : DS.Motion.rowState, value: isHovering)
             .onHover { isHovering = $0 }
             .gesture(
-                TapGesture(count: 2).onEnded { Self.open(row.id, in: model) }
+                TapGesture(count: 2).onEnded { Self.open(row.id, inNewWindow: Self.optionIsDown, in: model) }
                     .simultaneously(with: TapGesture().onEnded { select() })
             )
             .contextMenu {
@@ -104,6 +115,7 @@ struct RecentTile: View {
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(Text(verbatim: LibraryRowFormat.spokenLabel(for: row, detail: [row.excerpt ?? ""])))
             .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+            .accessibilityAction { select() }
             .accessibilityActions {
                 if let model { LibraryRowActionButtons(model: model, entry: row.entry, rename: rename) }
             }
@@ -111,7 +123,7 @@ struct RecentTile: View {
     }
 
     private var content: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .top) {
                 EntryTile(kind: row.sourceKind, side: 36, onAccent: onAccent)
                 Spacer(minLength: DS.Spacing.small)
@@ -120,28 +132,27 @@ struct RecentTile: View {
                         .font(DS.Font.caption)
                         .monospacedDigit()
                         .foregroundStyle(secondaryInk)
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, 2)
+                        .padding(.horizontal, DS.Spacing.snug)
+                        .padding(.vertical, DS.Spacing.hair)
                         .background(Capsule().fill(onAccent ? DS.Color.onAccentWash : DS.Palette.subtleFill))
                 }
             }
-            .padding(.bottom, DS.Spacing.tight)
             Text(row.title)
                 .font(DS.Font.heading)
                 .foregroundStyle(primaryInk)
                 .lineLimit(1)
+                .padding(.top, DS.Spacing.small)
             Text(verbatim: row.when)
                 .font(DS.Font.body)
                 .foregroundStyle(secondaryInk)
                 .lineLimit(1)
-            if let excerpt = row.excerpt {
-                Text(verbatim: excerpt)
-                    .font(DS.Font.excerpt)
-                    .lineSpacing(2)
-                    .foregroundStyle(onAccent ? DS.Color.onAccent : DS.Color.primaryText.opacity(0.78))
-                    .lineLimit(4)
-                    .padding(.top, 2)
-            }
+                .padding(.top, DS.Spacing.tight)
+            Text(verbatim: row.excerpt ?? " ")
+                .font(DS.Font.excerpt)
+                .lineSpacing(2)
+                .foregroundStyle(excerptInk)
+                .lineLimit(3, reservesSpace: true)
+                .padding(.top, DS.Spacing.small)
         }
     }
 }

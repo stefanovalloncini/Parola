@@ -17,6 +17,8 @@ struct ContentView: View {
                     .transition(.opacity)
             }
         }
+        .modifier(HideToolbarTitleIfAvailable())
+        .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
         .animation(.smooth(duration: 0.35), value: model.introduction.isPresented)
         .background(MainWindowReporter(model: model))
         .background(LinkPasteInstaller(model: model))
@@ -32,8 +34,6 @@ struct ContentView: View {
         } detail: {
             ContentRoutes()
                 .toolbar { ContentToolbar() }
-                .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
-                .modifier(HideToolbarTitleIfAvailable())
         }
         .modifier(TakeSidebarRelease())
         .contentSheets()

@@ -9,10 +9,8 @@ struct KindTileTests {
     ]
 
     private func ends(of token: ThemeColor) -> [(String, RGBA)] {
-        guard case .dynamic(let light, let dark) = token else { return [] }
-        return [("light", light), ("dark", dark)].flatMap { appearance, foot in
-            [("\(appearance) foot", foot), ("\(appearance) top", foot.blended(toward: .white, amount: DS.KindTile.highlight))]
-        }
+        guard case .dynamic(let light, let dark) = token, case .dynamic(let lightTop, let darkTop) = DS.KindTile.top(of: token) else { return [] }
+        return [("light foot", light), ("light top", lightTop), ("dark foot", dark), ("dark top", darkTop)]
     }
 
     @Test("a white glyph clears 3:1 on both ends of every tile in both appearances")

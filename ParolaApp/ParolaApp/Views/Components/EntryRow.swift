@@ -64,7 +64,7 @@ enum EntrySourceKind: Equatable {
 
 /// How tall every row of entries is, and where its parts sit.
 enum EntryRowMetrics {
-    static let height: CGFloat = 64
+    static let height: CGFloat = 72
     /// The queue's own badge, which stays at the size its rows were drawn for.
     static let badgeSide: CGFloat = 28
     static let rowBadgeSide: CGFloat = 30
@@ -107,10 +107,9 @@ struct EntryTile: View {
     var onAccent = false
 
     var body: some View {
-        let fill = kind.tileFill.color
-        RoundedRectangle(cornerRadius: side * 0.3, style: .continuous)
+        RoundedRectangle(cornerRadius: DS.Radius.tile, style: .continuous)
             .fill(LinearGradient(
-                colors: [fill.mix(with: .white, by: DS.KindTile.highlight), fill], startPoint: .top, endPoint: .bottom
+                colors: [DS.KindTile.top(of: kind.tileFill).color, kind.tileFill.color], startPoint: .top, endPoint: .bottom
             ))
             .frame(width: side, height: side)
             .overlay {
@@ -120,7 +119,7 @@ struct EntryTile: View {
             }
             .overlay {
                 if onAccent {
-                    RoundedRectangle(cornerRadius: side * 0.3, style: .continuous)
+                    RoundedRectangle(cornerRadius: DS.Radius.tile, style: .continuous)
                         .strokeBorder(DS.Color.onAccent.opacity(0.5), lineWidth: 1)
                 }
             }
@@ -142,8 +141,10 @@ struct EntryRow<Accessory: View, Actions: View>: View {
     var help: String?
     /// Off for a caller that draws something under the row and washes the two together.
     var drawsHover: Bool = true
-    /// Lets a row put its own control over the date and duration while it is hovered.
-    var hidesTrailingMeta: Bool = false
+    /// A list that tracks one hovered row itself says so here, so a row scrolled from under the pointer lets go.
+    var hovered: Bool?
+    /// A control for the title line's trailing edge; its slot is kept free so the date and duration don't move when it appears.
+    var titleAccessory: AnyView?
     let accessory: Accessory
     let trailingActions: Actions
 
@@ -151,6 +152,8 @@ struct EntryRow<Accessory: View, Actions: View>: View {
     @Environment(AppModel.self) private var model: AppModel?
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.backgroundProminence) private var backgroundProminence
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.displayScale) private var displayScale
     @State private var isHovering = false
 
     init(
@@ -159,7 +162,8 @@ struct EntryRow<Accessory: View, Actions: View>: View {
         isSelected: Bool = false,
         help: String? = nil,
         drawsHover: Bool = true,
-        hidesTrailingMeta: Bool = false,
+        hovered: Bool? = nil,
+        titleAccessory: AnyView? = nil,
         @ViewBuilder accessory: () -> Accessory,
         @ViewBuilder trailingActions: () -> Actions
     ) {
@@ -168,7 +172,8 @@ struct EntryRow<Accessory: View, Actions: View>: View {
         self.isSelected = isSelected
         self.help = help
         self.drawsHover = drawsHover
-        self.hidesTrailingMeta = hidesTrailingMeta
+        self.hovered = hovered
+        self.titleAccessory = titleAccessory
         self.accessory = accessory()
         self.trailingActions = trailingActions()
     }
@@ -203,16 +208,23 @@ struct EntryRow<Accessory: View, Actions: View>: View {
     private var detailStyle: Color {
         if onAccent { return DS.Color.onAccentSecondary }
         if case .snippet = detail { return DS.Color.secondaryText }
-        return DS.Color.primaryText.opacity(0.72)
+        return DS.Color.primaryText.opacity(colorScheme == .dark ? 0.6 : 0.72)
     }
+
+    private var isHighlighted: Bool { hovered ?? isHovering }
 
     private var onAccent: Bool {
         DS.onAccent(isSelected: isSelected, prominence: backgroundProminence)
     }
 
+    @ViewBuilder
     var body: some View {
-        chromedRow
-            .onHover { isHovering = $0 }
+        if hovered == nil {
+            chromedRow
+                .onHover { isHovering = $0 }
+        } else {
+            chromedRow
+        }
     }
 
     /// Not on the whole row, or it would cover the trailing actions' own tooltips.
@@ -241,12 +253,12 @@ struct EntryRow<Accessory: View, Actions: View>: View {
                 .padding(.horizontal, DS.Spacing.small)
                 .overlay(alignment: .bottom) {
                     Rectangle()
-                        .fill(DS.Palette.divider.opacity(isSelected ? 0 : 0.6))
-                        .frame(height: 0.5)
+                        .fill(DS.Palette.divider.opacity(isSelected || isHighlighted ? 0 : 1))
+                        .frame(height: 1 / displayScale)
                         .padding(.leading, DS.Spacing.small + EntryRowMetrics.rowTextInset)
                         .padding(.trailing, DS.Spacing.small)
                 }
-                .rowChrome(selected: isSelected, hovered: isHovering, selection: .native)
+                .rowChrome(selected: isSelected, hovered: isHighlighted, selection: .native)
         } else {
             row
         }
@@ -283,17 +295,19 @@ struct EntryRow<Accessory: View, Actions: View>: View {
                 .foregroundStyle(secondaryStyle)
                 .lineLimit(1)
                 .fixedSize()
-                .opacity(hidesTrailingMeta ? 0 : 1)
             Text(verbatim: display.duration ?? "")
                 .font(DS.Font.secondary)
                 .monospacedDigit()
                 .foregroundStyle(secondaryStyle)
                 .lineLimit(1)
                 .frame(width: EntryRowMetrics.durationWidth, alignment: .trailing)
-                .opacity(hidesTrailingMeta ? 0 : 1)
                 .accessibilityLabel(Text(verbatim: display.spokenDuration ?? ""))
                 .accessibilityHidden(display.duration == nil)
+            if titleAccessory != nil {
+                Color.clear.frame(width: RowMenuSlot.width, height: 1)
+            }
         }
+        .overlay(alignment: .trailing) { titleAccessory }
     }
 
     private var detailLine: some View {
@@ -374,14 +388,14 @@ extension EntryRow where Accessory == EmptyView, Actions == EmptyView {
         detail: EntryRowDetail = .excerpt(nil),
         isSelected: Bool = false,
         help: String? = nil,
-        hidesTrailingMeta: Bool = false
+        hovered: Bool? = nil
     ) {
         self.init(
             display: display,
             detail: detail,
             isSelected: isSelected,
             help: help,
-            hidesTrailingMeta: hidesTrailingMeta,
+            hovered: hovered,
             accessory: { EmptyView() },
             trailingActions: { EmptyView() }
         )

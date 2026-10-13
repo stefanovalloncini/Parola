@@ -24,7 +24,7 @@ enum LibraryListItem: Identifiable, Equatable {
         }
     }
 
-    /// Titles and entries in one run, so a title scrolls away with the rows under it; an untitled group adds none.
+    /// A group's title, then its entries, in one run; an untitled group adds no title.
     static func items(for groups: [LibraryDateGroups.Group]) -> [LibraryListItem] {
         var items: [LibraryListItem] = []
         items.reserveCapacity(groups.reduce(0) { $0 + $1.rows.count + 1 })
@@ -43,6 +43,41 @@ enum LibraryListItem: Identifiable, Equatable {
             if case .entry(let row) = item { return row.id }
             return nil
         })
+    }
+}
+
+/// Whether the pointer is on one row. Each row watches a flag of its own, so a change touches the two rows involved and not every row on screen.
+@MainActor
+@Observable
+final class RowHoverFlag {
+    fileprivate(set) var isOn = false
+}
+
+/// Tracks the one row the pointer is on, so a row scrolled from under a still pointer lets go when the next one is entered.
+@MainActor
+@Observable
+final class RowHover {
+    @ObservationIgnored private var flags: [LibraryEntry.ID: RowHoverFlag] = [:]
+    @ObservationIgnored private(set) var current: LibraryEntry.ID?
+
+    func flag(for id: LibraryEntry.ID) -> RowHoverFlag {
+        if let flag = flags[id] { return flag }
+        let flag = RowHoverFlag()
+        flags[id] = flag
+        return flag
+    }
+
+    func enter(_ id: LibraryEntry.ID) {
+        guard current != id else { return }
+        if let previous = current { flags[previous]?.isOn = false }
+        current = id
+        flag(for: id).isOn = true
+    }
+
+    func leave(_ id: LibraryEntry.ID) {
+        guard current == id else { return }
+        flags[id]?.isOn = false
+        current = nil
     }
 }
 
@@ -89,6 +124,9 @@ struct LibraryRowList<Top: View>: View {
     var shelf: [LibraryRowDisplay] = []
     /// Set while the page's own title has scrolled out of sight, so the toolbar can carry a compact one.
     var titleScrolledAway: Binding<Bool>?
+    /// Brings the shelf into view before the keyboard puts a selection on one of its tiles.
+    var scrollToPageTop: (() -> Void)?
+    @State private var hover = RowHover()
     /// The tile the keyboard is on; the list keeps the responder, and the arrows are read here while this is set.
     @State private var shelfCursor: LibraryEntry.ID?
 
@@ -104,6 +142,7 @@ struct LibraryRowList<Top: View>: View {
         rowAppeared: ((LibraryEntry.ID) -> Void)? = nil,
         shelf: [LibraryRowDisplay] = [],
         titleScrolledAway: Binding<Bool>? = nil,
+        scrollToPageTop: (() -> Void)? = nil,
         top: Top? = nil
     ) {
         self.items = items
@@ -119,6 +158,7 @@ struct LibraryRowList<Top: View>: View {
         self.rowAppeared = rowAppeared
         self.shelf = shelf
         self.titleScrolledAway = titleScrolledAway
+        self.scrollToPageTop = scrollToPageTop
         self.top = top
     }
 
@@ -137,7 +177,8 @@ struct LibraryRowList<Top: View>: View {
                 detail: detail,
                 isSelected: selection.contains(row.id),
                 rename: rename,
-                delete: delete
+                delete: delete,
+                menuEntries: menuEntries
             )
             .equatable()
             .onAppear { rowAppeared?(row.id) }
@@ -145,6 +186,11 @@ struct LibraryRowList<Top: View>: View {
             .listRowInsets(EdgeInsets())
             .listRowSeparator(.hidden)
         }
+    }
+
+    /// The "…" menu acts on the selection when its row is part of it, as the right-click menu does.
+    private func menuEntries(for entry: LibraryEntry) -> [LibraryEntry] {
+        LibraryRowsTarget.menuEntries(for: entry, selection: selection, in: model.libraryEntries)
     }
 
     private var rowSelection: Binding<Set<LibraryEntry.ID>> {
@@ -189,6 +235,7 @@ struct LibraryRowList<Top: View>: View {
             }
         }
         .listStyle(.inset)
+        .environment(hover)
         .onScrollGeometryChange(for: Bool.self) { geometry in
             geometry.contentOffset.y + geometry.contentInsets.top > Self.titleScrollThreshold
         } action: { _, scrolledAway in
@@ -201,15 +248,19 @@ struct LibraryRowList<Top: View>: View {
             entries: LibraryRowsTarget.selectedEntries(selection, in: items, shelf: shelf), rename: rename, delete: delete
         ))
         .onDeleteCommand(perform: deleteSelection)
-        .background { ShelfKeyMonitor(isActive: !shelf.isEmpty, handle: handle) }
+        .background { ShelfKeyMonitor(isActive: !shelf.isEmpty && !model.hasSearchResults, handle: handle) }
         .onChange(of: selection) { _, new in
             if let cursor = shelfCursor, new != [cursor] { shelfCursor = nil }
         }
         .onChange(of: focus.wrappedValue) { old, new in
             if new != focusKey { shelfCursor = nil }
-            guard new == focusKey, old != focusKey, selection.isEmpty, Self.isTab(NSApp.currentEvent),
-                  let first = shelf.first else { return }
-            chooseTile(first.id)
+            guard new == focusKey, old != focusKey else { return }
+            if selection.isEmpty, Self.isTab(NSApp.currentEvent), let first = shelf.first {
+                scrollToPageTop?()
+                chooseTile(first.id)
+            } else {
+                shelfCursor = RecentShelfRules.cursorToRestore(selection: selection, shelfIDs: shelf.map(\.id))
+            }
         }
         .onChange(of: shelf.map(\.id)) { _, ids in
             if let cursor = shelfCursor, !ids.contains(cursor) { shelfCursor = nil }
@@ -264,12 +315,13 @@ struct LibraryRowList<Top: View>: View {
         case .none:
             break
         case .moveTo(let index):
+            scrollToPageTop?()
             chooseTile(shelf[index].id)
         case .leaveForList:
             shelfCursor = nil
             if let first = firstRowID { selection = [first] }
-        case .open(let index):
-            RecentTile.open(shelf[index].id, in: model)
+        case .open(let index, let inNewWindow):
+            RecentTile.open(shelf[index].id, inNewWindow: inNewWindow, in: model)
         case .delete(let index):
             delete([shelf[index].id])
         }
@@ -306,7 +358,7 @@ struct LibraryRowList<Top: View>: View {
     }
 }
 
-/// A date group's title as a row of its own, on the gutter the rows' badges start on.
+/// A date group's title, on the gutter the rows' badges start on; the list pins it under the toolbar while its group scrolls.
 struct LibraryGroupHeader: View {
     let title: String
 
@@ -315,8 +367,8 @@ struct LibraryGroupHeader: View {
             .font(DS.Font.heading)
             .foregroundStyle(DS.Color.primaryText)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.top, DS.Spacing.snug)
-            .padding(.bottom, DS.Spacing.snug)
+            .padding(.top, DS.Spacing.medium)
+            .padding(.bottom, DS.Spacing.small)
             .accessibilityAddTraits(.isHeader)
     }
 }
@@ -335,7 +387,9 @@ struct LibraryListRow: View, Equatable {
     let isSelected: Bool
     let rename: (LibraryEntry) -> Void
     let delete: (Set<LibraryEntry.ID>) -> Void
-    @State private var isHovering = false
+    let menuEntries: (LibraryEntry) -> [LibraryEntry]
+    @Environment(RowHover.self) private var hover: RowHover?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     nonisolated static func == (lhs: LibraryListRow, rhs: LibraryListRow) -> Bool {
         lhs.row == rhs.row && lhs.detail == rhs.detail && lhs.isSelected == rhs.isSelected
@@ -369,23 +423,21 @@ struct LibraryListRow: View, Equatable {
         }
     }
 
-    private var showsMenu: Bool { isHovering }
+    private var isHovered: Bool { hover?.flag(for: row.id).isOn ?? false }
 
     @ViewBuilder
     private var rowContent: some View {
         switch detail {
         case .excerpt:
-            EntryRow(display: row, detail: .excerpt(row.excerpt), isSelected: isSelected, hidesTrailingMeta: showsMenu)
-                .overlay(alignment: .topTrailing) {
-                    if let model, showsMenu {
-                        RowMenuButton {
-                            LibraryRowMenu(model: model, entries: [row.entry], rename: rename, delete: delete)
-                        }
-                        .padding(.top, 14)
-                        .padding(.trailing, DS.Spacing.small)
-                    }
-                }
-                .onHover { isHovering = $0 }
+            EntryRow(
+                display: row, detail: .excerpt(row.excerpt), isSelected: isSelected, hovered: isHovered,
+                titleAccessory: AnyView(menuSlot),
+                accessory: { EmptyView() },
+                trailingActions: { EmptyView() }
+            )
+            .onHover { inside in
+                if inside { hover?.enter(row.id) } else { hover?.leave(row.id) }
+            }
         case .match(let showsTimestamp):
             SearchResultRow(
                 display: row,
@@ -394,6 +446,22 @@ struct LibraryListRow: View, Equatable {
                 showsTimestamp: showsTimestamp
             )
         }
+    }
+}
+
+extension LibraryListRow {
+    /// Always there, so the date and duration keep their columns; the button fades in over it.
+    private var menuSlot: some View {
+        ZStack {
+            if isHovered, let model {
+                RowMenuButton(isSelected: isSelected) {
+                    LibraryRowMenu(model: model, entries: menuEntries(row.entry), rename: rename, delete: delete)
+                }
+                .transition(.opacity)
+            }
+        }
+        .frame(width: RowMenuSlot.width, height: RowMenuSlot.height)
+        .animation(reduceMotion ? nil : DS.Motion.rowState, value: isHovered)
     }
 }
 
@@ -414,16 +482,27 @@ struct LibraryRowActionButtons: View {
     }
 }
 
+/// The room a row keeps on its title line for the menu button.
+enum RowMenuSlot {
+    static let width: CGFloat = 28
+    static let height: CGFloat = 20
+}
+
 /// The row's own right-click menu, one click away while the pointer is over it.
 struct RowMenuButton<Items: View>: View {
+    let isSelected: Bool
     @ViewBuilder let items: () -> Items
+    @Environment(\.backgroundProminence) private var backgroundProminence
+
+    private var onAccent: Bool { DS.onAccent(isSelected: isSelected, prominence: backgroundProminence) }
 
     var body: some View {
         Menu(content: items) {
             Image(systemName: "ellipsis")
                 .font(.system(size: 12, weight: .semibold))
-                .frame(width: 28, height: 22)
-                .background(Capsule().fill(DS.Palette.pillFill))
+                .foregroundStyle(onAccent ? DS.Color.onAccent : DS.Color.primaryText)
+                .frame(width: RowMenuSlot.width, height: RowMenuSlot.height)
+                .background(Capsule().fill(onAccent ? DS.Color.onAccentWash : DS.Palette.pillFill))
         }
         .menuStyle(.button)
         .buttonStyle(.plain)

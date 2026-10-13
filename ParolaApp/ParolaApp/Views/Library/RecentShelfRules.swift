@@ -1,5 +1,11 @@
 import CoreGraphics
+import SwiftUI
 import ParolaCore
+
+extension EnvironmentValues {
+    /// Off only in tests that read the page's own rows.
+    @Entry var showsRecentShelf = true
+}
 
 /// When the Recent shelf shows, which entries it takes and how it moves between its tiles and the list.
 enum RecentShelfRules {
@@ -7,7 +13,6 @@ enum RecentShelfRules {
     static let minimumPageCount = 4
     static let minimumTileWidth: CGFloat = 200
     static let tileSpacing = DS.Spacing.regular
-    static let tileHeight: CGFloat = 210
 
     /// Three tiles while each keeps its minimum width across the shelf, else two.
     static func tileCount(contentWidth: CGFloat) -> Int {
@@ -34,6 +39,7 @@ enum RecentShelfRules {
         case up
         case down
         case `return`
+        case optionReturn
         case delete
     }
 
@@ -41,7 +47,7 @@ enum RecentShelfRules {
         case none
         case moveTo(Int)
         case leaveForList
-        case open(Int)
+        case open(Int, inNewWindow: Bool)
         case delete(Int)
     }
 
@@ -56,9 +62,16 @@ enum RecentShelfRules {
         case .right: return .moveTo(min(cursor + 1, tileCount - 1))
         case .up: return .moveTo(cursor)
         case .down: return .leaveForList
-        case .return: return .open(cursor)
+        case .return: return .open(cursor, inNewWindow: false)
+        case .optionReturn: return .open(cursor, inNewWindow: true)
         case .delete: return .delete(cursor)
         }
+    }
+
+    /// A shelf tile that is the whole selection gets the keyboard back when the list regains focus.
+    static func cursorToRestore(selection: Set<LibraryEntry.ID>, shelfIDs: [LibraryEntry.ID]) -> LibraryEntry.ID? {
+        guard selection.count == 1, let only = selection.first, shelfIDs.contains(only) else { return nil }
+        return only
     }
 
     enum SelectionLook: Equatable {

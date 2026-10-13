@@ -45,8 +45,8 @@ struct ListCellModelTests {
 
     @Test("an entry row, a search row and a trashed row draw with no model")
     func rows() {
-        #expect(renders(LibraryListRow(row: display, detail: .excerpt, isSelected: false, rename: { _ in }, delete: { _ in })))
-        #expect(renders(LibraryListRow(row: display, detail: .match(showsTimestamp: true), isSelected: true, rename: { _ in }, delete: { _ in })))
+        #expect(renders(LibraryListRow(row: display, detail: .excerpt, isSelected: false, rename: { _ in }, delete: { _ in }, menuEntries: { [$0] })))
+        #expect(renders(LibraryListRow(row: display, detail: .match(showsTimestamp: true), isSelected: true, rename: { _ in }, delete: { _ in }, menuEntries: { [$0] })))
         #expect(renders(EntryRow(display: display, detail: .snippet(AttributedString("ship"), timecode: "01:02", reservesTimecode: true))))
         #expect(renders(RecentlyDeletedRow(display: display, daysLeft: 3, timeLeft: "3 days", onRestore: {}, onPurge: {})))
     }
