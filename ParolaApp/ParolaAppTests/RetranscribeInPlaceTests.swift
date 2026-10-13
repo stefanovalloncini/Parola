@@ -96,6 +96,7 @@ extension TranscriberMockSuites {
         @Test("an entry opened before the library has listed it can be transcribed again at once")
         func openedBeforeTheListCanRunAgain() async throws {
             let model = makeModel("retranscribe-unlisted")
+            await model.refreshLibraryAndWait()
             let wav = try makeWAV("unlisted")
             defer { try? FileManager.default.removeItem(at: wav) }
             let entry = try await model.library.add(
