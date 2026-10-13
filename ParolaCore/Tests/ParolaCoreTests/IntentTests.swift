@@ -330,8 +330,9 @@ struct IntentPerformerTests {
         }
         _ = try await TranscribeFileIntent(file: IntentFile(data: Data("abc".utf8), filename: "clip.wav")).perform()
         let done = try #require(seen.url)
-        var gone = false
-        for _ in 0..<200 where !gone {
+        let deadline = ContinuousClock.now + .seconds(15)
+        var gone = !FileManager.default.fileExists(atPath: done.path)
+        while !gone, ContinuousClock.now < deadline {
             try await Task.sleep(for: .milliseconds(10))
             gone = !FileManager.default.fileExists(atPath: done.path)
         }
