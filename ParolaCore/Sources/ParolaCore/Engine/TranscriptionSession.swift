@@ -437,14 +437,14 @@ public actor TranscriptionSession {
         if let allowed = managedConfiguration.allowedEngines, !allowed.contains(engineID) {
             ParolaLog.notice(.models, "rejected by policy: engine \(engineID)")
             throw ParolaError.policyRestricted(
-                "The \(engineID.displayName) engine is disabled by a managed policy."
+                FixedFailureText.engineDisabled(engineID.displayName)
             )
         }
         if managedConfiguration.requireEnglishOnly,
            let language = options.language, language.lowercased() != "en" {
             ParolaLog.notice(.models, "rejected by policy: language")
             throw ParolaError.policyRestricted(
-                "Transcription is restricted to English by a managed policy."
+                FixedFailureText.englishOnly
             )
         }
         guard let baseCaps = await registry.capabilities(for: engineID) else {
@@ -463,11 +463,11 @@ public actor TranscriptionSession {
         }
         if options.task == .translate, !caps.supportsTranslate {
             ParolaLog.notice(.models, "engine \(engineID) rejected translate")
-            throw ParolaError.unsupportedForEngine("\(engineID.displayName) does not support translation.")
+            throw ParolaError.unsupportedForEngine(FixedFailureText.cannotTranslate(engineID.displayName))
         }
         if options.diarize, !caps.supportsDiarization {
             ParolaLog.notice(.models, "engine \(engineID) rejected diarize")
-            throw ParolaError.unsupportedForEngine("\(engineID.displayName) does not support speaker labels.")
+            throw ParolaError.unsupportedForEngine(FixedFailureText.cannotLabelSpeakers(engineID.displayName))
         }
         return caps
     }
@@ -476,7 +476,7 @@ public actor TranscriptionSession {
     static func unreadableFileReason(at url: URL) -> String? {
         guard let size = try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? UInt64,
               size == 0 else { return nil }
-        return "The file is empty."
+        return FixedFailureText.fileIsEmpty
     }
 
     /// Names the model rather than the engine: the usual cause is an English-only variant on an

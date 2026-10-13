@@ -2720,8 +2720,7 @@ final class AppModel {
                 finishModelDownload()
             } catch {
                 if !Task.isCancelled {
-                    let message = Self.offlineMessage(for: error)
-                        ?? String(localized: "Download failed: \(FailureText.message(for: error))")
+                    let message = Self.offlineMessage(for: error) ?? Self.downloadFailureMessage(for: error)
                     // A take or a run that took the page since keeps it, as does a transcript the bar was drawn past; Settings still says why.
                     if case .downloadingModel = phase { phase = transcript == nil ? .failed(message: message) : .ready }
                     modelActionError = message
@@ -3654,6 +3653,11 @@ final class AppModel {
             localized: "Parola needs to download the speech model, and the network isn't reachable. Connect to the internet and try again — after that, transcription runs fully offline.",
             bundle: bundle
         )
+    }
+
+    nonisolated static func downloadFailureMessage(for error: Error, bundle: Bundle = .main) -> String {
+        if case ParolaError.modelDownloadFailed = error { return FailureText.message(for: error, bundle: bundle) }
+        return String(localized: "Download failed: \(FailureText.message(for: error, bundle: bundle))", bundle: bundle)
     }
 
     nonisolated static func unsupportedURLMessage(bundle: Bundle = .main) -> String {
@@ -4686,6 +4690,7 @@ final class AppModel {
 
     /// A live take that failed keeps what it heard: its confirmed words and its audio, as an interrupted entry.
     private func keepFailedLiveTake(_ reason: String, take: TakeContext?, session: (any StreamingTranscriber)?) async {
+        let reason = FailureText.reason(reason)
         let recovery = recoveryGeneration(of: take)
         // Held first, so the teardown below leaves the checkpoint for the save to end.
         if let recovery { recoveryHeldByTake.insert(recovery) }

@@ -89,7 +89,7 @@ actor WhisperKitTranscriber: Transcriber {
     ) async throws -> Transcript {
         guard let kit = whisperKit, let modelName = loadedModel else {
             ParolaLog.fault(.engineWhisperKit, "transcribe called with no model loaded")
-            throw ParolaError.engineLoadFailed("model not loaded")
+            throw ParolaError.engineLoadFailed(FixedFailureText.engineModelNotLoaded)
         }
         let interval = signposter.beginInterval("transcribe", "model=\(modelName, privacy: .public)")
         defer { signposter.endInterval("transcribe", interval) }
@@ -159,14 +159,14 @@ actor WhisperKitTranscriber: Transcriber {
                 .engineWhisperKit, "engine returned no results",
                 Self.emptyResultFields(model: modelName, url: url)
             )
-            throw ParolaError.transcriptionFailed("WhisperKit returned no results")
+            throw ParolaError.transcriptionFailed(FixedFailureText.noResults)
         }
         guard !outcomes.isEmpty else {
             ParolaLog.error(
                 .engineWhisperKit, "engine returned an empty result set",
                 Self.emptyResultFields(model: modelName, url: url)
             )
-            throw ParolaError.transcriptionFailed("WhisperKit returned an empty result set")
+            throw ParolaError.transcriptionFailed(FixedFailureText.emptyResultSet)
         }
 
         var segments: [TranscriptSegment] = []

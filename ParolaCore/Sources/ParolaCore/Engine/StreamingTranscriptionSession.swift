@@ -527,7 +527,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
     // The loop returns without failing when it can't capture (e.g. denied mic); if stop() didn't drive that return (loop still set), surface a failure so the consumer doesn't wait forever.
     private func handleStreamerEndedWithoutStop() async {
         if loop != nil { ParolaLog.error(.streaming, "streaming loop ended without a stop request") }
-        await finishStream(failure: "Couldn't start the microphone. Check Microphone access in System Settings › Privacy & Security › Microphone.")
+        await finishStream(failure: FixedFailureText.microphoneNotStarted)
     }
 
     private func finishStream(failure: String?, keepingAudio: Bool = false) async {

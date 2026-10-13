@@ -329,7 +329,7 @@ public struct ParolaDocument: Sendable {
         }
         let manifest: Manifest = try readJSON(at: manifestURL)
         guard manifest.version <= Manifest.currentVersion else {
-            throw ParolaError.ioError("Parola document version \(manifest.version) is newer than this app understands.")
+            throw ParolaError.ioError(FixedFailureText.documentTooNew(version: manifest.version))
         }
         let transcript: Transcript = try readJSON(at: url.appendingPathComponent("transcript.json"))
 

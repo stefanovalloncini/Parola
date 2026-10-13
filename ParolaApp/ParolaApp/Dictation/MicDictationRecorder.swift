@@ -74,6 +74,17 @@ actor MicDictationRecorder: DictationRecorder {
     }
 
     func start() async throws {
+        do { try await begin() } catch { throw presented(error) }
+    }
+
+    private func presented(_ error: any Error) -> any Error {
+        if !(error is CancellationError) {
+            ParolaLog.error(.dictation, "dictation recorder failed", [.error: .error(error)])
+        }
+        return FailureText.presented(error)
+    }
+
+    private func begin() async throws {
         isStarting = true
         discardRequested = false
         defer { isStarting = false }
@@ -87,6 +98,10 @@ actor MicDictationRecorder: DictationRecorder {
     }
 
     func stopAndTranscribe() async throws -> String {
+        do { return try await finish() } catch { throw presented(error) }
+    }
+
+    private func finish() async throws -> String {
         if streamingSession != nil {
             return try await stopStreaming()
         }

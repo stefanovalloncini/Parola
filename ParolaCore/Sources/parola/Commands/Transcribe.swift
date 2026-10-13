@@ -309,7 +309,7 @@ struct Transcribe: AsyncParsableCommand {
                 stderr("✓ \(job.url.lastPathComponent) → \(target.path)")
                 warnIfLanguageAssumed(transcript)
                 reportTiming(transcript)
-            case .failed(let id, let reason):
+            case .failed(let id, let reason, _):
                 if let job = jobByID[id] { stderr("✘ \(job.url.lastPathComponent): \(reason)") }
             case .cancelled(let id):
                 if let job = jobByID[id] { stderr("⨯ \(job.url.lastPathComponent): cancelled") }

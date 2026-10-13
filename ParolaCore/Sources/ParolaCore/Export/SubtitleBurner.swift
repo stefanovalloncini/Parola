@@ -45,7 +45,7 @@ public enum SubtitleBurner {
         progress: (@Sendable (Double) -> Void)? = nil
     ) async throws {
         guard FileManager.default.fileExists(atPath: video.path) else {
-            throw ParolaError.audioLoadFailed(video, underlying: "video file does not exist")
+            throw ParolaError.audioLoadFailed(video, underlying: FixedFailureText.videoMissing)
         }
 
         let asset = AVURLAsset(url: video)

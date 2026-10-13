@@ -55,7 +55,7 @@ public actor MicAudioSource: LiveAudioSource {
         let tapFormat = inputNode.outputFormat(forBus: 0)
         guard tapFormat.sampleRate > 0 else {
             ParolaLog.error(.audioCapture, "microphone input format is invalid")
-            throw ParolaError.captureUnavailable("microphone not available — input format invalid (mic permission?)")
+            throw ParolaError.captureUnavailable(FixedFailureText.microphoneUnavailable)
         }
 
         guard let outFormat = AVAudioFormat(

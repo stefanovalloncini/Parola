@@ -525,7 +525,7 @@ public final class ModelStore: Sendable {
     package func checkDownloadsAllowed() throws {
         if managedConfiguration.disableModelDownloads {
             ParolaLog.notice(.models, "download blocked by policy")
-            throw ParolaError.policyRestricted("Model downloads are disabled by a managed policy.")
+            throw ParolaError.policyRestricted(FixedFailureText.modelDownloadsDisabled)
         }
     }
 
@@ -536,7 +536,7 @@ public final class ModelStore: Sendable {
            !allowed.contains(entry.engineID) {
             ParolaLog.notice(.models, "download blocked by policy for \(entry.engineID)")
             throw ParolaError.policyRestricted(
-                "The \(entry.engineID.displayName) engine is disabled by a managed policy."
+                FixedFailureText.engineDisabled(entry.engineID.displayName)
             )
         }
     }

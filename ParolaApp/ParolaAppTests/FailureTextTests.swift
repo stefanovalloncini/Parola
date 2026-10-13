@@ -22,15 +22,15 @@ struct FailureTextTests {
         let it = try bundle("it")
         let file = URL(fileURLWithPath: "/tmp/riunione.m4a")
         #expect(FailureText.message(for: ParolaError.modelNotFound("small"), bundle: it)
-            == "Il modello small non è ancora scaricato. Scaricalo da Impostazioni › Modelli locali.")
+            == "Il modello small non è ancora stato scaricato. Scaricalo da Impostazioni › Modelli locali.")
         #expect(FailureText.message(for: ParolaError.unknownModel("smal", suggestion: "small"), bundle: it)
             == "Modello “smal” sconosciuto. Intendevi “small”?")
         #expect(FailureText.message(for: ParolaError.featureDisabled(.batch), bundle: it)
-            == "Disattivato in questa installazione: Trascrizione in batch.")
+            == "Funzione disattivata dalla tua organizzazione: Trascrizione in batch.")
         #expect(FailureText.message(for: ParolaError.fileMissing(file), bundle: it)
             == "Parola non è riuscita a trovare riunione.m4a.")
         #expect(FailureText.message(for: ParolaError.audioLoadFailed(file, underlying: "x"), bundle: it)
-            == "Parola non è riuscita a caricare l'audio da riunione.m4a.")
+            == "Parola non è riuscita a caricare l'audio di riunione.m4a. x")
         #expect(FailureText.message(for: ParolaError.unreadableFile(name: "a.m4a", reason: "The file is empty."), bundle: it)
             == "Parola non è riuscita a leggere a.m4a. Il file è vuoto.")
         #expect(FailureText.message(for: ParolaError.fileReadTimedOut(name: "a.m4a"), bundle: it)
@@ -43,11 +43,11 @@ struct FailureTextTests {
         #expect(FailureText.message(for: ParolaError.engineNotRegistered("whisper"), bundle: it)
             == "Questo motore vocale non è disponibile in questa build.")
         #expect(FailureText.message(for: ParolaError.policyRestricted("Model downloads are disabled by a managed policy."), bundle: it)
-            == "Lo scaricamento dei modelli è disattivato da un criterio gestito.")
+            == "La tua organizzazione ha disattivato il download dei modelli.")
         #expect(FailureText.message(for: ParolaError.ioError("This entry has no audio to replace."), bundle: it)
             == "Questa trascrizione non ha audio da sostituire.")
         #expect(FailureText.message(for: ParolaError.unsupportedForEngine("Parakeet does not support translation"), bundle: it)
-            == "Questo motore vocale non sa tradurre. Scegli un modello Whisper.")
+            == "Questo motore non traduce. Scegli un modello Whisper.")
         #expect(FailureText.message(for: ParolaError.modelChecksumMismatch(file: "a", expected: "b", got: "c"), bundle: it)
             == "Un file scaricato non ha superato il controllo di integrità. Scarica di nuovo il modello.")
     }
@@ -64,12 +64,12 @@ struct FailureTextTests {
     func deliveryErrors() throws {
         let it = try bundle("it")
         #expect(FailureText.message(for: DeliveryError.vaultUnavailable("Vault", "/Volumes/Note"), bundle: it)
-            == "Parola non riesce a raggiungere /Volumes/Note. Scegli di nuovo la cartella nelle impostazioni di Invia a.")
+            == "Parola non raggiunge /Volumes/Note. Scegli di nuovo la cartella in Impostazioni › Invia a.")
         #expect(FailureText.message(for: DeliveryError.writeFailed("/Volumes/Note", "Disco pieno."), bundle: it)
             == "Parola non è riuscita a scrivere in /Volumes/Note. Disco pieno.")
         #expect(FailureText.message(for: DeliveryPayloadError.entryGone("x"), bundle: it)
             == "Questa trascrizione è stata eliminata, quindi non c'è nulla da inviare.")
-        #expect(FailureText.message(for: .givenUp("Obsidian"), bundle: it) == "Parola ha smesso di provare a inviare a Obsidian.")
+        #expect(FailureText.message(for: .givenUp("Obsidian"), bundle: it) == "Parola ha smesso di riprovare l'invio a Obsidian.")
         #expect(FailureText.message(for: .notEnabled, bundle: it) == "Questa destinazione è disattivata.")
         #expect(FailureText.message(for: .payloadUnavailable("That transcript was deleted, so there is nothing to send."), bundle: it)
             == "Parola non è riuscita a leggere la trascrizione da inviare. Questa trascrizione è stata eliminata, quindi non c'è nulla da inviare.")
@@ -80,7 +80,7 @@ struct FailureTextTests {
         let it = try bundle("it")
         let error = CaptureInterrupted(url: URL(fileURLWithPath: "/tmp/take.caf"), reason: "Disco pieno")
         #expect(FailureText.message(for: error, bundle: it)
-            == "La registrazione ha smesso di salvarsi a metà (Disco pieno). Quello che era già salvato si trova in /tmp/take.caf.")
+            == "Il salvataggio della registrazione si è interrotto (Disco pieno). La parte già salvata si trova in /tmp/take.caf.")
     }
 
     @Test("AI and library failures read in Italian")
@@ -89,13 +89,13 @@ struct FailureTextTests {
         #expect(FailureText.message(for: CloudLLMError.missingAPIKey(.openAI), bundle: it) == "Nessuna chiave API configurata per OpenAI.")
         #expect(FailureText.message(for: CloudLLMError.requestFailed(provider: .groq, status: 429, body: ""), bundle: it)
             == "Richiesta a Groq non riuscita (HTTP 429).")
-        #expect(FailureText.message(for: CloudLLMError.disabledByPolicy, bundle: it) == "I modelli cloud sono disattivati dalla tua organizzazione.")
+        #expect(FailureText.message(for: CloudLLMError.disabledByPolicy, bundle: it) == "La tua organizzazione ha disattivato gli LLM cloud.")
         #expect(FailureText.message(for: CloudLLMError.tokenBudgetExceeded(provider: .anthropic, used: 9, limit: 5), bundle: it)
             == "La trascrizione è troppo lunga per Anthropic (9 token, limite 5).")
         #expect(FailureText.message(for: LanguageModelFactory.Failure.notAvailable("Apple Intelligence isn't available right now."), bundle: it)
             == "Apple Intelligence non è disponibile al momento.")
         #expect(FailureText.message(for: SummaryService.FailureReason.modelError("Cloud LLMs are disabled by your organization."), bundle: it)
-            == "Riepilogo non riuscito: I modelli cloud sono disattivati dalla tua organizzazione.")
+            == "Riepilogo non riuscito: La tua organizzazione ha disattivato gli LLM cloud.")
         #expect(FailureText.message(for: TranscriptChatSession.FailureReason.modelError("Boom"), bundle: it) == "Chat non riuscita: Boom")
         #expect(FailureText.message(for: LibraryStore.LibraryError.inTrash("x"), bundle: it)
             == "Questa trascrizione è in Eliminati di recente. Ripristinala per aprirla.")
@@ -146,11 +146,93 @@ struct FailureTextTests {
         #endif
     }
 
+    @Test("Core's fixed sentences are matched through its constants")
+    func fixedSentences() throws {
+        let it = try bundle("it")
+        let constants = [
+            FixedFailureText.modelDownloadsDisabled, FixedFailureText.englishOnly, FixedFailureText.fileIsEmpty,
+            FixedFailureText.noAudioToReplace, FixedFailureText.historyMustEndWithUserTurn, FixedFailureText.engineModelNotLoaded,
+            FixedFailureText.speakerModelUnavailable, FixedFailureText.noResults, FixedFailureText.emptyResultSet,
+            FixedFailureText.microphoneUnavailable, FixedFailureText.microphoneNotStarted, FixedFailureText.appleIntelligenceUnsupportedDevice,
+            FixedFailureText.appleIntelligenceOff, FixedFailureText.appleIntelligencePreparing,
+            FixedFailureText.appleIntelligenceUnavailable, FixedFailureText.appleIntelligenceNeedsNewerOS,
+            FixedFailureText.engineDisabled("Parakeet"), FixedFailureText.cannotTranslate("Parakeet"),
+            FixedFailureText.cannotLabelSpeakers("Parakeet"), FixedFailureText.documentTooNew(version: 9),
+        ]
+        for text in constants { #expect(FailureText.reason(text, bundle: it) != text, "\(text)") }
+    }
+
+    @Test("the engine checks a transcription session makes are translated")
+    func sessionSentences() throws {
+        let it = try bundle("it")
+        #expect(FailureText.message(for: ParolaError.unsupportedForEngine(FixedFailureText.cannotTranslate("Parakeet")), bundle: it)
+            == "Questo motore non traduce. Scegli un modello Whisper.")
+        #expect(FailureText.message(for: ParolaError.unsupportedForEngine(FixedFailureText.cannotLabelSpeakers("Parakeet")), bundle: it)
+            == "Parakeet non sa distinguere gli speaker.")
+        #expect(FailureText.message(for: ParolaError.policyRestricted(FixedFailureText.englishOnly), bundle: it)
+            == "La tua organizzazione limita la trascrizione all'inglese.")
+        #expect(FailureText.message(for: ParolaError.policyRestricted(FixedFailureText.engineDisabled("Parakeet")), bundle: it)
+            == "La tua organizzazione ha disattivato il motore Parakeet.")
+        #expect(FailureText.message(for: ParolaError.captureUnavailable(FixedFailureText.microphoneUnavailable), bundle: it)
+            == "Registrazione audio non disponibile: Il microfono non è disponibile. Controlla che Parola possa usarlo in Impostazioni di Sistema → Privacy e sicurezza → Microfono.")
+        #expect(FailureText.reason(FixedFailureText.microphoneNotStarted, bundle: it)
+            == "Il microfono non è disponibile. Controlla che Parola possa usarlo in Impostazioni di Sistema → Privacy e sicurezza → Microfono.")
+    }
+
+    @Test("a capture failure reaching a live take is translated through its reason")
+    func capturePrefix() throws {
+        let it = try bundle("it")
+        #expect(FailureText.reason(ParolaError.captureUnavailable(FixedFailureText.microphoneUnavailable).description, bundle: it)
+            == "Registrazione audio non disponibile: Il microfono non è disponibile. Controlla che Parola possa usarlo in Impostazioni di Sistema → Privacy e sicurezza → Microfono.")
+    }
+
+    @Test("a missing video reads as a missing file, and other audio failures keep their reason")
+    func audioLoad() throws {
+        let it = try bundle("it")
+        let url = URL(fileURLWithPath: "/tmp/clip.mp4")
+        #expect(FailureText.message(for: ParolaError.audioLoadFailed(url, underlying: FixedFailureText.videoMissing), bundle: it)
+            == "Parola non è riuscita a trovare clip.mp4.")
+        #expect(FailureText.message(for: ParolaError.audioLoadFailed(url, underlying: FixedFailureText.fileIsEmpty), bundle: it)
+            == "Parola non è riuscita a caricare l'audio di clip.mp4. Il file è vuoto.")
+    }
+
+    @Test("a delete failure drops Core's own lead-in, and a failed download isn't framed twice")
+    func modelFailures() throws {
+        let it = try bundle("it")
+        #expect(FailureText.message(for: ParolaError.ioError("Failed to delete small: Operation not permitted"), bundle: it)
+            == "Operation not permitted")
+        let failed = ParolaError.modelDownloadFailed("small", underlying: "boom")
+        #expect(AppModel.downloadFailureMessage(for: failed, bundle: it) == "Impossibile scaricare il modello small: boom")
+        #expect(AppModel.downloadFailureMessage(for: Unlisted(), bundle: it) == "Download non riuscito: Something only the system knows.")
+    }
+
+    @Test("a batch job's failure is worded from its error")
+    func batchError() throws {
+        let it = try bundle("it")
+        let event = BatchEvent.failed(jobID: UUID(), reason: "x", error: ParolaError.fileMissing(URL(fileURLWithPath: "/tmp/a.m4a")))
+        guard case .failed(_, _, let error?) = event else { Issue.record("no error"); return }
+        #expect(FailureText.message(for: error, bundle: it) == "Parola non è riuscita a trovare a.m4a.")
+    }
+
+    @Test("what the dictation recorder throws is already worded")
+    func presented() throws {
+        let error = FailureText.presented(ParolaError.invalidLanguage("xx"))
+        #expect(error.localizedDescription == FailureText.message(for: ParolaError.invalidLanguage("xx")))
+        #expect(FailureText.presented(CancellationError()) is CancellationError)
+    }
+
+    @Test("Apple Intelligence reasons shown in the app are translated")
+    func aiReason() throws {
+        let it = try bundle("it")
+        #expect(FailureText.reason("Apple Intelligence is off. Turn it on in Settings to use this feature.", bundle: it)
+            == "Apple Intelligence è disattivata. Attivala in Impostazioni di Sistema per usare questa funzione.")
+    }
+
     @Test("batch rows translate the feature-off reason")
     func batchReason() throws {
         let it = try bundle("it")
         #expect(FailureText.reason(ParolaError.featureDisabled(.batch).description, bundle: it)
-            == "Disattivato in questa installazione: Trascrizione in batch.")
+            == "Funzione disattivata dalla tua organizzazione: Trascrizione in batch.")
     }
 
     @Test("the library line says entry or entries")

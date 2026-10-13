@@ -67,6 +67,17 @@
         }
       }
     },
+    "%@ can't label speakers.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ non sa distinguere gli speaker."
+          }
+        }
+      }
+    },
     "%@ can't stream Live Captions. Pick a Whisper model first.": {
       "extractionState": "manual",
       "localizations": {
@@ -128,7 +139,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@ ha smesso di rispondere a metà: %@"
+            "value": "Risposta di %@ interrotta: %@"
           }
         }
       }
@@ -139,7 +150,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Disattivato in questa installazione: %@."
+            "value": "Funzione disattivata dalla tua organizzazione: %@."
           }
         }
       }
@@ -2205,7 +2216,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Apple Intelligence è disattivata. Attivala nelle Impostazioni per usare questa funzione."
+            "value": "Apple Intelligence è disattivata. Attivala in Impostazioni di Sistema per usare questa funzione."
           }
         }
       }
@@ -2216,7 +2227,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Apple Intelligence sta ancora preparando il suo modello. Riprova tra poco."
+            "value": "Apple Intelligence sta ancora preparando il modello. Riprova tra poco."
           }
         }
       }
@@ -2238,7 +2249,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Apple Intelligence richiede macOS 26 o iOS 26, o versioni successive."
+            "value": "Apple Intelligence richiede macOS 26, iOS 26 o versioni successive."
           }
         }
       }
@@ -4186,7 +4197,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "I modelli cloud sono disattivati dalla tua organizzazione."
+            "value": "La tua organizzazione ha disattivato gli LLM cloud."
           }
         }
       }
@@ -5732,7 +5743,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Scaricamento non riuscito: %@"
+            "value": "Download non riuscito: %@"
           }
         }
       }
@@ -9248,7 +9259,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Registrazione riunioni"
+            "value": "Registrazione delle riunioni"
           }
         }
       }
@@ -9507,7 +9518,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Lo scaricamento dei modelli è disattivato da un criterio gestito."
+            "value": "La tua organizzazione ha disattivato il download dei modelli."
           }
         }
       }
@@ -11629,13 +11640,13 @@
         }
       }
     },
-    "Parola couldn't load the audio from %@.": {
+    "Parola couldn't load the audio from %@. %@": {
       "extractionState": "manual",
       "localizations": {
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Parola non è riuscita a caricare l'audio da %@."
+            "value": "Parola non è riuscita a caricare l'audio di %@. %@"
           }
         }
       }
@@ -11646,7 +11657,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Parola non riesce a raggiungere %@. Scegli di nuovo la cartella nelle impostazioni di Invia a."
+            "value": "Parola non raggiunge %@. Scegli di nuovo la cartella in Impostazioni › Invia a."
           }
         }
       }
@@ -11734,7 +11745,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Parola sta già inviando quella trascrizione a %@."
+            "value": "Parola sta già inviando questa trascrizione a %@."
           }
         }
       }
@@ -11822,7 +11833,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Parola ha smesso di provare a inviare a %@."
+            "value": "Parola ha smesso di riprovare l'invio a %@."
           }
         }
       }
@@ -16754,7 +16765,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Questa destinazione non è più nelle impostazioni di Invia a."
+            "value": "Questa destinazione non è più in Impostazioni › Invia a."
           }
         }
       }
@@ -16798,7 +16809,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Il motore %@ è disattivato da un criterio gestito."
+            "value": "La tua organizzazione ha disattivato il motore %@."
           }
         }
       }
@@ -16968,13 +16979,24 @@
         }
       }
     },
+    "The microphone isn't available. Check that Parola can use it in System Settings → Privacy & Security → Microphone.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il microfono non è disponibile. Controlla che Parola possa usarlo in Impostazioni di Sistema → Privacy e sicurezza → Microfono."
+          }
+        }
+      }
+    },
     "The model %@ isn't downloaded yet. Download it in Settings › Local Models.": {
       "extractionState": "manual",
       "localizations": {
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Il modello %@ non è ancora scaricato. Scaricalo da Impostazioni › Modelli locali."
+            "value": "Il modello %@ non è ancora stato scaricato. Scaricalo da Impostazioni › Modelli locali."
           }
         }
       }
@@ -17118,7 +17140,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "La registrazione ha smesso di salvarsi a metà (%@). Quello che era già salvato si trova in %@."
+            "value": "Il salvataggio della registrazione si è interrotto (%@). La parte già salvata si trova in %@."
           }
         }
       }
@@ -17174,6 +17196,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Il sito ha rifiutato il download."
+          }
+        }
+      }
+    },
+    "The speaker labelling model isn't available.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il modello per distinguere gli speaker non è disponibile."
           }
         }
       }
@@ -17535,6 +17568,17 @@
         }
       }
     },
+    "This engine can't translate. Pick a Whisper model.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questo motore non traduce. Scegli un modello Whisper."
+          }
+        }
+      }
+    },
     "This is a test note from Parola.": {
       "extractionState": "manual",
       "localizations": {
@@ -17586,17 +17630,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Questa registrazione è stata eliminata. Ripristinala da Eliminati di recente per riprovare."
-          }
-        }
-      }
-    },
-    "This speech engine can't translate. Pick a Whisper model.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Questo motore vocale non sa tradurre. Scegli un modello Whisper."
           }
         }
       }
@@ -18501,6 +18534,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Trascrizione non riuscita: %@"
+          }
+        }
+      }
+    },
+    "Transcription is restricted to English by a managed policy.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La tua organizzazione limita la trascrizione all'inglese."
           }
         }
       }

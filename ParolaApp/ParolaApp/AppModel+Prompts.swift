@@ -207,7 +207,7 @@ extension AppModel {
         guard features.isEnabled(.ai) else { return }
         Task { [weak self] in
             let availability = await LanguageModelFactory.onDeviceAvailability()
-            self?.aiUnavailableReason = availability.reason
+            self?.aiUnavailableReason = availability.reason.map { FailureText.reason($0) }
         }
     }
 

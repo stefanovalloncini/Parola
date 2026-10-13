@@ -2,7 +2,18 @@ import Foundation
 import ParolaCore
 
 /// The app's wording for the failures ParolaCore throws. Core keeps its English text for the CLI and MCP.
+/// A failure already worded for the person, for code in ParolaCore that shows `localizedDescription` as it is.
+struct PresentedFailure: LocalizedError {
+    let message: String
+    var errorDescription: String? { message }
+}
+
 enum FailureText {
+    nonisolated static func presented(_ error: any Error) -> any Error {
+        if error is CancellationError || error is PresentedFailure { return error }
+        return PresentedFailure(message: message(for: error))
+    }
+
     nonisolated static func message(for error: any Error, bundle: Bundle = .main) -> String {
         switch error {
         case let error as ParolaError: return parola(error, bundle: bundle)
@@ -73,8 +84,9 @@ enum FailureText {
             return String(localized: "Failed to download model \(name): \(underlying)", bundle: bundle)
         case .modelChecksumMismatch:
             return String(localized: "A downloaded file failed its integrity check. Download the model again.", bundle: bundle)
-        case .audioLoadFailed(let url, _):
-            return String(localized: "Parola couldn't load the audio from \(url.lastPathComponent).", bundle: bundle)
+        case .audioLoadFailed(let url, let underlying):
+            if underlying == FixedFailureText.videoMissing { return parola(.fileMissing(url), bundle: bundle) }
+            return String(localized: "Parola couldn't load the audio from \(url.lastPathComponent). \(reason(underlying, bundle: bundle))", bundle: bundle)
         case .fileMissing(let url):
             return String(localized: "Parola couldn't find \(url.lastPathComponent).", bundle: bundle)
         case .transcriptionFailed(let text), .engineLoadFailed(let text):
@@ -183,29 +195,35 @@ enum FailureText {
         if text == LibraryStore.LibraryError.inTrash("").errorDescription { return library(.inTrash(""), bundle: bundle) }
         if text == CloudLLMError.disabledByPolicy.errorDescription { return cloud(.disabledByPolicy, bundle: bundle) }
         switch text {
-        case "The file is empty.":
+        case FixedFailureText.fileIsEmpty:
             return String(localized: "The file is empty.", bundle: bundle)
-        case "This entry has no audio to replace.":
+        case FixedFailureText.noAudioToReplace:
             return String(localized: "This transcript has no audio to replace.", bundle: bundle)
-        case "Model downloads are disabled by a managed policy.":
+        case FixedFailureText.modelDownloadsDisabled:
             return String(localized: "Model downloads are disabled by a managed policy.", bundle: bundle)
-        case "History must end with a user turn.":
+        case FixedFailureText.englishOnly:
+            return String(localized: "Transcription is restricted to English by a managed policy.", bundle: bundle)
+        case FixedFailureText.historyMustEndWithUserTurn:
             return String(localized: "The conversation has to end with your message.", bundle: bundle)
-        case "This device doesn't support Apple Intelligence.":
+        case FixedFailureText.appleIntelligenceUnsupportedDevice:
             return String(localized: "This device doesn't support Apple Intelligence.", bundle: bundle)
-        case "Apple Intelligence is off. Turn it on in Settings to use this feature.":
+        case FixedFailureText.appleIntelligenceOff:
             return String(localized: "Apple Intelligence is off. Turn it on in Settings to use this feature.", bundle: bundle)
-        case "Apple Intelligence is still preparing its model. Try again in a little while.":
+        case FixedFailureText.appleIntelligencePreparing:
             return String(localized: "Apple Intelligence is still preparing its model. Try again in a little while.", bundle: bundle)
-        case "Apple Intelligence isn't available right now.":
+        case FixedFailureText.appleIntelligenceUnavailable:
             return String(localized: "Apple Intelligence isn't available right now.", bundle: bundle)
-        case "Apple Intelligence needs macOS 26 or iOS 26 or newer.":
+        case FixedFailureText.appleIntelligenceNeedsNewerOS:
             return String(localized: "Apple Intelligence needs macOS 26 or iOS 26 or newer.", bundle: bundle)
-        case "Apple Speech does not support translation", "Parakeet does not support translation":
-            return String(localized: "This speech engine can't translate. Pick a Whisper model.", bundle: bundle)
-        case "model not loaded", "Parakeet model not loaded", "Apple Speech engine not loaded", "SpeakerKit unavailable":
+        case FixedFailureText.microphoneUnavailable, FixedFailureText.microphoneNotStarted:
+            return String(localized: "The microphone isn't available. Check that Parola can use it in System Settings → Privacy & Security → Microphone.", bundle: bundle)
+        case FixedFailureText.speakerModelUnavailable:
+            return String(localized: "The speaker labelling model isn't available.", bundle: bundle)
+        case "Apple Speech does not support translation":
+            return String(localized: "This engine can't translate. Pick a Whisper model.", bundle: bundle)
+        case FixedFailureText.engineModelNotLoaded, "Parakeet model not loaded", "Apple Speech engine not loaded":
             return String(localized: "The speech model isn't loaded.", bundle: bundle)
-        case "WhisperKit returned no results", "WhisperKit returned an empty result set":
+        case FixedFailureText.noResults, FixedFailureText.emptyResultSet:
             return String(localized: "The model didn't return any text.", bundle: bundle)
         default:
             return nil
@@ -213,12 +231,31 @@ enum FailureText {
     }
 
     private nonisolated static func patternedReason(_ text: String, bundle: Bundle) -> String? {
-        if text.hasPrefix("The "), text.hasSuffix(" engine is disabled by a managed policy.") {
-            let name = text.dropFirst("The ".count).dropLast(" engine is disabled by a managed policy.".count)
-            return String(localized: "The \(String(name)) engine is disabled by a managed policy.", bundle: bundle)
+        let policy = " engine is disabled by a managed policy."
+        if text.hasPrefix("The "), text.hasSuffix(policy) {
+            let name = String(text.dropFirst("The ".count).dropLast(policy.count))
+            return String(localized: "The \(name) engine is disabled by a managed policy.", bundle: bundle)
+        }
+        for ending in [" does not support translation.", " does not support translation"] where text.hasSuffix(ending) {
+            return String(localized: "This engine can't translate. Pick a Whisper model.", bundle: bundle)
+        }
+        let labels = " does not support speaker labels."
+        if text.hasSuffix(labels) {
+            return String(localized: "\(String(text.dropLast(labels.count))) can't label speakers.", bundle: bundle)
         }
         if text.hasPrefix("Parola document version "), text.hasSuffix(" is newer than this app understands.") {
             return String(localized: "This transcript was saved by a newer version of Parola.", bundle: bundle)
+        }
+        if text.hasPrefix("Failed to delete "), let colon = text.range(of: ": ") {
+            return reason(String(text[colon.upperBound...]), bundle: bundle)
+        }
+        let capture = "Audio capture unavailable: "
+        if text.hasPrefix(capture) {
+            return String(localized: "Audio capture unavailable: \(reason(String(text.dropFirst(capture.count)), bundle: bundle))", bundle: bundle)
+        }
+        let transcription = "Transcription failed: "
+        if text.hasPrefix(transcription) {
+            return String(localized: "Transcription failed: \(reason(String(text.dropFirst(transcription.count)), bundle: bundle))", bundle: bundle)
         }
         return nil
     }

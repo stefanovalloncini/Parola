@@ -37,7 +37,7 @@ struct FeatureGateSeamTests {
         var finished = false
         for await event in await queue.process(jobs: jobs, options: TranscriptionOptions()) {
             switch event {
-            case .failed(_, let reason):
+            case .failed(_, let reason, _):
                 failed += 1
                 #expect(reason.contains("disabled in this deployment"))
             case .finished:

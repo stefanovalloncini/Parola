@@ -45,7 +45,7 @@ struct BatchQueueTests {
         var sawFinished = false
         for await event in events {
             switch event {
-            case .failed(let id, _): failedOrder.append(id)
+            case .failed(let id, _, _): failedOrder.append(id)
             case .finished: sawFinished = true
             default: break
             }
@@ -210,7 +210,7 @@ struct BatchQueueTests {
             switch event {
             case .started(let id): started.append(id)
             case .completed(let id, _): completed.append(id)
-            case .failed(let id, _), .cancelled(let id), .progress(let id, _): mentioned.insert(id)
+            case .failed(let id, _, _), .cancelled(let id), .progress(let id, _): mentioned.insert(id)
             case .finished: break
             }
         }

@@ -87,7 +87,7 @@ struct AIServicesPane: View {
 
     private var onDeviceStatus: String {
         guard let onDevice else { return String(localized: "Checking…") }
-        return onDevice.reason ?? String(localized: "Ready")
+        return onDevice.reason.map { FailureText.reason($0) } ?? String(localized: "Ready")
     }
 
     // MARK: - Configured services

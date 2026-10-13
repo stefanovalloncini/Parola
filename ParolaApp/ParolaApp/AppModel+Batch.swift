@@ -79,9 +79,10 @@ extension AppModel {
             if let job = batchJobs.first(where: { $0.id == id }) {
                 land(.batchJob(job, transcript: processed))
             }
-        case .failed(let id, let reason):
+        case .failed(let id, let reason, let error):
             guard !isCancelled(id) else { return }
-            mutateBatchJob(id) { $0.status = .failed; $0.error = reason }
+            let message = error.map { FailureText.message(for: $0) } ?? FailureText.reason(reason)
+            mutateBatchJob(id) { $0.status = .failed; $0.error = message }
         case .cancelled(let id):
             mutateBatchJob(id) { $0.status = .cancelled }
         case .finished:

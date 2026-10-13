@@ -25,7 +25,7 @@ actor DiarizationService {
             }
         }
         guard let kit = speakerKit else {
-            throw ParolaError.engineLoadFailed("SpeakerKit unavailable")
+            throw ParolaError.engineLoadFailed(FixedFailureText.speakerModelUnavailable)
         }
 
         let audioArray: [Float]

@@ -297,7 +297,7 @@ struct FoundationLanguageModel: LanguageModel {
 
     private func makeSession(history: [ChatTurn]) throws -> (LanguageModelSession, String) {
         guard let last = history.last, last.role == .user else {
-            throw TranscriptChatSession.FailureReason.modelError("History must end with a user turn.")
+            throw TranscriptChatSession.FailureReason.modelError(FixedFailureText.historyMustEndWithUserTurn)
         }
         var entries: [FoundationModels.Transcript.Entry] = []
         entries.append(.instructions(

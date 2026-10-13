@@ -1211,7 +1211,7 @@ public actor LibraryStore {
         }
         let manifest = try makeEntry(bundleURL: bundleURL).manifest
         guard let current = ParolaDocument.audioURL(in: bundleURL, manifest: manifest) else {
-            throw ParolaError.ioError("This entry has no audio to replace.")
+            throw ParolaError.ioError(FixedFailureText.noAudioToReplace)
         }
         cachedLoaded.remove(id)
         let duration = try await offActorThrowingIO {
@@ -1534,7 +1534,7 @@ public actor LibraryStore {
         let data = try Data(contentsOf: manifestURL)
         let manifest = try decoder.decode(ParolaDocument.Manifest.self, from: data)
         guard manifest.version <= ParolaDocument.Manifest.currentVersion else {
-            throw ParolaError.ioError("Parola document version \(manifest.version) is newer than this app understands.")
+            throw ParolaError.ioError(FixedFailureText.documentTooNew(version: manifest.version))
         }
         return LibraryEntry(id: Self.entryID(for: bundleURL), bundleURL: bundleURL, manifest: manifest)
     }

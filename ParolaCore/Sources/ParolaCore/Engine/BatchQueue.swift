@@ -52,9 +52,14 @@ public enum BatchEvent: Sendable {
     case started(jobID: UUID)
     case progress(jobID: UUID, fraction: Double)
     case completed(jobID: UUID, transcript: Transcript)
-    case failed(jobID: UUID, reason: String)
+    /// `reason` is the line the CLI prints; `error` lets a front end word the failure itself.
+    case failed(jobID: UUID, reason: String, error: (any Error)?)
     case cancelled(jobID: UUID)
     case finished
+
+    public static func failed(jobID: UUID, reason: String) -> BatchEvent {
+        .failed(jobID: jobID, reason: reason, error: nil)
+    }
 }
 
 /// Sequentially transcribes a list of files through a single ``TranscriptionSession``.
@@ -176,7 +181,7 @@ public actor BatchQueue {
                         .error: .error(error),
                     ]
                 )
-                continuation.yield(.failed(jobID: job.id, reason: String(describing: error)))
+                continuation.yield(.failed(jobID: job.id, reason: String(describing: error), error: error))
             }
         }
         ParolaLog.info(

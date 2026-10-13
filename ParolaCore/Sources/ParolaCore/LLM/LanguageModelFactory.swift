@@ -204,11 +204,11 @@ public enum LanguageModelFactory {
             case .unavailable(let reason):
                 return unavailableMessage(for: reason)
             @unknown default:
-                return "Apple Intelligence isn't available right now."
+                return FixedFailureText.appleIntelligenceUnavailable
             }
         }
         #endif
-        return "Apple Intelligence needs macOS 26 or iOS 26 or newer."
+        return FixedFailureText.appleIntelligenceNeedsNewerOS
     }
 
     /// The one check every on-device path makes before it talks to the model, and the one error it throws.
@@ -237,7 +237,7 @@ public enum LanguageModelFactory {
             return FoundationLanguageModel(instructions: instructions)
         }
         #endif
-        throw Failure.notAvailable("Apple Intelligence needs macOS 26 or iOS 26 or newer.")
+        throw Failure.notAvailable(FixedFailureText.appleIntelligenceNeedsNewerOS)
     }
 
     /// Whether `error` says the input was too long for the model's window, in any provider's words.
@@ -262,13 +262,13 @@ public enum LanguageModelFactory {
     public static func unavailableMessage(for reason: SystemLanguageModel.Availability.UnavailableReason) -> String {
         switch reason {
         case .deviceNotEligible:
-            return "This device doesn't support Apple Intelligence."
+            return FixedFailureText.appleIntelligenceUnsupportedDevice
         case .appleIntelligenceNotEnabled:
-            return "Apple Intelligence is off. Turn it on in Settings to use this feature."
+            return FixedFailureText.appleIntelligenceOff
         case .modelNotReady:
-            return "Apple Intelligence is still preparing its model. Try again in a little while."
+            return FixedFailureText.appleIntelligencePreparing
         @unknown default:
-            return "Apple Intelligence isn't available right now."
+            return FixedFailureText.appleIntelligenceUnavailable
         }
     }
     #endif
