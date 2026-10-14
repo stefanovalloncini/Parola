@@ -26,6 +26,13 @@ actor ParakeetTranscriber: Transcriber {
         return supportedLanguages(forModel: model).allows(language)
     }
 
+    nonisolated static func languageRejection(_ language: String, model: String) -> ParolaError {
+        let label = ModelCatalog.variant(id: model)?.displayName ?? model
+        return .unsupportedForEngine("\(label) does not support \"\(language)\"")
+    }
+
+    nonisolated static let translationRejection = ParolaError.unsupportedForEngine("Parakeet does not support translation")
+
     /// The language a finished run is stamped with, and what the run can tell the user about it —
     /// nothing when they named it or the model speaks only English, which was never choosing. A
     /// guess is clamped to what the model speaks: an unsupported one is rejected by this very
@@ -49,26 +56,38 @@ actor ParakeetTranscriber: Transcriber {
         let interval = signposter.beginInterval("load", "model=\(model, privacy: .public)")
         defer { signposter.endInterval("load", interval) }
 
-        let version = try Self.modelVersion(for: model)
-        let targetDir = modelStore.installedURL(for: model)
-        try FileManager.default.createDirectory(at: targetDir, withIntermediateDirectories: true)
         // A switch lets the old model go first, so the two are never resident together.
         manager = nil
         loadedModel = nil
 
+        let models = try await Self.loadModels(for: model, in: modelStore)
         do {
-            let models = try await AsrModels.downloadAndLoad(to: targetDir, version: version)
             let asr = AsrManager(config: .default)
             try await asr.loadModels(models)
             self.manager = asr
             self.loadedModel = model
         } catch {
-            ParolaLog.error(
-                .engineParakeet, "model \(ModelToken(model)) failed to load",
-                [.error: .error(error)]
-            )
-            throw ParolaError.engineLoadFailed("Parakeet load failed: \(error.localizedDescription)")
+            throw Self.loadFailure(error, model: model)
         }
+    }
+
+    static func loadModels(for model: String, in store: ModelStore) async throws -> AsrModels {
+        let version = try modelVersion(for: model)
+        let targetDir = store.installedURL(for: model)
+        try FileManager.default.createDirectory(at: targetDir, withIntermediateDirectories: true)
+        do {
+            return try await AsrModels.downloadAndLoad(to: targetDir, version: version)
+        } catch {
+            throw loadFailure(error, model: model)
+        }
+    }
+
+    private static func loadFailure(_ error: any Error, model: String) -> ParolaError {
+        ParolaLog.error(
+            .engineParakeet, "model \(ModelToken(model)) failed to load",
+            [.error: .error(error)]
+        )
+        return ParolaError.engineLoadFailed("Parakeet load failed: \(error.localizedDescription)")
     }
 
     func transcribe(
@@ -82,12 +101,11 @@ actor ParakeetTranscriber: Transcriber {
         }
         if let lang = options.language, !Self.accepts(language: lang, forModel: modelName) {
             ParolaLog.notice(.engineParakeet, "rejected language \(LanguageToken(lang))")
-            let label = ModelCatalog.variant(id: modelName)?.displayName ?? modelName
-            throw ParolaError.unsupportedForEngine("\(label) does not support \"\(lang)\"")
+            throw Self.languageRejection(lang, model: modelName)
         }
         if options.task == .translate {
             ParolaLog.notice(.engineParakeet, "rejected translate: unsupported")
-            throw ParolaError.unsupportedForEngine("Parakeet does not support translation")
+            throw Self.translationRejection
         }
         let interval = signposter.beginInterval("transcribe", "model=\(modelName, privacy: .public)")
         defer { signposter.endInterval("transcribe", interval) }
@@ -245,10 +263,23 @@ actor ParakeetTranscriber: Transcriber {
     static let segmentGapThreshold: TimeInterval = 0.8
     static let maxTokensPerSegment: Int = 80
 
+    /// Extra places a run is cut. Live captions need short segments so confirmation can keep up with nonstop speech.
+    struct SegmentSplitting: Sendable {
+        var endsOnSentenceEnd = false
+        var maxSpanSeconds: TimeInterval?
+
+        static let batch = SegmentSplitting()
+        static let captions = SegmentSplitting(endsOnSentenceEnd: true, maxSpanSeconds: 7)
+    }
+
+    private static let sentenceEnders: Set<Character> = [".", "?", "!", "…"]
+
     /// Group token timings into segments. Splits on silence gaps over `segmentGapThreshold`
     /// seconds or when a run reaches `maxTokensPerSegment`. Falls back to a single segment
     /// containing the full text.
-    static func makeSegments(from result: ASRResult, includeWords: Bool) -> [TranscriptSegment] {
+    static func makeSegments(
+        from result: ASRResult, includeWords: Bool, splitting: SegmentSplitting = .batch
+    ) -> [TranscriptSegment] {
         let trimmedText = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let timings = result.tokenTimings, !timings.isEmpty else {
             guard !trimmedText.isEmpty else { return [] }
@@ -289,15 +320,18 @@ actor ParakeetTranscriber: Transcriber {
             currentTokens.removeAll()
         }
 
-        for timing in timings {
-            if !currentTokens.isEmpty {
+        for (index, timing) in timings.enumerated() {
+            if let first = currentTokens.first {
                 let gap = timing.startTime - lastEnd
-                if gap > segmentGapThreshold || currentTokens.count >= maxTokensPerSegment {
+                let overSpan = splitting.maxSpanSeconds.map { timing.endTime - first.startTime > $0 } ?? false
+                if gap > segmentGapThreshold || currentTokens.count >= maxTokensPerSegment || overSpan {
                     flush()
                 }
             }
             currentTokens.append(timing)
             lastEnd = timing.endTime
+            let next = index + 1 < timings.count ? timings[index + 1] : nil
+            if splitting.endsOnSentenceEnd, endsSentence(timing, before: next) { flush() }
         }
         flush()
 
@@ -305,6 +339,11 @@ actor ParakeetTranscriber: Transcriber {
             return [TranscriptSegment(id: 0, start: 0, end: result.duration, text: trimmedText, words: nil)]
         }
         return segments
+    }
+
+    private static func endsSentence(_ token: TokenTiming, before next: TokenTiming?) -> Bool {
+        guard let last = token.token.last(where: { !$0.isWhitespace }), sentenceEnders.contains(last) else { return false }
+        return next.map { $0.token.first?.isWhitespace ?? false } ?? true
     }
 
     struct WordPiece: Sendable {

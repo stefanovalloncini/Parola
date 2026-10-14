@@ -25,6 +25,10 @@ actor StreamingRealtimeLoop {
         var maxModelWaitOnStop: Duration = .seconds(120)
         /// How far held audio may run past `maxWindowSeconds` during the model load before it's cut back, so the cut isn't paid per buffer.
         var preModelSlackSeconds: Double = 5
+        /// A segment ending this long before the end of the decoded window is confirmed even while held back. Nil leaves confirmation to the holdback alone.
+        var forceConfirmAfterSeconds: Double?
+        /// A decode never starts earlier than this long before the end of the window. Nil decodes from the oldest unconfirmed audio.
+        var maxDecodeSeconds: Double?
     }
 
     typealias Transcribe = @Sendable ([Float], DecodingOptions, @escaping TranscriptionCallback) async throws -> TranscriptionResult
@@ -534,9 +538,10 @@ actor StreamingRealtimeLoop {
         let decoded = samples ?? window
         let offsetSeconds = Double(windowStartSample) / Double(config.sampleRate)
         let decodedEndSeconds = Float(offsetSeconds + Double(decoded.count) / Double(config.sampleRate))
+        confirmStaleSegments(decodedEnd: Double(decodedEndSeconds))
         var options = decoder.options
         // clipTimestamps is window-relative; everything emitted from here back out must be absolute.
-        options.clipTimestamps = [Float(max(0, retainedFloorSeconds - offsetSeconds))]
+        options.clipTimestamps = [Float(max(0, decodeFloorSeconds(decodedEnd: Double(decodedEndSeconds)) - offsetSeconds))]
         let emitProgressPartials = unconfirmedSegments.isEmpty
         let onPartial = self.onPartial
         let compressionCheckWindow = config.compressionCheckWindow
@@ -580,22 +585,54 @@ actor StreamingRealtimeLoop {
                 onConfirmed(makeBatch(segments))
             }
             unconfirmedSegments = []
-        } else if segments.count > config.requiredSegmentsForConfirmation {
+        } else if confirmCount(of: segments, decodedEnd: decodedEndSeconds) > 0 {
+            let held = confirmCount(of: segments, decodedEnd: decodedEndSeconds)
             // Whisper timestamps sometimes regress: anything ending at or before the watermark was already delivered, and the purge math needs the watermark to only move forward.
-            let confirmable = segments.prefix(segments.count - config.requiredSegmentsForConfirmation)
+            let confirmable = segments.prefix(held)
                 .filter { $0.end > lastConfirmedEndSeconds }
             if let furthestEnd = confirmable.map(\.end).max() {
                 // Whisper pads the window to 30 s, so an end past the audio actually decoded is a hallucinated timestamp: taking it would start the next decode beyond speech nobody has read yet.
                 lastConfirmedEndSeconds = max(lastConfirmedEndSeconds, min(furthestEnd, decodedEndSeconds))
                 onConfirmed(makeBatch(confirmable))
             }
-            unconfirmedSegments = Array(segments.suffix(config.requiredSegmentsForConfirmation))
+            unconfirmedSegments = Array(segments.dropFirst(held))
         } else {
             unconfirmedSegments = segments
         }
         emitPartial()
         purgeConfirmedAudio()
         return false
+    }
+
+    private func confirmCount(of segments: [TranscriptionSegment], decodedEnd: Float) -> Int {
+        let held = max(0, segments.count - config.requiredSegmentsForConfirmation)
+        guard let age = config.forceConfirmAfterSeconds else { return held }
+        let cutoff = decodedEnd - Float(age)
+        return max(held, segments.prefix { $0.end < cutoff }.count)
+    }
+
+    private func decodeFloorSeconds(decodedEnd: Double) -> Double {
+        guard let maxDecode = config.maxDecodeSeconds else { return retainedFloorSeconds }
+        return max(retainedFloorSeconds, decodedEnd - maxDecode)
+    }
+
+    /// Held-back segments the next decode could no longer reach: too old to wait for a successor, or before the part of the window it decodes.
+    private func confirmStaleSegments(decodedEnd: Double) {
+        guard let age = config.forceConfirmAfterSeconds, !unconfirmedSegments.isEmpty else { return }
+        let reach = decodedEnd - (config.maxDecodeSeconds ?? .infinity)
+        let (stale, kept) = unconfirmedSegments.reduce(into: ([TranscriptionSegment](), [TranscriptionSegment]())) { split, segment in
+            if Double(segment.end) < decodedEnd - age || Double(segment.start) < reach {
+                split.0.append(segment)
+            } else {
+                split.1.append(segment)
+            }
+        }
+        guard !stale.isEmpty else { return }
+        if let furthest = stale.map(\.end).max() {
+            lastConfirmedEndSeconds = max(lastConfirmedEndSeconds, min(furthest, Float(decodedEnd)))
+        }
+        unconfirmedSegments = kept
+        onConfirmed(makeBatch(stale))
     }
 
     private func makeBatch(_ segments: [TranscriptionSegment]) -> ConfirmedAudioBatch {

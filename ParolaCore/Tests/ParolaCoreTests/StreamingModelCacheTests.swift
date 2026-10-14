@@ -25,6 +25,13 @@ actor LoadGate {
     }
 }
 
+extension StreamingModelLease {
+    var shared: SharedWhisperKit {
+        guard case .whisper(let shared) = payload else { preconditionFailure("not a Whisper lease") }
+        return shared
+    }
+}
+
 extension StreamingModelCache {
     static func makeUnloadedKit() async throws -> SharedWhisperKit {
         let kit = try await WhisperKit(WhisperKitConfig(

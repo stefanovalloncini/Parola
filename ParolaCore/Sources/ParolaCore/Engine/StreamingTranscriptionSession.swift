@@ -17,6 +17,12 @@ public protocol StreamingSpeakerLabeler: Sendable {
     ) async -> String?
 }
 
+/// What a streaming session is for. Captions are the only purpose a Parakeet model can serve.
+public enum StreamingPurpose: Sendable {
+    case take
+    case captions
+}
+
 /// Drives real-time microphone transcription with a windowed loop over WhisperKit's decoder.
 ///
 /// Lifecycle:
@@ -33,6 +39,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
 
     public let modelStore: ModelStore
     nonisolated let source: CaptionSource
+    nonisolated let purpose: StreamingPurpose
     nonisolated var deviceUID: String? { source.deviceUID }
     public nonisolated let levelMeter = LevelMeter()
 
@@ -53,6 +60,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
     private var allConfirmed: [TranscriptSegment] = []
     private var nextSegmentID: Int = 0
     private var loadedModel: String?
+    private var loadedEngine = EngineID.whisperKit
     private var optionsForRun: TranscriptionOptions?
     private var speakerLabeler: (any StreamingSpeakerLabeler)?
     private var failureAudioURL: URL?
@@ -70,11 +78,11 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
     /// for the model and decodes it. Otherwise a stop during the load drops that audio.
     public init(
         modelStore: ModelStore = .shared, persistAudio: Bool = false, deviceUID: String? = nil,
-        source: CaptionSource? = nil, waitsForModelOnStop: Bool = false
+        source: CaptionSource? = nil, waitsForModelOnStop: Bool = false, purpose: StreamingPurpose = .take
     ) {
         self.init(
             modelStore: modelStore, persistAudio: persistAudio, source: source ?? .microphone(deviceUID: deviceUID),
-            waitsForModelOnStop: waitsForModelOnStop, modelCache: .shared
+            waitsForModelOnStop: waitsForModelOnStop, purpose: purpose, modelCache: .shared
         )
     }
 
@@ -83,14 +91,16 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         persistAudio: Bool = false,
         source: CaptionSource = .microphone(deviceUID: nil),
         waitsForModelOnStop: Bool = false,
+        purpose: StreamingPurpose = .take,
         modelCache: StreamingModelCache,
         capture: (@Sendable (CaptionSource) -> CaptionCapture)? = nil,
-        makeDecoder: @escaping MakeDecoder = StreamingTranscriptionSession.whisperDecoder,
+        makeDecoder: @escaping MakeDecoder = StreamingTranscriptionSession.decoder(over:options:),
         clock: any Clock<Duration> = ContinuousClock()
     ) {
         self.modelStore = modelStore
         self.persistAudio = persistAudio
         self.source = source
+        self.purpose = purpose
         self.waitsForModelOnStop = persistAudio || waitsForModelOnStop
         self.modelCache = modelCache
         self.captureFor = capture ?? { CaptionCapture.live($0, clock: clock) }
@@ -136,16 +146,22 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         audioCutShort = false
 
         let modelName = options.model ?? ModelCatalog.fallbackModelID
-        if !ModelCatalog.canStream(id: modelName), let variant = ModelCatalog.variant(id: modelName) {
+        let engine = ModelCatalog.variant(id: modelName)?.engineID ?? .whisperKit
+        let allowed = purpose == .captions ? ModelCatalog.canCaption(id: modelName) : ModelCatalog.canStream(id: modelName)
+        if !allowed, let variant = ModelCatalog.variant(id: modelName) {
             ParolaLog.notice(.streaming, "engine \(variant.engineID) cannot stream")
             throw ParolaError.unsupportedForEngine(
                 "Live transcription runs on Whisper models; \(variant.displayName) can't stream. Pick a Whisper model and try again."
             )
         }
-        ParolaLog.info(
-            .streaming, "streaming session starting on whisperkit",
-            [.model: .safe(ModelToken(modelName))]
-        )
+        if engine == .parakeet {
+            try ParakeetStreamingDecoder.admit(options, model: modelName)
+        } else {
+            ParolaLog.info(
+                .streaming, "streaming session starting on whisperkit",
+                [.model: .safe(ModelToken(modelName))]
+            )
+        }
         let downloaded: Void? = try await loadingModel { [modelStore] in
             guard !modelStore.isInstalled(modelName) else { return }
             if await EngineRegistry.shared.registeredEngines().isEmpty {
@@ -162,11 +178,14 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         deniedText = capture.deniedText
         let persister = persistAudio ? StreamingAudioPersister(sampleRate: Double(WhisperKit.sampleRate)) : nil
         self.loadedModel = modelName
+        self.loadedEngine = engine
         let stream = launch(
             options: options, speakerLabeler: speakerLabeler, persister: persister
         ) { [modelCache, modelStore] sink, confirmed in
             StreamingRealtimeLoop(
-                configuration: .init(wantsConfirmedAudio: speakerLabeler != nil, waitsForModelOnStop: waitsForModelOnStop),
+                configuration: Self.loopConfiguration(
+                    engine: engine, wantsConfirmedAudio: speakerLabeler != nil, waitsForModelOnStop: waitsForModelOnStop
+                ),
                 dependencies: .init(
                     requestPermission: capture.requestPermission,
                     startCapture: { ingest in
@@ -198,6 +217,20 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         return try await streamOnceDecoding(stream)
     }
 
+    static func loopConfiguration(
+        engine: EngineID, wantsConfirmedAudio: Bool, waitsForModelOnStop: Bool
+    ) -> StreamingRealtimeLoop.Configuration {
+        var configuration = StreamingRealtimeLoop.Configuration(
+            wantsConfirmedAudio: wantsConfirmedAudio, waitsForModelOnStop: waitsForModelOnStop
+        )
+        if engine == .parakeet {
+            configuration.requiredSegmentsForConfirmation = 1
+            configuration.forceConfirmAfterSeconds = 8
+            configuration.maxDecodeSeconds = 15
+        }
+        return configuration
+    }
+
     /// Hands the stream over once decodes can run or the take ends first; a cancel or a failed load throws instead.
     private func streamOnceDecoding(_ stream: AsyncStream<StreamingEvent>) async throws -> AsyncStream<StreamingEvent> {
         guard let loop, let streamerTask else { return stream }
@@ -225,11 +258,23 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         return try makeDecoder(lease, options)
     }
 
+    static func decoder(
+        over lease: StreamingModelLease, options: TranscriptionOptions
+    ) throws -> StreamingRealtimeLoop.Decoder {
+        switch lease.payload {
+        case .whisper: try whisperDecoder(over: lease, options: options)
+        case .parakeet: try ParakeetStreamingDecoder.over(lease: lease, options: options)
+        }
+    }
+
     static func whisperDecoder(
         over lease: StreamingModelLease, options: TranscriptionOptions
     ) throws -> StreamingRealtimeLoop.Decoder {
         let modelName = lease.modelName
-        let kit = lease.shared.kit
+        guard case .whisper(let shared) = lease.payload else {
+            throw ParolaError.engineLoadFailed("Whisper captions were handed another engine's model")
+        }
+        let kit = shared.kit
         guard let tokenizer = kit.tokenizer else {
             ParolaLog.error(
                 .streaming, "tokenizer was nil after model load",
@@ -397,7 +442,8 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
     /// A take no model ran on is stamped with no model name, which callers keep as not transcribed rather than as no speech.
     func finishedTranscript(recordedURL: URL?, modelRan: Bool = true) async -> Transcript {
         await Self.finishedTake(
-            segments: allConfirmed, options: optionsForRun, modelName: modelRan ? loadedModel ?? "unknown" : "", audioURL: recordedURL
+            segments: allConfirmed, options: optionsForRun, modelName: modelRan ? loadedModel ?? "unknown" : "", audioURL: recordedURL,
+            engine: loadedEngine
         )
     }
 
@@ -407,7 +453,8 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         segments: [TranscriptSegment],
         options: TranscriptionOptions?,
         modelName: String,
-        audioURL: URL?
+        audioURL: URL?,
+        engine: EngineID = .whisperKit
     ) async -> Transcript {
         let raw = Transcript(
             segments: segments,
@@ -417,7 +464,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
             durationSeconds: segments.last?.end
         )
         return await TranscriptFinisher.finish(
-            raw, engine: .whisperKit, options: options ?? TranscriptionOptions(), audioURL: audioURL
+            raw, engine: engine, options: options ?? TranscriptionOptions(), audioURL: audioURL
         )
     }
 

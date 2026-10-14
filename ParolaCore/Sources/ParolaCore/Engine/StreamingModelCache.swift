@@ -1,22 +1,28 @@
 import Foundation
 import os
 @preconcurrency import WhisperKit
+@preconcurrency import FluidAudio
 
 // Safe because borrowers only read the kit (a session decodes with a TextDecoder of its own) and the cache unloads or reloads its models only while no lease on it is out.
 struct SharedWhisperKit: @unchecked Sendable {
     let kit: WhisperKit
 }
 
+enum StreamingModelPayload: Sendable {
+    case whisper(SharedWhisperKit)
+    case parakeet(AsrModels)
+}
+
 /// A model borrowed from the streaming cache. The model stays loaded while any lease on it is
 /// out, so release it once nothing decodes with it; a lease dropped unreleased is returned late.
 public final class StreamingModelLease: Sendable {
-    let shared: SharedWhisperKit
+    let payload: StreamingModelPayload
     public let modelName: String
     private let cache: StreamingModelCache
     private let isReleased = OSAllocatedUnfairLock(initialState: false)
 
-    init(shared: SharedWhisperKit, modelName: String, cache: StreamingModelCache) {
-        self.shared = shared
+    init(payload: StreamingModelPayload, modelName: String, cache: StreamingModelCache) {
+        self.payload = payload
         self.modelName = modelName
         self.cache = cache
     }
@@ -39,31 +45,33 @@ public final class StreamingModelLease: Sendable {
     }
 }
 
-/// Keeps loaded streaming WhisperKit instances alive across sessions so a dictation press
-/// or live-captions start doesn't pay the model load again. Borrowers share one instance
-/// per model name and hold a lease while they decode; loads are single-flight. A model with
-/// no lease out unloads after `idleTimeout` or on memory pressure and keeps its kit, so the
-/// next borrow reloads only the CoreML models.
+/// Keeps loaded streaming models alive across sessions so a dictation press or live-captions
+/// start doesn't pay the model load again. Borrowers share one instance per model name and
+/// hold a lease while they decode; loads are single-flight. A model with no lease out unloads
+/// after `idleTimeout` or on memory pressure. A WhisperKit model keeps its kit, so the next
+/// borrow reloads only the CoreML models; a Parakeet model is dropped and loaded again.
 actor StreamingModelCache {
     static let shared = StreamingModelCache()
 
     typealias Loader = @Sendable (_ modelName: String, _ store: ModelStore) async throws -> SharedWhisperKit
+    typealias ParakeetLoader = @Sendable (_ modelName: String, _ store: ModelStore) async throws -> AsrModels
     typealias Reloader = @Sendable (SharedWhisperKit) async throws -> Void
     typealias Unloader = @Sendable (SharedWhisperKit) async -> Void
 
     private struct Entry {
-        let shared: SharedWhisperKit
+        let payload: StreamingModelPayload
         var isResident = true
         var unloading: Task<Void, Never>?
     }
 
     private struct Load {
         let id: Int
-        let task: Task<SharedWhisperKit, Error>
+        let task: Task<StreamingModelPayload, Error>
         var dropUnlessLeased = false
     }
 
     private let loader: Loader
+    private let parakeetLoader: ParakeetLoader
     private let reloader: Reloader
     private let unloader: Unloader
     private var idleTimeout: Duration
@@ -81,12 +89,14 @@ actor StreamingModelCache {
 
     init(
         loader: @escaping Loader = StreamingModelCache.loadKit,
+        parakeetLoader: @escaping ParakeetLoader = StreamingModelCache.loadParakeet,
         reloader: @escaping Reloader = StreamingModelCache.reloadKit,
         unloader: @escaping Unloader = StreamingModelCache.unloadKit,
         idleTimeout: Duration = ModelResidency.idleTimeout,
         clock: any Clock<Duration> = ContinuousClock()
     ) {
         self.loader = loader
+        self.parakeetLoader = parakeetLoader
         self.reloader = reloader
         self.unloader = unloader
         self.idleTimeout = idleTimeout
@@ -100,8 +110,8 @@ actor StreamingModelCache {
         leases[modelName, default: 0] += 1
         unloadOnRelease.remove(modelName)
         do {
-            let shared = try await residentKit(modelName, store: store)
-            return StreamingModelLease(shared: shared, modelName: modelName, cache: self)
+            let payload = try await residentModel(modelName, store: store)
+            return StreamingModelLease(payload: payload, modelName: modelName, cache: self)
         } catch {
             returnLease(modelName)
             throw error
@@ -112,7 +122,7 @@ actor StreamingModelCache {
     func warm(_ modelName: String, store: ModelStore) async {
         installPressureSourceIfNeeded()
         unloadOnRelease.remove(modelName)
-        _ = try? await residentKit(modelName, store: store)
+        _ = try? await residentModel(modelName, store: store)
         armIdleUnloadIfUnleased()
     }
 
@@ -190,38 +200,41 @@ actor StreamingModelCache {
         unloadOnRelease.removeAll()
     }
 
-    private func residentKit(_ modelName: String, store: ModelStore) async throws -> SharedWhisperKit {
+    private func residentModel(_ modelName: String, store: ModelStore) async throws -> StreamingModelPayload {
         // Borrowing a new name is a model switch: dropping the other entries frees their
         // multi-GB kits once running sessions release theirs.
         currentModelName = modelName
         entries = entries.filter { $0.key == modelName }
-        if let entry = entries[modelName], entry.isResident { return entry.shared }
+        if let entry = entries[modelName], entry.isResident { return entry.payload }
         if let pending = inFlight[modelName] {
             return try await Self.awaitCancellable(pending.task)
         }
         return try await Self.awaitCancellable(startLoad(modelName, store: store))
     }
 
-    private func startLoad(_ modelName: String, store: ModelStore) -> Task<SharedWhisperKit, Error> {
+    private func startLoad(_ modelName: String, store: ModelStore) -> Task<StreamingModelPayload, Error> {
         lastLoadID &+= 1
         let loadID = lastLoadID
-        let load: @Sendable () async throws -> SharedWhisperKit
-        if let kept = entries[modelName] {
+        let load: @Sendable () async throws -> StreamingModelPayload
+        if let kept = entries[modelName], case .whisper(let shared) = kept.payload {
             let reloader = reloader
-            load = { [shared = kept.shared, unloading = kept.unloading] in
+            load = { [unloading = kept.unloading] in
                 await unloading?.value
                 try await reloader(shared)
-                return shared
+                return .whisper(shared)
             }
+        } else if ModelCatalog.variant(id: modelName)?.engineID == .parakeet {
+            let parakeetLoader = parakeetLoader
+            load = { .parakeet(try await parakeetLoader(modelName, store)) }
         } else {
             let loader = loader
-            load = { try await loader(modelName, store) }
+            load = { .whisper(try await loader(modelName, store)) }
         }
         // Books its own result before any borrower resumes; Task {}, not detached, so the log scope follows the load.
         let task = Task { [weak self] in
-            let kit: SharedWhisperKit
+            let loaded: StreamingModelPayload
             do {
-                kit = try await load()
+                loaded = try await load()
             } catch {
                 if !isCancellation(error) {
                     ParolaLog.error(
@@ -229,27 +242,27 @@ actor StreamingModelCache {
                         [.model: .safe(ModelToken(modelName)), .error: .error(error)]
                     )
                 }
-                await self?.finishLoad(modelName, loadID: loadID, kit: nil)
+                await self?.finishLoad(modelName, loadID: loadID, loaded: nil)
                 throw error
             }
-            await self?.finishLoad(modelName, loadID: loadID, kit: kit)
-            return kit
+            await self?.finishLoad(modelName, loadID: loadID, loaded: loaded)
+            return loaded
         }
         inFlight[modelName] = Load(id: loadID, task: task)
         return task
     }
 
-    private func finishLoad(_ modelName: String, loadID: Int, kit: SharedWhisperKit?) {
+    private func finishLoad(_ modelName: String, loadID: Int, loaded: StreamingModelPayload?) {
         guard let load = inFlight[modelName], load.id == loadID else { return }
         inFlight[modelName] = nil
         let unleased = leaseCount(for: modelName) == 0
         // Cache only the latest requested name: a switch may have superseded this load
         // while it ran, and caching both would leave two multi-GB kits resident.
-        guard let kit, currentModelName == modelName, !(load.dropUnlessLeased && unleased) else {
+        guard let loaded, currentModelName == modelName, !(load.dropUnlessLeased && unleased) else {
             entries[modelName] = nil
             return
         }
-        entries[modelName] = Entry(shared: kit)
+        entries[modelName] = Entry(payload: loaded)
         if unleased { armIdleUnloadIfUnleased() }
     }
 
@@ -261,8 +274,11 @@ actor StreamingModelCache {
 
     private func unloadModels(of modelName: String) {
         guard var entry = entries[modelName], entry.isResident, leaseCount(for: modelName) == 0 else { return }
+        guard case .whisper(let shared) = entry.payload else {
+            entries[modelName] = nil
+            return
+        }
         let unloader = unloader
-        let shared = entry.shared
         entry.isResident = false
         entry.unloading = Task { await unloader(shared) }
         entries[modelName] = entry
@@ -295,10 +311,10 @@ actor StreamingModelCache {
     /// the dictation key mid-load shouldn't sit out a multi-second (or hung) model load.
     /// The continuation is taken exactly once, by whichever side gets there first.
     private static func awaitCancellable(
-        _ task: Task<SharedWhisperKit, Error>
-    ) async throws -> SharedWhisperKit {
-        let pending = OSAllocatedUnfairLock<CheckedContinuation<SharedWhisperKit, Error>?>(initialState: nil)
-        @Sendable func take() -> CheckedContinuation<SharedWhisperKit, Error>? {
+        _ task: Task<StreamingModelPayload, Error>
+    ) async throws -> StreamingModelPayload {
+        let pending = OSAllocatedUnfairLock<CheckedContinuation<StreamingModelPayload, Error>?>(initialState: nil)
+        @Sendable func take() -> CheckedContinuation<StreamingModelPayload, Error>? {
             pending.withLock { held in
                 defer { held = nil }
                 return held
@@ -313,7 +329,7 @@ actor StreamingModelCache {
                     return
                 }
                 Task {
-                    let result: Result<SharedWhisperKit, Error>
+                    let result: Result<StreamingModelPayload, Error>
                     do { result = .success(try await task.value) } catch { result = .failure(error) }
                     take()?.resume(with: result)
                 }
@@ -346,6 +362,10 @@ actor StreamingModelCache {
             download: false
         )
         return SharedWhisperKit(kit: kit)
+    }
+
+    private static func loadParakeet(modelName: String, store: ModelStore) async throws -> AsrModels {
+        try await ParakeetTranscriber.loadModels(for: modelName, in: store)
     }
 
     private static func reloadKit(_ shared: SharedWhisperKit) async throws {
