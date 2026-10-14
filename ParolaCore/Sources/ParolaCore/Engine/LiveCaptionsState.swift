@@ -91,13 +91,21 @@ public struct LiveCaptionsState: Sendable, Equatable {
         }
     }
 
-    /// The session delivers a take's new partial before the line it confirms: one that starts with the line is its older form, and one that doesn't is newer and stays.
+    /// The new partial arrives before the line it confirms: the partial's leading words that are that line's words go, and what is left was said after it.
     private static func remainder(of partial: String, after confirmed: String) -> String {
-        let text = partial.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !confirmed.isEmpty else { return partial }
-        if confirmed.hasPrefix(text) { return "" }
-        guard text.hasPrefix(confirmed) else { return partial }
-        return String(text.dropFirst(confirmed.count)).trimmingCharacters(in: .whitespacesAndNewlines)
+        let confirmedWords = confirmed.split(whereSeparator: \.isWhitespace).map(comparable)
+        let words = partial.split(whereSeparator: \.isWhitespace)
+        var matched = 0
+        while matched < min(words.count, confirmedWords.count), comparable(words[matched]) == confirmedWords[matched] { matched += 1 }
+        if matched == words.count - 1, matched < confirmedWords.count, confirmedWords[matched].hasPrefix(comparable(words[matched])) {
+            matched += 1
+        }
+        guard matched > 0 || words.isEmpty else { return partial }
+        return words.dropFirst(matched).joined(separator: " ")
+    }
+
+    private static func comparable<S: StringProtocol>(_ word: S) -> String {
+        word.lowercased().trimmingCharacters(in: .punctuationCharacters)
     }
 
     /// Puts an earlier run's captions ahead of this one's, for a session restarted mid-way.

@@ -45,6 +45,23 @@ struct LiveCaptionsStateTests {
         #expect(s.partial == "me hand", "what follows the confirmed words stays")
     }
 
+    @Test("a confirm takes the confirmed words off the partial, word by word, and keeps what was said after", arguments: [
+        ("I", "It's fine", "It's fine"),
+        ("That is all.", "that is all", ""),
+        ("all from me.", "all from me", ""),
+        ("so let me hand,", "So let me hand", ""),
+        ("No, no.", "No", ""),
+        ("so let", "so let me hand", "me hand"),
+        ("finish a sentence,", "That is exactly the", "That is exactly the"),
+        ("hello world", "hel", ""),
+        ("that is all.", "that is all so", "so"),
+    ])
+    func confirmStripsWords(confirmed: String, partial: String, left: String) {
+        var s = LiveCaptionsState(partial: partial)
+        s.apply(.confirmed(TranscriptSegment(id: 0, start: 0, end: 1, text: confirmed)))
+        #expect(s.partial == left)
+    }
+
     @Test("partial event appears in displayed text")
     func partial() {
         var s = LiveCaptionsState()
