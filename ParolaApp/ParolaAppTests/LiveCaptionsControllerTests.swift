@@ -180,6 +180,7 @@ extension TranscriberMockSuites {
             ))
             let controller = LiveCaptionsController(showsPanel: false)
             model.liveCaptions = controller
+            await model.awaitModelListRefresh()
 
             model.selectedModel = "nvidia_parakeet-tdt-0.6b-v3"
             model.liveCaptionsTranslate = true
