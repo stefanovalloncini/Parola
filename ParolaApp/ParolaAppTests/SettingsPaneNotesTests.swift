@@ -37,8 +37,8 @@ struct SettingsPaneNotesTests {
     @Test("Live Captions' intro is a note under its box, not a row of its own")
     func liveCaptionsIntroIsAFooter() throws {
         let found = elements(LiveCaptionsPane(), model: makeModel())
-        let intro = try #require(text(startingWith: "Live captions transcribe the microphone", in: found))
-        let lastRow = try #require(text(startingWith: "Translate captions live as you speak", in: found))
+        let intro = try #require(text(startingWith: "Live captions show the words", in: found))
+        let lastRow = try #require(text(startingWith: "Translate the captions into English as they appear", in: found))
         let start = try #require(leaf("LiveCaptions.Button.StartStop", in: found))
         #expect(intro.frame.maxY <= lastRow.frame.minY, "the intro sits above the rows")
         #expect(lastRow.frame.minY - intro.frame.maxY < 28, "the intro sits \(lastRow.frame.minY - intro.frame.maxY) pt under the box")
@@ -132,7 +132,7 @@ struct SettingsPaneNotesTests {
         model.translate = true
         let warning = model.translateMismatchWarning ?? "missing"
         let found = elements(LiveCaptionsPane(), model: model)
-        expectUnder(warning, row: "Translate captions live as you speak", in: found)
+        expectUnder(warning, row: "Translate the captions into English as they appear", in: found)
     }
 
     @Test("Dictation's model warning is part of the Model row, beside Change…")

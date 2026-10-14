@@ -79,6 +79,19 @@ struct AppMenusTests {
         #expect(transcript.contains("Auto-Detect Language"), "\(transcript)")
     }
 
+    @Test("Captions offers a Listen To picker under Start, with the microphone, system audio and the saved app")
+    func captionsListenToPicker() throws {
+        let model = makeModel("captions-listen-to")
+        model.captionApps = CaptionAppList(observesChanges: false, ownBundleID: nil, runningApps: { [] }, audioBundleIDs: { [] })
+        model.liveCaptionsSourceRaw = "app:us.zoom.xos"
+        let menu = items(CaptionsCommands(model: model, liveCaptions: LiveCaptionsController()))
+        #expect(menu.map(\.title).prefix(2) == ["Start Live Captions", "Listen To"], "\(menu.map(\.title))")
+        let picker = try #require(menu.first { $0.title == "Listen To" })
+        let rows = try #require(picker.submenu).items
+        #expect(rows.filter { !$0.isSeparatorItem }.map(\.title).prefix(2) == ["Microphone", "System Audio"])
+        #expect(rows.contains { $0.title == "Zoom (not open)" && $0.state == .on }, "\(rows.map(\.title))")
+    }
+
     @Test("the Playback menu shows Space, ⌘← and ⌘→ on Play, Skip Back and Skip Forward")
     func playbackMenuShowsItsKeys() {
         let playback = items(PlaybackCommands(model: makeModel("playback-keys"))).prefix(3)

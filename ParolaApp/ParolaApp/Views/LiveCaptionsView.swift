@@ -9,22 +9,25 @@ struct LiveCaptionsView: View {
 
     private static let horizontalInset: CGFloat = 22
     private static let verticalInset: CGFloat = 18
-    private static let chipTopInset: CGFloat = 10
-    private static let chipInset: CGFloat = 9
+    private static let chipRowTopInset: CGFloat = 10
 
     var body: some View {
-        content
-            .padding(.horizontal, Self.horizontalInset)
-            .padding(.vertical, Self.verticalInset)
-            .frame(minWidth: 560, maxWidth: .infinity, alignment: .center)
-            .background(background)
-            .overlay(border)
-            .overlay(alignment: .topTrailing) {
-                modeChip.padding(.top, Self.chipTopInset).padding(.trailing, DS.Spacing.regular)
+        VStack(spacing: DS.Spacing.small) {
+            HStack {
+                Spacer(minLength: 0)
+                LiveCaptionsChip(controller: controller)
             }
-            .opacity(opacity)
-            .contextMenu { settingsMenu }
-            .axBranch("LiveCaptions")
+            content
+        }
+        .padding(.horizontal, Self.horizontalInset)
+        .padding(.top, Self.chipRowTopInset)
+        .padding(.bottom, Self.verticalInset)
+        .frame(minWidth: 560, maxWidth: .infinity, alignment: .center)
+        .background(background)
+        .overlay(border)
+        .opacity(opacity)
+        .contextMenu { settingsMenu }
+        .axBranch("LiveCaptions")
     }
 
     @ViewBuilder
@@ -38,8 +41,13 @@ struct LiveCaptionsView: View {
                     .multilineTextAlignment(.center)
                 if !controller.state.isActive {
                     HStack(spacing: DS.Spacing.small) {
+                        if let permission = controller.failurePermission {
+                            Button("Open Settings") { controller.openPermission(permission) }
+                                .buttonStyle(DSPillButtonStyle(kind: .primary, size: .compact))
+                                .axLeaf("Button.OpenSettings")
+                        }
                         Button("Retry") { Task { await controller.tryAgain() } }
-                            .buttonStyle(DSPillButtonStyle(kind: .primary, size: .compact))
+                            .buttonStyle(DSPillButtonStyle(kind: controller.failurePermission == nil ? .primary : .secondary, size: .compact))
                             .axLeaf("Button.Retry")
                         Button("Close") { controller.closeFailure() }
                             .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
@@ -80,26 +88,6 @@ struct LiveCaptionsView: View {
     private var border: some View {
         RoundedRectangle(cornerRadius: DS.Radius.large, style: .continuous)
             .strokeBorder(Color.white.opacity(0.06), lineWidth: 1)
-    }
-
-    @ViewBuilder
-    private var modeChip: some View {
-        let translating = controller.translateToEnglish
-        HStack(spacing: 6) {
-            Image(systemName: translating ? "character.bubble" : "mic.fill")
-                .font(DS.Font.caption)
-            Text(translating ? "Translate" : "Mic")
-                .font(DS.Font.mono.weight(.semibold))
-                .textCase(.uppercase)
-        }
-        .foregroundStyle(translating ? DS.Color.onAccent : Color.white.opacity(0.7))
-        .padding(.horizontal, Self.chipInset)
-        .frame(height: 20)
-        .background(Capsule().fill(chipFill(translating: translating)))
-    }
-
-    private func chipFill(translating: Bool) -> Color {
-        translating ? DS.Color.accentFill : Color.white.opacity(0.12)
     }
 
     @ViewBuilder
@@ -170,5 +158,57 @@ enum LiveCaptionStylePreset {
         case .compact: return 20
         case .subtle: return 22
         }
+    }
+}
+
+/// The source and translate chip; the panel gives it a row of its own so it never sits over the caption text.
+struct LiveCaptionsChip: View {
+    @Bindable var controller: LiveCaptionsController
+    private static let inset: CGFloat = 9
+
+    var body: some View {
+        let translating = controller.translateToEnglish
+        HStack(spacing: 6) {
+            Image(systemName: translating ? "character.bubble" : Self.symbol(for: controller.source))
+                .font(DS.Font.caption)
+            Group {
+                if translating {
+                    Text("Translate")
+                } else {
+                    sourceName
+                }
+            }
+            .font(DS.Font.mono.weight(.semibold))
+            .textCase(.uppercase)
+            .lineLimit(1)
+            .truncationMode(.tail)
+            .frame(maxWidth: 150)
+            .fixedSize(horizontal: true, vertical: false)
+        }
+        .foregroundStyle(translating ? DS.Color.onAccent : Color.white.opacity(0.7))
+        .padding(.horizontal, Self.inset)
+        .frame(height: 20)
+        .background(Capsule().fill(chipFill(translating: translating)))
+    }
+
+    @ViewBuilder
+    private var sourceName: some View {
+        switch controller.source {
+        case .microphone: Text("Mic")
+        case .systemAudio: Text("System")
+        case .app(let bundleID): Text(verbatim: controller.appName(bundleID))
+        }
+    }
+
+    private static func symbol(for source: CaptionSource) -> String {
+        switch source {
+        case .microphone: "mic.fill"
+        case .systemAudio: "speaker.wave.2.fill"
+        case .app: "macwindow"
+        }
+    }
+
+    private func chipFill(translating: Bool) -> Color {
+        translating ? DS.Color.accentFill : Color.white.opacity(0.12)
     }
 }

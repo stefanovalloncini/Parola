@@ -115,7 +115,7 @@ struct SettingsCopyTests {
         let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
         let italian = try #require(Bundle(path: path))
         let keys = [
-            "Live captions transcribe the microphone as you speak and show the words in a floating panel that stays above other windows.",
+            "Live captions show the words in a floating panel that stays above other windows.",
             "Microphone access is off",
             "Parola needs the microphone to record and dictate.",
             "Whisper translates from the detected source language into English. Only multilingual Whisper models can translate.",
@@ -218,7 +218,7 @@ struct SettingsCopyTests {
 
     @Test("Live Captions says it captions what you say, and starts from its own pane")
     func liveCaptionsStartsFromThePane() {
-        #expect(SettingsRoute.liveCaptions.summary == "Captions of what you say, in a floating window.")
+        #expect(SettingsRoute.liveCaptions.summary == "Captions of what you say or what your Mac plays, in a floating window.")
         let model = makeModel("settings-copy-captions")
         let pane = elements(LiveCaptionsPane(), model: model)
         let buttons = pane.filter { $0.role == NSAccessibility.Role.button.rawValue }.compactMap(\.name)

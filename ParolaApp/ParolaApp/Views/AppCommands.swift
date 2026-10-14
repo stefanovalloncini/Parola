@@ -360,6 +360,14 @@ struct CaptionsCommands: View {
                 !liveCaptions.isActive
                     && (model.introduction.isPresented || model.liveCaptionsUnavailableReason != nil)
             )
+            Picker("Listen To", selection: sourceBinding) {
+                Text("Microphone").tag("microphone")
+                Text("System Audio").tag("systemAudio")
+                let choices = model.captionApps.choices(saved: model.liveCaptionsSourceRaw)
+                if !choices.isEmpty { Divider() }
+                ForEach(choices) { Text(verbatim: $0.title).tag($0.setting) }
+            }
+            .axLeaf("Menu.Captions.ListenTo")
             Toggle("Translate to English", isOn: translateBinding)
             Divider()
             Button(liveCaptions.isPresenterOpen ? "Exit Presenter" : "Enter Presenter Mode") {
@@ -369,6 +377,13 @@ struct CaptionsCommands: View {
             Button("Save Captions…") { liveCaptions.saveCaptionsHistory() }
                 .disabled(!liveCaptions.hasHistory)
         }
+    }
+
+    private var sourceBinding: Binding<String> {
+        Binding(
+            get: { model.liveCaptionsSourceRaw },
+            set: { model.liveCaptionsSourceRaw = $0 }
+        )
     }
 
     private var translateBinding: Binding<Bool> {

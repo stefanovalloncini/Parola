@@ -56,39 +56,6 @@
         }
       }
     },
-    "Captions of what you say, in a floating window.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sottotitoli di ciò che dici, in una finestra mobile."
-          }
-        }
-      }
-    },
-    "Live captions transcribe the microphone as you speak and show the words in a floating panel that stays above other windows.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "I sottotitoli in tempo reale trascrivono il microfono mentre parli e mostrano le parole in un pannello mobile che resta sopra le altre finestre."
-          }
-        }
-      }
-    },
-    "Translate captions live as you speak.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Traduce i sottotitoli in tempo reale mentre parli."
-          }
-        }
-      }
-    },
     "%@ (no audio)": {
       "extractionState": "manual",
       "localizations": {
