@@ -216,6 +216,11 @@ public enum ModelCatalog {
         (variant(id: id)?.engineID ?? .whisperKit) == .whisperKit
     }
 
+    /// Whether Live Captions can run on this model: Whisper streams, and Parakeet re-decodes a rolling window.
+    public static func canCaption(id: String) -> Bool {
+        canStream(id: id) || variant(id: id)?.engineID == .parakeet
+    }
+
     /// Entries kept for people who already downloaded them; the pickers list them only when installed.
     public static let hiddenUnlessInstalled: Set<String> = ["nvidia_parakeet-tdt-0.6b-v2"]
 
