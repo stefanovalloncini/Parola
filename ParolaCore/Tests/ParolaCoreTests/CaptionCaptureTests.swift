@@ -81,6 +81,18 @@ struct FixtureCaptureTests {
         #expect(finished.value == 1)
     }
 
+    @Test("no end handler runs after a stop, even once the delivery task has wound down")
+    func noEndAfterStop() async {
+        let clock = TestClock()
+        let ended = Awaitable(0)
+        let capture = FixtureCapture(samples: [Float](repeating: 0.1, count: 16_000), clock: clock)
+        capture.start(onBuffer: { _ in }, onEnd: { ended.increment() })
+        await clock.waitForSleeper()
+        capture.stop()
+        await capture.finished()
+        #expect(ended.value == 0)
+    }
+
     @Test("a missing file throws")
     func missingFile() {
         #expect(throws: ParolaError.self) {
@@ -122,7 +134,7 @@ struct SinkCaptureTests {
 
 #if os(macOS)
 
-private actor StubSource: LiveAudioSource {
+private actor StubSource: LiveAudioSource, TargetsGoneReporting {
     let sink: @Sendable ([Float]) -> Void
     private let gate: UninterruptibleGate?
     private(set) var started = false
@@ -131,6 +143,8 @@ private actor StubSource: LiveAudioSource {
     private var endHandler: (@Sendable () -> Void)?
 
     func whenCaptureEnds(_ handler: @escaping @Sendable () -> Void) async { endHandler = handler }
+
+    func whenTargetsGone(_ handler: @escaping @Sendable () -> Void) async { endHandler = handler }
 
     func end() { endHandler?() }
 
@@ -162,6 +176,8 @@ private final class FakeEnvironment: Sendable {
     }
 
     private let state = OSAllocatedUnfairLock(initialState: State())
+
+    func setProcessObjects(_ objects: [UInt32]) { state.withLock { $0.processObjects = objects } }
     let probeGate: UninterruptibleGate?
     let startGate: UninterruptibleGate?
     let startFailure: (any Error)?
@@ -352,9 +368,9 @@ struct ExternalCaptionCaptureTests {
 
     @Test("a source that ends by itself reports the source's own sentence once")
     func endReportsOnce() async throws {
-        for (source, text) in [
-            (CaptionSource.systemAudio, FixedFailureText.systemAudioStopped),
-            (app, FixedFailureText.appQuit("us.zoom.xos")),
+        for (source, objectsAfter, text) in [
+            (CaptionSource.systemAudio, [UInt32(7)], FixedFailureText.systemAudioStopped),
+            (app, [], FixedFailureText.appQuit("us.zoom.xos")),
         ] {
             let fake = FakeEnvironment()
             let capture = CaptionCapture.external(source, environment: fake.environment)
@@ -362,11 +378,41 @@ struct ExternalCaptionCaptureTests {
             capture.whenEnded?({ text in ended.update { $0.append(text) } })
             _ = await capture.requestPermission()
             try await capture.start { _ in }
+            fake.setProcessObjects(objectsAfter)
             let stub = try #require(fake.sources.first)
             await stub.end()
             await stub.end()
             #expect(ended.value == [text])
         }
+    }
+
+    @Test("an app that still has audio processes after its tap lost one is not reported as quit", arguments: [
+        [UInt32(1), 3],
+        [UInt32(9)],
+        [UInt32(20), 21],
+    ])
+    func appStillThere(after: [UInt32]) async throws {
+        let fake = FakeEnvironment(processObjects: [1, 2])
+        let capture = CaptionCapture.external(app, environment: fake.environment)
+        let ended = Awaitable<[String]>([])
+        capture.whenEnded?({ text in ended.update { $0.append(text) } })
+        _ = await capture.requestPermission()
+        try await capture.start { _ in }
+        fake.setProcessObjects(after)
+        await fake.sources.first?.end()
+        #expect(ended.value == [FixedFailureText.appStoppedSending("us.zoom.xos")])
+    }
+
+    @Test("an end reported before the handler is registered is replayed to it")
+    func earlyEndIsReplayed() async throws {
+        let fake = FakeEnvironment()
+        let capture = CaptionCapture.external(.systemAudio, environment: fake.environment)
+        _ = await capture.requestPermission()
+        try await capture.start { _ in }
+        await fake.sources.first?.end()
+        let ended = Awaitable<[String]>([])
+        capture.whenEnded?({ text in ended.update { $0.append(text) } })
+        #expect(ended.value == [FixedFailureText.systemAudioStopped])
     }
 
     @Test("an end after a stop is not reported")
@@ -428,7 +474,6 @@ struct ExternalCaptionCaptureTests {
     }
 }
 
-
 @Suite("Capture end detection")
 struct CaptureEndDetectionTests {
     private final class ProcessList: Sendable {
@@ -452,21 +497,37 @@ struct CaptureEndDetectionTests {
         }
     }
 
-    @Test("the watch fires once, when every watched object has left the list")
-    func firesWhenAllGone() {
+    @Test("the watch fires once, as soon as any watched object has left the list")
+    func firesWhenAnyGone() {
         let list = ProcessList([7, 8, 9])
         let fired = Awaitable(0)
         let watch = ProcessEndWatch(
             objects: [7, 8], currentObjects: { list.current }, subscribe: list.subscribe, onGone: { fired.increment() }
         )
+        list.set([7, 8, 9, 11])
+        #expect(fired.value == 0, "a new process appearing is not an end")
         list.set([8, 9])
-        #expect(fired.value == 0, "one helper left, the other is still there")
-        list.set([9])
         list.set([])
         #expect(fired.value == 1)
         #expect(list.unsubscribed == 1)
         watch.check()
         #expect(fired.value == 1)
+    }
+
+    @Test("the watch fires when a helper is replaced, when every id changes, and when the app is gone", arguments: [
+        [UInt32(1), 3],
+        [UInt32(20), 21],
+        [UInt32](),
+    ])
+    func firesOnEachShape(after: [UInt32]) {
+        let list = ProcessList([1, 2])
+        let fired = Awaitable(0)
+        let watch = ProcessEndWatch(
+            objects: [1, 2], currentObjects: { list.current }, subscribe: list.subscribe, onGone: { fired.increment() }
+        )
+        list.set(after)
+        #expect(fired.value == 1)
+        watch.cancel()
     }
 
     @Test("an app that stays in the list, however quiet, is not an end")
@@ -485,6 +546,29 @@ struct CaptureEndDetectionTests {
         #expect(list.unsubscribed == 1)
     }
 
+    @Test("the hardware observer registers once and a removal drops it for good")
+    func observerRemoval() {
+        let before = ProcessListObserver.activeCount
+        let stop = ProcessListObserver.observe(on: .global(), {})
+        #expect(ProcessListObserver.activeCount == before + 1)
+        stop()
+        stop()
+        #expect(ProcessListObserver.activeCount == before)
+    }
+
+    @Test("a tap source that a meeting watches through the shared hook never ends its take")
+    @available(macOS 14.2, *)
+    func meetingTapDoesNotEnd() async {
+        let list = ProcessList([7])
+        let source = ProcessTapAudioSource(
+            processObjects: [7], samples: { _ in }, processList: { list.current }, subscribeToProcessList: list.subscribe
+        )
+        let fired = Awaitable(0)
+        await source.whenCaptureEnds { fired.increment() }
+        list.set([])
+        #expect(fired.value == 0)
+    }
+
     @Test("a tap source reports its app leaving the process list and not a stop")
     @available(macOS 14.2, *)
     func tapSourceEnd() async {
@@ -493,7 +577,7 @@ struct CaptureEndDetectionTests {
             processObjects: [7], samples: { _ in }, processList: { list.current }, subscribeToProcessList: list.subscribe
         )
         let fired = Awaitable(0)
-        await source.whenCaptureEnds { fired.increment() }
+        await source.whenTargetsGone { fired.increment() }
         list.set([])
         #expect(fired.value == 1)
 
@@ -502,7 +586,7 @@ struct CaptureEndDetectionTests {
         )
         list.set([7])
         let quiet = Awaitable(0)
-        await stopped.whenCaptureEnds { quiet.increment() }
+        await stopped.whenTargetsGone { quiet.increment() }
         await stopped.cancel()
         list.set([])
         #expect(quiet.value == 0)
@@ -524,6 +608,46 @@ struct CaptureEndDetectionTests {
         await cancelled.cancel()
         await cancelled.captureEnded(Dropped())
         #expect(quiet.value == 0)
+    }
+}
+
+
+private actor HandlerKeepingSource: LiveAudioSource {
+    private var endHandler: (@Sendable () -> Void)?
+    func whenCaptureEnds(_ handler: @escaping @Sendable () -> Void) async { endHandler = handler }
+    func start() async throws {}
+    func prepare() async throws -> URL { throw CancellationError() }
+    func cancel() async {}
+}
+
+private final class Sentinel: Sendable {}
+
+@Suite("Caption capture lifetime")
+struct CaptionCaptureLifetimeTests {
+    @Test("a source that keeps its end handler does not keep a stopped capture alive")
+    func stoppedCaptureIsReleased() async throws {
+        weak var sentinel: Sentinel?
+        let source = HandlerKeepingSource()
+        do {
+            let held = Sentinel()
+            sentinel = held
+            let env = CaptionCaptureEnvironment(
+                permissions: CapturePermissionCheck(screenRecordingGranted: { true }, tapStatus: { .granted }, probeTapConsent: {}),
+                fixtureURL: { nil },
+                processObjects: { _ in [7] },
+                makeSystemSource: { _ in source },
+                makeTapSource: { _, _ in source },
+                startTimeout: .seconds(15),
+                clock: ContinuousClock()
+            )
+            let capture = CaptionCapture.external(.systemAudio, environment: env)
+            capture.whenEnded?({ _ in withExtendedLifetime(held) {} })
+            _ = await capture.requestPermission()
+            try await capture.start { _ in }
+            capture.stop()
+        }
+        await pollUntil("the capture to be released") { sentinel == nil }
+        withExtendedLifetime(source) {}
     }
 }
 

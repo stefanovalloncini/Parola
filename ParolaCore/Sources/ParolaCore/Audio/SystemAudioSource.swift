@@ -170,6 +170,7 @@ public actor SystemAudioSource: LiveAudioSource {
 
     private func stop() async throws {
         stopping = true
+        endHandler = nil
         if let stream {
             try? await stream.stopCapture()
             self.stream = nil

@@ -286,7 +286,7 @@ public actor ProcessTapAudioSource: LiveAudioSource {
         handler?.setPaused(paused)
     }
 
-    public func whenCaptureEnds(_ handler: @escaping @Sendable () -> Void) async {
+    func whenTargetsGone(_ handler: @escaping @Sendable () -> Void) async {
         endWatch?.cancel()
         guard !cancelled else { return }
         endWatch = ProcessEndWatch(
@@ -336,8 +336,7 @@ public actor ProcessTapAudioSource: LiveAudioSource {
     }
 }
 
-/// Calls `onGone` once, when none of the watched process objects is in the audio system's process list any more.
-/// A process that is still running but silent keeps its object, so quiet is not an end.
+/// Calls `onGone` once, when any watched process object has left the process list; a running but silent process keeps its object.
 final class ProcessEndWatch: Sendable {
     typealias Unsubscribe = @Sendable () -> Void
 
@@ -370,7 +369,7 @@ final class ProcessEndWatch: Sendable {
     }
 
     func check() {
-        guard !state.withLock({ $0.finished }), objects.isDisjoint(with: currentObjects()) else { return }
+        guard !state.withLock({ $0.finished }), !objects.isSubset(of: currentObjects()) else { return }
         guard let unsubscribe = finish() else { return }
         unsubscribe()
         onGone()
@@ -388,25 +387,72 @@ final class ProcessEndWatch: Sendable {
         }
     }
 
-    private static func processListAddress() -> AudioObjectPropertyAddress {
+    static let listenToHardware: @Sendable (@escaping @Sendable () -> Void) -> Unsubscribe = { notify in
+        ProcessListObserver.observe(on: DispatchQueue(label: "com.parola.process-end-watch"), notify)
+    }
+}
+
+/// Calls back when Core Audio's list of audio processes changes, until the returned closure is called.
+public enum ProcessListObserver {
+    private struct Registration: Sendable {
+        var queue: DispatchQueue
+        var notify: @Sendable () -> Void
+    }
+
+    private struct Registry {
+        var next: UInt = 1
+        var live: [UInt: Registration] = [:]
+    }
+
+    // The HAL gets a token, not a pointer, so a callback still in flight when the listener is removed finds nothing instead of freed memory.
+    private static let registry = OSAllocatedUnfairLock(initialState: Registry())
+
+    static var activeCount: Int { registry.withLock { $0.live.count } }
+
+    public static func observe(on queue: DispatchQueue, _ notify: @escaping @Sendable () -> Void) -> @Sendable () -> Void {
+        let token = registry.withLock { registry -> UInt in
+            defer { registry.next += 1 }
+            registry.live[registry.next] = Registration(queue: queue, notify: notify)
+            return registry.next
+        }
+        var address = listAddress()
+        let context = UnsafeMutableRawPointer(bitPattern: token)
+        let status = AudioObjectAddPropertyListener(
+            AudioObjectID(kAudioObjectSystemObject), &address, processListChanged, context
+        )
+        guard status == noErr else {
+            ParolaLog.error(.audioCapture, "could not listen for audio process changes", [.count: .int(Int(status))])
+            _ = registry.withLock { $0.live.removeValue(forKey: token) }
+            return {}
+        }
+        return {
+            var address = listAddress()
+            AudioObjectRemovePropertyListener(
+                AudioObjectID(kAudioObjectSystemObject), &address, processListChanged, UnsafeMutableRawPointer(bitPattern: token)
+            )
+            _ = registry.withLock { $0.live.removeValue(forKey: token) }
+        }
+    }
+
+    fileprivate static func deliver(token: UInt) {
+        guard let registration = registry.withLock({ $0.live[token] }) else { return }
+        registration.queue.async { registration.notify() }
+    }
+
+    private static func listAddress() -> AudioObjectPropertyAddress {
         AudioObjectPropertyAddress(
             mSelector: kAudioHardwarePropertyProcessObjectList,
             mScope: kAudioObjectPropertyScopeGlobal,
             mElement: kAudioObjectPropertyElementMain
         )
     }
+}
 
-    static let listenToHardware: @Sendable (@escaping @Sendable () -> Void) -> Unsubscribe = { notify in
-        let queue = DispatchQueue(label: "com.parola.process-end-watch")
-        let block: @Sendable (UInt32, UnsafePointer<AudioObjectPropertyAddress>) -> Void = { _, _ in notify() }
-        let system = AudioObjectID(kAudioObjectSystemObject)
-        var address = processListAddress()
-        guard AudioObjectAddPropertyListenerBlock(system, &address, queue, block) == noErr else { return {} }
-        return {
-            var address = processListAddress()
-            AudioObjectRemovePropertyListenerBlock(system, &address, queue, block)
-        }
-    }
+private func processListChanged(
+    _: AudioObjectID, _: UInt32, _: UnsafePointer<AudioObjectPropertyAddress>, context: UnsafeMutableRawPointer?
+) -> OSStatus {
+    ProcessListObserver.deliver(token: UInt(bitPattern: context))
+    return noErr
 }
 
 // Unchecked Sendable: mutated only on the serial IO queue passed to

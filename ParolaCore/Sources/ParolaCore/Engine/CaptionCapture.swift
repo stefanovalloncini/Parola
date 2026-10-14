@@ -114,12 +114,22 @@ struct CaptionCaptureEnvironment: Sendable {
     }
 }
 
+/// A source that can tell its watched processes are gone; only captions ask, so a meeting's `whenCaptureEnds` stays as it was.
+protocol TargetsGoneReporting: LiveAudioSource {
+    func whenTargetsGone(_ handler: @escaping @Sendable () -> Void) async
+}
+
 extension CaptionCapture {
     /// System audio (ScreenCaptureKit) or one app (a process tap), refused or failed with a sentence that names the source.
     static func external(_ source: CaptionSource, environment env: CaptionCaptureEnvironment) -> CaptionCapture {
         let run = ExternalRun()
         let bundleID: String? = if case .app(let id) = source { id } else { nil }
-        let endedText = bundleID.map(FixedFailureText.appQuit) ?? FixedFailureText.systemAudioStopped
+        let fixtureEndText = bundleID.map(FixedFailureText.appQuit) ?? FixedFailureText.systemAudioStopped
+        let endText: @Sendable () -> String = {
+            guard let bundleID else { return FixedFailureText.systemAudioStopped }
+            return env.processObjects(bundleID).isEmpty
+                ? FixedFailureText.appQuit(bundleID) : FixedFailureText.appStoppedSending(bundleID)
+        }
         let deniedText = bundleID == nil ? FixedFailureText.systemAudioNotAllowed : FixedFailureText.appAudioNotAllowed
         return CaptionCapture(
             requestPermission: {
@@ -134,7 +144,7 @@ extension CaptionCapture {
                 if let url = run.fixtureURL {
                     let fixture = try FixtureCapture(fixtureURL: url, clock: env.clock)
                     guard run.adopt(fixture: fixture) else { return }
-                    fixture.start(onBuffer: onBuffer, onEnd: { run.captureEnded(endedText) })
+                    fixture.start(onBuffer: onBuffer, onEnd: { [weak run] in run?.captureEnded(fixtureEndText) })
                     return
                 }
                 let chunker = SampleRechunker(size: WhisperKit.sampleRate / 10, downstream: onBuffer)
@@ -153,7 +163,15 @@ extension CaptionCapture {
                     await live.cancel()
                     return
                 }
-                await live.whenCaptureEnds { run.captureEnded(endedText) }
+                let ended: @Sendable () -> Void = { [weak run] in
+                    guard let run else { return }
+                    run.captureEnded(endText())
+                }
+                if let tap = live as? any TargetsGoneReporting {
+                    await tap.whenTargetsGone(ended)
+                } else {
+                    await live.whenCaptureEnds(ended)
+                }
                 try await Self.boundedStart(of: live, run: run, deniedText: deniedText, environment: env)
                 if run.isStopped { await live.cancel() }
             },
@@ -257,6 +275,7 @@ private final class ExternalRun: Sendable {
         var stopped = false
         var stopWaiters: [@Sendable () -> Void] = []
         var endHandler: (@Sendable (String) -> Void)?
+        var pendingEnd: String?
         var ended = false
     }
 
@@ -288,7 +307,16 @@ private final class ExternalRun: Sendable {
     }
 
     func onEnded(_ handler: @escaping @Sendable (String) -> Void) {
-        state.withLock { $0.endHandler = handler }
+        let pending = state.withLock { state -> String? in
+            guard !state.stopped else { return nil }
+            guard let pending = state.pendingEnd else {
+                state.endHandler = handler
+                return nil
+            }
+            state.pendingEnd = nil
+            return pending
+        }
+        if let pending { handler(pending) }
     }
 
     /// Passes `text` to the end handler once, and not at all after a stop.
@@ -296,6 +324,7 @@ private final class ExternalRun: Sendable {
         let handler = state.withLock { state -> (@Sendable (String) -> Void)? in
             guard !state.stopped, !state.ended else { return nil }
             state.ended = true
+            if state.endHandler == nil { state.pendingEnd = text }
             return state.endHandler
         }
         handler?(text)
@@ -313,6 +342,7 @@ private final class ExternalRun: Sendable {
     func stop() {
         let (fixture, source, chunker, waiters) = state.withLock { state in
             state.stopped = true
+            state.endHandler = nil
             defer { state.stopWaiters = [] }
             return (state.fixture, state.source, state.chunker, state.stopWaiters)
         }

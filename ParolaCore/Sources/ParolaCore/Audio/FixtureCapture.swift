@@ -27,7 +27,7 @@ public final class FixtureCapture: Sendable {
         self.chunkSamples = WhisperKit.sampleRate / 10
     }
 
-    /// Delivers the first chunk now and chunk k at k × `chunkDuration`, until the file ends or `stop()`; `onEnd` runs once when the file ends, never after a stop.
+    /// Delivers the first chunk now and chunk k at k × `chunkDuration`, until the file ends or `stop()`; `onEnd` runs when the file ends, unless a stop got in first.
     public func start(onBuffer: @escaping @Sendable ([Float]) -> Void, onEnd: (@Sendable () -> Void)? = nil) {
         let samples = samples
         let clock = clock
@@ -60,9 +60,10 @@ public final class FixtureCapture: Sendable {
     }
 
     public func stop() {
-        task.withLock { current in
-            current?.cancel()
-            current = nil
-        }
+        task.withLock { $0?.cancel() }
+    }
+
+    func finished() async {
+        await task.withLock { $0 }?.value
     }
 }
