@@ -834,6 +834,23 @@
         }
       }
     },
+    "Whole words": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Whole words"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parole intere"
+          }
+        }
+      }
+    },
     "YouTube ingestion": {
       "extractionState": "manual",
       "localizations": {

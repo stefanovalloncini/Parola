@@ -13,12 +13,13 @@ extension AppModel {
         let clock = clock
         let query = findQuery
         let caseSensitive = findCaseSensitive
+        let wholeWords = findWholeWords
         matchesDebounce = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(150), clock: clock)
             guard !Task.isCancelled else { return }
             if !query.isEmpty { self?.lastFindQuery = query }
             let result = await Task.detached {
-                transcript.findMatches(query, caseSensitive: caseSensitive)
+                transcript.findMatches(query, caseSensitive: caseSensitive, wholeWords: wholeWords)
             }.value
             guard !Task.isCancelled else { return }
             self?.applyMatches(result)
@@ -33,7 +34,7 @@ extension AppModel {
             return
         }
         if !findQuery.isEmpty, lastFindQuery != findQuery { lastFindQuery = findQuery }
-        applyMatches(transcript.findMatches(findQuery, caseSensitive: findCaseSensitive))
+        applyMatches(transcript.findMatches(findQuery, caseSensitive: findCaseSensitive, wholeWords: findWholeWords))
     }
 
     private func applyMatches(_ result: [TranscriptMatch]) {
@@ -49,15 +50,15 @@ extension AppModel {
             currentSegmentID = id
             pendingRevealSegmentID = id
         }
-        guard Self.transcriptHasMatch(query, caseSensitive: findCaseSensitive, in: transcript.segments) else { return }
+        guard Self.transcriptHasMatch(query, caseSensitive: findCaseSensitive, wholeWords: findWholeWords, in: transcript.segments) else { return }
         findIsOpen = true
         // The 150 ms recompute this starts re-snaps the selection to the first Find match.
         if findQuery == query { scheduleRecomputeMatches() } else { findQuery = query }
     }
 
     /// Stops at the first hit instead of collecting every one, so a Find-closed jump doesn't rescan the whole transcript twice.
-    static func transcriptHasMatch(_ query: String, caseSensitive: Bool, in segments: [TranscriptSegment]) -> Bool {
-        Transcript.containsMatch(query, caseSensitive: caseSensitive, in: segments)
+    static func transcriptHasMatch(_ query: String, caseSensitive: Bool, wholeWords: Bool = false, in segments: [TranscriptSegment]) -> Bool {
+        Transcript.containsMatch(query, caseSensitive: caseSensitive, wholeWords: wholeWords, in: segments)
     }
 
     /// The index quantizes a boundary to hundredths, so a segment can start a few milliseconds past the time the row shows.
@@ -110,7 +111,7 @@ extension AppModel {
     func replaceAllMatches() {
         guard let transcript, !findQuery.isEmpty else { return }
         applyTranscriptEdit(
-            transcript.replacingAll(findQuery, with: findReplacement, caseSensitive: findCaseSensitive),
+            transcript.replacingAll(findQuery, with: findReplacement, caseSensitive: findCaseSensitive, wholeWords: findWholeWords),
             actionName: String(localized: "Replace All")
         )
         recomputeMatches()

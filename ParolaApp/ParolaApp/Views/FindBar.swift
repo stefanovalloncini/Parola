@@ -92,6 +92,14 @@ struct FindBar: View {
                 .accessibilityLabel("Case sensitive")
 
             FindToggleButton(
+                systemName: "text.word.spacing",
+                isOn: model.findWholeWords,
+                help: "Whole words"
+            ) { model.findWholeWords.toggle() }
+                .accessibilityLabel("Whole words")
+                .accessibilityIdentifier("find.wholeWords")
+
+            FindToggleButton(
                 systemName: "arrow.2.squarepath",
                 isOn: showReplace,
                 help: showReplace ? "Hide replace" : "Show replace"

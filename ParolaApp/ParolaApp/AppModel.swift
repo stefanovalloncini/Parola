@@ -785,6 +785,7 @@ final class AppModel {
     var findReplacements: Int = 0
     var findQuery: String = "" { didSet { scheduleRecomputeMatches() } }
     var findCaseSensitive: Bool = false { didSet { scheduleRecomputeMatches() } }
+    var findWholeWords: Bool = false { didSet { scheduleRecomputeMatches() } }
     var findReplacement: String = ""
     var matches: [TranscriptMatch] = [] {
         didSet {

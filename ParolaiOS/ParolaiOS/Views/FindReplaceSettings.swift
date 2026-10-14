@@ -144,9 +144,10 @@ private struct FindReplaceRuleRow: View {
                 }
                 .accessibilityLabel(Text("Delete rule"))
             }
-            HStack(spacing: 16) {
+            VStack(alignment: .leading, spacing: 4) {
                 Toggle("Case-sensitive", isOn: $rule.caseSensitive)
-                Toggle("Regex", isOn: $rule.regex)
+                Toggle("Whole words", isOn: Binding(get: { rule.wholeWord }, set: { rule.setWholeWord($0) }))
+                Toggle("Regex", isOn: Binding(get: { rule.regex }, set: { rule.setRegex($0) }))
             }
             .font(.caption)
             .toggleStyle(.switch)

@@ -19685,6 +19685,17 @@
         }
       }
     },
+    "Whole words": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parole intere"
+          }
+        }
+      }
+    },
     "With Homebrew, Parola installs and updates it for you:": {
       "extractionState": "manual",
       "localizations": {

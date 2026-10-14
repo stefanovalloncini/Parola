@@ -46,6 +46,29 @@ struct AppModelRulesTests {
         #expect(reader.autoExportRules == rules)
     }
 
+    @Test("a stored rule list from before whole words still loads")
+    func oldFindReplaceBlobLoads() throws {
+        let defaults = freshDefaults()
+        let id = UUID()
+        let blob = #"[{"id":"\#(id.uuidString)","find":"cat","replace":"dog","caseSensitive":false,"regex":false,"enabled":true}]"#
+        defaults.set(Data(blob.utf8), forKey: "findReplaceRules")
+
+        let reader = makeReader(defaults: defaults)
+        #expect(reader.findReplaceRules.map(\.find) == ["cat"])
+        #expect(reader.findReplaceRules.first?.wholeWord == false)
+    }
+
+    @Test("a whole-word rule survives a save and reload")
+    func wholeWordRoundTrip() throws {
+        let defaults = freshDefaults()
+        let writer = try makeModel(defaults: defaults)
+        writer.findReplaceRules = [FindReplaceRule(find: "cat", replace: "dog", wholeWord: true)]
+
+        let reader = makeReader(defaults: defaults)
+        #expect(reader.findReplaceRules == writer.findReplaceRules)
+        #expect(reader.findReplaceRules.first?.wholeWord == true)
+    }
+
     @Test("ignored-segment rules survive a save and reload")
     func ignoredSegmentRoundTrip() throws {
         let defaults = freshDefaults()

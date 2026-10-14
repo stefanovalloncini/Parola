@@ -146,7 +146,11 @@ private struct FindReplaceRuleRow: View {
             HStack(spacing: 16) {
                 Toggle("Case-sensitive", isOn: $rule.caseSensitive).toggleStyle(.checkbox)
                     .axLeaf("FindReplace.Toggle.CaseSensitive")
-                Toggle("Regex", isOn: $rule.regex).toggleStyle(.checkbox)
+                Toggle("Whole words", isOn: Binding(get: { rule.wholeWord }, set: { rule.setWholeWord($0) }))
+                    .toggleStyle(.checkbox)
+                    .axLeaf("FindReplace.Toggle.WholeWords")
+                Toggle("Regex", isOn: Binding(get: { rule.regex }, set: { rule.setRegex($0) }))
+                    .toggleStyle(.checkbox)
                     .axLeaf("FindReplace.Toggle.Regex")
             }
             .font(DS.Font.secondary)

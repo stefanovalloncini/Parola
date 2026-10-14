@@ -122,6 +122,36 @@ struct FindAndReplaceTests {
         #expect(model.matches.isEmpty)
     }
 
+    @Test("the Whole words toggle recomputes the matches")
+    func wholeWordsRecomputes() async {
+        model.transcript = Self.makeTranscript(["cat category cat.", "concat"])
+        openFind(query: "cat")
+        #expect(model.matches.count == 4)
+
+        model.findWholeWords = true
+        #expect(await waitUntil { model.matches.count == 2 })
+        model.findWholeWords = false
+        #expect(await waitUntil { model.matches.count == 4 })
+    }
+
+    @Test("Replace All with Whole words leaves embedded hits alone")
+    func replaceAllWholeWords() {
+        model.transcript = Self.makeTranscript(["cat category cat."])
+        model.findWholeWords = true
+        openFind(query: "cat")
+        model.findReplacement = "dog"
+        model.replaceAllMatches()
+        #expect(model.transcript?.segments.map(\.text) == ["dog category dog."])
+    }
+
+    @Test("revealInTranscript honours Whole words")
+    func revealWholeWords() {
+        model.transcript = Self.makeTranscript(["category"])
+        model.findWholeWords = true
+        model.revealInTranscript("cat")
+        #expect(!model.findIsOpen)
+    }
+
     @Test("replaceCurrentMatch updates only the active segment")
     func replaceCurrent() throws {
         openFind(query: "Hello")
