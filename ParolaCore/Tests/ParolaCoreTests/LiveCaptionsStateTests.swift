@@ -29,6 +29,22 @@ struct LiveCaptionsStateTests {
         #expect(s.downloadFraction == nil)
     }
 
+    @Test("the newest words stay visible when the line before them is confirmed")
+    func newestWordsSurviveAConfirm() {
+        var s = LiveCaptionsState()
+        s.apply(.partial(text: "That is exactly the"))
+        s.apply(.confirmed(TranscriptSegment(id: 0, start: 0, end: 4, text: "finish a sentence,")))
+        #expect(s.captionText == "finish a sentence, That is exactly the")
+
+        s.apply(.partial(text: "all from me."))
+        s.apply(.confirmed(TranscriptSegment(id: 1, start: 4, end: 6, text: "all from me.")))
+        #expect(s.partial.isEmpty, "a partial that is the confirmed line itself is done")
+
+        s.apply(.partial(text: "so let me hand"))
+        s.apply(.confirmed(TranscriptSegment(id: 2, start: 6, end: 7, text: "so let")))
+        #expect(s.partial == "me hand", "what follows the confirmed words stays")
+    }
+
     @Test("partial event appears in displayed text")
     func partial() {
         var s = LiveCaptionsState()

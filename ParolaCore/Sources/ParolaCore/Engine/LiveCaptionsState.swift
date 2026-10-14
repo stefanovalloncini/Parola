@@ -9,7 +9,7 @@ public struct LiveCaptionsState: Sendable, Equatable {
     public var maxLines: Int
     public var isActive: Bool
     public var isLoading: Bool
-    /// How far the model's download has got while it is one, so the panel can say so instead of just loading.
+    /// How far the model's download has got while there is one, so the panel can say so instead of just loading.
     public var downloadFraction: Double?
     public var error: String?
 
@@ -76,7 +76,7 @@ public struct LiveCaptionsState: Sendable, Equatable {
                     confirmedLines.removeFirst(confirmedLines.count - maxLines)
                 }
             }
-            partial = ""
+            partial = Self.remainder(of: partial, after: trimmed)
         case .voiceActivity:
             break
         case .warning(let msg):
@@ -89,6 +89,15 @@ public struct LiveCaptionsState: Sendable, Equatable {
         case .finished:
             partial = ""
         }
+    }
+
+    /// The session delivers a take's new partial before the line it confirms: one that starts with the line is its older form, and one that doesn't is newer and stays.
+    private static func remainder(of partial: String, after confirmed: String) -> String {
+        let text = partial.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !confirmed.isEmpty else { return partial }
+        if confirmed.hasPrefix(text) { return "" }
+        guard text.hasPrefix(confirmed) else { return partial }
+        return String(text.dropFirst(confirmed.count)).trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     /// Puts an earlier run's captions ahead of this one's, for a session restarted mid-way.
