@@ -13,6 +13,12 @@ struct PresenterCaptionsView: View {
         return controller.state.confirmedLines.last ?? ""
     }
 
+    private var statusText: LocalizedStringKey {
+        guard controller.state.isLoading else { return "Waiting for speech…" }
+        guard let fraction = controller.state.downloadFraction else { return "Loading model…" }
+        return "Downloading model \(Int((fraction * 100).rounded())) %"
+    }
+
     var body: some View {
         ZStack(alignment: .topTrailing) {
             Color.black.ignoresSafeArea()
@@ -45,7 +51,7 @@ struct PresenterCaptionsView: View {
                     .font(.system(size: fontSize / 2))
                     .foregroundStyle(.white.opacity(0.4))
                     .symbolEffect(.variableColor.iterative, isActive: controller.state.isActive)
-                Text(controller.state.isLoading ? "Loading model…" : "Waiting for speech…")
+                Text(statusText)
                     .font(.system(size: fontSize / 2.4, weight: .medium))
                     .foregroundStyle(.white.opacity(0.5))
             }
@@ -54,7 +60,8 @@ struct PresenterCaptionsView: View {
                 .font(.system(size: fontSize, weight: .semibold, design: .rounded))
                 .foregroundStyle(.white)
                 .multilineTextAlignment(.center)
-                .frame(maxWidth: .infinity, alignment: .center)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                .clipped()
                 .accessibilityAddTraits(.updatesFrequently)
         }
     }

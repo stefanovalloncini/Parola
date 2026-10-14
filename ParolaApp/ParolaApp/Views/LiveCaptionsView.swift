@@ -59,7 +59,7 @@ struct LiveCaptionsView: View {
             HStack(spacing: 8) {
                 Image(systemName: controller.state.isLoading ? "arrow.down.circle" : "waveform")
                     .symbolEffect(.variableColor.iterative, isActive: controller.state.isActive)
-                Text(controller.state.isLoading ? "Loading model" : "Listening")
+                Text(statusText)
             }
             .font(.system(size: fontSize - 6, weight: .medium))
             .foregroundStyle(.white.opacity(0.55))
@@ -67,14 +67,32 @@ struct LiveCaptionsView: View {
             Text(caption)
                 .font(.system(size: fontSize, weight: .semibold))
                 .foregroundStyle(.white)
-                .lineLimit(2)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, minHeight: captionHeight, maxHeight: captionHeight, alignment: .bottom)
+                .clipped()
+                .mask(rollUpFade)
                 .contentTransition(.opacity)
                 .animation(.easeOut(duration: 0.22), value: controller.state.history.count)
                 .accessibilityLabel(caption)
                 .accessibilityAddTraits(.updatesFrequently)
         }
+    }
+
+    private var statusText: LocalizedStringKey {
+        guard controller.state.isLoading else { return "Listening" }
+        guard let fraction = controller.state.downloadFraction else { return "Loading model" }
+        return "Downloading model \(Int((fraction * 100).rounded())) %"
+    }
+
+    /// Two lines tall, newest words at the bottom: older ones scroll off the top.
+    private var captionHeight: CGFloat {
+        let font = NSFont.systemFont(ofSize: fontSize, weight: .semibold)
+        return (NSLayoutManager().defaultLineHeight(for: font) * 2).rounded(.up)
+    }
+
+    private var rollUpFade: some View {
+        LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black, location: 0.3)], startPoint: .top, endPoint: .bottom)
     }
 
     private var background: some View {
@@ -130,13 +148,7 @@ struct LiveCaptionsView: View {
         fontSize = preset.fontSize
     }
 
-    private var caption: String {
-        let last = controller.state.confirmedLines.last
-        let partial = controller.state.partial.trimmingCharacters(in: .whitespacesAndNewlines)
-        return [last, partial.isEmpty ? nil : partial]
-            .compactMap { $0 }
-            .joined(separator: " ")
-    }
+    private var caption: String { controller.state.captionText }
 }
 
 enum LiveCaptionStylePreset {

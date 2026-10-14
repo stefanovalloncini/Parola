@@ -36,7 +36,10 @@ final class LiveCaptionsController {
     private var presenterWindow: NSWindow?
     private var session: (any StreamingTranscriber)?
     private var consumer: Task<Void, Never>?
-    private var lastOptions: TranscriptionOptions?
+    private(set) var lastOptions: TranscriptionOptions?
+    /// What Retry starts with: the app's current model and language, so a fix made since the failure takes effect.
+    @ObservationIgnored var optionsProvider: (@MainActor () -> TranscriptionOptions)?
+    @ObservationIgnored var unavailableReason: (@MainActor () -> String?)?
 
     init(showsPanel: Bool = true) {
         self.showsPanel = showsPanel
@@ -104,7 +107,12 @@ final class LiveCaptionsController {
 
         consumer = Task { [weak self] in
             do {
-                let events = try await s.start(options: options, speakerLabeler: nil, downloadProgress: { _ in })
+                let events = try await s.start(options: options, speakerLabeler: nil, downloadProgress: { fraction in
+                    Task { @MainActor in
+                        if self?.state.isLoading == true { self?.state.downloadFraction = fraction }
+                    }
+                })
+                self?.state.downloadFraction = nil
                 self?.state.isLoading = false
                 for await event in events {
                     self?.handle(event)
@@ -150,10 +158,16 @@ final class LiveCaptionsController {
         session = nil
     }
 
-    /// A failed session stays on its panel with the reason; Retry starts it again where it was.
+    /// A failed session stays on its panel with the reason; Retry starts it again with the current settings.
     func tryAgain() async {
-        guard !state.isActive, let lastOptions else { return }
-        await start(options: lastOptions, source: source)
+        guard !state.isActive else { return }
+        if let reason = unavailableReason?() {
+            failurePermission = nil
+            state.error = reason
+            return
+        }
+        guard let options = optionsProvider?() ?? lastOptions else { return }
+        await start(options: optionsWithTranslate(options), source: source)
     }
 
     func closeFailure() {

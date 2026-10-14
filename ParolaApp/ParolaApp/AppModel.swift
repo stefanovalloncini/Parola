@@ -1125,6 +1125,11 @@ final class AppModel {
             liveCaptions?.openPermission = { [capturePermissions] permission in
                 Self.openCaptionPermission(permission, using: capturePermissions)
             }
+            liveCaptions?.optionsProvider = { [weak self] in
+                guard let self else { return TranscriptionOptions() }
+                return makeOptions(task: .transcribe, model: selectedModel, language: selectedLanguage)
+            }
+            liveCaptions?.unavailableReason = { [weak self] in self?.liveCaptionsUnavailableReason }
         }
     }
 
@@ -1145,8 +1150,13 @@ final class AppModel {
 
     /// Nil when the selected model can show live captions; otherwise the user-facing reason.
     var liveCaptionsUnavailableReason: String? {
-        guard !ModelCatalog.canCaption(id: selectedModel) else { return nil }
-        return String(localized: "\(AppModel.modelLabel(selectedModel)) can't show Live Captions. Pick a Whisper or Parakeet model.")
+        guard ModelCatalog.canCaption(id: selectedModel) else { return unsupportedCaptionReason }
+        if ModelCatalog.variant(id: selectedModel)?.engineID == .parakeet { return languageMismatchWarning }
+        return nil
+    }
+
+    private var unsupportedCaptionReason: String {
+        String(localized: "\(AppModel.modelLabel(selectedModel)) can't show Live Captions. Pick a Whisper or Parakeet model.")
     }
 
     func toggleLiveCaptions() {
@@ -2349,9 +2359,7 @@ final class AppModel {
     }
 
     private func applyLiveCaptionsTranslateChange() {
-        // Same capability gate as makeOptions: engines that can't translate would
-        // otherwise get .translate re-instated by the captions controller. Parakeet passes
-        // so the captions panel says it can't, instead of the switch silently doing nothing.
+        // Parakeet passes so the panel reports it can't translate, instead of the switch doing nothing.
         let parakeet = ModelCatalog.variant(id: selectedModel)?.engineID == .parakeet
         let enabled = liveCaptionsTranslate && (selectedModelCapabilities.supportsTranslate || parakeet)
         Task { await liveCaptions?.setTranslate(enabled) }

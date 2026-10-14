@@ -111,6 +111,17 @@
         }
       }
     },
+    "%@ is English-only. Pick a multilingual model (like Whisper) to transcribe other languages.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ è solo in inglese. Scegli un modello multilingue (come Whisper) per trascrivere altre lingue."
+          }
+        }
+      }
+    },
     "%@ can't transcribe %@. Pick a multilingual model (like Whisper) to transcribe other languages.": {
       "extractionState": "manual",
       "localizations": {
@@ -5829,6 +5840,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Download non riuscito: %@"
+          }
+        }
+      }
+    },
+    "Downloading model %lld %%": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download del modello %lld %%"
           }
         }
       }

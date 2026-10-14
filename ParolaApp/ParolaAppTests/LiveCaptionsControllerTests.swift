@@ -93,6 +93,107 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("Retry uses the current translate setting, not the one the failed start had", .timeLimit(.minutes(1)))
+        func retryAfterTranslateIsTurnedOff() async throws {
+            try await withMocksCleared(.streaming) {
+                let controller = LiveCaptionsController(showsPanel: false)
+                controller.optionsProvider = { TranscriptionOptions(model: "nvidia_parakeet-tdt-0.6b-v3") }
+                await controller.setTranslate(true)
+                await controller.toggle(options: TranscriptionOptions(model: "nvidia_parakeet-tdt-0.6b-v3"))
+                await waitUntil { controller.state.error != nil }
+                #expect(controller.lastOptions?.task == .translate)
+
+                await controller.setTranslate(false)
+                MockStreamingTranscriberRegistry.shared.install(MockTranscriberResponse(partials: ["again"], delayMs: 300))
+                await controller.tryAgain()
+
+                #expect(controller.state.isActive)
+                #expect(controller.state.error == nil)
+                #expect(controller.lastOptions?.task == .transcribe)
+                await controller.stop()
+            }
+        }
+
+        @Test("Retry starts on the model picked since the failure", .timeLimit(.minutes(1)))
+        func retryAfterPickingWhisper() async throws {
+            try await withMocksCleared(.streaming) {
+                let controller = LiveCaptionsController(showsPanel: false)
+                await controller.setTranslate(true)
+                await controller.toggle(options: TranscriptionOptions(model: "nvidia_parakeet-tdt-0.6b-v3"))
+                await waitUntil { controller.state.error != nil }
+
+                await controller.setTranslate(false)
+                controller.optionsProvider = { TranscriptionOptions(model: "openai_whisper-tiny") }
+                MockStreamingTranscriberRegistry.shared.install(MockTranscriberResponse(partials: ["again"], delayMs: 300))
+                await controller.tryAgain()
+
+                #expect(controller.state.isActive)
+                #expect(controller.lastOptions?.model == "openai_whisper-tiny")
+                await controller.stop()
+            }
+        }
+
+        @Test("Retry with a model captions can't use shows the reason again instead of starting", .timeLimit(.minutes(1)))
+        func retryWithAnUnavailableModel() async throws {
+            try await withMocksCleared(.streaming) {
+                MockStreamingTranscriberRegistry.shared.install(MockTranscriberResponse(
+                    failure: MockTranscriberFailure(code: .transcriptionFailed, message: "The capture stopped.")
+                ))
+                let controller = LiveCaptionsController(showsPanel: false)
+                await controller.start(options: TranscriptionOptions())
+                await waitUntil { controller.state.error != nil }
+
+                controller.unavailableReason = { "Apple Speech can't show Live Captions. Pick a Whisper or Parakeet model." }
+                await controller.tryAgain()
+
+                #expect(controller.state.error == "Apple Speech can't show Live Captions. Pick a Whisper or Parakeet model.")
+                #expect(!controller.state.isActive)
+                #expect(controller.isPanelShown)
+            }
+        }
+
+        @Test("a model that downloads shows its fraction until it has loaded", .timeLimit(.minutes(1)))
+        func downloadFractionShows() async throws {
+            try await withMocksCleared(.streaming) {
+                let gate = MockTranscriberGate()
+                MockStreamingTranscriberRegistry.shared.install(MockTranscriberResponse(
+                    partials: ["hello"], downloadFractions: [0.42], delayMs: 300, gate: gate
+                ))
+                let controller = LiveCaptionsController(showsPanel: false)
+                await controller.start(options: TranscriptionOptions())
+                await waitUntil { controller.state.downloadFraction == 0.42 }
+                #expect(controller.state.isLoading)
+
+                await gate.open()
+                await waitUntil { !controller.state.isLoading }
+
+                #expect(controller.state.downloadFraction == nil)
+                await controller.stop()
+            }
+        }
+
+        @Test("flipping Translate in the app reaches the controller for Parakeet, and still not for Apple Speech", .timeLimit(.minutes(1)))
+        func appModelFlipReachesTheController() async throws {
+            let model = AppModel(bootstrap: AppBootstrap(
+                mode: .test, library: makeTempLibraryURL("captions-flip"), defaultsOverride: temporaryDefaults(),
+                sideEffects: [], filePicker: TestFilePicker(), clock: ContinuousClock()
+            ))
+            let controller = LiveCaptionsController(showsPanel: false)
+            model.liveCaptions = controller
+
+            model.selectedModel = "nvidia_parakeet-tdt-0.6b-v3"
+            model.liveCaptionsTranslate = true
+            await waitUntil { controller.translateToEnglish }
+            #expect(controller.translateToEnglish)
+
+            model.liveCaptionsTranslate = false
+            await waitUntil { !controller.translateToEnglish }
+            model.selectedModel = "apple-speech-analyzer"
+            model.liveCaptionsTranslate = true
+            await Task.yield()
+            #expect(!controller.translateToEnglish)
+        }
+
         @Test("closing a failed panel hides it", .timeLimit(.minutes(1)))
         func closingAFailedPanel() async throws {
             try await withMocksCleared(.streaming) {

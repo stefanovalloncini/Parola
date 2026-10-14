@@ -89,6 +89,25 @@ struct SettingsCopyTests {
         #expect(model.liveCaptionsUnavailableReason != nil)
     }
 
+    @Test("English-only Parakeet v2 is unavailable for captions in another language, with the translated language advice")
+    func captionsLanguageAdvice() throws {
+        let model = makeModel("settings-copy-captions-language")
+        model.selectedLanguage = "it"
+        model.selectedModel = "nvidia_parakeet-tdt-0.6b-v2"
+        let reason = try #require(model.liveCaptionsUnavailableReason)
+        #expect(reason == model.languageMismatchWarning)
+        for id in ["nvidia_parakeet-tdt-0.6b-v3", "openai_whisper-tiny"] {
+            model.selectedModel = id
+            #expect(model.liveCaptionsUnavailableReason == nil, "\(id)")
+        }
+        let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
+        let italian = try #require(Bundle(path: path))
+        let key = "%@ is English-only. Pick a multilingual model (like Whisper) to transcribe other languages."
+        #expect(italian.localizedString(forKey: key, value: "MISSING", table: nil) != "MISSING")
+        let download = italian.localizedString(forKey: "Downloading model %lld %%", value: "MISSING", table: nil)
+        #expect(download == "Download del modello %lld %%")
+    }
+
     @Test("the Live Captions and Translation panes' model warnings have their Italian")
     func modelWarningsAreTranslated() throws {
         let model = makeModel("settings-copy-model-warnings")
