@@ -115,11 +115,11 @@ struct StageLayoutTests {
         #expect(measured(DS.Font.takeTimerCompact, text: "0:00") == measured(DS.Font.takeTimerCompact, text: "1:11"))
     }
 
-    @Test("the Stage's words are New York 24")
+    @Test("the Stage's words are SF 24")
     @MainActor
     func stageTextFace() {
-        #expect(measured(DS.Font.liveTranscriptStage) == measured(.system(size: 24, design: .serif)))
-        #expect(measured(DS.Font.liveTranscriptStage) != measured(.system(size: 24)))
+        #expect(measured(DS.Font.liveTranscriptStage) == measured(.system(size: 24)))
+        #expect(measured(DS.Font.liveTranscriptStage) != measured(.system(size: 24, design: .serif)))
     }
 
     /// What can be up under the page when a take starts, each with a control that only its strip draws.

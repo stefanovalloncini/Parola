@@ -28,7 +28,7 @@ struct TypeScaleTests {
             #expect(height(bigger) > height(smaller))
         }
         #expect(height(DS.Font.bodyStrong) == height(DS.Font.body))
-        // The reading tier is New York on its own rhythm, so it steps down within itself, not against chrome.
+        // The reading tier has its own rhythm, so it steps down within itself, not against chrome.
         #expect(height(DS.Font.transcript) > height(DS.Font.transcriptCompact))
         #expect(height(DS.Font.transcriptCompact) > height(DS.Font.body))
     }
@@ -42,7 +42,7 @@ struct TypeScaleTests {
     func tiersSharingAHeightDiffer() {
         #expect(measured(DS.Font.body) != measured(DS.Font.bodyStrong))
         #expect(measured(DS.Font.secondary) != measured(DS.Font.mono))
-        // transcriptEmphasis is the transcript face at semibold: same line, wider glyphs — the serif's own pair.
+        // transcriptEmphasis is the transcript face at semibold: same line, wider glyphs.
         #expect(height(DS.Font.transcriptEmphasis) == height(DS.Font.transcript))
         #expect(measured(DS.Font.transcriptEmphasis) != measured(DS.Font.transcript))
     }
@@ -64,16 +64,14 @@ struct TypeScaleTests {
         #expect(height(DS.Font.sheetTitle) > height(DS.Font.heading))
     }
 
-    @Test("the reading tier is New York, the chrome around it is SF")
-    func readingTierIsSerif() {
-        #expect(measured(DS.Font.transcript) == measured(.system(size: 17, design: .serif)))
-        #expect(measured(DS.Font.transcript) != measured(.system(size: 17)))
-        #expect(measured(DS.Font.transcriptEmphasis) == measured(.system(size: 17, weight: .semibold, design: .serif)))
-        #expect(measured(DS.Font.transcriptEmphasis) != measured(.system(size: 17, weight: .semibold)))
-        #expect(measured(DS.Font.transcriptCompact) == measured(.system(size: 15, design: .serif)))
-        #expect(measured(DS.Font.transcriptCompact) != measured(.system(size: 15)))
-        #expect(measured(DS.Font.excerpt) == measured(.system(size: 14, design: .serif)))
-        #expect(measured(DS.Font.excerpt) != measured(DS.Font.body))
+    @Test("the reading tier is SF like the chrome around it")
+    func readingTierIsSF() {
+        #expect(measured(DS.Font.transcript) == measured(.system(size: 17)))
+        #expect(measured(DS.Font.transcript) != measured(.system(size: 17, design: .serif)))
+        #expect(measured(DS.Font.transcriptEmphasis) == measured(.system(size: 17, weight: .semibold)))
+        #expect(measured(DS.Font.transcriptCompact) == measured(.system(size: 15)))
+        #expect(measured(DS.Font.excerpt) == measured(.system(size: 14)))
+        #expect(measured(DS.Font.excerpt) != measured(.system(size: 14, design: .serif)))
         #expect(measured(DS.Font.body) == measured(.system(size: 13)))
     }
 

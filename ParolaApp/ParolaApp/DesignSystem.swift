@@ -59,8 +59,7 @@ enum DS {
 
     /// Sixteen fixed tiers, ours rather than the system text styles, so a tier means the same thing
     /// on every surface. Pick by role — page title, section heading, row title, meta line, caption.
-    /// Three faces: SF for the chrome, New York for the reading surface (`transcript`, `transcriptEmphasis`,
-    /// `transcriptCompact`, and a row's `excerpt` of it), SF Rounded for the timer.
+    /// SF throughout, SF Rounded for the timer.
     enum Font {
         /// The brand lockup on the first-run stage, nowhere else.
         static let wordmark = SwiftUI.Font.system(size: 56, weight: .bold)
@@ -75,11 +74,11 @@ enum DS {
         static let secondary = SwiftUI.Font.system(size: 12)
         static let caption = SwiftUI.Font.system(size: 11, weight: .medium)
         static let mono = SwiftUI.Font.system(size: 12, design: .monospaced).monospacedDigit()
-        static let transcript = SwiftUI.Font.system(size: 17, design: .serif)
+        static let transcript = SwiftUI.Font.system(size: 17)
         /// Derived so the karaoke word under the playhead follows the transcript face wherever it goes.
         static let transcriptEmphasis = transcript.weight(.semibold)
-        static let transcriptCompact = SwiftUI.Font.system(size: 15, design: .serif)
-        static let excerpt = SwiftUI.Font.system(size: 14, design: .serif)
+        static let transcriptCompact = SwiftUI.Font.system(size: 15)
+        static let excerpt = SwiftUI.Font.system(size: 14)
         static let timer = SwiftUI.Font.system(size: 22, weight: .light, design: .rounded).monospacedDigit()
     }
 

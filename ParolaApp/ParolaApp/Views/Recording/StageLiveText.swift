@@ -29,7 +29,7 @@ enum LiveParagraphs {
     }
 }
 
-/// The Stage's teleprompter for a live take: the newest three or four lines in New York 24 pt, older ones fading out at the top.
+/// The Stage's teleprompter for a live take: the newest three or four lines in 24 pt, older ones fading out at the top.
 struct StageLiveText: View {
     /// Off while the Stage is out of sight, so the caret stops blinking.
     let isOnScreen: Bool
