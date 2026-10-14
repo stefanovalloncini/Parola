@@ -27,6 +27,23 @@ struct FixtureCaptureTests {
         #expect(clock.sleeperCount == 0, "the file is done, nothing waits for more")
     }
 
+    @Test("chunks land on their deadlines even when the clock jumps past several at once")
+    func deadlinesAreAbsolute() async {
+        let clock = TestClock()
+        let capture = FixtureCapture(samples: [Float](repeating: 0.1, count: 160_000), clock: clock)
+        let received = Awaitable(0)
+        capture.start { _ in received.increment() }
+        await received.wait(atLeast: 1, "the first chunk")
+        await clock.waitForSleeper()
+
+        clock.advance(by: .milliseconds(1_050))
+        await received.wait(atLeast: 11, "every chunk due by 1.05 s, with no sleep of its own per chunk")
+        await clock.waitForSleeper()
+        clock.advance(by: .milliseconds(8_950))
+        await received.wait(atLeast: 100, "all 100 chunks of a 10 s file after 10 s")
+        #expect(received.value == 100)
+    }
+
     @Test("stop ends delivery")
     func stopEndsDelivery() async {
         let clock = TestClock()

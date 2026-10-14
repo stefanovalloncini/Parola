@@ -27,24 +27,32 @@ public final class FixtureCapture: Sendable {
         self.chunkSamples = WhisperKit.sampleRate / 10
     }
 
-    /// Delivers the first chunk now and one more each `chunkDuration` until the file ends or `stop()`.
+    /// Delivers the first chunk now and chunk k at k × `chunkDuration`, until the file ends or `stop()`.
     public func start(onBuffer: @escaping @Sendable ([Float]) -> Void) {
         let samples = samples
         let clock = clock
         let size = chunkSamples
-        let running = Task {
-            var offset = 0
-            while offset < samples.count, !Task.isCancelled {
-                let end = min(offset + size, samples.count)
-                onBuffer(Array(samples[offset..<end]))
-                offset = end
-                guard offset < samples.count else { return }
-                do { try await clock.sleep(for: Self.chunkDuration) } catch { return }
-            }
-        }
+        let running = Task { await Self.deliver(samples, in: size, on: clock, to: onBuffer) }
         task.withLock { current in
             current?.cancel()
             current = running
+        }
+    }
+
+    // Absolute deadlines, so a late wake is made up by the next chunk instead of pushing the whole file back.
+    private static func deliver<C: Clock<Duration>>(
+        _ samples: [Float], in size: Int, on clock: C, to onBuffer: @Sendable ([Float]) -> Void
+    ) async {
+        let start = clock.now
+        var offset = 0
+        var index = 0
+        while offset < samples.count, !Task.isCancelled {
+            let end = min(offset + size, samples.count)
+            onBuffer(Array(samples[offset..<end]))
+            offset = end
+            index += 1
+            guard offset < samples.count else { return }
+            do { try await clock.sleep(until: start.advanced(by: chunkDuration * index), tolerance: .zero) } catch { return }
         }
     }
 
