@@ -11,7 +11,7 @@ import ScreenCaptureKit
 public actor SystemAudioSource: LiveAudioSource {
     private var stream: SCStream?
     private var handler: SampleHandler?
-    private let outputURL: URL
+    private let outputURL: URL?
     private let outputFormat: AVAudioFormat
     private let callbackQueue = DispatchQueue(label: "com.parola.system-audio")
     public nonisolated let levelMeter = LevelMeter()
@@ -20,9 +20,20 @@ public actor SystemAudioSource: LiveAudioSource {
     private var stopping = false
     private var endHandler: (@Sendable () -> Void)?
     private var endedByItself = false
+    private let sink: (@Sendable ([Float]) -> Void)?
 
     public init() {
-        self.outputURL = RecordingScratch.fileURL(prefix: "parola-system")
+        self.init(sink: nil)
+    }
+
+    /// Hands the converted samples to `sink` instead of writing a file; there is nothing to prepare or keep.
+    public init(samples sink: @escaping @Sendable ([Float]) -> Void) {
+        self.init(sink: sink)
+    }
+
+    private init(sink: (@Sendable ([Float]) -> Void)?) {
+        self.sink = sink
+        self.outputURL = sink == nil ? RecordingScratch.fileURL(prefix: "parola-system") : nil
         guard let format = AVAudioFormat(
             commonFormat: .pcmFormatFloat32,
             sampleRate: 16_000,
@@ -70,16 +81,23 @@ public actor SystemAudioSource: LiveAudioSource {
         guard let converter = AVAudioConverter(from: srcFormat, to: outputFormat) else {
             throw ParolaError.captureUnavailable("could not create audio converter")
         }
-        let writeFile = try AVAudioFile(
-            forWriting: outputURL,
-            settings: outputFormat.settings,
-            commonFormat: .pcmFormatFloat32,
-            interleaved: false
-        )
+        let writer: CaptureFileWriter
+        if let sink {
+            writer = .forwarding(to: sink)
+        } else if let outputURL {
+            writer = CaptureFileWriter(file: try AVAudioFile(
+                forWriting: outputURL,
+                settings: outputFormat.settings,
+                commonFormat: .pcmFormatFloat32,
+                interleaved: false
+            ))
+        } else {
+            throw ParolaError.captureUnavailable("no file to record to")
+        }
 
         let handler = SampleHandler(
             converter: converter,
-            writer: CaptureFileWriter(file: writeFile),
+            writer: writer,
             outputFormat: outputFormat,
             queue: callbackQueue,
             onLevel: { [levelMeter] in levelMeter.record($0) },
@@ -96,8 +114,12 @@ public actor SystemAudioSource: LiveAudioSource {
                 [.error: .error(error)]
             )
             try? await stream.stopCapture()
-            try? FileManager.default.removeItem(at: outputURL)
+            removeScratchFile()
             throw error
+        }
+        guard !stopping else {
+            try? await stream.stopCapture()
+            throw CancellationError()
         }
         self.stream = stream
         self.handler = handler
@@ -105,6 +127,7 @@ public actor SystemAudioSource: LiveAudioSource {
 
     public func prepare() async throws -> URL {
         try await stop()
+        guard let outputURL else { throw ParolaError.captureUnavailable("a sample capture keeps no file") }
         if let captureFailure {
             ParolaLog.error(.audioRecording, "system audio take cut short by a write failure")
             throw CaptureInterrupted(url: outputURL, reason: captureFailure)
@@ -137,6 +160,11 @@ public actor SystemAudioSource: LiveAudioSource {
 
     public func cancel() async {
         try? await stop()
+        removeScratchFile()
+    }
+
+    private func removeScratchFile() {
+        guard let outputURL else { return }
         try? FileManager.default.removeItem(at: outputURL)
     }
 

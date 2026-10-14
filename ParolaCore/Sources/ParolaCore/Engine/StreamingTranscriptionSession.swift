@@ -27,40 +27,17 @@ public protocol StreamingSpeakerLabeler: Sendable {
 /// await session.stop()
 /// ```
 ///
-/// One session = one mic capture. Construct a new one to record again.
+/// One session = one capture. Construct a new one to record again.
 public actor StreamingTranscriptionSession: StreamingTranscriber {
-    /// What a take records from; tests stand in for the hardware.
-    struct Microphone: Sendable {
-        var requestPermission: @Sendable () async -> Bool
-        var start: @Sendable (_ onBuffer: @escaping @Sendable ([Float]) -> Void) throws -> Void
-        var stop: @Sendable () -> Void
-
-        static func input(_ deviceID: DeviceID?) -> Microphone {
-            // Capture must not share the cached kit's AudioProcessor: its AVAudioEngine and sample
-            // buffer are per-recording state, and another session could be borrowing the same kit.
-            nonisolated(unsafe) let processor = AudioProcessor()
-            return Microphone(
-                requestPermission: { await AudioProcessor.requestRecordPermission() },
-                start: { onBuffer in
-                    try processor.startRecordingLive(inputDeviceID: deviceID) { buffer in
-                        onBuffer(buffer)
-                        // Runs on the tap thread, serialized with processBuffer's appends, so this purge can't race them.
-                        processor.purgeAudioSamples(keepingLast: 1)
-                    }
-                },
-                stop: { processor.stopRecording() }
-            )
-        }
-    }
-
     typealias MakeDecoder = @Sendable (StreamingModelLease, TranscriptionOptions) throws -> StreamingRealtimeLoop.Decoder
 
     public let modelStore: ModelStore
-    nonisolated let deviceUID: String?
+    nonisolated let source: CaptionSource
+    nonisolated var deviceUID: String? { source.deviceUID }
     public nonisolated let levelMeter = LevelMeter()
 
     private let modelCache: StreamingModelCache
-    private let microphone: @Sendable (DeviceID?) -> Microphone
+    private let captureFor: @Sendable (CaptionSource) -> CaptionCapture
     private let makeDecoder: MakeDecoder
     private let clock: any Clock<Duration>
     private var modelLease: StreamingModelLease?
@@ -80,6 +57,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
     private var speakerLabeler: (any StreamingSpeakerLabeler)?
     private var failureAudioURL: URL?
     private var audioCutShort = false
+    private var deniedText = FixedFailureText.microphoneNotStarted
     private var startedAt: ContinuousClock.Instant?
     private var isStarting = false
     private var pendingEnd: PendingEnd?
@@ -91,10 +69,11 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
     /// A take that persists audio, or one that asks to, keeps what it captured while the model loads: a stop then waits
     /// for the model and decodes it. Otherwise a stop during the load drops that audio.
     public init(
-        modelStore: ModelStore = .shared, persistAudio: Bool = false, deviceUID: String? = nil, waitsForModelOnStop: Bool = false
+        modelStore: ModelStore = .shared, persistAudio: Bool = false, deviceUID: String? = nil,
+        source: CaptionSource? = nil, waitsForModelOnStop: Bool = false
     ) {
         self.init(
-            modelStore: modelStore, persistAudio: persistAudio, deviceUID: deviceUID,
+            modelStore: modelStore, persistAudio: persistAudio, source: source ?? .microphone(deviceUID: deviceUID),
             waitsForModelOnStop: waitsForModelOnStop, modelCache: .shared
         )
     }
@@ -102,19 +81,19 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
     init(
         modelStore: ModelStore = .shared,
         persistAudio: Bool = false,
-        deviceUID: String? = nil,
+        source: CaptionSource = .microphone(deviceUID: nil),
         waitsForModelOnStop: Bool = false,
         modelCache: StreamingModelCache,
-        microphone: @escaping @Sendable (DeviceID?) -> Microphone = Microphone.input,
+        capture: (@Sendable (CaptionSource) -> CaptionCapture)? = nil,
         makeDecoder: @escaping MakeDecoder = StreamingTranscriptionSession.whisperDecoder,
         clock: any Clock<Duration> = ContinuousClock()
     ) {
         self.modelStore = modelStore
         self.persistAudio = persistAudio
-        self.deviceUID = deviceUID
+        self.source = source
         self.waitsForModelOnStop = persistAudio || waitsForModelOnStop
         self.modelCache = modelCache
-        self.microphone = microphone
+        self.captureFor = capture ?? { CaptionCapture.live($0, clock: clock) }
         self.makeDecoder = makeDecoder
         self.clock = clock
     }
@@ -179,7 +158,8 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
             return Self.takeEndedBeforeCapture(modelName: modelName, options: options)
         }
 
-        let microphone = microphone(Self.resolveInputDeviceID(uid: deviceUID))
+        let capture = captureFor(source)
+        deniedText = capture.deniedText
         let persister = persistAudio ? StreamingAudioPersister(sampleRate: Double(WhisperKit.sampleRate)) : nil
         self.loadedModel = modelName
         let stream = launch(
@@ -188,15 +168,16 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
             StreamingRealtimeLoop(
                 configuration: .init(wantsConfirmedAudio: speakerLabeler != nil, waitsForModelOnStop: waitsForModelOnStop),
                 dependencies: .init(
-                    requestPermission: microphone.requestPermission,
+                    requestPermission: capture.requestPermission,
                     startCapture: { ingest in
-                        try microphone.start { buffer in
+                        try await capture.start { buffer in
                             if ingest(buffer) {
                                 persister?.append(buffer)
                             }
                         }
                     },
-                    stopCapture: microphone.stop,
+                    stopCapture: capture.stop,
+                    interruptStart: capture.interruptStart,
                     model: .loading { [weak self] in
                         let lease = try await modelCache.borrow(modelName, store: modelStore)
                         guard let self else {
@@ -527,7 +508,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
     // The loop returns without failing when it can't capture (e.g. denied mic); if stop() didn't drive that return (loop still set), surface a failure so the consumer doesn't wait forever.
     private func handleStreamerEndedWithoutStop() async {
         if loop != nil { ParolaLog.error(.streaming, "streaming loop ended without a stop request") }
-        await finishStream(failure: FixedFailureText.microphoneNotStarted)
+        await finishStream(failure: deniedText)
     }
 
     private func finishStream(failure: String?, keepingAudio: Bool = false) async {

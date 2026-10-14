@@ -43,34 +43,39 @@ actor StreamingRealtimeLoop {
 
         var requestPermission: @Sendable () async -> Bool
         /// The callback's Bool reports whether it took the buffer, so a caller can gate another consumer on the same decision.
-        var startCapture: @Sendable (@escaping @Sendable ([Float]) -> Bool) throws -> Void
+        var startCapture: @Sendable (@escaping @Sendable ([Float]) -> Bool) async throws -> Void
         var stopCapture: @Sendable () -> Void
+        /// Called instead of `stopCapture` when a stop lands while `startCapture` is still running, so a start that can be cut short is.
+        var interruptStart: (@Sendable () -> Void)?
         var model: Model
         var tick: @Sendable () async throws -> Void
 
         init(
             requestPermission: @escaping @Sendable () async -> Bool,
-            startCapture: @escaping @Sendable (@escaping @Sendable ([Float]) -> Bool) throws -> Void,
+            startCapture: @escaping @Sendable (@escaping @Sendable ([Float]) -> Bool) async throws -> Void,
             stopCapture: @escaping @Sendable () -> Void,
+            interruptStart: (@Sendable () -> Void)? = nil,
             transcribe: @escaping Transcribe,
             tick: @escaping @Sendable () async throws -> Void
         ) {
             self.init(
                 requestPermission: requestPermission, startCapture: startCapture, stopCapture: stopCapture,
-                model: .ready(transcribe), tick: tick
+                interruptStart: interruptStart, model: .ready(transcribe), tick: tick
             )
         }
 
         init(
             requestPermission: @escaping @Sendable () async -> Bool,
-            startCapture: @escaping @Sendable (@escaping @Sendable ([Float]) -> Bool) throws -> Void,
+            startCapture: @escaping @Sendable (@escaping @Sendable ([Float]) -> Bool) async throws -> Void,
             stopCapture: @escaping @Sendable () -> Void,
+            interruptStart: (@Sendable () -> Void)? = nil,
             model: Model,
             tick: @escaping @Sendable () async throws -> Void
         ) {
             self.requestPermission = requestPermission
             self.startCapture = startCapture
             self.stopCapture = stopCapture
+            self.interruptStart = interruptStart
             self.model = model
             self.tick = tick
         }
@@ -134,6 +139,7 @@ actor StreamingRealtimeLoop {
     private var currentText = ""
     private var isRunning = false
     private var didStopCapture = false
+    private var startingCapture = false
     private var stopRequested = false
     private var flushesOnStop = true
     private var permissionWait: CheckedContinuation<Bool?, Never>?
@@ -184,12 +190,21 @@ actor StreamingRealtimeLoop {
         // stop() can land while the first-run prompt is up; Allow must not bring up a mic nobody can stop.
         guard !stopRequested else { return .stopped }
         let startedAt = ContinuousClock.now
+        startingCapture = true
         do {
-            try deps.startCapture { [weak self] buffer in self?.ingest(buffer) ?? false }
+            try await deps.startCapture { [weak self] buffer in self?.ingest(buffer) ?? false }
         } catch {
+            startingCapture = false
             ParolaLog.error(.streaming, "streaming capture failed to start", [.error: .error(error)])
             stopCapture()
+            guard !stopRequested else { return .stopped }
             return .failed(error)
+        }
+        startingCapture = false
+        // A stop that landed during the start only interrupted it, so whatever came up is stopped now.
+        guard !stopRequested else {
+            stopCapture()
+            return .stopped
         }
         isRunning = true
         let decoder: Decoder
@@ -385,7 +400,11 @@ actor StreamingRealtimeLoop {
         } else {
             modelLoad?.cancel()
         }
-        stopCapture()
+        if startingCapture {
+            deps.interruptStart?()
+        } else {
+            stopCapture()
+        }
         answerPermission(nil)
     }
 

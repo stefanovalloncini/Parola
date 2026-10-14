@@ -18,6 +18,14 @@ final class CaptureFileWriter: @unchecked Sendable {
         self.writeChunk = writeChunk
     }
 
+    /// A writer with no file: each chunk's samples go to `sink`, copied before the capture reuses the buffer.
+    static func forwarding(to sink: @escaping @Sendable ([Float]) -> Void) -> CaptureFileWriter {
+        CaptureFileWriter { buffer in
+            guard let channel = buffer.floatChannelData?[0], buffer.frameLength > 0 else { return }
+            sink(Array(UnsafeBufferPointer(start: channel, count: Int(buffer.frameLength))))
+        }
+    }
+
     var failure: String? {
         latchedFailure.withLock { $0 }
     }

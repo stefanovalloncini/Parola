@@ -34,14 +34,17 @@ public enum StreamingTranscriberFactory {
         modelStore: ModelStore = .shared,
         clock: any Clock<Duration> = ContinuousClock(),
         deviceUID: String? = nil,
+        source: CaptionSource? = nil,
         persistAudio: Bool = false,
         waitsForModelOnStop: Bool = false
     ) -> any StreamingTranscriber {
+        let source = source ?? .microphone(deviceUID: deviceUID)
         if let response = MockStreamingTranscriberRegistry.shared.resolve() {
-            return MockStreamingTranscriber(response: response, clock: clock)
+            MockStreamingTranscriberRegistry.shared.recordMade(source: source)
+            return MockStreamingTranscriber(response: response, clock: clock, source: source)
         }
         return StreamingTranscriptionSession(
-            modelStore: modelStore, persistAudio: persistAudio, deviceUID: deviceUID, waitsForModelOnStop: waitsForModelOnStop
+            modelStore: modelStore, persistAudio: persistAudio, source: source, waitsForModelOnStop: waitsForModelOnStop
         )
     }
 

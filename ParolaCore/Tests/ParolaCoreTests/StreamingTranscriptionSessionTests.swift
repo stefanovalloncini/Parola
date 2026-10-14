@@ -168,9 +168,10 @@ private final class StandInMic: Sendable {
         self.holdsDecodes = holdsDecodes
     }
 
-    func microphone(_ deviceID: DeviceID?) -> StreamingTranscriptionSession.Microphone {
+    func capture(_ source: CaptionSource) -> CaptionCapture {
         .init(
             requestPermission: { [granted] in granted },
+            deniedText: FixedFailureText.microphoneNotStarted,
             start: { [self] onBuffer in
                 state.withLock { $0.onBuffer = onBuffer }
                 captureStarted.fire()
@@ -291,7 +292,7 @@ struct StreamingTakeEndingTests {
         let gate = LoadGate()
         let cache = StreamingModelCache.probing(probe, gate: gate)
         let session = StreamingTranscriptionSession(
-            modelStore: try Self.seededStore(), modelCache: cache, microphone: StandInMic().microphone
+            modelStore: try Self.seededStore(), modelCache: cache, capture: StandInMic().capture
         )
         let starting = GuardedTask { try await session.start(options: TranscriptionOptions(model: Self.tiny)) }
         await probe.loads.wait(atLeast: 1, "the model load to start")
@@ -316,7 +317,7 @@ struct StreamingTakeEndingTests {
         let gate = LoadGate()
         let cache = StreamingModelCache.probing(probe, gate: gate)
         let session = StreamingTranscriptionSession(
-            modelStore: try Self.seededStore(), modelCache: cache, microphone: StandInMic().microphone
+            modelStore: try Self.seededStore(), modelCache: cache, capture: StandInMic().capture
         )
         let starting = GuardedTask { try await session.start(options: TranscriptionOptions(model: Self.tiny)) }
         await probe.loads.wait(atLeast: 1, "the model load to start")
@@ -335,7 +336,7 @@ struct StreamingTakeEndingTests {
         let probe = CacheProbe()
         let cache = StreamingModelCache.probing(probe)
         let session = StreamingTranscriptionSession(
-            modelStore: try Self.seededStore(), modelCache: cache, microphone: StandInMic().microphone
+            modelStore: try Self.seededStore(), modelCache: cache, capture: StandInMic().capture
         )
 
         await #expect(throws: ParolaError.self) {
@@ -613,7 +614,7 @@ struct StreamingCaptureFirstTests {
         try store.seedInstalledModel(tiny)
         return StreamingTranscriptionSession(
             modelStore: store, persistAudio: persistAudio, waitsForModelOnStop: waitsForModelOnStop, modelCache: cache,
-            microphone: mic.microphone, makeDecoder: mic.decoder, clock: clock
+            capture: mic.capture, makeDecoder: mic.decoder, clock: clock
         )
     }
 
@@ -1314,3 +1315,296 @@ struct StreamingTranscriptionSessionTests {
         #expect(labeler.calls.isEmpty)
     }
 }
+
+/// A capture the test scripts: what it was asked, whether it is up, and an optional start that waits on a gate.
+private final class ScriptedCapture: Sendable {
+    private struct State {
+        var sources: [CaptionSource] = []
+        var running = false
+        var startCalls = 0
+        var stopCalls = 0
+        var interrupts = 0
+    }
+
+    private let state = OSAllocatedUnfairLock(initialState: State())
+    private let granted: Bool
+    private let startGate: UninterruptibleGate?
+    let deniedText: String
+
+    init(granted: Bool = true, deniedText: String = "denied for the test", startGate: UninterruptibleGate? = nil) {
+        self.granted = granted
+        self.deniedText = deniedText
+        self.startGate = startGate
+    }
+
+    var sources: [CaptionSource] { state.withLock { $0.sources } }
+    var running: Bool { state.withLock { $0.running } }
+    var startCalls: Int { state.withLock { $0.startCalls } }
+    var stopCalls: Int { state.withLock { $0.stopCalls } }
+    var interrupts: Int { state.withLock { $0.interrupts } }
+
+    func capture(_ source: CaptionSource) -> CaptionCapture {
+        state.withLock { $0.sources.append(source) }
+        return CaptionCapture(
+            requestPermission: { [granted] in granted },
+            deniedText: deniedText,
+            start: { [self] _ in
+                state.withLock { $0.startCalls += 1 }
+                await startGate?.wait()
+                state.withLock { $0.running = true }
+            },
+            stop: { [self] in state.withLock { $0.running = false; $0.stopCalls += 1 } },
+            interruptStart: { [self] in state.withLock { $0.interrupts += 1 } }
+        )
+    }
+}
+
+@Suite("Caption sources in a session")
+struct StreamingSessionSourceTests {
+    private static let tiny = "openai_whisper-tiny"
+
+    private static func session(
+        source: CaptionSource, capture: @escaping @Sendable (CaptionSource) -> CaptionCapture, cache: StreamingModelCache
+    ) throws -> StreamingTranscriptionSession {
+        let store = ModelStore(modelsDirectory: FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-source-\(UUID().uuidString)"))
+        try store.seedInstalledModel(tiny)
+        return StreamingTranscriptionSession(
+            modelStore: store, source: source, modelCache: cache, capture: capture,
+            makeDecoder: StandInMic().decoder
+        )
+    }
+
+    @Test("each source asks for its own capture")
+    func routesEachSource() async throws {
+        let sources: [CaptionSource] = [.microphone(deviceUID: "usb"), .systemAudio, .app(bundleID: "us.zoom.xos")]
+        for source in sources {
+            let scripted = ScriptedCapture()
+            let cache = StreamingModelCache.probing(CacheProbe())
+            let session = try Self.session(source: source, capture: scripted.capture, cache: cache)
+            let events = try #require(try await GuardedTask {
+                try await session.start(options: TranscriptionOptions(model: Self.tiny))
+            }.value("the start to return"))
+            #expect(scripted.sources == [source])
+            #expect(scripted.running)
+            await session.stop()
+            for await _ in events {}
+            #expect(!scripted.running)
+        }
+    }
+
+    @Test("a refused capture fails with the source's own text and never starts")
+    func deniedUsesTheSourceText() async throws {
+        let scripted = ScriptedCapture(granted: false, deniedText: FixedFailureText.systemAudioNotAllowed)
+        let cache = StreamingModelCache.probing(CacheProbe())
+        let session = try Self.session(source: .systemAudio, capture: scripted.capture, cache: cache)
+        let events = try #require(try await GuardedTask {
+            try await session.start(options: TranscriptionOptions(model: Self.tiny))
+        }.value("the start to return"))
+        var failure: String?
+        for await event in events {
+            if case .failed(let text) = event { failure = text }
+        }
+        #expect(failure == FixedFailureText.systemAudioNotAllowed)
+        #expect(scripted.startCalls == 0)
+    }
+
+    @Test("a stop that lands while the capture is starting leaves nothing running")
+    func stopDuringAsyncStart() async throws {
+        let gate = UninterruptibleGate()
+        let scripted = ScriptedCapture(startGate: gate)
+        let cache = StreamingModelCache.probing(CacheProbe())
+        let session = try Self.session(source: .systemAudio, capture: scripted.capture, cache: cache)
+        let starting = GuardedTask { try await session.start(options: TranscriptionOptions(model: Self.tiny)) }
+        await gate.arrivals.wait(atLeast: 1, "the capture to begin starting")
+
+        let stopping = GuardedTask { await session.stop() }
+        await pollUntil("the stop to reach the capture's start") { scripted.interrupts >= 1 }
+        #expect(scripted.stopCalls == 0, "the capture is not stopped under its own start")
+        gate.open()
+        _ = try await stopping.value("the stop to return")
+        let events = try #require(try await starting.value("the start to return"))
+        for await _ in events {}
+
+        #expect(!scripted.running, "the capture that came up after the stop was stopped")
+        #expect(scripted.stopCalls >= 1)
+    }
+
+    #if os(macOS)
+    @Test("speech heard in 10 ms buffers still gets its tail decoded after it ends")
+    func tenMillisecondBuffersDecodeTheTail() async throws {
+        let pushable = PushableSource()
+        let mic = StandInMic()
+        let cache = StreamingModelCache.probing(CacheProbe())
+        let store = ModelStore(modelsDirectory: FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-rechunk-\(UUID().uuidString)"))
+        try store.seedInstalledModel(Self.tiny)
+        let session = StreamingTranscriptionSession(
+            modelStore: store, source: .systemAudio, modelCache: cache,
+            capture: { CaptionCapture.external($0, environment: pushable.environment) },
+            makeDecoder: mic.decoder
+        )
+        _ = try #require(try await GuardedTask {
+            try await session.start(options: TranscriptionOptions(model: Self.tiny))
+        }.value("the start to return"))
+
+        func feed(seconds: Double, value: Float) {
+            for _ in 0..<Int(seconds * 100) { pushable.push([Float](repeating: value, count: 160)) }
+        }
+        feed(seconds: 0.2, value: 0)
+        feed(seconds: 1.3, value: 0.5)
+        await mic.decodes.wait(atLeast: 1, "the first decode")
+        let before = mic.decodes.value
+
+        feed(seconds: 0.6, value: 0.5)
+        feed(seconds: 1.2, value: 0)
+        await mic.decodes.wait(atLeast: before + 1, "the tail to decode")
+        await session.stop()
+    }
+
+    @Test("a tap consent nobody answers still lets Stop end the session")
+    func unansweredConsentStopsOnStop() async throws {
+        let probe = UninterruptibleGate()
+        let fake = SessionFakeTap(probeGate: probe)
+        let cache = StreamingModelCache.probing(CacheProbe())
+        let source = CaptionSource.app(bundleID: "us.zoom.xos")
+        let session = try Self.session(
+            source: source, capture: { CaptionCapture.external($0, environment: fake.environment) }, cache: cache
+        )
+        let starting = GuardedTask { try await session.start(options: TranscriptionOptions(model: Self.tiny)) }
+        await probe.arrivals.wait(atLeast: 1, "the consent probe to be waiting")
+
+        let stopping = GuardedTask { await session.stop() }
+        _ = try await stopping.value("the stop to return while the dialog is up")
+        let events = try #require(try await starting.value("the start to return"))
+        for await _ in events {}
+        #expect(fake.sourcesMade == 0)
+        probe.open()
+    }
+
+    @Test("an undetermined tap goes through the probe and then captures")
+    func undeterminedProbesThenStarts() async throws {
+        let fake = SessionFakeTap(tap: .undetermined, tapAfterProbe: .granted)
+        let cache = StreamingModelCache.probing(CacheProbe())
+        let session = try Self.session(
+            source: .app(bundleID: "us.zoom.xos"),
+            capture: { CaptionCapture.external($0, environment: fake.environment) }, cache: cache
+        )
+        let events = try #require(try await GuardedTask {
+            try await session.start(options: TranscriptionOptions(model: Self.tiny))
+        }.value("the start to return"))
+        #expect(fake.probes == 1)
+        #expect(fake.sourcesMade == 1)
+        await session.stop()
+        for await _ in events {}
+    }
+
+    @Test("a denied tap fails the session with the app text before any capture exists")
+    func deniedTapFailsFast() async throws {
+        let fake = SessionFakeTap(tap: .denied)
+        let cache = StreamingModelCache.probing(CacheProbe())
+        let session = try Self.session(
+            source: .app(bundleID: "us.zoom.xos"),
+            capture: { CaptionCapture.external($0, environment: fake.environment) }, cache: cache
+        )
+        let events = try #require(try await GuardedTask {
+            try await session.start(options: TranscriptionOptions(model: Self.tiny))
+        }.value("the start to return"))
+        var failure: String?
+        for await event in events {
+            if case .failed(let text) = event { failure = text }
+        }
+        #expect(failure == FixedFailureText.appAudioNotAllowed)
+        #expect(fake.sourcesMade == 0)
+        #expect(fake.probes == 0)
+    }
+    #endif
+}
+
+#if os(macOS)
+private final class SessionFakeTap: Sendable {
+    private let state = OSAllocatedUnfairLock(initialState: (probes: 0, sources: 0))
+    private let tap: SystemAudioRecordingPermission
+    private let tapAfterProbe: SystemAudioRecordingPermission
+    private let probeGate: UninterruptibleGate?
+
+    init(
+        tap: SystemAudioRecordingPermission = .undetermined, tapAfterProbe: SystemAudioRecordingPermission = .granted,
+        probeGate: UninterruptibleGate? = nil
+    ) {
+        self.tap = tap
+        self.tapAfterProbe = tapAfterProbe
+        self.probeGate = probeGate
+    }
+
+    var probes: Int { state.withLock { $0.probes } }
+    var sourcesMade: Int { state.withLock { $0.sources } }
+
+    var environment: CaptionCaptureEnvironment {
+        CaptionCaptureEnvironment(
+            permissions: CapturePermissionCheck(
+                screenRecordingGranted: { true },
+                tapStatus: { [self] in state.withLock { $0.probes > 0 } ? tapAfterProbe : tap },
+                probeTapConsent: { [self] in
+                    state.withLock { $0.probes += 1 }
+                    await probeGate?.wait()
+                }
+            ),
+            fixtureURL: { nil },
+            processObjects: { _ in [1] },
+            makeSystemSource: { [self] _ in made() },
+            makeTapSource: { [self] _, _ in made() },
+            startTimeout: .seconds(15),
+            clock: ContinuousClock()
+        )
+    }
+
+    private func made() -> any LiveAudioSource {
+        state.withLock { $0.sources += 1 }
+        return IdleSource()
+    }
+}
+
+private actor IdleSource: LiveAudioSource {
+    func start() async throws {}
+    func prepare() async throws -> URL { throw CancellationError() }
+    func cancel() async {}
+}
+#endif
+
+#if os(macOS)
+/// A source whose callback the test calls, standing in for a tap that delivers small buffers.
+private actor PushableSource: LiveAudioSource {
+    private final class Box: Sendable {
+        let sink = OSAllocatedUnfairLock<(@Sendable ([Float]) -> Void)?>(initialState: nil)
+    }
+
+    private nonisolated let box = Box()
+
+    nonisolated func push(_ samples: [Float]) { box.sink.withLock { $0 }?(samples) }
+
+    nonisolated var environment: CaptionCaptureEnvironment {
+        CaptionCaptureEnvironment(
+            permissions: CapturePermissionCheck(
+                screenRecordingGranted: { true }, tapStatus: { .granted }, probeTapConsent: {}
+            ),
+            fixtureURL: { nil },
+            processObjects: { _ in [1] },
+            makeSystemSource: { [self] sink in
+                box.sink.withLock { $0 = sink }
+                return self
+            },
+            makeTapSource: { [self] _, sink in
+                box.sink.withLock { $0 = sink }
+                return self
+            },
+            startTimeout: .seconds(15),
+            clock: ContinuousClock()
+        )
+    }
+
+    func start() async throws {}
+    func prepare() async throws -> URL { throw CancellationError() }
+    func cancel() async {}
+}
+#endif

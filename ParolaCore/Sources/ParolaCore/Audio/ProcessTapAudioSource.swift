@@ -12,7 +12,7 @@ import CoreAudio
 @available(macOS 14.2, *)
 public actor ProcessTapAudioSource: LiveAudioSource {
     private let processObjects: [AudioObjectID]
-    private let outputURL: URL
+    private let outputURL: URL?
     private let outputFormat: AVAudioFormat
     private let callbackQueue = DispatchQueue(label: "com.parola.process-tap")
     public nonisolated let levelMeter = LevelMeter()
@@ -21,12 +21,26 @@ public actor ProcessTapAudioSource: LiveAudioSource {
     private var ioProcID: AudioDeviceIOProcID?
     private var handler: TapHandler?
     private var captureFailure: String?
+    private let sink: (@Sendable ([Float]) -> Void)?
+    private var cancelled = false
 
     /// Audio process objects whose bundle ID matches a target (or a helper under it).
     /// Only processes currently registered with the audio system appear; an app that
     /// starts playing after the take begins is not picked up.
     public static func audioProcessObjects(matching targets: Set<String>) -> [AudioObjectID] {
         guard !targets.isEmpty else { return [] }
+        return allAudioProcessObjects().filter { object in
+            guard let bundleID = bundleID(of: object) else { return false }
+            return matchesTarget(bundleID: bundleID, targets: targets)
+        }
+    }
+
+    /// The bundle IDs of every process currently registered with the audio system.
+    public static func audioProcessBundleIDs() -> [String] {
+        allAudioProcessObjects().compactMap(bundleID(of:))
+    }
+
+    private static func allAudioProcessObjects() -> [AudioObjectID] {
         var address = AudioObjectPropertyAddress(
             mSelector: kAudioHardwarePropertyProcessObjectList,
             mScope: kAudioObjectPropertyScopeGlobal,
@@ -39,10 +53,7 @@ public actor ProcessTapAudioSource: LiveAudioSource {
         guard AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &dataSize, &objects) == noErr else {
             return []
         }
-        return objects.filter { object in
-            guard let bundleID = bundleID(of: object) else { return false }
-            return matchesTarget(bundleID: bundleID, targets: targets)
-        }
+        return objects
     }
 
     /// A target bundle ID matches the app itself and its helper bundles (`id` or `id.*`),
@@ -68,8 +79,18 @@ public actor ProcessTapAudioSource: LiveAudioSource {
     }
 
     public init(processObjects: [AudioObjectID]) {
+        self.init(processObjects: processObjects, sink: nil)
+    }
+
+    /// Hands the converted samples to `sink` instead of writing a file, and sets the tap up off the cooperative pool.
+    public init(processObjects: [AudioObjectID], samples sink: @escaping @Sendable ([Float]) -> Void) {
+        self.init(processObjects: processObjects, sink: sink)
+    }
+
+    private init(processObjects: [AudioObjectID], sink: (@Sendable ([Float]) -> Void)?) {
+        self.sink = sink
         self.processObjects = processObjects
-        self.outputURL = RecordingScratch.fileURL(prefix: "parola-system")
+        self.outputURL = sink == nil ? RecordingScratch.fileURL(prefix: "parola-system") : nil
         guard let format = AVAudioFormat(
             commonFormat: .pcmFormatFloat32,
             sampleRate: 16_000,
@@ -83,6 +104,51 @@ public actor ProcessTapAudioSource: LiveAudioSource {
 
     public func start() async throws {
         guard ioProcID == nil else { return }
+        let objects = processObjects
+        let output = outputFormat
+        let url = outputURL
+        let queue = callbackQueue
+        let sink = sink
+        let meter = levelMeter
+        let build: @Sendable () throws -> TapParts = {
+            try Self.installTap(processObjects: objects, outputFormat: output, outputURL: url, sink: sink, queue: queue, levelMeter: meter)
+        }
+        // A consent prompt parks AudioDeviceCreateIOProcIDWithBlock, which must not hold a cooperative thread.
+        let parts = sink == nil ? try build() : try await Self.offCooperativePool(build)
+        guard !cancelled else {
+            Self.tearDown(parts)
+            throw CancellationError()
+        }
+        tapID = parts.tapID
+        aggregateID = parts.aggregateID
+        ioProcID = parts.ioProcID
+        handler = parts.handler
+    }
+
+    // Unchecked Sendable: the parts move once from the setup thread to this actor, then only the IO queue touches the handler.
+    private struct TapParts: @unchecked Sendable {
+        var tapID: AudioObjectID
+        var aggregateID: AudioObjectID
+        var ioProcID: AudioDeviceIOProcID
+        var handler: TapHandler
+    }
+
+    private static func offCooperativePool<T: Sendable>(_ work: @escaping @Sendable () throws -> T) async throws -> T {
+        try await withCheckedThrowingContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                continuation.resume(with: Result { try work() })
+            }
+        }
+    }
+
+    private static func installTap(
+        processObjects: [AudioObjectID],
+        outputFormat: AVAudioFormat,
+        outputURL: URL?,
+        sink: (@Sendable ([Float]) -> Void)?,
+        queue: DispatchQueue,
+        levelMeter: LevelMeter
+    ) throws -> TapParts {
         let description = CATapDescription(stereoMixdownOfProcesses: processObjects)
         description.isPrivate = true
         var tap = AudioObjectID(kAudioObjectUnknown)
@@ -94,7 +160,6 @@ public actor ProcessTapAudioSource: LiveAudioSource {
             )
             throw ParolaError.captureUnavailable("could not create the audio process tap")
         }
-        tapID = tap
 
         let aggregate: [String: Any] = [
             kAudioAggregateDeviceNameKey: "Parola Process Tap",
@@ -107,10 +172,18 @@ public actor ProcessTapAudioSource: LiveAudioSource {
         ]
         var aggregateID = AudioObjectID(kAudioObjectUnknown)
         guard AudioHardwareCreateAggregateDevice(aggregate as CFDictionary, &aggregateID) == noErr else {
-            teardownTap()
+            AudioHardwareDestroyProcessTap(tap)
             throw ParolaError.captureUnavailable("could not create the tap aggregate device")
         }
-        self.aggregateID = aggregateID
+
+        func cleanUp() {
+            AudioHardwareDestroyAggregateDevice(aggregateID)
+            AudioHardwareDestroyProcessTap(tap)
+        }
+        func fail(_ message: String) -> ParolaError {
+            cleanUp()
+            return ParolaError.captureUnavailable(message)
+        }
 
         var formatAddress = AudioObjectPropertyAddress(
             mSelector: kAudioTapPropertyFormat,
@@ -119,49 +192,65 @@ public actor ProcessTapAudioSource: LiveAudioSource {
         )
         var asbd = AudioStreamBasicDescription()
         var asbdSize = UInt32(MemoryLayout<AudioStreamBasicDescription>.size)
-        guard AudioObjectGetPropertyData(tapID, &formatAddress, 0, nil, &asbdSize, &asbd) == noErr,
+        guard AudioObjectGetPropertyData(tap, &formatAddress, 0, nil, &asbdSize, &asbd) == noErr,
               let srcFormat = AVAudioFormat(streamDescription: &asbd) else {
-            teardownAll()
-            throw ParolaError.captureUnavailable("could not read the tap stream format")
+            throw fail("could not read the tap stream format")
         }
         guard let converter = AVAudioConverter(from: srcFormat, to: outputFormat) else {
-            teardownAll()
-            throw ParolaError.captureUnavailable("could not create audio converter")
+            throw fail("could not create audio converter")
         }
-        let writeFile = try AVAudioFile(
-            forWriting: outputURL,
-            settings: outputFormat.settings,
-            commonFormat: .pcmFormatFloat32,
-            interleaved: false
-        )
+        let writer: CaptureFileWriter
+        if let sink {
+            writer = .forwarding(to: sink)
+        } else if let outputURL {
+            do {
+                writer = CaptureFileWriter(file: try AVAudioFile(
+                    forWriting: outputURL,
+                    settings: outputFormat.settings,
+                    commonFormat: .pcmFormatFloat32,
+                    interleaved: false
+                ))
+            } catch {
+                cleanUp()
+                throw error
+            }
+        } else {
+            throw fail("no file to record to")
+        }
 
         let handler = TapHandler(
             converter: converter,
-            writer: CaptureFileWriter(file: writeFile),
+            writer: writer,
             outputFormat: outputFormat,
             srcFormat: srcFormat,
-            onLevel: { [levelMeter] in levelMeter.record($0) }
+            onLevel: { levelMeter.record($0) }
         )
-        self.handler = handler
 
         var procID: AudioDeviceIOProcID?
-        let status = AudioDeviceCreateIOProcIDWithBlock(&procID, aggregateID, callbackQueue) { _, inInputData, _, _, _ in
+        let status = AudioDeviceCreateIOProcIDWithBlock(&procID, aggregateID, queue) { _, inInputData, _, _, _ in
             handler.process(bufferList: inInputData)
         }
         guard status == noErr, let procID else {
-            teardownAll()
-            throw ParolaError.captureUnavailable("could not install the tap IO proc")
+            throw fail("could not install the tap IO proc")
         }
-        ioProcID = procID
         guard AudioDeviceStart(aggregateID, procID) == noErr else {
             ParolaLog.error(.audioCapture, "tap aggregate device failed to start")
-            teardownAll()
-            throw ParolaError.captureUnavailable("could not start the tap aggregate device")
+            AudioDeviceDestroyIOProcID(aggregateID, procID)
+            throw fail("could not start the tap aggregate device")
         }
+        return TapParts(tapID: tap, aggregateID: aggregateID, ioProcID: procID, handler: handler)
+    }
+
+    private static func tearDown(_ parts: TapParts) {
+        AudioDeviceStop(parts.aggregateID, parts.ioProcID)
+        AudioDeviceDestroyIOProcID(parts.aggregateID, parts.ioProcID)
+        AudioHardwareDestroyAggregateDevice(parts.aggregateID)
+        AudioHardwareDestroyProcessTap(parts.tapID)
     }
 
     public func prepare() async throws -> URL {
         await stop()
+        guard let outputURL else { throw ParolaError.captureUnavailable("a sample capture keeps no file") }
         if let captureFailure {
             ParolaLog.error(.audioRecording, "app audio take cut short by a write failure")
             throw CaptureInterrupted(url: outputURL, reason: captureFailure)
@@ -177,10 +266,12 @@ public actor ProcessTapAudioSource: LiveAudioSource {
 
     public func cancel() async {
         await stop()
+        guard let outputURL else { return }
         try? FileManager.default.removeItem(at: outputURL)
     }
 
     private func stop() async {
+        cancelled = true
         defer { levelMeter.reset() }
         if let ioProcID, aggregateID != kAudioObjectUnknown {
             AudioDeviceStop(aggregateID, ioProcID)

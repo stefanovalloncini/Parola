@@ -17,8 +17,13 @@ public actor MockStreamingTranscriber: StreamingTranscriber {
         case cancel
     }
 
-    public init<C: Clock>(response: MockTranscriberResponse, clock: C) where C.Duration == Duration {
+    public nonisolated let source: CaptionSource
+
+    public init<C: Clock>(
+        response: MockTranscriberResponse, clock: C, source: CaptionSource = .microphone(deviceUID: nil)
+    ) where C.Duration == Duration {
         self.response = response
+        self.source = source
         self.sleeper = { ms in try? await Task.sleep(for: .milliseconds(ms), clock: clock) }
     }
 

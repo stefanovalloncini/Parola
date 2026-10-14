@@ -36,4 +36,26 @@ struct StreamingTranscriberFactoryTests {
         #expect(StreamingTranscriptionSession.resolveInputDeviceID(uid: "") == nil)
         #expect(StreamingTranscriptionSession.resolveInputDeviceID(uid: "no-such-device-uid") == nil)
     }
+
+    @Test("the factory keeps the device UID overload and takes a source")
+    func factoryRouting() {
+        MockStreamingTranscriberRegistry.shared.clear()
+        let byDevice = StreamingTranscriberFactory.make(deviceUID: "usb")
+        #expect((byDevice as? StreamingTranscriptionSession)?.source == .microphone(deviceUID: "usb"))
+        #expect((byDevice as? StreamingTranscriptionSession)?.deviceUID == "usb")
+
+        let bySource = StreamingTranscriberFactory.make(deviceUID: "usb", source: .app(bundleID: "us.zoom.xos"))
+        #expect((bySource as? StreamingTranscriptionSession)?.source == .app(bundleID: "us.zoom.xos"))
+        #expect((bySource as? StreamingTranscriptionSession)?.deviceUID == nil)
+    }
+
+    @Test("a mock transcriber records the source it was made with")
+    func mockRecordsSource() {
+        MockStreamingTranscriberRegistry.shared.install(MockTranscriberResponse(partials: ["x"]))
+        defer { MockStreamingTranscriberRegistry.shared.clear() }
+        let made = StreamingTranscriberFactory.make(source: .systemAudio) as? MockStreamingTranscriber
+        _ = StreamingTranscriberFactory.make(deviceUID: "usb")
+        #expect(made?.source == .systemAudio)
+        #expect(MockStreamingTranscriberRegistry.shared.madeSources() == [.systemAudio, .microphone(deviceUID: "usb")])
+    }
 }
