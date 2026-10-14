@@ -60,6 +60,7 @@ struct PresenterCaptionsView: View {
                 .font(.system(size: fontSize, weight: .semibold, design: .rounded))
                 .foregroundStyle(.white)
                 .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
                 .clipped()
                 .accessibilityAddTraits(.updatesFrequently)
