@@ -1615,13 +1615,14 @@ private final class SessionFakeTap: Sendable {
         )
     }
 
-    private func made() -> any LiveAudioSource {
+    private func made() -> IdleSource {
         state.withLock { $0.sources += 1 }
         return IdleSource()
     }
 }
 
-private actor IdleSource: LiveAudioSource {
+private actor IdleSource: LiveAudioSource, TargetsGoneReporting {
+    func whenTargetsGone(_ handler: @escaping @Sendable () -> Void) async {}
     func start() async throws {}
     func prepare() async throws -> URL { throw CancellationError() }
     func cancel() async {}
@@ -1630,7 +1631,9 @@ private actor IdleSource: LiveAudioSource {
 
 #if os(macOS)
 /// A source whose callback the test calls, standing in for a tap that delivers small buffers.
-private actor PushableSource: LiveAudioSource {
+private actor PushableSource: LiveAudioSource, TargetsGoneReporting {
+    func whenTargetsGone(_ handler: @escaping @Sendable () -> Void) async {}
+
     private final class Box: Sendable {
         let sink = OSAllocatedUnfairLock<(@Sendable ([Float]) -> Void)?>(initialState: nil)
     }

@@ -1306,9 +1306,9 @@ struct StreamingLoopCaptureEndRaceTests {
         let outcome = await run.outcome()
         if ending {
             guard case .failed = outcome else {
-            Issue.record("expected .failed, got \(String(describing: outcome))")
-            return
-        }
+                Issue.record("expected .failed, got \(String(describing: outcome))")
+                return
+            }
         }
         #expect(recorder.batches.flatMap { $0.segments.map(\.text) } == [" one", " two", " three"])
     }

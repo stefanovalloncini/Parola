@@ -128,7 +128,7 @@ actor StreamingRealtimeLoop {
 
     // Trimming old entries is safe: VAD only reads a recent suffix (baseline over the last 20, voice check over the new-audio span).
     private static let maxEnergyEntries = 4096
-    private static let waitingForSpeech = "Waiting for speech..."
+    private static let waitingForSpeech = LiveCaptionsState.waitingPlaceholder
 
     /// Yields once decodes can run and finishes then, or as the run ends without them: a caller waits on it for the model.
     nonisolated let decoderReady: AsyncStream<Void>

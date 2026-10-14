@@ -94,6 +94,7 @@ public enum LogField: String, Sendable, CaseIterable, Comparable {
     case offset
     case rotations
     case stage
+    case status
 
     public static func < (lhs: LogField, rhs: LogField) -> Bool {
         lhs.rawValue < rhs.rawValue

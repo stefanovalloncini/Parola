@@ -11,7 +11,7 @@ import os
 ///
 /// Requires the System Audio Recording permission; the first tap triggers the TCC prompt.
 @available(macOS 14.2, *)
-public actor ProcessTapAudioSource: LiveAudioSource {
+public actor ProcessTapAudioSource: LiveAudioSource, TargetsGoneReporting {
     private let processObjects: [AudioObjectID]
     private let outputURL: URL?
     private let outputFormat: AVAudioFormat

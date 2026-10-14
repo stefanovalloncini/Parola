@@ -91,9 +91,11 @@ struct CaptionCaptureEnvironment: Sendable {
     var fixtureURL: @Sendable () async -> URL?
     var processObjects: @Sendable (_ bundleID: String) -> [AudioObjectID]
     var makeSystemSource: @Sendable (_ sink: @escaping @Sendable ([Float]) -> Void) -> any LiveAudioSource
-    var makeTapSource: @Sendable (_ objects: [AudioObjectID], _ sink: @escaping @Sendable ([Float]) -> Void) throws -> any LiveAudioSource
+    var makeTapSource: @Sendable (_ objects: [AudioObjectID], _ sink: @escaping @Sendable ([Float]) -> Void) throws -> any TargetsGoneReporting
     var startTimeout: Duration
     var clock: any Clock<Duration>
+    /// How long the process list gets to settle after a watched process leaves, before the app reads as quit or as still there.
+    var endSettle: Duration = .seconds(1)
 
     static func live(clock: any Clock<Duration>) -> CaptionCaptureEnvironment {
         CaptionCaptureEnvironment(
@@ -150,12 +152,15 @@ extension CaptionCapture {
                 let chunker = SampleRechunker(size: WhisperKit.sampleRate / 10, downstream: onBuffer)
                 let sink: @Sendable ([Float]) -> Void = { chunker.append($0) }
                 let live: any LiveAudioSource
+                var tap: (any TargetsGoneReporting)?
                 if let bundleID {
                     let objects = env.processObjects(bundleID)
                     guard !objects.isEmpty else {
                         throw CaptionCaptureError(text: FixedFailureText.appNotPlayingAudio(bundleID))
                     }
-                    live = try env.makeTapSource(objects, sink)
+                    let made = try env.makeTapSource(objects, sink)
+                    tap = made
+                    live = made
                 } else {
                     live = env.makeSystemSource(sink)
                 }
@@ -163,11 +168,10 @@ extension CaptionCapture {
                     await live.cancel()
                     return
                 }
-                let ended = run.endReporter(endText)
-                if let tap = live as? any TargetsGoneReporting {
-                    await tap.whenTargetsGone(ended)
+                if let tap {
+                    await tap.whenTargetsGone(run.endReporter(settleFor: env.endSettle, on: env.clock, endText))
                 } else {
-                    await live.whenCaptureEnds(ended)
+                    await live.whenCaptureEnds(run.endReporter(endText))
                 }
                 try await Self.boundedStart(of: live, run: run, deniedText: deniedText, environment: env)
                 if run.isStopped { await live.cancel() }
@@ -273,6 +277,7 @@ private final class ExternalRun: Sendable {
         var stopWaiters: [@Sendable () -> Void] = []
         var endHandler: (@Sendable (String) -> Void)?
         var pendingEnd: String?
+        var settling: Task<Void, Never>?
         var ended = false
     }
 
@@ -317,11 +322,27 @@ private final class ExternalRun: Sendable {
     }
 
     /// A callback for a source to hold; it keeps nothing of the run alive.
-    func endReporter(_ text: @escaping @Sendable () -> String) -> @Sendable () -> Void {
+    func endReporter(
+        settleFor settle: Duration? = nil, on clock: (any Clock<Duration>)? = nil, _ text: @escaping @Sendable () -> String
+    ) -> @Sendable () -> Void {
         { [weak self] in
             guard let self else { return }
-            captureEnded(text())
+            guard let settle, let clock else { return captureEnded(text()) }
+            settleThenEnd(after: settle, on: clock, text)
         }
+    }
+
+    private func settleThenEnd(after settle: Duration, on clock: any Clock<Duration>, _ text: @escaping @Sendable () -> String) {
+        let waiting = Task { [weak self] in
+            guard (try? await clock.sleep(for: settle)) != nil else { return }
+            self?.captureEnded(text())
+        }
+        let accepted = state.withLock { state -> Bool in
+            guard !state.stopped, state.settling == nil else { return false }
+            state.settling = waiting
+            return true
+        }
+        if !accepted { waiting.cancel() }
     }
 
     /// Passes `text` to the end handler once, and not at all after a stop.
@@ -348,6 +369,7 @@ private final class ExternalRun: Sendable {
         let (fixture, source, chunker, waiters) = state.withLock { state in
             state.stopped = true
             state.endHandler = nil
+            state.settling?.cancel()
             defer { state.stopWaiters = [] }
             return (state.fixture, state.source, state.chunker, state.stopWaiters)
         }

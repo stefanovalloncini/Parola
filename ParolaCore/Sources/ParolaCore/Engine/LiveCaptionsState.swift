@@ -63,6 +63,9 @@ public struct LiveCaptionsState: Sendable, Equatable {
             && lhs.error == rhs.error
     }
 
+    /// The partial a streaming session shows before any speech has been decoded.
+    public static let waitingPlaceholder = "Waiting for speech..."
+
     public mutating func apply(_ event: StreamingEvent) {
         switch event {
         case .partial(let text):
