@@ -144,7 +144,7 @@ extension CaptionCapture {
                 if let url = run.fixtureURL {
                     let fixture = try FixtureCapture(fixtureURL: url, clock: env.clock)
                     guard run.adopt(fixture: fixture) else { return }
-                    fixture.start(onBuffer: onBuffer, onEnd: { [weak run] in run?.captureEnded(fixtureEndText) })
+                    fixture.start(onBuffer: onBuffer, onEnd: run.endReporter { fixtureEndText })
                     return
                 }
                 let chunker = SampleRechunker(size: WhisperKit.sampleRate / 10, downstream: onBuffer)
@@ -163,10 +163,7 @@ extension CaptionCapture {
                     await live.cancel()
                     return
                 }
-                let ended: @Sendable () -> Void = { [weak run] in
-                    guard let run else { return }
-                    run.captureEnded(endText())
-                }
+                let ended = run.endReporter(endText)
                 if let tap = live as? any TargetsGoneReporting {
                     await tap.whenTargetsGone(ended)
                 } else {
@@ -317,6 +314,14 @@ private final class ExternalRun: Sendable {
             return pending
         }
         if let pending { handler(pending) }
+    }
+
+    /// A callback for a source to hold; it keeps nothing of the run alive.
+    func endReporter(_ text: @escaping @Sendable () -> String) -> @Sendable () -> Void {
+        { [weak self] in
+            guard let self else { return }
+            captureEnded(text())
+        }
     }
 
     /// Passes `text` to the end handler once, and not at all after a stop.
