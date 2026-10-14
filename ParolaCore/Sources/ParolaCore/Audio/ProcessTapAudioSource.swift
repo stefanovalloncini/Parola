@@ -2,6 +2,7 @@
 import Foundation
 import AVFoundation
 import CoreAudio
+import os
 
 /// Captures the audio of specific processes via a Core Audio process tap and writes
 /// 16 kHz mono Float32 WAV. Unlike ScreenCaptureKit's content filter, tap process
@@ -23,6 +24,9 @@ public actor ProcessTapAudioSource: LiveAudioSource {
     private var captureFailure: String?
     private let sink: (@Sendable ([Float]) -> Void)?
     private var cancelled = false
+    private let processList: @Sendable () -> [AudioObjectID]
+    private let subscribeToProcessList: @Sendable (@escaping @Sendable () -> Void) -> ProcessEndWatch.Unsubscribe
+    private var endWatch: ProcessEndWatch?
 
     /// Audio process objects whose bundle ID matches a target (or a helper under it).
     /// Only processes currently registered with the audio system appear; an app that
@@ -87,7 +91,25 @@ public actor ProcessTapAudioSource: LiveAudioSource {
         self.init(processObjects: processObjects, sink: sink)
     }
 
-    private init(processObjects: [AudioObjectID], sink: (@Sendable ([Float]) -> Void)?) {
+    init(
+        processObjects: [AudioObjectID],
+        samples sink: @escaping @Sendable ([Float]) -> Void,
+        processList: @escaping @Sendable () -> [AudioObjectID],
+        subscribeToProcessList: @escaping @Sendable (@escaping @Sendable () -> Void) -> ProcessEndWatch.Unsubscribe
+    ) {
+        self.init(
+            processObjects: processObjects, sink: sink, processList: processList, subscribeToProcessList: subscribeToProcessList
+        )
+    }
+
+    private init(
+        processObjects: [AudioObjectID],
+        sink: (@Sendable ([Float]) -> Void)?,
+        processList: @escaping @Sendable () -> [AudioObjectID] = { ProcessTapAudioSource.allAudioProcessObjects() },
+        subscribeToProcessList: @escaping @Sendable (@escaping @Sendable () -> Void) -> ProcessEndWatch.Unsubscribe = ProcessEndWatch.listenToHardware
+    ) {
+        self.processList = processList
+        self.subscribeToProcessList = subscribeToProcessList
         self.sink = sink
         self.processObjects = processObjects
         self.outputURL = sink == nil ? RecordingScratch.fileURL(prefix: "parola-system") : nil
@@ -264,6 +286,14 @@ public actor ProcessTapAudioSource: LiveAudioSource {
         handler?.setPaused(paused)
     }
 
+    public func whenCaptureEnds(_ handler: @escaping @Sendable () -> Void) async {
+        endWatch?.cancel()
+        guard !cancelled else { return }
+        endWatch = ProcessEndWatch(
+            objects: processObjects, currentObjects: processList, subscribe: subscribeToProcessList, onGone: handler
+        )
+    }
+
     public func cancel() async {
         await stop()
         guard let outputURL else { return }
@@ -272,6 +302,8 @@ public actor ProcessTapAudioSource: LiveAudioSource {
 
     private func stop() async {
         cancelled = true
+        endWatch?.cancel()
+        endWatch = nil
         defer { levelMeter.reset() }
         if let ioProcID, aggregateID != kAudioObjectUnknown {
             AudioDeviceStop(aggregateID, ioProcID)
@@ -300,6 +332,79 @@ public actor ProcessTapAudioSource: LiveAudioSource {
         if tapID != kAudioObjectUnknown {
             AudioHardwareDestroyProcessTap(tapID)
             tapID = AudioObjectID(kAudioObjectUnknown)
+        }
+    }
+}
+
+/// Calls `onGone` once, when none of the watched process objects is in the audio system's process list any more.
+/// A process that is still running but silent keeps its object, so quiet is not an end.
+final class ProcessEndWatch: Sendable {
+    typealias Unsubscribe = @Sendable () -> Void
+
+    private struct State {
+        var finished = false
+        var unsubscribe: Unsubscribe = {}
+    }
+
+    private let objects: Set<AudioObjectID>
+    private let currentObjects: @Sendable () -> [AudioObjectID]
+    private let onGone: @Sendable () -> Void
+    private let state = OSAllocatedUnfairLock(initialState: State())
+
+    init(
+        objects: [AudioObjectID],
+        currentObjects: @escaping @Sendable () -> [AudioObjectID],
+        subscribe: @Sendable (@escaping @Sendable () -> Void) -> Unsubscribe,
+        onGone: @escaping @Sendable () -> Void
+    ) {
+        self.objects = Set(objects)
+        self.currentObjects = currentObjects
+        self.onGone = onGone
+        let unsubscribe = subscribe { [weak self] in self?.check() }
+        let cancelledAlready = state.withLock { state -> Bool in
+            state.unsubscribe = unsubscribe
+            return state.finished
+        }
+        if cancelledAlready { unsubscribe() }
+        check()
+    }
+
+    func check() {
+        guard !state.withLock({ $0.finished }), objects.isDisjoint(with: currentObjects()) else { return }
+        guard let unsubscribe = finish() else { return }
+        unsubscribe()
+        onGone()
+    }
+
+    func cancel() {
+        finish()?()
+    }
+
+    private func finish() -> Unsubscribe? {
+        state.withLock { state in
+            guard !state.finished else { return nil }
+            state.finished = true
+            return state.unsubscribe
+        }
+    }
+
+    private static func processListAddress() -> AudioObjectPropertyAddress {
+        AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyProcessObjectList,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+    }
+
+    static let listenToHardware: @Sendable (@escaping @Sendable () -> Void) -> Unsubscribe = { notify in
+        let queue = DispatchQueue(label: "com.parola.process-end-watch")
+        let block: @Sendable (UInt32, UnsafePointer<AudioObjectPropertyAddress>) -> Void = { _, _ in notify() }
+        let system = AudioObjectID(kAudioObjectSystemObject)
+        var address = processListAddress()
+        guard AudioObjectAddPropertyListenerBlock(system, &address, queue, block) == noErr else { return {} }
+        return {
+            var address = processListAddress()
+            AudioObjectRemovePropertyListenerBlock(system, &address, queue, block)
         }
     }
 }

@@ -1164,3 +1164,106 @@ struct StreamingRealtimeLoopTests {
         #expect(capture.stopped)
     }
 }
+
+private final class EndSignal: Sendable {
+    private let handler = OSAllocatedUnfairLock<(@Sendable (any Error) -> Void)?>(initialState: nil)
+
+    func register(_ new: @escaping @Sendable (any Error) -> Void) {
+        handler.withLock { $0 = new }
+    }
+
+    var registered: Bool { handler.withLock { $0 != nil } }
+
+    func end(_ error: any Error = ScriptError()) {
+        handler.withLock { $0 }?(error)
+    }
+}
+
+@Suite("Streaming loop capture end")
+struct StreamingLoopCaptureEndTests {
+    private func endingLoop(_ signal: EndSignal, _ capture: FakeCapture) -> StreamingRealtimeLoop {
+        StreamingRealtimeLoop(
+            configuration: .init(),
+            decodingOptions: DecodingOptions(),
+            dependencies: .init(
+                requestPermission: { true },
+                startCapture: { capture.install($0) },
+                stopCapture: { capture.markStopped() },
+                whenCaptureEnds: { signal.register($0) },
+                transcribe: { _, _, _ in TranscriptionResult(text: "", segments: [], language: "en", timings: TranscriptionTimings()) },
+                tick: { try await Task.sleep(nanoseconds: 1_000_000) }
+            ),
+            onPartial: { _ in },
+            onEnergy: { _ in },
+            onConfirmed: { _ in }
+        )
+    }
+
+    @Test("a capture that ends by itself fails the run with its error and stops capture once")
+    func endFailsTheRun() async {
+        let signal = EndSignal()
+        let capture = FakeCapture()
+        let runTask = LoopRun(endingLoop(signal, capture))
+        let installedWait = await eventually { capture.installed && signal.registered }
+        #expect(installedWait)
+        signal.end()
+        signal.end()
+        guard case .failed(let error) = await runTask.outcome() else {
+            Issue.record("expected .failed")
+            return
+        }
+        #expect(error is ScriptError)
+        #expect(capture.stopCount == 1)
+    }
+
+    @Test("an end that arrives after a stop is ignored")
+    func endAfterStopIsIgnored() async {
+        let signal = EndSignal()
+        let capture = FakeCapture()
+        let loop = endingLoop(signal, capture)
+        let runTask = LoopRun(loop)
+        let installedWait = await eventually { capture.installed && signal.registered }
+        #expect(installedWait)
+        await loop.stop()
+        signal.end()
+        guard case .stopped = await runTask.outcome() else {
+            Issue.record("expected .stopped")
+            return
+        }
+        #expect(capture.stopCount == 1)
+    }
+
+    @Test("an end while the model is still loading fails the run without waiting for it")
+    func endDuringModelLoad() async {
+        let signal = EndSignal()
+        let capture = FakeCapture()
+        let loop = StreamingRealtimeLoop(
+            configuration: .init(),
+            decodingOptions: DecodingOptions(),
+            dependencies: .init(
+                requestPermission: { true },
+                startCapture: { capture.install($0) },
+                stopCapture: { capture.markStopped() },
+                whenCaptureEnds: { signal.register($0) },
+                model: .loading {
+                    try await Task.sleep(for: .seconds(600))
+                    throw ScriptError()
+                },
+                tick: { try await Task.sleep(nanoseconds: 1_000_000) }
+            ),
+            onPartial: { _ in },
+            onEnergy: { _ in },
+            onConfirmed: { _ in }
+        )
+        let runTask = LoopRun(loop)
+        let installedWait = await eventually { capture.installed && signal.registered }
+        #expect(installedWait)
+        signal.end()
+        let outcome = await runTask.outcome()
+        guard case .failed = outcome else {
+            Issue.record("expected .failed, got \(String(describing: outcome))")
+            return
+        }
+        #expect(capture.stopCount == 1)
+    }
+}

@@ -27,12 +27,14 @@ public final class FixtureCapture: Sendable {
         self.chunkSamples = WhisperKit.sampleRate / 10
     }
 
-    /// Delivers the first chunk now and chunk k at k × `chunkDuration`, until the file ends or `stop()`.
-    public func start(onBuffer: @escaping @Sendable ([Float]) -> Void) {
+    /// Delivers the first chunk now and chunk k at k × `chunkDuration`, until the file ends or `stop()`; `onEnd` runs once when the file ends, never after a stop.
+    public func start(onBuffer: @escaping @Sendable ([Float]) -> Void, onEnd: (@Sendable () -> Void)? = nil) {
         let samples = samples
         let clock = clock
         let size = chunkSamples
-        let running = Task { await Self.deliver(samples, in: size, on: clock, to: onBuffer) }
+        let running = Task {
+            if await Self.deliver(samples, in: size, on: clock, to: onBuffer) { onEnd?() }
+        }
         task.withLock { current in
             current?.cancel()
             current = running
@@ -42,7 +44,7 @@ public final class FixtureCapture: Sendable {
     // Absolute deadlines, so a late wake is made up by the next chunk instead of pushing the whole file back.
     private static func deliver<C: Clock<Duration>>(
         _ samples: [Float], in size: Int, on clock: C, to onBuffer: @Sendable ([Float]) -> Void
-    ) async {
+    ) async -> Bool {
         let start = clock.now
         var offset = 0
         var index = 0
@@ -51,9 +53,10 @@ public final class FixtureCapture: Sendable {
             onBuffer(Array(samples[offset..<end]))
             offset = end
             index += 1
-            guard offset < samples.count else { return }
-            do { try await clock.sleep(until: start.advanced(by: chunkDuration * index), tolerance: .zero) } catch { return }
+            guard offset < samples.count else { return !Task.isCancelled }
+            do { try await clock.sleep(until: start.advanced(by: chunkDuration * index), tolerance: .zero) } catch { return false }
         }
+        return !Task.isCancelled
     }
 
     public func stop() {

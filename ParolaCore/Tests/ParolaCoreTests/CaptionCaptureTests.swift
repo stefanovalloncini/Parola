@@ -58,6 +58,29 @@ struct FixtureCaptureTests {
         #expect(received.value == 1)
     }
 
+    @Test("the end handler runs when the file runs out, and not after a stop")
+    func endHandler() async {
+        let clock = TestClock()
+        let finished = Awaitable(0)
+        let capture = FixtureCapture(samples: [Float](repeating: 0.1, count: 4_000), clock: clock)
+        capture.start(onBuffer: { _ in }, onEnd: { finished.increment() })
+        await clock.waitForSleeper()
+        clock.advance(by: .milliseconds(100))
+        await clock.waitForSleeper()
+        clock.advance(by: .milliseconds(100))
+        await finished.wait(atLeast: 1, "the end after the last chunk")
+
+        let stopped = Awaitable(0)
+        let cut = FixtureCapture(samples: [Float](repeating: 0.1, count: 16_000), clock: clock)
+        cut.start(onBuffer: { _ in }, onEnd: { stopped.increment() })
+        await clock.waitForSleeper()
+        cut.stop()
+        clock.advance(by: .seconds(2))
+        await pollUntil("the stopped task to wind down") { clock.sleeperCount == 0 }
+        #expect(stopped.value == 0)
+        #expect(finished.value == 1)
+    }
+
     @Test("a missing file throws")
     func missingFile() {
         #expect(throws: ParolaError.self) {
@@ -105,6 +128,11 @@ private actor StubSource: LiveAudioSource {
     private(set) var started = false
     private(set) var cancelCount = 0
     private let startFailure: (any Error)?
+    private var endHandler: (@Sendable () -> Void)?
+
+    func whenCaptureEnds(_ handler: @escaping @Sendable () -> Void) async { endHandler = handler }
+
+    func end() { endHandler?() }
 
     init(sink: @escaping @Sendable ([Float]) -> Void, gate: UninterruptibleGate? = nil, startFailure: (any Error)? = nil) {
         self.sink = sink
@@ -322,6 +350,59 @@ struct ExternalCaptionCaptureTests {
         gate.open()
     }
 
+    @Test("a source that ends by itself reports the source's own sentence once")
+    func endReportsOnce() async throws {
+        for (source, text) in [
+            (CaptionSource.systemAudio, FixedFailureText.systemAudioStopped),
+            (app, FixedFailureText.appQuit("us.zoom.xos")),
+        ] {
+            let fake = FakeEnvironment()
+            let capture = CaptionCapture.external(source, environment: fake.environment)
+            let ended = Awaitable<[String]>([])
+            capture.whenEnded?({ text in ended.update { $0.append(text) } })
+            _ = await capture.requestPermission()
+            try await capture.start { _ in }
+            let stub = try #require(fake.sources.first)
+            await stub.end()
+            await stub.end()
+            #expect(ended.value == [text])
+        }
+    }
+
+    @Test("an end after a stop is not reported")
+    func endAfterStop() async throws {
+        let fake = FakeEnvironment()
+        let capture = CaptionCapture.external(.systemAudio, environment: fake.environment)
+        let ended = Awaitable(0)
+        capture.whenEnded?({ _ in ended.increment() })
+        _ = await capture.requestPermission()
+        try await capture.start { _ in }
+        capture.stop()
+        await fake.sources.first?.end()
+        #expect(ended.value == 0)
+    }
+
+    @Test("a fixture that runs out is an end")
+    func fixtureEnd() async throws {
+        let wav = FileManager.default.temporaryDirectory.appendingPathComponent("caption-end-\(UUID().uuidString).wav")
+        defer { try? FileManager.default.removeItem(at: wav) }
+        let format = try #require(AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 16_000, channels: 1, interleaved: false))
+        do {
+            let file = try AVAudioFile(forWriting: wav, settings: format.settings, commonFormat: .pcmFormatFloat32, interleaved: false)
+            let buffer = try #require(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 800))
+            buffer.frameLength = 800
+            try file.write(from: buffer)
+        }
+        let fake = FakeEnvironment(fixture: wav)
+        let capture = CaptionCapture.external(.systemAudio, environment: fake.environment)
+        let ended = Awaitable<[String]>([])
+        capture.whenEnded?({ text in ended.update { $0.append(text) } })
+        _ = await capture.requestPermission()
+        try await capture.start { _ in }
+        await ended.wait(until: { $0.count == 1 }, "the fixture to run out")
+        #expect(ended.value == [FixedFailureText.systemAudioStopped])
+    }
+
     @Test("a fixture replaces the capture and skips every permission check")
     func fixtureSkipsPermissions() async throws {
         let wav = FileManager.default.temporaryDirectory.appendingPathComponent("caption-fixture-\(UUID().uuidString).wav")
@@ -344,6 +425,105 @@ struct ExternalCaptionCaptureTests {
         }
         #expect(fake.sources.isEmpty)
         #expect(fake.probes == 0)
+    }
+}
+
+
+@Suite("Capture end detection")
+struct CaptureEndDetectionTests {
+    private final class ProcessList: Sendable {
+        private let objects = OSAllocatedUnfairLock<[UInt32]>(initialState: [])
+        private let notify = OSAllocatedUnfairLock<(@Sendable () -> Void)?>(initialState: nil)
+        private let removals = OSAllocatedUnfairLock(initialState: 0)
+
+        init(_ objects: [UInt32]) { self.objects.withLock { $0 = objects } }
+
+        var current: [UInt32] { objects.withLock { $0 } }
+        var unsubscribed: Int { removals.withLock { $0 } }
+
+        func subscribe(_ block: @escaping @Sendable () -> Void) -> ProcessEndWatch.Unsubscribe {
+            notify.withLock { $0 = block }
+            return { [self] in removals.withLock { $0 += 1 } }
+        }
+
+        func set(_ new: [UInt32]) {
+            objects.withLock { $0 = new }
+            notify.withLock { $0 }?()
+        }
+    }
+
+    @Test("the watch fires once, when every watched object has left the list")
+    func firesWhenAllGone() {
+        let list = ProcessList([7, 8, 9])
+        let fired = Awaitable(0)
+        let watch = ProcessEndWatch(
+            objects: [7, 8], currentObjects: { list.current }, subscribe: list.subscribe, onGone: { fired.increment() }
+        )
+        list.set([8, 9])
+        #expect(fired.value == 0, "one helper left, the other is still there")
+        list.set([9])
+        list.set([])
+        #expect(fired.value == 1)
+        #expect(list.unsubscribed == 1)
+        watch.check()
+        #expect(fired.value == 1)
+    }
+
+    @Test("an app that stays in the list, however quiet, is not an end")
+    func quietIsNotAnEnd() {
+        let list = ProcessList([7])
+        let fired = Awaitable(0)
+        let watch = ProcessEndWatch(
+            objects: [7], currentObjects: { list.current }, subscribe: list.subscribe, onGone: { fired.increment() }
+        )
+        list.set([7, 11])
+        list.set([7])
+        #expect(fired.value == 0)
+        watch.cancel()
+        list.set([])
+        #expect(fired.value == 0, "a cancelled watch stays quiet")
+        #expect(list.unsubscribed == 1)
+    }
+
+    @Test("a tap source reports its app leaving the process list and not a stop")
+    @available(macOS 14.2, *)
+    func tapSourceEnd() async {
+        let list = ProcessList([7])
+        let source = ProcessTapAudioSource(
+            processObjects: [7], samples: { _ in }, processList: { list.current }, subscribeToProcessList: list.subscribe
+        )
+        let fired = Awaitable(0)
+        await source.whenCaptureEnds { fired.increment() }
+        list.set([])
+        #expect(fired.value == 1)
+
+        let stopped = ProcessTapAudioSource(
+            processObjects: [7], samples: { _ in }, processList: { list.current }, subscribeToProcessList: list.subscribe
+        )
+        list.set([7])
+        let quiet = Awaitable(0)
+        await stopped.whenCaptureEnds { quiet.increment() }
+        await stopped.cancel()
+        list.set([])
+        #expect(quiet.value == 0)
+    }
+
+    @Test("a system source in sink mode reports ScreenCaptureKit stopping it, and not after a cancel")
+    func systemSinkModeEnd() async {
+        struct Dropped: Error {}
+        let source = SystemAudioSource(samples: { _ in })
+        let fired = Awaitable(0)
+        await source.whenCaptureEnds { fired.increment() }
+        await source.captureEnded(Dropped())
+        await source.captureEnded(Dropped())
+        #expect(fired.value == 1)
+
+        let cancelled = SystemAudioSource(samples: { _ in })
+        let quiet = Awaitable(0)
+        await cancelled.whenCaptureEnds { quiet.increment() }
+        await cancelled.cancel()
+        await cancelled.captureEnded(Dropped())
+        #expect(quiet.value == 0)
     }
 }
 

@@ -22,6 +22,8 @@ struct CaptionCapture: Sendable {
     var stop: @Sendable () -> Void
     /// What a stop does while `start` is still running, when the capture can be cut short then; nil leaves the start to finish first.
     var interruptStart: (@Sendable () -> Void)?
+    /// Registers the handler called with the sentence to show if the capture ends by itself; set before `start`, never called after `stop`.
+    var whenEnded: (@Sendable (_ handler: @escaping @Sendable (String) -> Void) -> Void)?
 
     static func microphone(deviceID: DeviceID?) -> CaptionCapture {
         // Capture must not share the cached kit's AudioProcessor: its AVAudioEngine and sample
@@ -117,6 +119,7 @@ extension CaptionCapture {
     static func external(_ source: CaptionSource, environment env: CaptionCaptureEnvironment) -> CaptionCapture {
         let run = ExternalRun()
         let bundleID: String? = if case .app(let id) = source { id } else { nil }
+        let endedText = bundleID.map(FixedFailureText.appQuit) ?? FixedFailureText.systemAudioStopped
         let deniedText = bundleID == nil ? FixedFailureText.systemAudioNotAllowed : FixedFailureText.appAudioNotAllowed
         return CaptionCapture(
             requestPermission: {
@@ -131,7 +134,7 @@ extension CaptionCapture {
                 if let url = run.fixtureURL {
                     let fixture = try FixtureCapture(fixtureURL: url, clock: env.clock)
                     guard run.adopt(fixture: fixture) else { return }
-                    fixture.start(onBuffer: onBuffer)
+                    fixture.start(onBuffer: onBuffer, onEnd: { run.captureEnded(endedText) })
                     return
                 }
                 let chunker = SampleRechunker(size: WhisperKit.sampleRate / 10, downstream: onBuffer)
@@ -150,11 +153,13 @@ extension CaptionCapture {
                     await live.cancel()
                     return
                 }
+                await live.whenCaptureEnds { run.captureEnded(endedText) }
                 try await Self.boundedStart(of: live, run: run, deniedText: deniedText, environment: env)
                 if run.isStopped { await live.cancel() }
             },
             stop: { run.stop() },
-            interruptStart: { run.stop() }
+            interruptStart: { run.stop() },
+            whenEnded: { run.onEnded($0) }
         )
     }
 
@@ -251,6 +256,8 @@ private final class ExternalRun: Sendable {
         var chunker: SampleRechunker?
         var stopped = false
         var stopWaiters: [@Sendable () -> Void] = []
+        var endHandler: (@Sendable (String) -> Void)?
+        var ended = false
     }
 
     private let state = OSAllocatedUnfairLock(initialState: State())
@@ -278,6 +285,20 @@ private final class ExternalRun: Sendable {
             state.chunker = chunker
             return true
         }
+    }
+
+    func onEnded(_ handler: @escaping @Sendable (String) -> Void) {
+        state.withLock { $0.endHandler = handler }
+    }
+
+    /// Passes `text` to the end handler once, and not at all after a stop.
+    func captureEnded(_ text: String) {
+        let handler = state.withLock { state -> (@Sendable (String) -> Void)? in
+            guard !state.stopped, !state.ended else { return nil }
+            state.ended = true
+            return state.endHandler
+        }
+        handler?(text)
     }
 
     /// Calls `waiter` once the run is stopped, at once if it already is.

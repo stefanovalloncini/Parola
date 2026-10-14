@@ -198,6 +198,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
                     },
                     stopCapture: capture.stop,
                     interruptStart: capture.interruptStart,
+                    whenCaptureEnds: Self.endRegistration(of: capture),
                     model: .loading { [weak self] in
                         let lease = try await modelCache.borrow(modelName, store: modelStore)
                         guard let self else {
@@ -216,6 +217,13 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
             )
         }
         return try await streamOnceDecoding(stream)
+    }
+
+    private static func endRegistration(
+        of capture: CaptionCapture
+    ) -> (@Sendable (_ handler: @escaping @Sendable (any Error) -> Void) -> Void)? {
+        guard let register = capture.whenEnded else { return nil }
+        return { handler in register { handler(CaptionCaptureError(text: $0)) } }
     }
 
     static func loopConfiguration(

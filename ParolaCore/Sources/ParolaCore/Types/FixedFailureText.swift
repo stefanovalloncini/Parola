@@ -28,6 +28,13 @@ public enum FixedFailureText {
         app + appNotPlayingAudioSuffix
     }
 
+    public static let systemAudioStopped = "The system audio stopped."
+    public static let appQuitSuffix = " quit."
+
+    public static func appQuit(_ app: String) -> String {
+        app + appQuitSuffix
+    }
+
     public static func engineDisabled(_ engineName: String) -> String {
         "The \(engineName) engine is disabled by a managed policy."
     }

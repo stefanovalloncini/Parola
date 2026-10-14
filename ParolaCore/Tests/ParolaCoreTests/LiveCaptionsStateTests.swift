@@ -127,6 +127,17 @@ struct LiveCaptionsStateTests {
         #expect(s.isActive == false)
     }
 
+    @Test("a failure keeps the confirmed lines and clears the partial")
+    func failedKeepsConfirmedText() {
+        var s = LiveCaptionsState(isActive: true)
+        s.apply(.confirmed(TranscriptSegment(id: 0, start: 0, end: 1, text: "kept line")))
+        s.apply(.partial(text: "half a sent"))
+        s.apply(.failed(FixedFailureText.systemAudioStopped))
+        #expect(s.history == ["kept line"])
+        #expect(s.confirmedLines == ["kept line"])
+        #expect(s.partial == "")
+    }
+
     @Test("finished event clears partial")
     func finishedEvent() {
         var s = LiveCaptionsState()

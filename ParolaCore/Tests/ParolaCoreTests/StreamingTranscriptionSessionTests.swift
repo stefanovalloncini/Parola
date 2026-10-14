@@ -1324,6 +1324,7 @@ private final class ScriptedCapture: Sendable {
         var startCalls = 0
         var stopCalls = 0
         var interrupts = 0
+        var endHandler: (@Sendable (String) -> Void)?
     }
 
     private let state = OSAllocatedUnfairLock(initialState: State())
@@ -1343,6 +1344,10 @@ private final class ScriptedCapture: Sendable {
     var stopCalls: Int { state.withLock { $0.stopCalls } }
     var interrupts: Int { state.withLock { $0.interrupts } }
 
+    func end(_ text: String) {
+        state.withLock { $0.endHandler }?(text)
+    }
+
     func capture(_ source: CaptionSource) -> CaptionCapture {
         state.withLock { $0.sources.append(source) }
         return CaptionCapture(
@@ -1354,7 +1359,8 @@ private final class ScriptedCapture: Sendable {
                 state.withLock { $0.running = true }
             },
             stop: { [self] in state.withLock { $0.running = false; $0.stopCalls += 1 } },
-            interruptStart: { [self] in state.withLock { $0.interrupts += 1 } }
+            interruptStart: { [self] in state.withLock { $0.interrupts += 1 } },
+            whenEnded: { [self] handler in state.withLock { $0.endHandler = handler } }
         )
     }
 }
@@ -1391,6 +1397,56 @@ struct StreamingSessionSourceTests {
             for await _ in events {}
             #expect(!scripted.running)
         }
+    }
+
+    @Test("a capture that ends by itself fails the session with its sentence and stops the capture")
+    func captureEndFailsTheSession() async throws {
+        let scripted = ScriptedCapture()
+        let cache = StreamingModelCache.probing(CacheProbe())
+        let session = try Self.session(source: .systemAudio, capture: scripted.capture, cache: cache)
+        let events = try #require(try await GuardedTask {
+            try await session.start(options: TranscriptionOptions(model: Self.tiny))
+        }.value("the start to return"))
+        scripted.end(FixedFailureText.systemAudioStopped)
+        scripted.end(FixedFailureText.systemAudioStopped)
+        var failures: [String] = []
+        for await event in events {
+            if case .failed(let text) = event { failures.append(text) }
+        }
+        #expect(failures == [FixedFailureText.systemAudioStopped])
+        #expect(!scripted.running)
+    }
+
+    @Test("an end that arrives after a stop adds no failure")
+    func captureEndAfterStop() async throws {
+        let scripted = ScriptedCapture()
+        let cache = StreamingModelCache.probing(CacheProbe())
+        let session = try Self.session(source: .app(bundleID: "us.zoom.xos"), capture: scripted.capture, cache: cache)
+        let events = try #require(try await GuardedTask {
+            try await session.start(options: TranscriptionOptions(model: Self.tiny))
+        }.value("the start to return"))
+        await session.stop()
+        scripted.end(FixedFailureText.appQuit("us.zoom.xos"))
+        var failed = false
+        for await event in events {
+            if case .failed = event { failed = true }
+        }
+        #expect(!failed)
+    }
+
+    @Test("a new session after an end captures again")
+    func restartAfterEnd() async throws {
+        let scripted = ScriptedCapture()
+        let cache = StreamingModelCache.probing(CacheProbe())
+        for _ in 0..<2 {
+            let session = try Self.session(source: .systemAudio, capture: scripted.capture, cache: cache)
+            let events = try #require(try await GuardedTask {
+                try await session.start(options: TranscriptionOptions(model: Self.tiny))
+            }.value("the start to return"))
+            scripted.end(FixedFailureText.systemAudioStopped)
+            for await _ in events {}
+        }
+        #expect(scripted.startCalls == 2)
     }
 
     @Test("a refused capture fails with the source's own text and never starts")

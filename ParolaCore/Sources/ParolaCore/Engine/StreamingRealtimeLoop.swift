@@ -57,6 +57,8 @@ actor StreamingRealtimeLoop {
         var stopCapture: @Sendable () -> Void
         /// Called instead of `stopCapture` when a stop lands while `startCapture` is still running, so a start that can be cut short is.
         var interruptStart: (@Sendable () -> Void)?
+        /// Registers the handler the capture calls if it ends by itself; the run then fails with that error.
+        var whenCaptureEnds: (@Sendable (_ handler: @escaping @Sendable (any Error) -> Void) -> Void)?
         var model: Model
         var tick: @Sendable () async throws -> Void
 
@@ -65,12 +67,13 @@ actor StreamingRealtimeLoop {
             startCapture: @escaping @Sendable (@escaping @Sendable ([Float]) -> Bool) async throws -> Void,
             stopCapture: @escaping @Sendable () -> Void,
             interruptStart: (@Sendable () -> Void)? = nil,
+            whenCaptureEnds: (@Sendable (_ handler: @escaping @Sendable (any Error) -> Void) -> Void)? = nil,
             transcribe: @escaping Transcribe,
             tick: @escaping @Sendable () async throws -> Void
         ) {
             self.init(
                 requestPermission: requestPermission, startCapture: startCapture, stopCapture: stopCapture,
-                interruptStart: interruptStart, model: .ready(transcribe), tick: tick
+                interruptStart: interruptStart, whenCaptureEnds: whenCaptureEnds, model: .ready(transcribe), tick: tick
             )
         }
 
@@ -79,6 +82,7 @@ actor StreamingRealtimeLoop {
             startCapture: @escaping @Sendable (@escaping @Sendable ([Float]) -> Bool) async throws -> Void,
             stopCapture: @escaping @Sendable () -> Void,
             interruptStart: (@Sendable () -> Void)? = nil,
+            whenCaptureEnds: (@Sendable (_ handler: @escaping @Sendable (any Error) -> Void) -> Void)? = nil,
             model: Model,
             tick: @escaping @Sendable () async throws -> Void
         ) {
@@ -86,6 +90,7 @@ actor StreamingRealtimeLoop {
             self.startCapture = startCapture
             self.stopCapture = stopCapture
             self.interruptStart = interruptStart
+            self.whenCaptureEnds = whenCaptureEnds
             self.model = model
             self.tick = tick
         }
@@ -163,6 +168,7 @@ actor StreamingRealtimeLoop {
     private var modelWaitLimit: Task<Void, Never>?
     private var gaveUpOnModel = false
     private var interruptedTotal: Int?
+    private var captureEndError: (any Error)?
 
     /// `decodingOptions` go with a ready `transcribe`; a model that loads brings its own.
     init(
@@ -207,6 +213,7 @@ actor StreamingRealtimeLoop {
         guard !stopRequested else { return .stopped }
         let startedAt = ContinuousClock.now
         startingCapture = true
+        deps.whenCaptureEnds? { [weak self] error in Task { await self?.captureEnded(error) } }
         do {
             try await deps.startCapture { [weak self] buffer in self?.ingest(buffer) ?? false }
         } catch {
@@ -222,6 +229,7 @@ actor StreamingRealtimeLoop {
             stopCapture()
             return .stopped
         }
+        if let captureEndError { return endedRun(captureEndError) }
         isRunning = true
         let decoder: Decoder
         switch deps.model {
@@ -230,6 +238,7 @@ actor StreamingRealtimeLoop {
         case .loading(let load):
             markWaitingForSpeech()
             let loaded = await loadedModel(load)
+            if let captureEndError { return endedRun(captureEndError) }
             guard isRunning || (flushesOnStop && config.waitsForModelOnStop) else {
                 return flushesOnStop ? .stopped : .cancelled
             }
@@ -262,6 +271,7 @@ actor StreamingRealtimeLoop {
                 guard stopRequested, flushesOnStop else { return .failed(error) }
             }
         }
+        if let captureEndError { return endedRun(captureEndError) }
         guard flushesOnStop else { return .cancelled }
         // Runs on this task, never from stop(): a flush entering the actor mid-iterate
         // would race the in-flight decode on the shared TranscribeTask.
@@ -440,6 +450,19 @@ actor StreamingRealtimeLoop {
     private func answerPermission(_ granted: Bool?) {
         permissionWait?.resume(returning: granted)
         permissionWait = nil
+    }
+
+    private func captureEnded(_ error: any Error) {
+        guard !stopRequested, captureEndError == nil else { return }
+        captureEndError = error
+        isRunning = false
+        modelLoad?.cancel()
+        if !startingCapture { stopCapture() }
+    }
+
+    private func endedRun(_ error: any Error) -> Outcome {
+        stopCapture()
+        return .failed(error)
     }
 
     func cancel() {
