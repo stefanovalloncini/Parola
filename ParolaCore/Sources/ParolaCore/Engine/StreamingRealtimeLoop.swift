@@ -149,6 +149,8 @@ actor StreamingRealtimeLoop {
     private var currentText = ""
     private var lastConfirmedWord: String?
     private var lastConfirmedEndedSentence = false
+    private var confirmations = 0
+    private var heldAnchorSeconds: Double?
     private var isRunning = false
     private var didStopCapture = false
     private var startingCapture = false
@@ -549,6 +551,7 @@ actor StreamingRealtimeLoop {
         let decodedEndSeconds = Float(offsetSeconds + Double(decoded.count) / Double(config.sampleRate))
         confirmStaleSegments(decodedEnd: Double(decodedEndSeconds))
         let clipSeconds = decodeFloorSeconds(decodedEnd: Double(decodedEndSeconds))
+        let confirmationsBefore = confirmations
         var options = decoder.options
         // clipTimestamps is window-relative; everything emitted from here back out must be absolute.
         options.clipTimestamps = [Float(max(0, clipSeconds - offsetSeconds))]
@@ -610,6 +613,7 @@ actor StreamingRealtimeLoop {
         } else {
             unconfirmedSegments = segments
         }
+        updateHeldAnchor(confirmed: confirmations != confirmationsBefore)
         emitPartial()
         purgeConfirmedAudio()
         return false
@@ -620,6 +624,7 @@ actor StreamingRealtimeLoop {
             lastConfirmedWord = text.split(separator: " ").last.map(Self.comparable)
             lastConfirmedEndedSentence = text.last.map { ".?!…".contains($0) } ?? false
         }
+        confirmations += 1
         onConfirmed(batch)
     }
 
@@ -654,8 +659,8 @@ actor StreamingRealtimeLoop {
 
     private func decodeFloorSeconds(decodedEnd: Double) -> Double {
         var floor = retainedFloorSeconds
-        if let backoff = config.heldSegmentBackoffSeconds, let held = unconfirmedSegments.map({ Double($0.start) }).min() {
-            floor = max(Double(lastConfirmedEndSeconds), held - backoff)
+        if let backoff = config.heldSegmentBackoffSeconds, let anchor = heldAnchorSeconds {
+            floor = max(Double(lastConfirmedEndSeconds), anchor - backoff)
         }
         guard let maxDecode = config.maxDecodeSeconds else { return floor }
         return max(floor, decodedEnd - maxDecode)
@@ -678,6 +683,16 @@ actor StreamingRealtimeLoop {
         }
         unconfirmedSegments = kept
         confirm(makeBatch(stale))
+        updateHeldAnchor(confirmed: true)
+    }
+
+    /// The held start is taken where the segment was cut, so a later decode that drops its first word can't move the floor past it.
+    private func updateHeldAnchor(confirmed: Bool) {
+        guard let first = unconfirmedSegments.map({ Double($0.start) }).min() else {
+            heldAnchorSeconds = nil
+            return
+        }
+        if confirmed || heldAnchorSeconds == nil { heldAnchorSeconds = first }
     }
 
     private func makeBatch(_ segments: [TranscriptionSegment]) -> ConfirmedAudioBatch {

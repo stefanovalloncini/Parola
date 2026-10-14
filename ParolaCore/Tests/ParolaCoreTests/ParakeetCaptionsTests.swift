@@ -440,6 +440,34 @@ struct CaptionConfirmationTests {
     }
 }
 
+@Suite("Held segment anchor")
+struct HeldAnchorTests {
+    @Test("a decode that drops the held segment's first word doesn't move the next decode past it")
+    func anchorSurvivesADroppedHead() async throws {
+        let (loop, mic, calls, confirmed, partials) = scripted(
+            [[segment(0, 5, "if nothing"), segment(5, 9, "ship the following")],
+             [segment(3, 7, "following")],
+             [segment(2, 6, "the following now")]],
+            configuration: parakeetConfiguration()
+        )
+        let run = Task { await loop.run() }
+        #expect(await eventually { mic.installed })
+
+        mic.push(seconds: 10)
+        #expect(await eventually { confirmed.withLock { $0.count } == 1 })
+        mic.push(seconds: 1)
+        #expect(await eventuallyAsync { await calls.clips.count == 2 })
+        mic.push(seconds: 1)
+        #expect(await eventuallyAsync { await calls.clips.count == 3 })
+
+        let clips = await calls.clips.map { $0.first ?? -1 }
+        #expect(abs(clips[1] - 2) < 0.001 && abs(clips[2] - 2) < 0.001, "\(clips)")
+        #expect(await eventually { partials.withLock { $0.last } == "the following now" })
+        await loop.cancel()
+        _ = await run.value
+    }
+}
+
 @Suite("Caption decode gate")
 struct CaptionDecodeGateTests {
     @Test("a decode runs once the new audio reaches the engine's minimum, not only past it")
@@ -491,31 +519,56 @@ struct CaptionCutRepeatTests {
         }
     }
 
-    @Test("a repeated word after a sentence end or a pause is real speech and stays")
-    func repeatedWordAfterASentenceStays() async throws {
-        for (first, second, start) in [
-            ("Is that okay?", "Okay, let's move on", Float(2.05)),
-            ("I said that,", "that is fine", Float(2.3)),
-        ] {
-            let (loop, mic, calls, confirmed, partials) = scripted(
-                [[segment(0, 5, first), segment(5.2, 9, String(second.prefix(upTo: second.index(second.startIndex, offsetBy: 5))))],
-                 [segment(start, 9, second)]],
-                configuration: parakeetConfiguration()
-            )
-            let run = Task { await loop.run() }
-            #expect(await eventually { mic.installed })
+    private func partialAfterTheSecondDecode(
+        first: String, held: (start: Float, text: String), second: (start: Float, text: String)
+    ) async throws -> String? {
+        let (loop, mic, calls, confirmed, partials) = scripted(
+            [[segment(0, 5, first), segment(held.start, 9, held.text)], [segment(second.start, 9, second.text)]],
+            configuration: parakeetConfiguration()
+        )
+        let run = Task { await loop.run() }
+        #expect(await eventually { mic.installed })
+        mic.push(seconds: 10)
+        #expect(await eventually { confirmed.withLock { $0.count } == 1 })
+        mic.push(seconds: 2)
+        #expect(await eventuallyAsync { await calls.clips.count == 2 })
+        _ = await eventually { partials.withLock { $0.last } != nil }
+        let last = partials.withLock { $0.last }
+        await loop.cancel()
+        _ = await run.value
+        return last
+    }
 
-            mic.push(seconds: 10)
-            #expect(await eventually { confirmed.withLock { $0.count } == 1 })
-            mic.push(seconds: 2)
-            #expect(await eventuallyAsync { await calls.clips.count == 2 })
+    @Test("a repeat after a sentence end stays, whatever the timing")
+    func repeatAfterASentenceStays() async throws {
+        let shown = try await partialAfterTheSecondDecode(
+            first: "Is that okay?", held: (5.0, "Okay,"), second: (2.05, "Okay, let's move on")
+        )
+        #expect(shown == "Okay, let's move on")
+    }
 
-            #expect(await eventually { partials.withLock { $0.last } == second }, "\(partials.withLock { $0 })")
-            let started = try #require(await calls.clips.last?.first)
-            #expect(abs(started - 2.12) < 0.001, "the decode starts 0.08 s before the held segment, at \(started)")
-            await loop.cancel()
-            _ = await run.value
-        }
+    @Test("a repeat after a pause of 0.25 s or more stays even when it starts inside the 0.16 s window")
+    func repeatAfterAPauseStays() async throws {
+        let shown = try await partialAfterTheSecondDecode(
+            first: "I said that,", held: (5.3, "that"), second: (2.3, "that is fine")
+        )
+        #expect(shown == "that is fine")
+    }
+
+    @Test("a repeat that starts 0.16 s or more after the decode start stays even with under 0.25 s of gap")
+    func repeatStartingLateStays() async throws {
+        let shown = try await partialAfterTheSecondDecode(
+            first: "I said that", held: (5.0, "that"), second: (2.2, "that is fine")
+        )
+        #expect(shown == "that is fine")
+    }
+
+    @Test("with no sentence end, no pause and a start inside the window the repeat is dropped")
+    func hardCutRepeatIsDropped() async throws {
+        let shown = try await partialAfterTheSecondDecode(
+            first: "I said that", held: (5.0, "that"), second: (2.1, "that is fine")
+        )
+        #expect(shown == "is fine")
     }
 }
 
