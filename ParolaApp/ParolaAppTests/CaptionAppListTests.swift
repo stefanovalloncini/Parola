@@ -133,8 +133,22 @@ struct CaptionFailureTests {
             for: FixedFailureText.appQuit("us.zoom.xos"), appName: { $0 == "us.zoom.xos" ? "Zoom" : $0 }
         )
         #expect(quit == "Zoom quit.")
+        let stopped = CaptionFailure.message(
+            for: FixedFailureText.appStoppedSending("us.zoom.xos"), appName: { $0 == "us.zoom.xos" ? "Zoom" : $0 }
+        )
+        #expect(stopped == "Zoom stopped sending audio.")
         #expect(CaptionFailure.permission(for: FixedFailureText.systemAudioStopped) == nil)
         #expect(CaptionFailure.permission(for: FixedFailureText.appQuit("us.zoom.xos")) == nil)
+    }
+
+    @Test("only a bundle ID in front of the suffix is read as an app, so an engine error ending in quit is left alone")
+    func looseSuffix() {
+        let text = "the audio engine quit."
+        #expect(CaptionFailure.message(for: text, appName: { _ in "Zoom" }) == FailureText.reason(text, bundle: .main))
+        #expect(!CaptionFailure.isCaptureEnd(text))
+        #expect(CaptionFailure.isCaptureEnd(FixedFailureText.appQuit("us.zoom.xos")))
+        #expect(CaptionFailure.isCaptureEnd(FixedFailureText.systemAudioStopped))
+        #expect(!CaptionFailure.isCaptureEnd(FixedFailureText.appNotPlayingAudio("us.zoom.xos")))
     }
 
     @Test("Italian covers the captions failures")
@@ -145,6 +159,8 @@ struct CaptionFailureTests {
         let quit = CaptionFailure.message(for: FixedFailureText.appQuit("x"), appName: { _ in "Zoom" }, bundle: it)
         #expect(quit == "L'app Zoom è stata chiusa.")
         #expect(CaptionFailure.message(for: FixedFailureText.systemAudioStopped, appName: { $0 }, bundle: it) == "L'audio di sistema si è fermato.")
+        let stopped = CaptionFailure.message(for: FixedFailureText.appStoppedSending("x"), appName: { _ in "Zoom" }, bundle: it)
+        #expect(stopped == "Zoom ha smesso di inviare audio.")
         for fixed in [FixedFailureText.systemAudioNotAllowed, FixedFailureText.appAudioNotAllowed] {
             let text = CaptionFailure.message(for: fixed, appName: { $0 }, bundle: it)
             #expect(text != fixed && text.hasPrefix("Consenti l'accesso a Parola"), "\(text)")

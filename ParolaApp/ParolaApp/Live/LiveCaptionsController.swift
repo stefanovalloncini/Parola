@@ -146,6 +146,7 @@ final class LiveCaptionsController {
         if case .failed(let text) = event {
             failurePermission = CaptionFailure.permission(for: text)
             state.error = CaptionFailure.message(for: text, appName: appName)
+            if CaptionFailure.isCaptureEnd(text) { state.partial = "" }
             session = nil
             consumer?.cancel()
             consumer = nil
@@ -168,7 +169,9 @@ final class LiveCaptionsController {
             return
         }
         guard let options = optionsProvider?() ?? lastOptions else { return }
+        let earlier = state
         await start(options: optionsWithTranslate(options), source: source)
+        state.continuing(after: earlier)
     }
 
     func closeFailure() {

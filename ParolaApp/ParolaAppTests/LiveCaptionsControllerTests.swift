@@ -53,6 +53,46 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("Retry after a failure in the middle of a session keeps the earlier lines", .timeLimit(.minutes(1)))
+        func retryKeepsEarlierLines() async throws {
+            try await withMocksCleared(.streaming) {
+                MockStreamingTranscriberRegistry.shared.install(MockTranscriberResponse(
+                    segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "line before the end")],
+                    failure: MockTranscriberFailure(code: .transcriptionFailed, message: FixedFailureText.systemAudioStopped)
+                ))
+                let controller = LiveCaptionsController(showsPanel: false)
+                await controller.start(options: TranscriptionOptions())
+                await waitUntil { controller.state.error != nil }
+                #expect(controller.state.history == ["line before the end"])
+
+                MockStreamingTranscriberRegistry.shared.install(MockTranscriberResponse(
+                    segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "line after retry")], delayMs: 300
+                ))
+                await controller.tryAgain()
+                await waitUntil { controller.state.history.count == 2 }
+                #expect(controller.state.history == ["line before the end", "line after retry"])
+                #expect(controller.state.error == nil)
+                await controller.stop()
+            }
+        }
+
+        @Test("a capture that ended clears the unconfirmed words, and an engine failure keeps them", .timeLimit(.minutes(1)))
+        func partialOnFailure() async throws {
+            try await withMocksCleared(.streaming) {
+                for (message, kept) in [(FixedFailureText.systemAudioStopped, ""), ("engine died", "words still held")] {
+                    MockStreamingTranscriberRegistry.shared.install(MockTranscriberResponse(
+                        segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "line one")],
+                        partials: ["words still held"],
+                        failure: MockTranscriberFailure(code: .transcriptionFailed, message: message)
+                    ))
+                    let controller = LiveCaptionsController(showsPanel: false)
+                    await controller.start(options: TranscriptionOptions())
+                    await waitUntil { controller.state.error != nil }
+                    #expect(controller.state.partial == kept, "\(message)")
+                }
+            }
+        }
+
         @Test("Parakeet v2 captions in a language it doesn't speak fail at start, and Try Again fails the same way", .timeLimit(.minutes(1)))
         func parakeetRefusesAnotherLanguage() async throws {
             try await withMocksCleared(.streaming) {

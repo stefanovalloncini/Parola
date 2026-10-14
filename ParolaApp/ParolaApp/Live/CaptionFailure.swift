@@ -20,16 +20,30 @@ enum CaptionFailure {
         default:
             break
         }
-        if text.hasSuffix(FixedFailureText.appQuitSuffix) {
-            let name = appName(String(text.dropLast(FixedFailureText.appQuitSuffix.count)))
-            return String(localized: "\(name) quit.", bundle: bundle)
+        if let name = appBundleID(in: text, before: FixedFailureText.appQuitSuffix) {
+            return String(localized: "\(appName(name)) quit.", bundle: bundle)
         }
-        let suffix = FixedFailureText.appNotPlayingAudioSuffix
-        if text.hasSuffix(suffix) {
-            let name = appName(String(text.dropLast(suffix.count)))
-            return String(localized: "\(name) isn't playing any audio. Try again once it is.", bundle: bundle)
+        if let name = appBundleID(in: text, before: FixedFailureText.appStoppedSendingSuffix) {
+            return String(localized: "\(appName(name)) stopped sending audio.", bundle: bundle)
+        }
+        if let name = appBundleID(in: text, before: FixedFailureText.appNotPlayingAudioSuffix) {
+            return String(localized: "\(appName(name)) isn't playing any audio. Try again once it is.", bundle: bundle)
         }
         return FailureText.reason(text, bundle: bundle)
+    }
+
+    /// A capture that ended by itself, as opposed to one that failed to start or an engine error.
+    nonisolated static func isCaptureEnd(_ text: String) -> Bool {
+        text == FixedFailureText.systemAudioStopped
+            || appBundleID(in: text, before: FixedFailureText.appQuitSuffix) != nil
+            || appBundleID(in: text, before: FixedFailureText.appStoppedSendingSuffix) != nil
+    }
+
+    /// Core puts a bundle ID in front of these suffixes, and a bundle ID has no whitespace.
+    private nonisolated static func appBundleID(in text: String, before suffix: String) -> String? {
+        guard text.hasSuffix(suffix) else { return nil }
+        let name = String(text.dropLast(suffix.count))
+        return name.isEmpty || name.contains(where: \.isWhitespace) ? nil : name
     }
 
     nonisolated static func permission(for text: String) -> RecordingSession.Permission? {

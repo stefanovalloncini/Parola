@@ -331,6 +331,17 @@
         }
       }
     },
+    "%@ stopped sending audio.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ ha smesso di inviare audio."
+          }
+        }
+      }
+    },
     "%@ transcripts": {
       "extractionState": "manual",
       "localizations": {

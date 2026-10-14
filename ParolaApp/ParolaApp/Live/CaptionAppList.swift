@@ -132,19 +132,11 @@ final class CaptionAppList {
 
 /// Calls back when Core Audio's list of audio processes changes.
 private final class AudioListener {
-    private var address = AudioObjectPropertyAddress(
-        mSelector: kAudioHardwarePropertyProcessObjectList,
-        mScope: kAudioObjectPropertyScopeGlobal,
-        mElement: kAudioObjectPropertyElementMain
-    )
-    private let block: AudioObjectPropertyListenerBlock
+    private let stop: @Sendable () -> Void
 
     init(onChange: @escaping @Sendable () -> Void) {
-        block = { _, _ in onChange() }
-        AudioObjectAddPropertyListenerBlock(AudioObjectID(kAudioObjectSystemObject), &address, DispatchQueue.main, block)
+        stop = ProcessListObserver.observe(on: .main, onChange)
     }
 
-    func remove() {
-        AudioObjectRemovePropertyListenerBlock(AudioObjectID(kAudioObjectSystemObject), &address, DispatchQueue.main, block)
-    }
+    func remove() { stop() }
 }
