@@ -91,17 +91,16 @@ public struct LiveCaptionsState: Sendable, Equatable {
         }
     }
 
-    /// The new partial arrives before the line it confirms: the partial's leading words that are that line's words go, and what is left was said after it.
+    /// The new partial arrives before the line it confirms: it loses the confirmed words only when it starts with all of them or is an older form of them.
     private static func remainder(of partial: String, after confirmed: String) -> String {
         let confirmedWords = confirmed.split(whereSeparator: \.isWhitespace).map(comparable)
         let words = partial.split(whereSeparator: \.isWhitespace)
         var matched = 0
         while matched < min(words.count, confirmedWords.count), comparable(words[matched]) == confirmedWords[matched] { matched += 1 }
-        if matched == words.count - 1, matched < confirmedWords.count, confirmedWords[matched].hasPrefix(comparable(words[matched])) {
-            matched += 1
-        }
-        guard matched > 0 || words.isEmpty else { return partial }
-        return words.dropFirst(matched).joined(separator: " ")
+        if matched == confirmedWords.count, matched > 0 { return words.dropFirst(matched).joined(separator: " ") }
+        let endsInsideAWord = matched == words.count - 1 && matched < confirmedWords.count
+            && confirmedWords[matched].hasPrefix(comparable(words[matched]))
+        return matched == words.count || endsInsideAWord ? "" : partial
     }
 
     private static func comparable<S: StringProtocol>(_ word: S) -> String {

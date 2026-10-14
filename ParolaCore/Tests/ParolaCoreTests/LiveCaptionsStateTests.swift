@@ -55,6 +55,9 @@ struct LiveCaptionsStateTests {
         ("finish a sentence,", "That is exactly the", "That is exactly the"),
         ("hello world", "hel", ""),
         ("that is all.", "that is all so", "so"),
+        ("I went home.", "I was tired", "I was tired"),
+        ("So we ship it.", "So the next thing", "So the next thing"),
+        ("That is all.", "That was", "That was"),
     ])
     func confirmStripsWords(confirmed: String, partial: String, left: String) {
         var s = LiveCaptionsState(partial: partial)
