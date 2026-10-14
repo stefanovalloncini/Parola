@@ -598,13 +598,13 @@ struct SegmentCard: View {
         return cumulativeChars.firstIndex { $0 >= target } ?? cumulativeChars.count - 1
     }
 
-    static func syntheticKaraokeText(tokens: [String], spokenIndex: Int, serif: Bool = false) -> AttributedString {
+    static func syntheticKaraokeText(tokens: [String], spokenIndex: Int) -> AttributedString {
         var attr = AttributedString()
         for (index, token) in tokens.enumerated() {
             var piece = AttributedString(token + (index == tokens.count - 1 ? "" : " "))
             if index == spokenIndex {
                 piece.foregroundColor = DS.Color.highlight
-                piece.font = DS.Font.transcriptEmphasis(serif: serif)
+                piece.backgroundColor = DS.Color.highlight.opacity(0.18)
             }
             attr.append(piece)
         }
@@ -621,7 +621,7 @@ struct SegmentCard: View {
         ))
     }
 
-    static func karaokeText(words: [WordTiming], activeWordID: WordTiming.ID?, serif: Bool = false) -> AttributedString {
+    static func karaokeText(words: [WordTiming], activeWordID: WordTiming.ID?) -> AttributedString {
         var attr = AttributedString()
         for (index, word) in words.enumerated() {
             if index > 0, word.word.first != "'", word.word.first != "\u{2019}" {
@@ -634,7 +634,7 @@ struct SegmentCard: View {
             piece.foregroundColor = DS.Color.primaryText
             if word.id == activeWordID {
                 piece.foregroundColor = DS.Color.highlight
-                piece.font = DS.Font.transcriptEmphasis(serif: serif)
+                piece.backgroundColor = DS.Color.highlight.opacity(0.18)
             }
             attr.append(piece)
         }
@@ -681,7 +681,6 @@ struct SegmentCard: View {
 private struct SyntheticKaraoke: View {
     let segment: TranscriptSegment
 
-    @Environment(\.serifTranscript) private var serif
     @Environment(AppModel.self) private var model
     private let tokens: [String]
     private let cumulativeChars: [Int]
@@ -701,7 +700,7 @@ private struct SyntheticKaraoke: View {
         if tokens.isEmpty {
             Text(segment.text)
         } else {
-            SyntheticKaraokeLine(tokens: tokens, spokenIndex: spokenIndex, serif: serif)
+            SyntheticKaraokeLine(tokens: tokens, spokenIndex: spokenIndex)
                 .equatable()
         }
     }
@@ -716,10 +715,9 @@ private struct SyntheticKaraoke: View {
 private struct SyntheticKaraokeLine: View, Equatable {
     let tokens: [String]
     let spokenIndex: Int
-    let serif: Bool
 
     var body: some View {
-        Text(SegmentCard.syntheticKaraokeText(tokens: tokens, spokenIndex: spokenIndex, serif: serif))
+        Text(SegmentCard.syntheticKaraokeText(tokens: tokens, spokenIndex: spokenIndex))
     }
 }
 
@@ -781,11 +779,10 @@ private struct SegmentAssignMenu: View, Equatable {
 private struct WordKaraoke: View {
     let words: [WordTiming]
 
-    @Environment(\.serifTranscript) private var serif
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        WordKaraokeLine(words: words, activeWordID: model.currentWordID, serif: serif)
+        WordKaraokeLine(words: words, activeWordID: model.currentWordID)
             .equatable()
     }
 }
@@ -793,9 +790,8 @@ private struct WordKaraoke: View {
 private struct WordKaraokeLine: View, Equatable {
     let words: [WordTiming]
     let activeWordID: WordTiming.ID?
-    let serif: Bool
 
     var body: some View {
-        Text(SegmentCard.karaokeText(words: words, activeWordID: activeWordID, serif: serif))
+        Text(SegmentCard.karaokeText(words: words, activeWordID: activeWordID))
     }
 }

@@ -87,8 +87,8 @@ struct KaraokeTextTests {
         #expect(active?.foregroundColor != inactive?.foregroundColor)
     }
 
-    @Test("the active word takes the transcript face at emphasis, its neighbours none")
-    func activeWordTakesTheEmphasisTier() {
+    @Test("the active word gets a soft background and keeps the regular weight, its neighbours neither")
+    func activeWordHasBackgroundOnly() {
         let words = [
             timedWord("0-0", "ciao", start: 0, end: 0.5),
             timedWord("0-1", "mondo", start: 0.5, end: 1.0),
@@ -96,16 +96,41 @@ struct KaraokeTextTests {
         let attr = SegmentCard.karaokeText(words: words, activeWordID: "0-1")
         let active = attr.runs.first { $0.link == URL(string: "parola-seek-time://0.5") }
         let inactive = attr.runs.first { $0.link == URL(string: "parola-seek-time://0.0") }
-        #expect(active?.font == DS.Font.transcriptEmphasis(serif: false))
+        #expect(active?.backgroundColor != nil)
+        #expect(active?.font == nil)
+        #expect(inactive?.backgroundColor == nil)
         #expect(inactive?.font == nil)
     }
 
-    @Test("the active word follows the serif setting")
-    func activeWordFollowsSerif() {
+    @Test("a semibold word re-wraps a paragraph that the regular weight keeps, which is why the highlight does not change weight")
+    func semiboldWordReflows() {
+        let text = "Quick note before I forget. For the launch video, open on the empty desk, then the record button, then the words appearing as I speak."
+        func lineCount(emphasising word: String?, width: CGFloat) -> Int {
+            let regular = NSFont.systemFont(ofSize: 17)
+            let storage = NSMutableAttributedString(string: text, attributes: [.font: regular])
+            if let word {
+                storage.addAttribute(.font, value: NSFont.systemFont(ofSize: 17, weight: .semibold), range: (text as NSString).range(of: word))
+            }
+            let layout = NSLayoutManager()
+            let container = NSTextContainer(size: NSSize(width: width, height: .greatestFiniteMagnitude))
+            container.lineFragmentPadding = 0
+            layout.addTextContainer(container)
+            let textStorage = NSTextStorage(attributedString: storage)
+            textStorage.addLayoutManager(layout)
+            layout.ensureLayout(for: container)
+            var lines = 0
+            layout.enumerateLineFragments(forGlyphRange: layout.glyphRange(for: container)) { _, _, _, _, _ in lines += 1 }
+            return lines
+        }
+        #expect(lineCount(emphasising: nil, width: 361) == 3)
+        #expect(lineCount(emphasising: "video,", width: 361) == 4)
+    }
+
+    @Test("the active word follows no font override, so serif and SF share one rule")
+    func activeWordLeavesTheFontAlone() {
         let words = [timedWord("0-0", "ciao", start: 0, end: 0.5)]
-        let attr = SegmentCard.karaokeText(words: words, activeWordID: "0-0", serif: true)
-        #expect(attr.runs.first?.font == DS.Font.transcriptEmphasis(serif: true))
-        #expect(attr.runs.first?.font != DS.Font.transcriptEmphasis(serif: false))
+        let attr = SegmentCard.karaokeText(words: words, activeWordID: "0-0")
+        #expect(attr.runs.allSatisfy { $0.font == nil })
     }
 
     // MARK: - Synthetic karaoke
@@ -145,11 +170,11 @@ struct KaraokeTextTests {
         #expect(String(attr.characters) == "uno due tre")
     }
 
-    @Test("the spoken token takes the transcript face at emphasis")
-    func syntheticSpokenTokenTakesTheEmphasisTier() {
+    @Test("the spoken token gets a soft background and no font override")
+    func syntheticSpokenTokenHasBackgroundOnly() {
         let attr = SegmentCard.syntheticKaraokeText(tokens: ["uno", "due", "tre"], spokenIndex: 1)
-        let fonts = attr.runs.compactMap(\.font)
-        #expect(fonts == [DS.Font.transcriptEmphasis(serif: false)])
+        #expect(attr.runs.compactMap(\.backgroundColor).count == 1)
+        #expect(attr.runs.allSatisfy { $0.font == nil })
     }
 
     @Test("exactly one token carries the highlight")

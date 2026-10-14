@@ -42,9 +42,6 @@ struct TypeScaleTests {
     func tiersSharingAHeightDiffer() {
         #expect(measured(DS.Font.body) != measured(DS.Font.bodyStrong))
         #expect(measured(DS.Font.secondary) != measured(DS.Font.mono))
-        // transcriptEmphasis is the transcript face at semibold: same line, wider glyphs.
-        #expect(height(DS.Font.transcriptEmphasis(serif: false)) == height(DS.Font.transcript))
-        #expect(measured(DS.Font.transcriptEmphasis(serif: false)) != measured(DS.Font.transcript))
     }
 
     /// A `Font` carries no readable weight or design, so a tier is pinned by rendering equal to its reference.
@@ -68,7 +65,6 @@ struct TypeScaleTests {
     func readingTierIsSF() {
         #expect(measured(DS.Font.transcript) == measured(.system(size: 17)))
         #expect(measured(DS.Font.transcript) != measured(.system(size: 17, design: .serif)))
-        #expect(measured(DS.Font.transcriptEmphasis(serif: false)) == measured(.system(size: 17, weight: .semibold)))
         #expect(measured(DS.Font.transcriptCompact) == measured(.system(size: 15)))
         #expect(measured(DS.Font.excerpt) == measured(.system(size: 14)))
         #expect(measured(DS.Font.excerpt) != measured(.system(size: 14, design: .serif)))
@@ -81,7 +77,6 @@ struct TypeScaleTests {
         #expect(measured(DS.Font.transcript(serif: false)) == measured(DS.Font.transcript))
         #expect(measured(DS.Font.transcriptCompact(serif: true)) == measured(.system(size: 15, design: .serif)))
         #expect(measured(DS.Font.transcriptCompact(serif: false)) == measured(DS.Font.transcriptCompact))
-        #expect(measured(DS.Font.transcriptEmphasis(serif: true)) == measured(.system(size: 17, weight: .semibold, design: .serif)))
     }
 
     @Test("a transcript view follows the environment value and the other surfaces ignore it")
