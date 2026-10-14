@@ -1652,6 +1652,10 @@ extension TranscriberMockSuites {
                         let cleared = await waitUntil { field.stringValue.isEmpty }
                         #expect(cleared)
 
+                        let stopOffered = await waitUntil {
+                            HostedAccessibility.elements(in: window).contains { $0.identifier?.hasSuffix("Composer.Button.Stop") == true }
+                        }
+                        #expect(stopOffered, "the reply on its way swaps Send for Stop before the key is tried")
                         NSApp.sendEvent(try AppMenu.key("\r", keyCode: 36, in: window))
                         let sendingTookIt = window.performKeyEquivalent(with: try AppMenu.key("\r", keyCode: 36, in: window))
                         #expect(!sendingTookIt, "nothing takes ⌘⏎ while the composer is empty and a message is on its way")
