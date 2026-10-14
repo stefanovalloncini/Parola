@@ -430,7 +430,7 @@ struct CaptionConfirmationTests {
     @Test("a held-back segment that went stale is confirmed before the next decode, which starts at most 15 s back")
     func staleSegmentConfirmedFirst() async throws {
         let (loop, mic, calls, confirmed, _) = scripted(
-            [[segment(0, 4, "a"), segment(4, 9, "b")], []],
+            [[segment(0, 4, "a"), spoken(4, 9, "b c d e f")], []],
             configuration: parakeetConfiguration()
         )
         let run = Task { await loop.run() }
@@ -441,10 +441,10 @@ struct CaptionConfirmationTests {
         mic.push(seconds: 12)
         #expect(await eventually { confirmed.withLock { $0.count } == 2 })
 
-        #expect(confirmed.withLock { $0 } == ["a", "b"])
+        #expect(confirmed.withLock { $0 } == ["a", "b c d e f"])
         let clips = await calls.clips
         #expect(clips.count == 2)
-        // The first decode purged the window to 3.5 s before the held segment; the second starts 2 s before "b"'s end (9 s), 6.5 s into what is left.
+        // The first decode purged the window to 3.5 s before the held segment; the second starts 2 s before its end (9 s), at the word "e", 6.5 s into what is left.
         #expect(clips.last == [6.5])
         await loop.cancel()
         _ = await run.value
@@ -456,9 +456,9 @@ struct HeldAnchorTests {
     @Test("a decode that drops the held segment's first word doesn't move the next decode past it")
     func anchorSurvivesADroppedHead() async throws {
         let (loop, mic, calls, confirmed, partials) = scripted(
-            [[segment(0, 5, "if nothing"), segment(5, 9, "ship the following")],
-             [segment(3, 7, "following")],
-             [segment(2, 6, "the following now")]],
+            [[spoken(0, 5, "if nothing", words: [("if", 0, 2.9), ("nothing", 3.0, 5.0)]), spoken(5, 9, "ship the following")],
+             [inSecondWindow(spoken(6, 10, "following"))],
+             [inSecondWindow(spoken(4.9, 8, "the following now"))]],
             configuration: parakeetConfiguration()
         )
         let run = Task { await loop.run() }
@@ -500,7 +500,7 @@ struct CaptionDecodeGateTests {
     }
 }
 
-/// Words spread evenly over the segment, as the Parakeet decoder returns them.
+/// Words spread evenly over the segment, which is how the loop times a segment that has none.
 private func spoken(_ start: Float, _ end: Float, _ text: String) -> TranscriptionSegment {
     let pieces = text.split(separator: " ").map(String.init)
     let step = (end - start) / Float(pieces.count)
@@ -539,10 +539,16 @@ struct CaptionCutRepeatTests {
     private func afterTheSecondDecode(
         first: String, held: String, second: [TranscriptionSegment], configuration: StreamingRealtimeLoop.Configuration = parakeetConfiguration()
     ) async throws -> Shown {
+        try await afterTheSecondDecode(first: spoken(0, 5, first), held: held, second: second, configuration: configuration)
+    }
+
+    private func afterTheSecondDecode(
+        first: TranscriptionSegment, held: String, second: [TranscriptionSegment], configuration: StreamingRealtimeLoop.Configuration = parakeetConfiguration()
+    ) async throws -> Shown {
         var configuration = configuration
         configuration.requiredSegmentsForConfirmation = 1
         let (loop, mic, calls, confirmed, partials) = scripted(
-            [[spoken(0, 5, first), spoken(5, 9, held)], second.map(inSecondWindow), second.map(inSecondWindow)],
+            [[first, spoken(5, 9, held)], second.map(inSecondWindow), second.map(inSecondWindow)],
             configuration: configuration
         )
         let run = Task { await loop.run() }
@@ -561,8 +567,15 @@ struct CaptionCutRepeatTests {
 
     @Test("a decode after a confirm starts 2 s before the held audio")
     func clipHasLeftContext() async throws {
-        let shown = try await afterTheSecondDecode(first: "if nothing", held: "else", second: [spoken(3, 9, "if nothing else matters")])
+        let first = spoken(0, 5, "if nothing", words: [("if", 0, 2.9), ("nothing", 3.0, 5.0)])
+        let shown = try await afterTheSecondDecode(first: first, held: "else", second: [spoken(3, 9, "nothing else matters")])
         #expect(shown.clip == 1.5)
+    }
+
+    @Test("a context that would start inside a confirmed word starts at the word")
+    func clipSnapsToAWordStart() async throws {
+        let shown = try await afterTheSecondDecode(first: "if nothing", held: "else", second: [spoken(2.5, 9, "nothing else matters")])
+        #expect(shown.clip == 1.0)
     }
 
     @Test("the clip starts at the last confirmed segment when it is within 3 s of the held audio")
@@ -585,7 +598,7 @@ struct CaptionCutRepeatTests {
     }
 
     @Test("the left context is dropped, so a sentence that continues after a comma stays in lower case")
-    func contextWordsAreDropped() async throws {
+    func contextWordsBeforeTheBoundaryAreDropped() async throws {
         let shown = try await afterTheSecondDecode(
             first: "as soon as they finish a sentence,", held: "that is",
             second: [spoken(3, 9, "finish a sentence, that is exactly")]
@@ -652,13 +665,71 @@ struct CaptionCutRepeatTests {
         #expect(shown.partial == "the audio device changed")
     }
 
-    @Test("when no context word aligns, only the segments that end before the boundary go")
-    func unalignedContextFallsBackToTime() async throws {
+    @Test("when no context word aligns, the words heard before the boundary go, wherever the segment starts")
+    func unalignedContextFallsBackToWords() async throws {
         let shown = try await afterTheSecondDecode(
             first: "if nothing", held: "else",
-            second: [spoken(3, 4.5, "something different"), spoken(4.6, 9, "new words here")]
+            second: [spoken(3, 6.2, "something different new words here", words: [
+                ("something", 3.0, 3.8), ("different", 3.8, 4.6), ("new", 5.0, 5.4), ("words", 5.4, 5.8), ("here", 5.8, 6.2),
+            ])]
         )
         #expect(shown.partial == "new words here")
+    }
+
+    @Test("a revised last confirmed word aligns nothing, and the doubled context still goes")
+    func revisedLastWordDropsTheContext() async throws {
+        let shown = try await afterTheSecondDecode(
+            first: "as we were testing on real machines, and ship", held: "the following Monday.",
+            second: [spoken(3, 7, "real machines, and shipped the following Monday.", words: [
+                ("real", 3.0, 3.4), ("machines,", 3.4, 4.0), ("and", 4.0, 4.3), ("shipped", 4.3, 4.9),
+                ("the", 5.0, 5.3), ("following", 5.3, 6.0), ("Monday.", 6.0, 7.0),
+            ])]
+        )
+        #expect(shown.partial == "the following Monday.")
+    }
+
+    @Test("a doubled phrase never reaches a confirmed line")
+    func doubledContextIsNotConfirmed() async throws {
+        let (loop, mic, calls, confirmed, _) = scripted(
+            [[spoken(0, 5, "as we were testing on real machines, and ship"), spoken(5, 9, "the following Monday.")],
+             [inSecondWindow(spoken(3, 7, "real machines, and shipped the following Monday.", words: [
+                ("real", 3.0, 3.4), ("machines,", 3.4, 4.0), ("and", 4.0, 4.3), ("shipped", 4.3, 4.9),
+                ("the", 5.0, 5.3), ("following", 5.3, 6.0), ("Monday.", 6.0, 7.0),
+             ])), inSecondWindow(spoken(7.2, 8.4, "That is all."))]],
+            configuration: parakeetConfiguration()
+        )
+        let run = Task { await loop.run() }
+        #expect(await eventually { mic.installed })
+        mic.push(seconds: 10)
+        #expect(await eventually { confirmed.withLock { $0.count } == 1 })
+        mic.push(seconds: 2)
+        #expect(await eventually { confirmed.withLock { $0.count } == 2 })
+
+        #expect(confirmed.withLock { $0 } == ["as we were testing on real machines, and ship", "the following Monday."])
+        _ = await calls.clips
+        await loop.cancel()
+        _ = await run.value
+    }
+
+    @Test("the run is matched among the words before the boundary, so a later repeat of the last word is not mistaken for it")
+    func runEndStopsAtTheBoundary() async throws {
+        let shown = try await afterTheSecondDecode(
+            first: "we really want to ship it", held: "and ship it again",
+            second: [spoken(3, 7, "to shipped it, and ship it again", words: [
+                ("to", 3.0, 3.4), ("shipped", 3.4, 4.2), ("it,", 4.2, 4.9), ("and", 5.0, 5.3),
+                ("ship", 5.3, 5.7), ("it", 5.7, 6.0), ("again", 6.0, 6.5),
+            ])]
+        )
+        #expect(shown.partial == "and ship it again")
+    }
+
+    @Test("a decode that came back without its context keeps every word, even one the confirmed text ends on")
+    func decodeWithoutContextKeepsTheHeldWords() async throws {
+        let shown = try await afterTheSecondDecode(
+            first: "we fixed it in the", held: "logs, then the build",
+            second: [spoken(5.0, 9, "logs, then the build")]
+        )
+        #expect(shown.partial == "logs, then the build")
     }
 
     @Test("the context run is the longest suffix of the confirmed words, earliest on a tie")

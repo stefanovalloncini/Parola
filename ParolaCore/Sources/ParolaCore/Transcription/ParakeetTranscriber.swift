@@ -283,7 +283,7 @@ actor ParakeetTranscriber: Transcriber {
         }
     }
 
-    private static let sentenceEnders: Set<Character> = [".", "?", "!", "…"]
+    static let sentenceEnders: Set<Character> = [".", "?", "!", "…"]
 
     /// Group token timings into segments. Splits on silence gaps over `segmentGapThreshold`
     /// seconds or when a run reaches `maxTokensPerSegment`. Falls back to a single segment

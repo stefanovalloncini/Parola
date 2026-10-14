@@ -29,7 +29,7 @@ actor StreamingRealtimeLoop {
         var forceConfirmAfterSeconds: Double?
         /// A decode never starts earlier than this long before the end of the window. Nil decodes from the oldest unconfirmed audio.
         var maxDecodeSeconds: Double?
-        /// A decode starts this long before the held audio so its first word is written with the confirmed words to its left. Nil starts at the held audio.
+        /// A decode starts this long before the held audio so its first word is written with the confirmed words to its left, unless the confirmed text ended a sentence. Nil starts at the held audio.
         var leftContextSeconds: Double?
         /// A decode starts this far before the first held-back segment instead of at the confirmed end. Nil starts at the confirmed end.
         var heldSegmentBackoffSeconds: Double?
@@ -147,7 +147,8 @@ actor StreamingRealtimeLoop {
     private var lastConfirmedEndSeconds: Float = 0
     private var unconfirmedSegments: [TranscriptionSegment] = []
     private var currentText = ""
-    private var recentConfirmedWords: [String] = []
+    private var recentConfirmedWords: [ConfirmedWord] = []
+    private var stripsWordTimings = false
     private var lastConfirmedSegmentStart: Double?
     private var confirmedEndedSentence = false
     private var confirmations = 0
@@ -594,7 +595,7 @@ actor StreamingRealtimeLoop {
         }
         if config.leftContextSeconds != nil {
             if clipSeconds < keepFrom { dropContextWords(from: &segments, keepFrom: keepFrom) }
-            if !decoder.options.wordTimestamps { segments = segments.map { var bare = $0; bare.words = nil; return bare } }
+            stripsWordTimings = !decoder.options.wordTimestamps
         }
         if confirmAll {
             if let last = segments.last, last.end > lastConfirmedEndSeconds {
@@ -624,13 +625,24 @@ actor StreamingRealtimeLoop {
         return false
     }
 
+    private struct ConfirmedWord {
+        var text: String
+        var start: Double
+        var end: Double
+    }
+
     private func confirm(_ batch: ConfirmedAudioBatch) {
+        var batch = batch
         if let last = batch.segments.last {
             lastConfirmedSegmentStart = Double(last.start)
-            confirmedEndedSentence = last.text.trimmingCharacters(in: .whitespaces).last.map { ".?!…".contains($0) } ?? false
+            confirmedEndedSentence = last.text.trimmingCharacters(in: .whitespaces).last.map(ParakeetTranscriber.sentenceEnders.contains) ?? false
         }
-        let words = batch.segments.flatMap { $0.text.split(whereSeparator: \.isWhitespace).map(Self.comparable) }
+        let words = batch.segments.flatMap(Self.decodedWords(of:)).compactMap { word -> ConfirmedWord? in
+            let text = Self.comparable(Substring(word.text))
+            return text.isEmpty ? nil : ConfirmedWord(text: text, start: Double(word.start), end: Double(word.end))
+        }
         recentConfirmedWords = Array((recentConfirmedWords + words).suffix(Self.confirmedWordsKept))
+        if stripsWordTimings { batch.segments = batch.segments.map { var bare = $0; bare.words = nil; return bare } }
         confirmations += 1
         onConfirmed(batch)
     }
@@ -649,8 +661,12 @@ actor StreamingRealtimeLoop {
         if let segmentStart = lastConfirmedSegmentStart, segmentStart <= keepFrom, keepFrom - segmentStart <= Self.contextSegmentReachSeconds {
             start = segmentStart
         }
-        let reach = config.maxDecodeSeconds.map { decodedEnd - $0 } ?? -.infinity
-        return min(keepFrom, max(start, windowStart, reach))
+        let lowest = max(windowStart, config.maxDecodeSeconds.map { decodedEnd - $0 } ?? -.infinity)
+        start = max(start, lowest)
+        if let word = recentConfirmedWords.last(where: { $0.start <= start }), start < word.end {
+            start = word.start >= lowest ? word.start : word.end
+        }
+        return min(keepFrom, start)
     }
 
     private struct DecodedWord {
@@ -687,15 +703,17 @@ actor StreamingRealtimeLoop {
     /// The decode began inside confirmed text; this removes the words it heard again and keeps everything after them.
     private func dropContextWords(from segments: inout [TranscriptionSegment], keepFrom: Double) {
         guard !recentConfirmedWords.isEmpty else { return }
-        let inspected = segments.prefix { Double($0.start) < keepFrom + Self.contextJitterSeconds }
-        let decoded = inspected.map(Self.decodedWords(of:))
-        let flat = decoded.enumerated().flatMap { index, words in words.indices.map { (segment: index, word: $0) } }
-        let norms = flat.map { Self.comparable(Substring(decoded[$0.segment][$0.word].text)) }
-        guard let runEnd = Self.contextRunEnd(decoded: norms, confirmed: recentConfirmedWords) else {
-            segments.removeAll { Double($0.end) < keepFrom }
-            return
-        }
-        let last = flat[runEnd]
+        let decoded = segments.map(Self.decodedWords(of:))
+        let boundary = Float(keepFrom + Self.contextJitterSeconds)
+        let heard = decoded.enumerated()
+            .flatMap { segment, words in words.indices.map { (segment: segment, word: $0) } }
+            .prefix { decoded[$0.segment][$0.word].start < boundary }
+            .filter { !Self.comparable(Substring(decoded[$0.segment][$0.word].text)).isEmpty }
+        let norms = heard.map { Self.comparable(Substring(decoded[$0.segment][$0.word].text)) }
+        let heardBefore = heard.prefix { Double(decoded[$0.segment][$0.word].start + decoded[$0.segment][$0.word].end) / 2 < keepFrom }.count
+        let aligned = Self.contextRunEnd(decoded: norms, confirmed: recentConfirmedWords.map(\.text))
+        guard let runEnd = aligned ?? (heardBefore > 0 ? heardBefore - 1 : nil) else { return }
+        let last = heard[runEnd]
         var kept = Array(segments.dropFirst(last.segment))
         let words = Array(decoded[last.segment].dropFirst(last.word + 1))
         guard let first = words.first else {
