@@ -456,7 +456,7 @@ struct HeldAnchorTests {
     @Test("a decode that drops the held segment's first word doesn't move the next decode past it")
     func anchorSurvivesADroppedHead() async throws {
         let (loop, mic, calls, confirmed, partials) = scripted(
-            [[spoken(0, 5, "if nothing", words: [("if", 0, 2.9), ("nothing", 3.0, 5.0)]), spoken(5, 9, "ship the following")],
+            [[spoken(0, 5, "if nothing", words: [("if", 0, 2.9), ("nothing", 3.0, 3.5)]), spoken(5, 9, "ship the following")],
              [inSecondWindow(spoken(6, 10, "following"))],
              [inSecondWindow(spoken(4.9, 8, "the following now"))]],
             configuration: parakeetConfiguration()
