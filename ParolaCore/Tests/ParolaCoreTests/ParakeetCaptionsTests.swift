@@ -59,6 +59,29 @@ struct ParakeetCaptionSegmentTests {
     }
 }
 
+@Suite("Parakeet caption cuts at pauses")
+struct ParakeetCaptionPauseTests {
+    @Test("past four seconds a short pause ends the segment before the hard limit")
+    func shortPauseAfterFourSeconds() {
+        let words = (0..<16).map { index -> TokenTiming in
+            let start = Double(index) * 0.5 + (index >= 10 ? 0.3 : 0)
+            return token(" w\(index)", start, start + 0.4)
+        }
+        let segments = ParakeetTranscriber.makeSegments(from: result(words), includeWords: false, splitting: .captions)
+        #expect(segments.map { $0.text.split(separator: " ").count } == [10, 6])
+    }
+
+    @Test("a short pause inside the first four seconds does not split")
+    func shortPauseEarly() {
+        let words = (0..<6).map { index -> TokenTiming in
+            let start = Double(index) * 0.5 + (index >= 3 ? 0.3 : 0)
+            return token(" w\(index)", start, start + 0.4)
+        }
+        let segments = ParakeetTranscriber.makeSegments(from: result(words), includeWords: false, splitting: .captions)
+        #expect(segments.count == 1)
+    }
+}
+
 @Suite("Parakeet streaming decoder")
 struct ParakeetStreamingDecoderTests {
     private static func options() -> TranscriptionOptions {

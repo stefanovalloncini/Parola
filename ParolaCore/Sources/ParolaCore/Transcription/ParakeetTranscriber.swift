@@ -263,13 +263,24 @@ actor ParakeetTranscriber: Transcriber {
     static let segmentGapThreshold: TimeInterval = 0.8
     static let maxTokensPerSegment: Int = 80
 
-    /// Extra places a run is cut, always between words. Live captions need short segments so confirmation can keep up with nonstop speech.
+    /// Extra places a run is cut, always between words. Live captions need short segments so confirmation can keep up with
+    /// nonstop speech: past `softSpanSeconds` a short pause is enough, and past `maxSpanSeconds` any word boundary is.
     struct SegmentSplitting: Sendable {
         var endsOnSentenceEnd = false
+        var softSpanSeconds: TimeInterval?
+        var softGapSeconds: TimeInterval = 0.25
         var maxSpanSeconds: TimeInterval?
 
         static let batch = SegmentSplitting()
-        static let captions = SegmentSplitting(endsOnSentenceEnd: true, maxSpanSeconds: 7)
+        static let captions = SegmentSplitting(endsOnSentenceEnd: true, softSpanSeconds: 4, maxSpanSeconds: 7)
+
+        func cuts(before timing: TokenTiming, after first: TokenTiming, gap: TimeInterval) -> Bool {
+            guard timing.token.first?.isWhitespace ?? false else { return false }
+            let span = timing.endTime - first.startTime
+            if let maxSpanSeconds, span > maxSpanSeconds { return true }
+            guard let softSpanSeconds else { return false }
+            return timing.startTime - first.startTime > softSpanSeconds && gap >= softGapSeconds
+        }
     }
 
     private static let sentenceEnders: Set<Character> = [".", "?", "!", "…"]
@@ -323,8 +334,7 @@ actor ParakeetTranscriber: Transcriber {
         for (index, timing) in timings.enumerated() {
             if let first = currentTokens.first {
                 let gap = timing.startTime - lastEnd
-                let startsWord = timing.token.first?.isWhitespace ?? false
-                let overSpan = startsWord && (splitting.maxSpanSeconds.map { timing.endTime - first.startTime > $0 } ?? false)
+                let overSpan = splitting.cuts(before: timing, after: first, gap: gap)
                 if gap > segmentGapThreshold || currentTokens.count >= maxTokensPerSegment || overSpan {
                     flush()
                 }
