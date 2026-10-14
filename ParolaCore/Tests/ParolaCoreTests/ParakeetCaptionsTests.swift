@@ -125,6 +125,17 @@ struct ParakeetStreamingDecoderTests {
         #expect(abs(words[1].start - 2.4) < 0.001)
     }
 
+    @Test("word timings are built whatever the setting, for the loop to align with")
+    func wordsAreAlwaysBuilt() async throws {
+        let decoder = ParakeetStreamingDecoder.decoder(options: Self.options()) { _ in
+            result([token(" Hello", 0, 0.4), token(" world", 0.4, 0.9)])
+        }
+
+        let decoded = try await decoder.transcribe([Float](repeating: 0.1, count: 5 * sampleRate), decoder.options) { _ in true }
+
+        #expect(decoded.segments.first?.words?.map(\.word) == ["Hello", "world"])
+    }
+
     @Test("a slice never exceeds one encoder pass, whatever the clip says")
     func sliceIsClamped() async throws {
         let seen = OSAllocatedUnfairLock<[Int]>(initialState: [])
@@ -313,8 +324,8 @@ struct ParakeetCaptionsLoopTests {
         let decodes = run.speech.decodes
         #expect(decodes.allSatisfy { $0.sliceSeconds <= 15.001 }, "\(run.speech.decodedSeconds.max() ?? 0)")
         #expect(decodes.map(\.sliceSeconds).max() ?? 0 > 10, "the held segment never grew, so the reach rule wasn't exercised")
-        #expect(decodes.allSatisfy { $0.sliceStart >= $0.confirmedEnd - 0.001 }, "a decode went back over confirmed audio")
-        let bound = Int((15 + 2 + 1.5) * Double(sampleRate))
+        #expect(decodes.allSatisfy { $0.sliceStart >= $0.confirmedEnd - 3.001 }, "a decode went back past its left context")
+        let bound = Int((15 + 3.5 + 1.5) * Double(sampleRate))
         #expect(run.windowSamples.allSatisfy { $0 <= bound }, "\(run.windowSamples.max() ?? 0)")
         #expect(run.words == Array(0..<run.words.count), "confirmed words skip or repeat")
         #expect(run.words.count >= 140)
@@ -433,8 +444,8 @@ struct CaptionConfirmationTests {
         #expect(confirmed.withLock { $0 } == ["a", "b"])
         let clips = await calls.clips
         #expect(clips.count == 2)
-        // The first decode purged the window to 2 s before the held segment; the second decodes from "b"'s end (9 s), 7 s into what is left.
-        #expect(clips.last == [7])
+        // The first decode purged the window to 3.5 s before the held segment; the second starts 2 s before "b"'s end (9 s), 6.5 s into what is left.
+        #expect(clips.last == [6.5])
         await loop.cancel()
         _ = await run.value
     }
@@ -461,7 +472,7 @@ struct HeldAnchorTests {
         #expect(await eventuallyAsync { await calls.clips.count == 3 })
 
         let clips = await calls.clips.map { $0.first ?? -1 }
-        #expect(abs(clips[1] - 2) < 0.001 && abs(clips[2] - 2) < 0.001, "\(clips)")
+        #expect(abs(clips[1] - 1.5) < 0.001 && abs(clips[2] - 1.5) < 0.001, "\(clips)")
         #expect(await eventually { partials.withLock { $0.last } == "the following now" })
         await loop.cancel()
         _ = await run.value
@@ -489,42 +500,49 @@ struct CaptionDecodeGateTests {
     }
 }
 
+/// Words spread evenly over the segment, as the Parakeet decoder returns them.
+private func spoken(_ start: Float, _ end: Float, _ text: String) -> TranscriptionSegment {
+    let pieces = text.split(separator: " ").map(String.init)
+    let step = (end - start) / Float(pieces.count)
+    return spoken(start, end, text, words: pieces.enumerated().map { ($1, start + step * Float($0), start + step * Float($0 + 1)) })
+}
+
+private func spoken(_ start: Float, _ end: Float, _ text: String, words: [(String, Float, Float)]) -> TranscriptionSegment {
+    var made = TranscriptionSegment(start: start, end: end, text: text)
+    made.words = words.map { .init(word: $0.0, tokens: [], start: $0.1, end: $0.2, probability: 1) }
+    return made
+}
+
+/// The first decode confirms [0, 5] and the purge keeps 3.5 s before it, so the second decode's window starts 1.5 s in.
+private let secondWindowStart: Float = 1.5
+
+private func inSecondWindow(_ segment: TranscriptionSegment) -> TranscriptionSegment {
+    var moved = segment
+    moved.start -= secondWindowStart
+    moved.end -= secondWindowStart
+    moved.words = segment.words?.map { word in
+        var moved = word
+        moved.start -= secondWindowStart
+        moved.end -= secondWindowStart
+        return moved
+    }
+    return moved
+}
+
 @Suite("Caption cuts inside a word")
 struct CaptionCutRepeatTests {
-    @Test("a hard cut's repeated tail word is dropped, while Whisper keeps both")
-    func repeatedWordAtTheCut() async throws {
-        for (name, configuration, expected, clip) in [
-            ("parakeet", parakeetConfiguration(), "following now", Float(2)),
-            ("whisper", StreamingRealtimeLoop.Configuration(), "The following now", Float(2)),
-        ] {
-            var configuration = configuration
-            configuration.requiredSegmentsForConfirmation = 1
-            let (loop, mic, calls, confirmed, partials) = scripted(
-                [[segment(0, 5, "if nothing the"), segment(5, 9, "following")], [segment(2.05, 9, "The following now")]],
-                configuration: configuration
-            )
-            let run = Task { await loop.run() }
-            #expect(await eventually { mic.installed })
-
-            mic.push(seconds: 10)
-            #expect(await eventually { confirmed.withLock { $0.count } == 1 })
-            mic.push(seconds: 2)
-            #expect(await eventuallyAsync { await calls.clips.count == 2 })
-
-            #expect(await eventually { partials.withLock { $0.last } == expected }, "\(name): \(partials.withLock { $0 })")
-            let started = try #require(await calls.clips.last?.first)
-            #expect(abs(started - clip) < 0.001, "\(name) started at \(started)")
-            await loop.cancel()
-            _ = await run.value
-        }
+    private struct Shown {
+        var partial: String?
+        var clip: Float?
     }
 
-    private func partialAfterTheSecondDecode(
-        first: String, held: (start: Float, text: String), second: (start: Float, text: String)
-    ) async throws -> String? {
+    private func afterTheSecondDecode(
+        first: String, held: String, second: [TranscriptionSegment], configuration: StreamingRealtimeLoop.Configuration = parakeetConfiguration()
+    ) async throws -> Shown {
+        var configuration = configuration
+        configuration.requiredSegmentsForConfirmation = 1
         let (loop, mic, calls, confirmed, partials) = scripted(
-            [[segment(0, 5, first), segment(held.start, 9, held.text)], [segment(second.start, 9, second.text)]],
-            configuration: parakeetConfiguration()
+            [[spoken(0, 5, first), spoken(5, 9, held)], second.map(inSecondWindow)], configuration: configuration
         )
         let run = Task { await loop.run() }
         #expect(await eventually { mic.installed })
@@ -533,42 +551,146 @@ struct CaptionCutRepeatTests {
         mic.push(seconds: 2)
         #expect(await eventuallyAsync { await calls.clips.count == 2 })
         _ = await eventually { partials.withLock { $0.last } != nil }
-        let last = partials.withLock { $0.last }
+        let shown = Shown(partial: partials.withLock { $0.last }, clip: await calls.clips.last?.first)
         await loop.cancel()
         _ = await run.value
-        return last
+        return shown
+    }
+
+    @Test("a decode after a confirm starts 2 s before the held audio")
+    func clipHasLeftContext() async throws {
+        let shown = try await afterTheSecondDecode(first: "if nothing", held: "else", second: [spoken(3, 9, "if nothing else matters")])
+        #expect(shown.clip == 1.5)
+    }
+
+    @Test("the clip starts at the last confirmed segment when it is within 3 s of the held audio")
+    func clipStartsAtTheConfirmedSegment() async throws {
+        let (loop, mic, calls, confirmed, _) = scripted(
+            [[spoken(0, 2, "one"), spoken(2, 5, "two three"), spoken(5, 9, "four")], []], configuration: parakeetConfiguration()
+        )
+        let run = Task { await loop.run() }
+        #expect(await eventually { mic.installed })
+        mic.push(seconds: 10)
+        #expect(await eventually { confirmed.withLock { $0.count } == 2 })
+        mic.push(seconds: 2)
+        #expect(await eventuallyAsync { await calls.clips.count == 2 })
+
+        // The segment "two three" starts at 2 s; the purge left the window starting 1.5 s in.
+        let started = try #require(await calls.clips.last?.first)
+        #expect(abs(started - 0.5) < 0.001, "\(started)")
+        await loop.cancel()
+        _ = await run.value
+    }
+
+    @Test("the left context is dropped, so a sentence that continues after a comma stays in lower case")
+    func contextWordsAreDropped() async throws {
+        let shown = try await afterTheSecondDecode(
+            first: "as soon as they finish a sentence,", held: "that is",
+            second: [spoken(3, 9, "finish a sentence, that is exactly")]
+        )
+        #expect(shown.partial == "that is exactly")
     }
 
     @Test("a repeat after a sentence end stays, whatever the timing")
     func repeatAfterASentenceStays() async throws {
-        let shown = try await partialAfterTheSecondDecode(
-            first: "Is that okay?", held: (5.0, "Okay,"), second: (2.05, "Okay, let's move on")
+        let shown = try await afterTheSecondDecode(
+            first: "Is that okay?", held: "Okay,", second: [spoken(3, 9, "that okay? Okay, let's move on")]
         )
-        #expect(shown == "Okay, let's move on")
+        #expect(shown.partial == "Okay, let's move on")
     }
 
-    @Test("a repeat after a pause of 0.25 s or more stays even when it starts inside the 0.16 s window")
-    func repeatAfterAPauseStays() async throws {
-        let shown = try await partialAfterTheSecondDecode(
-            first: "I said that,", held: (5.3, "that"), second: (2.3, "that is fine")
+    @Test("a repeat right after the confirmed word stays even when the context starts on that word")
+    func repeatStays() async throws {
+        let shown = try await afterTheSecondDecode(
+            first: "I said that,", held: "that", second: [spoken(3, 9, "that, that is fine")]
         )
-        #expect(shown == "that is fine")
+        #expect(shown.partial == "that is fine")
+        let inside = try await afterTheSecondDecode(
+            first: "I said that,", held: "that", second: [spoken(3, 9, "said that, that is fine")]
+        )
+        #expect(inside.partial == "that is fine")
     }
 
-    @Test("a repeat that starts 0.16 s or more after the decode start stays even with under 0.25 s of gap")
-    func repeatStartingLateStays() async throws {
-        let shown = try await partialAfterTheSecondDecode(
-            first: "I said that", held: (5.0, "that"), second: (2.2, "that is fine")
+    @Test("a hard cut's repeated tail word is dropped by alignment, while Whisper keeps both")
+    func repeatedWordAtTheCut() async throws {
+        let context = try await afterTheSecondDecode(
+            first: "if nothing the", held: "following", second: [spoken(3, 9, "nothing the following now")]
         )
-        #expect(shown == "that is fine")
+        #expect(context.partial == "following now")
+        let withoutContext = try await afterTheSecondDecode(
+            first: "if nothing the", held: "following", second: [spoken(5.05, 9, "the following now")]
+        )
+        #expect(withoutContext.partial == "following now")
+
+        let whisper = try await afterTheSecondDecode(
+            first: "if nothing the", held: "following", second: [spoken(5.05, 9, "the following now")],
+            configuration: StreamingRealtimeLoop.Configuration()
+        )
+        #expect(whisper.partial == "the following now")
     }
 
-    @Test("with no sentence end, no pause and a start inside the window the repeat is dropped")
-    func hardCutRepeatIsDropped() async throws {
-        let shown = try await partialAfterTheSecondDecode(
-            first: "I said that", held: (5.0, "that"), second: (2.1, "that is fine")
+    @Test("a held first word timed a frame before the boundary is kept")
+    func jitteredFirstWordIsKept() async throws {
+        let shown = try await afterTheSecondDecode(
+            first: "we found a few cases where", held: "the audio device",
+            second: [spoken(3, 6, "a few cases where the audio device changed", words: [
+                ("a", 3.0, 3.4), ("few", 3.4, 3.8), ("cases", 3.8, 4.4), ("where", 4.4, 4.88),
+                ("the", 4.88, 4.96), ("audio", 4.96, 5.4), ("device", 5.4, 5.8), ("changed", 5.8, 6.0),
+            ])]
         )
-        #expect(shown == "is fine")
+        #expect(shown.partial == "the audio device changed")
+    }
+
+    @Test("when no context word aligns, only the segments that end before the boundary go")
+    func unalignedContextFallsBackToTime() async throws {
+        let shown = try await afterTheSecondDecode(
+            first: "if nothing", held: "else",
+            second: [spoken(3, 4.5, "something different"), spoken(4.6, 9, "new words here")]
+        )
+        #expect(shown.partial == "new words here")
+    }
+
+    @Test("the context run is the longest suffix of the confirmed words, earliest on a tie")
+    func contextRun() {
+        let confirmed = ["is", "that", "okay"]
+        #expect(StreamingRealtimeLoop.contextRunEnd(decoded: ["that", "okay", "okay", "let's"], confirmed: confirmed) == 1)
+        #expect(StreamingRealtimeLoop.contextRunEnd(decoded: ["okay", "okay", "let's"], confirmed: confirmed) == 0)
+        #expect(StreamingRealtimeLoop.contextRunEnd(decoded: ["so", "what"], confirmed: confirmed) == nil)
+    }
+
+    @Test("word timings are dropped from what the loop emits unless they were asked for")
+    func wordsAreStrippedWhenNotRequested() async throws {
+        for (asked, expected) in [(false, false), (true, true)] {
+            let batches = OSAllocatedUnfairLock<[TranscriptionSegment]>(initialState: [])
+            let mic = Mic()
+            let calls = Calls([[spoken(0, 5, "if nothing"), spoken(5, 9, "else")]])
+            var configuration = parakeetConfiguration()
+            configuration.useVAD = false
+            configuration.requiredSegmentsForConfirmation = 1
+            var options = DecodingOptions()
+            options.wordTimestamps = asked
+            let loop = StreamingRealtimeLoop(
+                configuration: configuration,
+                decodingOptions: options,
+                dependencies: .init(
+                    requestPermission: { true },
+                    startCapture: { mic.install($0) },
+                    stopCapture: {},
+                    transcribe: { _, options, _ in await calls.next(clip: options.clipTimestamps) },
+                    tick: { try await Task.sleep(nanoseconds: 1_000_000) }
+                ),
+                onPartial: { _ in },
+                onEnergy: { _ in },
+                onConfirmed: { batch in batches.withLock { $0.append(contentsOf: batch.segments) } }
+            )
+            let run = Task { await loop.run() }
+            #expect(await eventually { mic.installed })
+            mic.push(seconds: 10)
+            #expect(await eventually { !batches.withLock { $0 }.isEmpty })
+            #expect(batches.withLock { $0.allSatisfy { ($0.words != nil) == expected } }, "asked \(asked)")
+            await loop.cancel()
+            _ = await run.value
+        }
     }
 }
 

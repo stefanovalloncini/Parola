@@ -29,8 +29,8 @@ actor StreamingRealtimeLoop {
         var forceConfirmAfterSeconds: Double?
         /// A decode never starts earlier than this long before the end of the window. Nil decodes from the oldest unconfirmed audio.
         var maxDecodeSeconds: Double?
-        /// A decode that starts inside the word a forced cut ended on hears its tail again; this drops that repeat from the new text.
-        var dropsWordRepeatedAtCut = false
+        /// A decode starts this long before the held audio so its first word is written with the confirmed words to its left. Nil starts at the held audio.
+        var leftContextSeconds: Double?
         /// A decode starts this far before the first held-back segment instead of at the confirmed end. Nil starts at the confirmed end.
         var heldSegmentBackoffSeconds: Double?
         /// How much audio must arrive since the last decode before the next one runs.
@@ -147,8 +147,8 @@ actor StreamingRealtimeLoop {
     private var lastConfirmedEndSeconds: Float = 0
     private var unconfirmedSegments: [TranscriptionSegment] = []
     private var currentText = ""
-    private var lastConfirmedWord: String?
-    private var lastConfirmedEndedSentence = false
+    private var recentConfirmedWords: [String] = []
+    private var lastConfirmedSegmentStart: Double?
     private var confirmations = 0
     private var heldAnchorSeconds: Double?
     private var isRunning = false
@@ -550,7 +550,8 @@ actor StreamingRealtimeLoop {
         let offsetSeconds = Double(windowStartSample) / Double(config.sampleRate)
         let decodedEndSeconds = Float(offsetSeconds + Double(decoded.count) / Double(config.sampleRate))
         confirmStaleSegments(decodedEnd: Double(decodedEndSeconds))
-        let clipSeconds = decodeFloorSeconds(decodedEnd: Double(decodedEndSeconds))
+        let keepFrom = decodeFloorSeconds(decodedEnd: Double(decodedEndSeconds))
+        let clipSeconds = decodeStartSeconds(keepFrom: keepFrom, windowStart: offsetSeconds, decodedEnd: Double(decodedEndSeconds))
         let confirmationsBefore = confirmations
         var options = decoder.options
         // clipTimestamps is window-relative; everything emitted from here back out must be absolute.
@@ -590,7 +591,10 @@ actor StreamingRealtimeLoop {
             }
             return shifted
         }
-        if config.dropsWordRepeatedAtCut { dropWordRepeatedAtCut(from: &segments, decodeStart: clipSeconds) }
+        if config.leftContextSeconds != nil {
+            dropContextWords(from: &segments, keepFrom: keepFrom)
+            if !decoder.options.wordTimestamps { segments = segments.map { var bare = $0; bare.words = nil; return bare } }
+        }
         if confirmAll {
             if let last = segments.last, last.end > lastConfirmedEndSeconds {
                 lastConfirmedEndSeconds = last.end
@@ -620,34 +624,88 @@ actor StreamingRealtimeLoop {
     }
 
     private func confirm(_ batch: ConfirmedAudioBatch) {
-        if let text = batch.segments.last?.text.trimmingCharacters(in: .whitespaces) {
-            lastConfirmedWord = text.split(separator: " ").last.map(Self.comparable)
-            lastConfirmedEndedSentence = text.last.map { ".?!…".contains($0) } ?? false
-        }
+        if let last = batch.segments.last { lastConfirmedSegmentStart = Double(last.start) }
+        let words = batch.segments.flatMap { $0.text.split(whereSeparator: \.isWhitespace).map(Self.comparable) }
+        recentConfirmedWords = Array((recentConfirmedWords + words).suffix(Self.confirmedWordsKept))
         confirmations += 1
         onConfirmed(batch)
     }
+
+    private static let confirmedWordsKept = 10
+    private static let contextSegmentReachSeconds = 3.0
+    private static let contextJitterSeconds = 0.16
 
     private static func comparable(_ word: Substring) -> String {
         word.lowercased().trimmingCharacters(in: .punctuationCharacters)
     }
 
-    /// Only after a hard cut: no sentence end and no pause between the confirmed text and the new one.
-    private func dropWordRepeatedAtCut(from segments: inout [TranscriptionSegment], decodeStart: Double) {
-        guard let repeated = lastConfirmedWord, !lastConfirmedEndedSentence, var first = segments.first,
-              Double(first.start) - decodeStart < 0.16, Double(first.start) - Double(lastConfirmedEndSeconds) < 0.25,
-              let head = first.text.split(separator: " ", maxSplits: 1).first, Self.comparable(head) == repeated else { return }
-        let rest = first.text.drop { !$0.isWhitespace }.drop { $0.isWhitespace }
-        guard !rest.isEmpty else {
-            segments.removeFirst()
+    private func decodeStartSeconds(keepFrom: Double, windowStart: Double, decodedEnd: Double) -> Double {
+        guard let context = config.leftContextSeconds else { return keepFrom }
+        var start = keepFrom - context
+        if let segmentStart = lastConfirmedSegmentStart, segmentStart <= keepFrom, keepFrom - segmentStart <= Self.contextSegmentReachSeconds {
+            start = segmentStart
+        }
+        let reach = config.maxDecodeSeconds.map { decodedEnd - $0 } ?? -.infinity
+        return min(keepFrom, max(start, windowStart, reach))
+    }
+
+    private struct DecodedWord {
+        var text: String
+        var start: Float
+        var end: Float
+    }
+
+    private static func decodedWords(of segment: TranscriptionSegment) -> [DecodedWord] {
+        let pieces = segment.text.split(whereSeparator: \.isWhitespace)
+        if let words = segment.words, words.count == pieces.count {
+            return zip(pieces, words).map { DecodedWord(text: String($0), start: $1.start, end: $1.end) }
+        }
+        let step = (segment.end - segment.start) / Float(max(1, pieces.count))
+        return pieces.enumerated().map { index, piece in
+            let start = segment.start + step * Float(index)
+            return DecodedWord(text: String(piece), start: start, end: start + step)
+        }
+    }
+
+    /// Index of the last decoded word in the longest run that equals the end of the confirmed words; the earliest run wins a tie.
+    static func contextRunEnd(decoded: [String], confirmed: [String]) -> Int? {
+        var best: (length: Int, end: Int)?
+        for end in decoded.indices {
+            for length in stride(from: min(end + 1, confirmed.count), through: 1, by: -1)
+            where decoded[(end - length + 1)...end].elementsEqual(confirmed.suffix(length)) {
+                if length > (best?.length ?? 0) { best = (length, end) }
+                break
+            }
+        }
+        return best?.end
+    }
+
+    /// The decode began inside confirmed text; this removes the words it heard again and keeps everything after them.
+    private func dropContextWords(from segments: inout [TranscriptionSegment], keepFrom: Double) {
+        guard !recentConfirmedWords.isEmpty else { return }
+        let inspected = segments.prefix { Double($0.start) < keepFrom + Self.contextJitterSeconds }
+        let decoded = inspected.map(Self.decodedWords(of:))
+        let flat = decoded.enumerated().flatMap { index, words in words.indices.map { (segment: index, word: $0) } }
+        let norms = flat.map { Self.comparable(Substring(decoded[$0.segment][$0.word].text)) }
+        guard let runEnd = Self.contextRunEnd(decoded: norms, confirmed: recentConfirmedWords) else {
+            segments.removeAll { Double($0.end) < keepFrom }
             return
         }
-        first.text = String(rest)
-        if let words = first.words, words.count > 1 {
-            first.words = Array(words.dropFirst())
-            first.start = first.words?.first?.start ?? first.start
+        let last = flat[runEnd]
+        var kept = Array(segments.dropFirst(last.segment))
+        let words = Array(decoded[last.segment].dropFirst(last.word + 1))
+        guard let first = words.first else {
+            kept.removeFirst()
+            segments = kept
+            return
         }
-        segments[0] = first
+        var trimmed = kept[0]
+        trimmed.text = words.map(\.text).joined(separator: " ")
+        trimmed.start = first.start
+        let original = kept[0].words ?? []
+        trimmed.words = original.count == decoded[last.segment].count ? Array(original.dropFirst(last.word + 1)) : nil
+        kept[0] = trimmed
+        segments = kept
     }
 
     private func confirmCount(of segments: [TranscriptionSegment], decodedEnd: Float) -> Int {

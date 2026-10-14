@@ -228,7 +228,8 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
             configuration.requiredSegmentsForConfirmation = 1
             configuration.forceConfirmAfterSeconds = 8
             configuration.maxDecodeSeconds = 15
-            configuration.dropsWordRepeatedAtCut = true
+            configuration.leftContextSeconds = 2
+            configuration.purgePadSeconds = 3.5
             configuration.heldSegmentBackoffSeconds = 0.08
             configuration.minNewAudioSeconds = 0.7
         }

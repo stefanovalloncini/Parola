@@ -38,7 +38,6 @@ enum ParakeetStreamingDecoder {
     static func decoder(options: TranscriptionOptions, recognize: @escaping Recognize) -> StreamingRealtimeLoop.Decoder {
         let decoding = DecodingOptions(language: options.language, wordTimestamps: options.wordTimestamps)
         let language = options.language ?? "en"
-        let includeWords = options.wordTimestamps
         let minimum = ASRConstants.minimumRequiredSamples(forSampleRate: WhisperKit.sampleRate)
         return StreamingRealtimeLoop.Decoder(options: decoding) { samples, decodeOptions, _ in
             let requested = Int(Double(decodeOptions.clipTimestamps.first ?? 0) * sampleRate)
@@ -48,7 +47,7 @@ enum ParakeetStreamingDecoder {
             }
             let result = try await recognize(Array(samples[clip...]))
             let shift = Float(Double(clip) / sampleRate)
-            let segments = ParakeetTranscriber.makeSegments(from: result, includeWords: includeWords, splitting: .captions)
+            let segments = ParakeetTranscriber.makeSegments(from: result, includeWords: true, splitting: .captions)
                 .map { shifted($0, by: shift) }
             return TranscriptionResult(
                 text: segments.map(\.text).joined(separator: " "),
