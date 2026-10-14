@@ -9,6 +9,8 @@ public struct LiveCaptionsState: Sendable, Equatable {
     public var maxLines: Int
     public var isActive: Bool
     public var isLoading: Bool
+    /// How far the model's download has got while it is one, so the panel can say so instead of just loading.
+    public var downloadFraction: Double?
     public var error: String?
 
     public init(
@@ -17,6 +19,7 @@ public struct LiveCaptionsState: Sendable, Equatable {
         maxLines: Int = 4,
         isActive: Bool = false,
         isLoading: Bool = false,
+        downloadFraction: Double? = nil,
         error: String? = nil
     ) {
         self.confirmedLines = confirmedLines
@@ -25,7 +28,14 @@ public struct LiveCaptionsState: Sendable, Equatable {
         self.maxLines = maxLines
         self.isActive = isActive
         self.isLoading = isLoading
+        self.downloadFraction = downloadFraction
         self.error = error
+    }
+
+    /// The newest confirmed line and the partial after it: what the panel rolls up, oldest words first.
+    public var captionText: String {
+        let trimmed = partial.trimmingCharacters(in: .whitespacesAndNewlines)
+        return [confirmedLines.last, trimmed.isEmpty ? nil : trimmed].compactMap { $0 }.joined(separator: " ")
     }
 
     public var displayedText: String {
@@ -49,6 +59,7 @@ public struct LiveCaptionsState: Sendable, Equatable {
             && lhs.maxLines == rhs.maxLines
             && lhs.isActive == rhs.isActive
             && lhs.isLoading == rhs.isLoading
+            && lhs.downloadFraction == rhs.downloadFraction
             && lhs.error == rhs.error
     }
 
@@ -74,6 +85,7 @@ public struct LiveCaptionsState: Sendable, Equatable {
             error = msg
             isActive = false
             isLoading = false
+            downloadFraction = nil
         case .finished:
             partial = ""
         }
@@ -91,5 +103,6 @@ public struct LiveCaptionsState: Sendable, Equatable {
         partial = ""
         error = nil
         isLoading = false
+        downloadFraction = nil
     }
 }

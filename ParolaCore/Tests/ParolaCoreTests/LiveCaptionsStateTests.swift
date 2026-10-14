@@ -10,6 +10,25 @@ struct LiveCaptionsStateTests {
         #expect(s.displayedText == "")
     }
 
+    @Test("the caption the panel rolls is the newest line and the partial, and nothing older")
+    func captionText() {
+        var s = LiveCaptionsState(confirmedLines: ["older line", "newest line"], partial: "  and the words so far ")
+        #expect(s.captionText == "newest line and the words so far")
+        s.partial = ""
+        #expect(s.captionText == "newest line")
+        #expect(LiveCaptionsState().captionText == "")
+    }
+
+    @Test("a download fraction clears when the session resets or fails")
+    func downloadFractionClears() {
+        var s = LiveCaptionsState(isActive: true, isLoading: true, downloadFraction: 0.4)
+        s.apply(.failed("no"))
+        #expect(s.downloadFraction == nil)
+        s.downloadFraction = 0.9
+        s.reset()
+        #expect(s.downloadFraction == nil)
+    }
+
     @Test("partial event appears in displayed text")
     func partial() {
         var s = LiveCaptionsState()
