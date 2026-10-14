@@ -110,6 +110,15 @@ public struct LiveCaptionsState: Sendable, Equatable {
         word.lowercased().trimmingCharacters(in: .punctuationCharacters)
     }
 
+    /// Turns the words still held into a last line, for a run that ended before it confirmed them; the waiting placeholder is not words.
+    public mutating func keepPartialAsLine() {
+        let held = partial.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !held.isEmpty, held != Self.waitingPlaceholder else { return }
+        history.append(held)
+        confirmedLines.append(held)
+        partial = ""
+    }
+
     /// Puts an earlier run's captions ahead of this one's, for a session restarted mid-way.
     public mutating func continuing(after earlier: LiveCaptionsState) {
         history = earlier.history + history

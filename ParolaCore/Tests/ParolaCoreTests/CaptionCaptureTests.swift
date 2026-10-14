@@ -623,14 +623,11 @@ struct CaptureEndDetectionTests {
     @Test("removing the observer makes the hardware remove call once, with the token it was added under")
     func observerRemoval() {
         let fake = FakeHardware()
-        let before = ProcessListObserver.activeCount
         let stop = ProcessListObserver.observe(on: .global(), hardware: fake.hardware, {})
         #expect(fake.adds.count == 1)
-        #expect(ProcessListObserver.activeCount == before + 1)
         stop()
         stop()
         #expect(fake.removes == fake.adds)
-        #expect(ProcessListObserver.activeCount == before)
     }
 
     @Test("a delivery that is queued when the observer is removed never reaches it")

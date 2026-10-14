@@ -76,6 +76,29 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("Retry after an engine failure keeps the words it was holding, and not the waiting placeholder", .timeLimit(.minutes(1)))
+        func retryKeepsHeldWords() async throws {
+            try await withMocksCleared(.streaming) {
+                for (held, expected) in [
+                    ("words still held", ["line one", "words still held"]),
+                    (LiveCaptionsState.waitingPlaceholder, ["line one"]),
+                ] {
+                    MockStreamingTranscriberRegistry.shared.install(MockTranscriberResponse(
+                        segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "line one")],
+                        partials: [held],
+                        failure: MockTranscriberFailure(code: .transcriptionFailed, message: "engine died")
+                    ))
+                    let controller = LiveCaptionsController(showsPanel: false)
+                    await controller.start(options: TranscriptionOptions())
+                    await waitUntil { controller.state.error != nil }
+                    MockStreamingTranscriberRegistry.shared.install(MockTranscriberResponse(partials: ["again"], delayMs: 300))
+                    await controller.tryAgain()
+                    #expect(controller.state.history == expected, "\(held)")
+                    await controller.stop()
+                }
+            }
+        }
+
         @Test("a capture that ended clears the unconfirmed words, and an engine failure keeps them", .timeLimit(.minutes(1)))
         func partialOnFailure() async throws {
             try await withMocksCleared(.streaming) {

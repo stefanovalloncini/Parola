@@ -150,6 +150,20 @@ struct LiveCaptionsStateTests {
         #expect(s.displayedText.components(separatedBy: "two").count == 2, "\(s.displayedText)")
     }
 
+    @Test("the held words become a last line, and the waiting placeholder does not")
+    func keepPartialAsLine() {
+        var held = LiveCaptionsState(isActive: true)
+        held.apply(.partial(text: "words still held"))
+        held.keepPartialAsLine()
+        #expect(held.history == ["words still held"])
+        #expect(held.partial == "")
+
+        var waiting = LiveCaptionsState(isActive: true)
+        waiting.apply(.partial(text: LiveCaptionsState.waitingPlaceholder))
+        waiting.keepPartialAsLine()
+        #expect(waiting.history.isEmpty)
+    }
+
     @Test("finished event clears partial")
     func finishedEvent() {
         var s = LiveCaptionsState()

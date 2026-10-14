@@ -18,8 +18,6 @@ public enum ProcessListObserver {
     // The HAL gets a token, not a pointer, so a callback still in flight when the listener is removed finds nothing instead of freed memory.
     private static let registry = OSAllocatedUnfairLock(initialState: Registry())
 
-    static var activeCount: Int { registry.withLock { $0.live.count } }
-
     /// The two Core Audio calls, so a test can see them made.
     struct Hardware: Sendable {
         var add: @Sendable (_ token: UInt) -> OSStatus
@@ -55,7 +53,8 @@ public enum ProcessListObserver {
         }
         let status = hardware.add(token)
         guard status == noErr else {
-            ParolaLog.error(.audioCapture, "could not listen for audio process changes", [.status: .int(Int(status))])
+            let failure = NSError(domain: NSOSStatusErrorDomain, code: Int(status))
+            ParolaLog.error(.audioCapture, "could not listen for audio process changes", [.error: .error(failure)])
             _ = registry.withLock { $0.live.removeValue(forKey: token) }
             return {}
         }

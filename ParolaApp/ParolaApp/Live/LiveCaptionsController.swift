@@ -169,7 +169,8 @@ final class LiveCaptionsController {
             return
         }
         guard let options = optionsProvider?() ?? lastOptions else { return }
-        let earlier = state
+        var earlier = state
+        earlier.keepPartialAsLine()
         await start(options: optionsWithTranslate(options), source: source)
         state.continuing(after: earlier)
     }
