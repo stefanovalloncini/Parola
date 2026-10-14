@@ -43,7 +43,7 @@ struct ErrorBanner: View {
                         updateButton(updating: offer == .updating)
                     }
                     if let permission = take?.missingPermission {
-                        Button("Open System Settings…") { Self.openSettings(for: permission) }
+                        Button("Open System Settings…") { permission.openSettings() }
                             .buttonStyle(DSPillButtonStyle(kind: .primary, size: .compact))
                             .axLeaf("Error.Button.OpenSystemSettings")
                     }
@@ -156,19 +156,21 @@ struct ErrorBanner: View {
         }
     }
 
-    private static func openSettings(for permission: RecordingSession.Permission) {
-        switch permission {
-        case .microphone: openMicrophonePrivacySettings()
-        case .screenRecording: SystemCapturePermissions.openSystemSettings(pane: "Privacy_ScreenCapture")
-        case .systemAudioRecording: SystemCapturePermissions.openSystemSettings(pane: "Privacy_AudioCapture")
-        }
-    }
-
     private func retry() {
         if take == nil { model?.retryFailedTranscription() } else { model?.retryFailedTake() }
     }
 
     private func dismiss() {
         if take == nil { model?.dismissError() } else { model?.dismissTakeFailure() }
+    }
+}
+
+extension RecordingSession.Permission {
+    @MainActor func openSettings() {
+        switch self {
+        case .microphone: openMicrophonePrivacySettings()
+        case .screenRecording: SystemCapturePermissions.openSystemSettings(pane: "Privacy_ScreenCapture")
+        case .systemAudioRecording: SystemCapturePermissions.openSystemSettings(pane: "Privacy_AudioCapture")
+        }
     }
 }

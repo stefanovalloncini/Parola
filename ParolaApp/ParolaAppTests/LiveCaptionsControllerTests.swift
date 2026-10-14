@@ -69,6 +69,132 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("a start passes its source to the transcriber, and Try Again keeps it", .timeLimit(.minutes(1)))
+        func sourceSurvivesTryAgain() async throws {
+            try await withMocksCleared(.streaming) {
+                MockStreamingTranscriberRegistry.shared.install(MockTranscriberResponse(
+                    failure: MockTranscriberFailure(code: .transcriptionFailed, message: "The capture stopped.")
+                ))
+                let controller = LiveCaptionsController(showsPanel: false)
+                await controller.start(options: TranscriptionOptions(), source: .app(bundleID: "us.zoom.xos"))
+                await waitUntil { controller.state.error != nil }
+                #expect(controller.source == .app(bundleID: "us.zoom.xos"))
+
+                await controller.tryAgain()
+                await waitUntil { MockStreamingTranscriberRegistry.shared.madeSources().count == 2 }
+
+                #expect(MockStreamingTranscriberRegistry.shared.madeSources() == Array(repeating: .app(bundleID: "us.zoom.xos"), count: 2))
+                await controller.stop()
+            }
+        }
+
+        @Test("a source change while captions run restarts on it and keeps the lines", .timeLimit(.minutes(1)))
+        func sourceChangeRestartsAndKeepsHistory() async throws {
+            try await withMocksCleared(.streaming) {
+                MockStreamingTranscriberRegistry.shared.install(MockTranscriberResponse(
+                    segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "said before the switch")],
+                    partials: ["said", "said before"],
+                    delayMs: 300
+                ))
+                let controller = LiveCaptionsController(showsPanel: false)
+                await controller.start(options: TranscriptionOptions())
+                await waitUntil { !controller.state.partial.isEmpty }
+
+                await controller.setSource(.systemAudio)
+
+                #expect(controller.source == .systemAudio)
+                #expect(controller.state.isActive)
+                #expect(controller.state.history.first == "said before the switch")
+                #expect(MockStreamingTranscriberRegistry.shared.madeSources() == [.microphone(deviceUID: nil), .systemAudio])
+                await controller.stop()
+            }
+        }
+
+        @Test("two quick source changes during a slow stop end on the last one", .timeLimit(.minutes(1)))
+        func twoQuickChangesEndOnTheLast() async throws {
+            try await withMocksCleared(.streaming) {
+                MockStreamingTranscriberRegistry.shared.install(MockTranscriberResponse(
+                    segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "a line")],
+                    partials: ["a", "a line"],
+                    delayMs: 300
+                ))
+                let controller = LiveCaptionsController(showsPanel: false)
+                await controller.start(options: TranscriptionOptions())
+                await waitUntil { !controller.state.partial.isEmpty }
+
+                let first = Task { await controller.setSource(.systemAudio) }
+                await waitUntil { !controller.state.isActive }
+                await controller.setSource(.app(bundleID: "us.zoom.xos"))
+                await first.value
+
+                #expect(controller.source == .app(bundleID: "us.zoom.xos"))
+                #expect(MockStreamingTranscriberRegistry.shared.madeSources().last == .app(bundleID: "us.zoom.xos"))
+                await controller.stop()
+            }
+        }
+
+        @Test("a source picked while captions are off is the one the next start uses", .timeLimit(.minutes(1)))
+        func sourcePickedWhileOff() async {
+            let controller = LiveCaptionsController(showsPanel: false)
+            await controller.setSource(.systemAudio)
+            #expect(controller.source == .systemAudio)
+            #expect(!controller.state.isActive)
+        }
+
+        @Test("a permission failure reads in the user's words and offers its pane", .timeLimit(.minutes(1)))
+        func permissionFailureOffersSettings() async throws {
+            try await withMocksCleared(.streaming) {
+                MockStreamingTranscriberRegistry.shared.install(MockTranscriberResponse(
+                    failure: MockTranscriberFailure(code: .transcriptionFailed, message: FixedFailureText.systemAudioNotAllowed)
+                ))
+                let controller = LiveCaptionsController(showsPanel: false)
+                await controller.start(options: TranscriptionOptions(), source: .systemAudio)
+                await waitUntil { controller.state.error != nil }
+
+                #expect(controller.failurePermission == .screenRecording)
+                #expect(controller.state.error?.hasPrefix("Allow Parola in Screen & System Audio Recording") == true)
+
+                MockStreamingTranscriberRegistry.shared.install(MockTranscriberResponse(partials: ["again"], delayMs: 300))
+                await controller.tryAgain()
+                #expect(controller.failurePermission == nil)
+                await controller.stop()
+            }
+        }
+
+        @Test("the bridge sets the source and reports it with the state", .timeLimit(.minutes(1)))
+        func bridgeSetsTheSource() async throws {
+            let model = makeRecordingModel("captions-source-bridge")
+            model.captionApps = CaptionAppList(
+                observesChanges: false, ownBundleID: nil,
+                runningApps: { [.init(bundleID: "com.apple.Music", name: "Music")] },
+                audioBundleIDs: { ["com.apple.Music"] }
+            )
+            let server = try ParolaAutomationServer(model: model)
+            let commands = Dictionary(uniqueKeysWithValues: server.recordingCommands().map { ($0.name, $0) })
+            let context = AutomationContext(model: model, server: server)
+            func call(_ name: String, _ args: [String: AutomationValue] = [:]) async throws -> [String: AutomationValue] {
+                let command = try #require(commands[name])
+                let reply = try await command.handler(try command.validate(AutomationArgs(args)), context)
+                guard case .object(let fields) = reply else { throw AutomationError.precondition("\(name) did not reply with an object") }
+                return fields
+            }
+
+            #expect(try await call("getLiveCaptionsState")["source"] == .string("microphone"))
+            let set = try await call("setLiveCaptionsSource", ["source": .string("app:us.zoom.xos")])
+            #expect(set["source"] == .string("app:us.zoom.xos"))
+            #expect(model.liveCaptionsSource == .app(bundleID: "us.zoom.xos"))
+            #expect(try await call("getLiveCaptionsState")["source"] == .string("app:us.zoom.xos"))
+            await #expect(throws: AutomationError.self) {
+                _ = try await call("setLiveCaptionsSource", ["source": .string("speakers")])
+            }
+            let apps = try await call("listCaptionApps")
+            let expected = AutomationValue.array([.object([
+                "bundleID": .string("com.apple.Music"), "name": .string("Music"), "isMeetingApp": .bool(false),
+            ])])
+            #expect(apps["apps"] == expected)
+            withExtendedLifetime(server) {}
+        }
+
         @Test("closing the panel stops the microphone", .timeLimit(.minutes(1)))
         func closingThePanelStops() async throws {
             try await withMocksCleared(.streaming) {

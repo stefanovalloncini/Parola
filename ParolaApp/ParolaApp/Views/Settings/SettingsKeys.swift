@@ -186,7 +186,7 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
                 "showRecordingStatusItem", "showRecordingPill"
             ]
         case .liveCaptions:
-            return ["liveCaptionsTranslate"]
+            return ["liveCaptionsTranslate", "liveCaptionsSource"]
         case .dictation:
             return [
                 "dictationEnabled",

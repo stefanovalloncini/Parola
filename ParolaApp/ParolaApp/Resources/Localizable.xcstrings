@@ -56,6 +56,61 @@
         }
       }
     },
+    "Captions of what you say, in a floating window.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sottotitoli di ciò che dici, in una finestra mobile."
+          }
+        }
+      }
+    },
+    "Live captions transcribe the microphone as you speak and show the words in a floating panel that stays above other windows.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I sottotitoli in tempo reale trascrivono il microfono mentre parli e mostrano le parole in un pannello mobile che resta sopra le altre finestre."
+          }
+        }
+      }
+    },
+    "Translate captions live as you speak.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Traduce i sottotitoli in tempo reale mentre parli."
+          }
+        }
+      }
+    },
+    "%@ (no audio)": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ (nessun audio)"
+          }
+        }
+      }
+    },
+    "%@ (not open)": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ (non aperto)"
+          }
+        }
+      }
+    },
     "%@ can't detect speakers, so speaker detection is skipped.": {
       "extractionState": "manual",
       "localizations": {
@@ -173,6 +228,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@ è in esecuzione"
+          }
+        }
+      }
+    },
+    "%@ isn't playing any audio. Try again once it is.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ non sta riproducendo audio. Riprova quando parte."
           }
         }
       }
@@ -3250,6 +3316,17 @@
         }
       }
     },
+    "Pick an app to caption only its sound.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scegli un'app per sottotitolare solo il suo audio."
+          }
+        }
+      }
+    },
     "CSV": {
       "extractionState": "manual",
       "localizations": {
@@ -3454,13 +3531,13 @@
         }
       }
     },
-    "Captions of what you say, in a floating window.": {
+    "Captions of what you say or what your Mac plays, in a floating window.": {
       "extractionState": "manual",
       "localizations": {
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Sottotitoli di ciò che dici, in una finestra mobile."
+            "value": "Sottotitoli di ciò che dici o che il Mac riproduce, in una finestra mobile."
           }
         }
       }
@@ -8454,6 +8531,61 @@
         }
       }
     },
+    "Lets Live Captions hear one app's audio.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Permette ai sottotitoli in tempo reale di sentire l'audio di una sola app."
+          }
+        }
+      }
+    },
+    "Lets Live Captions hear the whole Mac's audio.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Permette ai sottotitoli in tempo reale di sentire l'audio dell'intero Mac."
+          }
+        }
+      }
+    },
+    "Listen To": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ascolta"
+          }
+        }
+      }
+    },
+    "Listen to": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ascolta"
+          }
+        }
+      }
+    },
+    "Live captions show the words in a floating panel that stays above other windows.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I sottotitoli in tempo reale mostrano le parole in un pannello mobile che resta sopra le altre finestre."
+          }
+        }
+      }
+    },
     "LRC Lyrics": {
       "extractionState": "manual",
       "localizations": {
@@ -8903,17 +9035,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sottotitoli in tempo reale"
-          }
-        }
-      }
-    },
-    "Live captions transcribe the microphone as you speak and show the words in a floating panel that stays above other windows.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "I sottotitoli in tempo reale trascrivono il microfono mentre parli e mostrano le parole in un pannello mobile che resta sopra le altre finestre."
           }
         }
       }
@@ -11631,6 +11752,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Overlay"
+          }
+        }
+      }
+    },
+    "Allow Parola in Screen & System Audio Recording to caption system audio.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Consenti l'accesso a Parola in Registrazione schermo e audio di sistema per sottotitolare l'audio del Mac."
+          }
+        }
+      }
+    },
+    "Allow Parola in System Audio Recording Only to caption one app.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Consenti l'accesso a Parola in Solo registrazione audio di sistema per sottotitolare un'app."
           }
         }
       }
@@ -16680,6 +16823,17 @@
         }
       }
     },
+    "System": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sistema"
+          }
+        }
+      }
+    },
     "System Audio": {
       "extractionState": "manual",
       "localizations": {
@@ -18797,13 +18951,13 @@
         }
       }
     },
-    "Translate captions live as you speak.": {
+    "Translate the captions into English as they appear.": {
       "extractionState": "manual",
       "localizations": {
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Traduce i sottotitoli in tempo reale mentre parli."
+            "value": "Traduce i sottotitoli in inglese mentre compaiono."
           }
         }
       }

@@ -1120,7 +1120,28 @@ final class AppModel {
 
     // MARK: - Live captions
 
-    @ObservationIgnored weak var liveCaptions: LiveCaptionsController?
+    @ObservationIgnored weak var liveCaptions: LiveCaptionsController? {
+        didSet {
+            liveCaptions?.openPermission = { [capturePermissions] permission in
+                Self.openCaptionPermission(permission, using: capturePermissions)
+            }
+        }
+    }
+
+    /// Screen Recording goes through the request the Allow… button makes, so a first ask raises the system prompt; the rest open their pane.
+    static func openCaptionPermission(
+        _ permission: RecordingSession.Permission, using permissions: SystemCapturePermissions,
+        openPane: (RecordingSession.Permission) -> Void = { $0.openSettings() }
+    ) {
+        switch permission {
+        case .screenRecording:
+            permissions.refresh()
+            // A failure that isn't a refusal (a start that timed out) has nothing to request; the pane is the way on.
+            if permissions.screenRecordingGranted { openPane(permission) } else { permissions.requestScreenRecording() }
+        case .systemAudioRecording, .microphone:
+            openPane(permission)
+        }
+    }
 
     /// Nil when the selected model can stream live captions; otherwise the user-facing reason.
     var liveCaptionsUnavailableReason: String? {
@@ -1142,8 +1163,7 @@ final class AppModel {
             }
             return
         }
-        let device = inputDeviceUID.isEmpty ? nil : inputDeviceUID
-        Task { await liveCaptions.toggle(options: makeOptions(task: .transcribe, model: selectedModel, language: selectedLanguage), deviceUID: device) }
+        Task { await liveCaptions.toggle(options: makeOptions(task: .transcribe, model: selectedModel, language: selectedLanguage), source: liveCaptionsSource) }
     }
 
     // MARK: - Dictation
@@ -1313,6 +1333,7 @@ final class AppModel {
         self.sparkleChannelRaw = defaults.string(forKey: "sparkleChannel") ?? SparkleChannel.stable.rawValue
         self.sparkleAutomatic = readBool("sparkleAutomatic", default: true)
         self.liveCaptionsTranslate = defaults.bool(forKey: "liveCaptionsTranslate")
+        self.liveCaptionsSourceRaw = CaptionSource(setting: defaults.string(forKey: "liveCaptionsSource")).setting
         self.remoteAIAcknowledged = defaults.bool(forKey: "remoteAIAcknowledged")
         self.showMostUsedPeople = readBool("showMostUsedPeople", default: true)
         self.openEntriesInNewWindow = defaults.bool(forKey: "openEntriesInNewWindow")
@@ -1336,6 +1357,7 @@ final class AppModel {
         loadSnippets()
         loadCorrectionRules()
         isReloadingSettings = false
+        Task { await liveCaptions?.setSource(liveCaptionsSource) }
 
         refreshModelList()
         Task { await refreshPeople() }
@@ -2293,6 +2315,31 @@ final class AppModel {
 
     private func applySparkleChannelChange() {
         SparkleUpdater.shared.channel = sparkleChannel
+    }
+
+    // MARK: - Live captions source
+
+    @ObservationIgnored lazy var captionApps = CaptionAppList()
+
+    var liveCaptionsSourceRaw: String = "microphone" {
+        didSet {
+            defaults.set(liveCaptionsSourceRaw, forKey: "liveCaptionsSource")
+            if !isReloadingSettings, !choosingCaptionSource { Task { await liveCaptions?.setSource(liveCaptionsSource) } }
+        }
+    }
+
+    @ObservationIgnored private var choosingCaptionSource = false
+
+    /// Picks the source and returns once a running session has restarted on it.
+    func chooseLiveCaptionsSource(_ raw: String) async {
+        choosingCaptionSource = true
+        liveCaptionsSourceRaw = raw
+        choosingCaptionSource = false
+        await liveCaptions?.setSource(liveCaptionsSource)
+    }
+
+    var liveCaptionsSource: CaptionSource {
+        CaptionSource(setting: liveCaptionsSourceRaw, deviceUID: inputDeviceUID.isEmpty ? nil : inputDeviceUID)
     }
 
     // MARK: - Live captions translation

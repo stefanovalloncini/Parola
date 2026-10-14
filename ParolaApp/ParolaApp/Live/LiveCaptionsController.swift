@@ -21,6 +21,13 @@ final class LiveCaptionsController {
     private(set) var hasHistory: Bool = false
     private(set) var isPanelShown = false
     var translateToEnglish: Bool = false
+    /// What the panel's chip names: the session's source, or the one picked since while captions are off.
+    private(set) var source: CaptionSource = .microphone(deviceUID: nil)
+    /// The privacy pane a failed session needs opened, when its reason is a missing permission.
+    private(set) var failurePermission: RecordingSession.Permission?
+    /// What the panel's permission pill does; the app routes Screen Recording to the same request as its Allow… button.
+    @ObservationIgnored var openPermission: @MainActor (RecordingSession.Permission) -> Void = { $0.openSettings() }
+    @ObservationIgnored var appName: (String) -> String = { CaptionAppList.installedName(forBundleID: $0) ?? $0 }
 
     private(set) var panel: NSPanel?
     @ObservationIgnored private var panelCloseObserver: (any NSObjectProtocol)?
@@ -30,7 +37,6 @@ final class LiveCaptionsController {
     private var session: (any StreamingTranscriber)?
     private var consumer: Task<Void, Never>?
     private var lastOptions: TranscriptionOptions?
-    private var lastDeviceUID: String?
 
     init(showsPanel: Bool = true) {
         self.showsPanel = showsPanel
@@ -43,24 +49,37 @@ final class LiveCaptionsController {
 
     var isPresenterOpen: Bool { presenterWindow != nil }
 
-    func toggle(options: TranscriptionOptions, deviceUID: String? = nil) async {
+    func toggle(options: TranscriptionOptions, source: CaptionSource = .microphone(deviceUID: nil)) async {
         if state.isActive {
             await stop()
         } else {
-            await start(options: optionsWithTranslate(options), deviceUID: deviceUID)
+            await start(options: optionsWithTranslate(options), source: source)
         }
+    }
+
+    /// A running session restarts on the new source and keeps its lines; a stopped or failed one just remembers it, so Retry uses it.
+    func setSource(_ newSource: CaptionSource) async {
+        guard newSource != source else { return }
+        source = newSource
+        guard state.isActive else { return }
+        await restart {}
     }
 
     func setTranslate(_ enabled: Bool) async {
         guard translateToEnglish != enabled else { return }
         translateToEnglish = enabled
         guard state.isActive else { return }
+        await restart {}
+    }
+
+    private func restart(changing change: () -> Void) async {
         await stop()
         // After the stop: it drains the lines still in flight into `state`, and start() resets it.
         let earlier = state
+        change()
         guard !state.isActive, let current = lastOptions else { return }
-        await start(options: optionsWithTranslate(current), deviceUID: lastDeviceUID)
-        // start() resets state; keep what was already captioned before the flip.
+        await start(options: optionsWithTranslate(current), source: source)
+        // start() resets state; keep what was already captioned before the restart.
         state.continuing(after: earlier)
     }
 
@@ -70,15 +89,16 @@ final class LiveCaptionsController {
         return copy
     }
 
-    func start(options: TranscriptionOptions, deviceUID: String? = nil) async {
+    func start(options: TranscriptionOptions, source: CaptionSource = .microphone(deviceUID: nil)) async {
         guard !state.isActive else { return }
         lastOptions = options
-        lastDeviceUID = deviceUID
+        self.source = source
+        failurePermission = nil
         state.reset()
         state.isActive = true
         state.isLoading = true
 
-        let s = StreamingTranscriberFactory.make(deviceUID: deviceUID)
+        let s = StreamingTranscriberFactory.make(source: source)
         session = s
         showWindow()
 
@@ -114,7 +134,9 @@ final class LiveCaptionsController {
 
     private func handle(_ event: StreamingEvent) {
         state.apply(event)
-        if case .failed = event {
+        if case .failed(let text) = event {
+            failurePermission = CaptionFailure.permission(for: text)
+            state.error = CaptionFailure.message(for: text, appName: appName)
             session = nil
             consumer?.cancel()
             consumer = nil
@@ -131,7 +153,7 @@ final class LiveCaptionsController {
     /// A failed session stays on its panel with the reason; Retry starts it again where it was.
     func tryAgain() async {
         guard !state.isActive, let lastOptions else { return }
-        await start(options: lastOptions, deviceUID: lastDeviceUID)
+        await start(options: lastOptions, source: source)
     }
 
     func closeFailure() {

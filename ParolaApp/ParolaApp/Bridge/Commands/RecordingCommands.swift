@@ -152,7 +152,49 @@ extension ParolaAutomationServer {
                         "confirmedLines": .array(s.confirmedLines.map { .string($0) }),
                         "displayedText": .string(s.displayedText),
                         "error": s.error.map { .string($0) } ?? .null,
+                        "source": .string(ctx.model.liveCaptionsSource.setting),
                     ])
+                }
+            ),
+
+            AutomationCommand(
+                name: "setLiveCaptionsSource",
+                area: .recording,
+                summary: "Chooses what live captions listen to; a running session restarts on it and keeps its lines.",
+                kind: .async,
+                args: [
+                    .init(
+                        name: "source",
+                        kind: .string(),
+                        required: true,
+                        summary: "\"microphone\", \"systemAudio\", or \"app:<bundleID>\""
+                    ),
+                ],
+                handler: { args, ctx in
+                    try ctx.require(.liveCaptions)
+                    let setting = try args.string("source")
+                    guard CaptionSource(setting: setting).setting == setting else {
+                        throw AutomationError.invalidArgs(field: "source", reason: "expected microphone, systemAudio or app:<bundleID>")
+                    }
+                    await ctx.model.chooseLiveCaptionsSource(setting)
+                    return .object(["source": .string(ctx.model.liveCaptionsSource.setting)])
+                }
+            ),
+
+            AutomationCommand(
+                name: "listCaptionApps",
+                area: .recording,
+                summary: "The running apps live captions can listen to: those with an audio process, meeting apps first.",
+                kind: .sync,
+                handler: { _, ctx in
+                    ctx.model.captionApps.refresh()
+                    return .object(["apps": .array(ctx.model.captionApps.apps.map { app in
+                        .object([
+                            "bundleID": .string(app.bundleID),
+                            "name": .string(app.name),
+                            "isMeetingApp": .bool(app.isMeetingApp),
+                        ])
+                    })])
                 }
             ),
 
