@@ -263,7 +263,7 @@ actor ParakeetTranscriber: Transcriber {
     static let segmentGapThreshold: TimeInterval = 0.8
     static let maxTokensPerSegment: Int = 80
 
-    /// Extra places a run is cut. Live captions need short segments so confirmation can keep up with nonstop speech.
+    /// Extra places a run is cut, always between words. Live captions need short segments so confirmation can keep up with nonstop speech.
     struct SegmentSplitting: Sendable {
         var endsOnSentenceEnd = false
         var maxSpanSeconds: TimeInterval?
@@ -323,7 +323,8 @@ actor ParakeetTranscriber: Transcriber {
         for (index, timing) in timings.enumerated() {
             if let first = currentTokens.first {
                 let gap = timing.startTime - lastEnd
-                let overSpan = splitting.maxSpanSeconds.map { timing.endTime - first.startTime > $0 } ?? false
+                let startsWord = timing.token.first?.isWhitespace ?? false
+                let overSpan = startsWord && (splitting.maxSpanSeconds.map { timing.endTime - first.startTime > $0 } ?? false)
                 if gap > segmentGapThreshold || currentTokens.count >= maxTokensPerSegment || overSpan {
                     flush()
                 }

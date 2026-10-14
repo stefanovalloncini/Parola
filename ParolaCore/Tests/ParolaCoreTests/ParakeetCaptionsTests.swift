@@ -44,13 +44,18 @@ struct ParakeetCaptionSegmentTests {
         #expect(segments.map(\.text) == ["It costs 3.5 euros."])
     }
 
-    @Test("a run with no punctuation and no pause is cut at the span limit")
+    @Test("a run with no punctuation and no pause is cut at the span limit, between words")
     func cutsLongRunsByDuration() {
-        let words = (0..<30).map { token(" w\($0)", Double($0) * 0.5, Double($0) * 0.5 + 0.45) }
-        let segments = ParakeetTranscriber.makeSegments(from: result(words), includeWords: false, splitting: .captions)
+        let pieces = (0..<30).flatMap { index -> [TokenTiming] in
+            let start = Double(index) * 0.5
+            return [token(" fo", start, start + 0.2), token("llowing", start + 0.2, start + 0.45)]
+        }
+        let segments = ParakeetTranscriber.makeSegments(from: result(pieces), includeWords: false, splitting: .captions)
         #expect(segments.count >= 2)
         #expect(segments.allSatisfy { $0.end - $0.start <= 7 })
-        #expect(segments.flatMap { $0.text.split(separator: " ") }.count == 30)
+        let words = segments.flatMap { $0.text.split(separator: " ") }
+        #expect(words.count == 30)
+        #expect(words.allSatisfy { $0 == "following" })
     }
 }
 
