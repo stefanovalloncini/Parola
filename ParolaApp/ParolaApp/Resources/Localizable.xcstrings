@@ -624,6 +624,47 @@
         }
       }
     },
+    "%lld lines skipped.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld line skipped."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld lines skipped."
+                }
+              }
+            }
+          }
+        },
+        "it": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld riga saltata."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld righe saltate."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld low-confidence segments": {
       "extractionState": "manual",
       "localizations": {
@@ -7695,6 +7736,58 @@
         }
       }
     },
+    "Import": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Importa"
+          }
+        }
+      }
+    },
+    "Import %lld rules from “%@”?": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Import %lld rule from “%@”?"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Import %lld rules from “%@”?"
+                }
+              }
+            }
+          }
+        },
+        "it": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Importare %lld regola da “%@”?"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Importare %lld regole da “%@”?"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "Import Pack": {
       "extractionState": "manual",
       "localizations": {
@@ -7746,6 +7839,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Importa da file…"
+          }
+        }
+      }
+    },
+    "Imported rules match whole words.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le regole importate cercano parole intere."
           }
         }
       }
@@ -10345,6 +10449,17 @@
         }
       }
     },
+    "No new find → replace lines in “%@”.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nessuna nuova riga trova → sostituisci in “%@”."
+          }
+        }
+      }
+    },
     "No patterns yet": {
       "localizations": {
         "it": {
@@ -10745,6 +10860,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Non è ancora stato registrato nulla."
+          }
+        }
+      }
+    },
+    "Nothing to import": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Niente da importare"
           }
         }
       }
@@ -12123,6 +12249,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Scegli un altro dispositivo o riconnetti quello attuale."
+          }
+        }
+      }
+    },
+    "Pick a term pack (.json) or a list of replacements (.csv, .tsv, .txt).": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scegli un term pack (.json) o un elenco di sostituzioni (.csv, .tsv, .txt)."
           }
         }
       }

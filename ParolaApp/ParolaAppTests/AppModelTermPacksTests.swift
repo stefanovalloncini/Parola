@@ -141,3 +141,141 @@ struct AppModelTermPacksTests {
         Issue.record("import of a present bundled pack should not fail")
     }
 }
+
+@MainActor
+@Suite("AppModel list import")
+struct AppModelRuleListImportTests {
+    private func makeModel() -> AppModel {
+        AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("rulelist"))
+    }
+
+    private func write(_ text: String, named name: String) throws -> URL {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("RuleList-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let url = dir.appendingPathComponent(name)
+        try Data(text.utf8).write(to: url)
+        return url
+    }
+
+    @Test("a list file previews first and changes nothing")
+    func previews() async throws {
+        let model = makeModel()
+        model.findReplaceRules = []
+        let url = try write("cat,dog\nfoo,bar\n# c\n", named: "list.csv")
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+
+        await model.importRulesFile(from: url)
+
+        #expect(model.findReplaceRules.isEmpty)
+        #expect(model.pendingRuleImport?.newRuleCount == 2)
+        #expect(model.pendingRuleImport?.skippedLines == 1)
+        #expect(model.pendingRuleImport?.fileName == "list.csv")
+    }
+
+    @Test("the preview count leaves out rules already present")
+    func previewExcludesDuplicates() async throws {
+        let model = makeModel()
+        model.findReplaceRules = [FindReplaceRule(find: "cat", replace: "dog", wholeWord: true)]
+        let url = try write("cat -> dog\nfoo -> bar", named: "list.txt")
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+
+        await model.importRulesFile(from: url)
+
+        #expect(model.pendingRuleImport?.newRuleCount == 1)
+    }
+
+    @Test("a list that adds nothing says so")
+    func nothingToImport() async throws {
+        let model = makeModel()
+        model.findReplaceRules = [FindReplaceRule(find: "cat", replace: "dog", wholeWord: true)]
+        let url = try write("cat,dog", named: "list.csv")
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+
+        await model.importRulesFile(from: url)
+
+        #expect(model.pendingRuleImport?.newRuleCount == 0)
+        #expect(model.pendingRuleImport?.title == "Nothing to import")
+    }
+
+    @Test("the zero case still reports skipped lines")
+    func nothingToImportShowsSkipped() async throws {
+        let model = makeModel()
+        model.findReplaceRules = [FindReplaceRule(find: "cat", replace: "dog", wholeWord: true)]
+        let url = try write("cat,dog\nbroken\n", named: "list.csv")
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+
+        await model.importRulesFile(from: url)
+
+        #expect(model.pendingRuleImport?.message.contains("1 line") == true)
+    }
+
+    @Test("confirming merges whole-word rules")
+    func confirm() async throws {
+        let model = makeModel()
+        model.findReplaceRules = []
+        let url = try write("cat,dog", named: "list.csv")
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+
+        await model.importRulesFile(from: url)
+        model.confirmRuleImport()
+
+        #expect(model.pendingRuleImport == nil)
+        #expect(model.findReplaceRules.map(\.find) == ["cat"])
+        #expect(model.findReplaceRules.first?.wholeWord == true)
+    }
+
+    @Test("cancelling leaves the rules unchanged")
+    func cancel() async throws {
+        let model = makeModel()
+        model.findReplaceRules = []
+        let url = try write("cat,dog", named: "list.csv")
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+
+        await model.importRulesFile(from: url)
+        model.cancelRuleImport()
+
+        #expect(model.pendingRuleImport == nil)
+        #expect(model.findReplaceRules.isEmpty)
+    }
+
+    @Test("a JSON pack merges straight away, without a preview")
+    func jsonUnchanged() async throws {
+        let model = makeModel()
+        model.findReplaceRules = []
+        let pack = TermPack(name: "T", locale: "en", rules: [TermPackRule(find: "redis", replace: "Redis")])
+        let url = try write(String(decoding: try TermPackIO.encode(pack), as: UTF8.self), named: "pack.json")
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+
+        await model.importRulesFile(from: url)
+
+        #expect(model.pendingRuleImport == nil)
+        #expect(model.findReplaceRules.map(\.find) == ["redis"])
+    }
+
+    @Test("a file that isn't UTF-8 fails the import")
+    func notUTF8() async throws {
+        let model = makeModel()
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("RuleList-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let url = dir.appendingPathComponent("list.csv")
+        try Data([0xFF, 0xFE, 0x61, 0x00, 0x2C, 0x00]).write(to: url)
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        await model.importRulesFile(from: url)
+
+        #expect(model.pendingRuleImport == nil)
+        if case .failed = model.phase {} else { Issue.record("expected a failed phase") }
+    }
+
+    @Test("regex and whole words exclude each other in the editor")
+    func exclusivity() {
+        var rule = FindReplaceRule(find: "a", replace: "b")
+        rule.setRegex(true)
+        rule.setWholeWord(true)
+        #expect(rule.wholeWord && !rule.regex)
+        rule.setRegex(true)
+        #expect(rule.regex && !rule.wholeWord)
+        rule.setRegex(false)
+        #expect(!rule.regex && !rule.wholeWord)
+    }
+}

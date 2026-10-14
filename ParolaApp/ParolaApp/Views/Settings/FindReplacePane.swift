@@ -53,6 +53,26 @@ struct FindReplacePane: View {
             SettingHelper(text: "Term packs add curated rules in one click.")
             ResetPaneButton(scope: .findReplace)
         }
+        .alert(
+            model.pendingRuleImport?.title ?? "",
+            isPresented: Binding(
+                get: { model.pendingRuleImport != nil },
+                set: { if !$0 { model.cancelRuleImport() } }
+            ),
+            presenting: model.pendingRuleImport
+        ) { pending in
+            if pending.newRuleCount > 0 {
+                Button("Import") { model.confirmRuleImport() }
+                    .axLeaf("FindReplace.Button.ImportConfirm")
+                Button("Cancel", role: .cancel) { model.cancelRuleImport() }
+                    .axLeaf("FindReplace.Button.ImportCancel")
+            } else {
+                Button("OK", role: .cancel) { model.cancelRuleImport() }
+                    .axLeaf("FindReplace.Button.ImportOK")
+            }
+        } message: { pending in
+            Text(verbatim: pending.message)
+        }
     }
 
     private func add() {

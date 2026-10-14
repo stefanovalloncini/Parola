@@ -952,6 +952,8 @@ final class AppModel {
         didSet { saveFindReplaceRules() }
     }
 
+    var pendingRuleImport: PendingRuleImport?
+
     var snippets: [Snippet] = [] {
         didSet {
             saveSnippets()

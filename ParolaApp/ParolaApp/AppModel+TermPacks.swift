@@ -9,13 +9,44 @@ extension AppModel {
         Task { [weak self] in
             guard let self else { return }
             let urls = await self.filePicker.chooseInputFiles(
-                allowedTypes: [.json],
+                allowedTypes: [.json, .commaSeparatedText, .tabSeparatedText, .plainText],
                 allowsMultiple: false,
-                message: "Pick a Parola term pack (.json)."
+                message: String(localized: "Pick a term pack (.json) or a list of replacements (.csv, .tsv, .txt).")
             )
             guard let url = urls.first else { return }
-            await self.importTermPack(from: url)
+            await self.importRulesFile(from: url)
         }
+    }
+
+    func importRulesFile(from url: URL) async {
+        guard url.pathExtension.lowercased() != "json" else {
+            await importTermPack(from: url)
+            return
+        }
+        do {
+            let list = try await Self.offMainIO {
+                let data = try Data(contentsOf: url)
+                guard let text = String(data: data, encoding: .utf8) else {
+                    throw CocoaError(.fileReadInapplicableStringEncoding)
+                }
+                return ReplacementList.parse(text, fileExtension: url.pathExtension)
+            }
+            let pack = TermPack(name: url.lastPathComponent, locale: "", rules: list.rules)
+            let added = TermPackIO.merge(pack: pack, into: findReplaceRules).count - findReplaceRules.count
+            pendingRuleImport = PendingRuleImport(fileName: url.lastPathComponent, pack: pack, newRuleCount: added, skippedLines: list.skippedLines)
+        } catch {
+            phase = .failed(message: String(localized: "Couldn't import term pack: \(FailureText.message(for: error))"))
+        }
+    }
+
+    func confirmRuleImport() {
+        guard let pending = pendingRuleImport else { return }
+        pendingRuleImport = nil
+        findReplaceRules = TermPackIO.merge(pack: pending.pack, into: findReplaceRules)
+    }
+
+    func cancelRuleImport() {
+        pendingRuleImport = nil
     }
 
     func importTermPack(from url: URL) async {
@@ -60,5 +91,28 @@ extension AppModel {
                 self.exportNotice = .failed(error)
             }
         }
+    }
+}
+
+struct PendingRuleImport: Equatable {
+    let fileName: String
+    let pack: TermPack
+    let newRuleCount: Int
+    let skippedLines: Int
+
+    var title: String {
+        newRuleCount == 0
+            ? String(localized: "Nothing to import")
+            : String(localized: "Import \(newRuleCount) rules from “\(fileName)”?")
+    }
+
+    var message: String {
+        let skipped = skippedLines > 0 ? String(localized: "\(skippedLines) lines skipped.") : nil
+        guard newRuleCount > 0 else {
+            let none = String(localized: "No new find → replace lines in “\(fileName)”.")
+            return skipped.map { none + " " + $0 } ?? none
+        }
+        let base = String(localized: "Imported rules match whole words.")
+        return skipped.map { base + " " + $0 } ?? base
     }
 }
