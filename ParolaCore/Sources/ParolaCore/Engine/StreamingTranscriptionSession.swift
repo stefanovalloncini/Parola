@@ -580,9 +580,9 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         } else {
             await persister?.discard()
         }
-        if let failure { continuation?.yield(.failed(failure)) }
         segmentContinuation?.finish()
         await consumerTask?.value
+        if let failure { continuation?.yield(.failed(failure)) }
         continuation?.finish()
         await teardown()
     }

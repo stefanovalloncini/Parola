@@ -127,15 +127,27 @@ struct LiveCaptionsStateTests {
         #expect(s.isActive == false)
     }
 
-    @Test("a failure keeps the confirmed lines and clears the partial")
+    @Test("a failure keeps the confirmed lines and the partial")
     func failedKeepsConfirmedText() {
         var s = LiveCaptionsState(isActive: true)
         s.apply(.confirmed(TranscriptSegment(id: 0, start: 0, end: 1, text: "kept line")))
         s.apply(.partial(text: "half a sent"))
-        s.apply(.failed(FixedFailureText.systemAudioStopped))
+        s.apply(.failed("engine died"))
         #expect(s.history == ["kept line"])
-        #expect(s.confirmedLines == ["kept line"])
+        #expect(s.partial == "half a sent")
+    }
+
+    @Test("held words flushed at a capture end are not shown twice")
+    func flushedWordsShowOnce() {
+        var s = LiveCaptionsState(isActive: true)
+        s.apply(.partial(text: "one two three"))
+        s.apply(.confirmed(TranscriptSegment(id: 0, start: 0, end: 1, text: "one")))
+        s.apply(.confirmed(TranscriptSegment(id: 1, start: 1, end: 2, text: "two")))
+        s.apply(.confirmed(TranscriptSegment(id: 2, start: 2, end: 3, text: "three")))
+        s.apply(.failed(FixedFailureText.systemAudioStopped))
+        #expect(s.history == ["one", "two", "three"])
         #expect(s.partial == "")
+        #expect(s.displayedText.components(separatedBy: "two").count == 2, "\(s.displayedText)")
     }
 
     @Test("finished event clears partial")

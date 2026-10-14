@@ -1399,7 +1399,7 @@ struct StreamingSessionSourceTests {
         }
     }
 
-    @Test("a capture that ends by itself fails the session with its sentence and stops the capture")
+    @Test("a capture that ends by itself fails the session with its sentence and stops the capture", .timeLimit(.minutes(1)))
     func captureEndFailsTheSession() async throws {
         let scripted = ScriptedCapture()
         let cache = StreamingModelCache.probing(CacheProbe())
@@ -1417,7 +1417,7 @@ struct StreamingSessionSourceTests {
         #expect(!scripted.running)
     }
 
-    @Test("an end that arrives after a stop adds no failure")
+    @Test("an end that arrives after a stop adds no failure", .timeLimit(.minutes(1)))
     func captureEndAfterStop() async throws {
         let scripted = ScriptedCapture()
         let cache = StreamingModelCache.probing(CacheProbe())
@@ -1434,7 +1434,7 @@ struct StreamingSessionSourceTests {
         #expect(!failed)
     }
 
-    @Test("a new session after an end captures again")
+    @Test("a new session after an end captures again", .timeLimit(.minutes(1)))
     func restartAfterEnd() async throws {
         let scripted = ScriptedCapture()
         let cache = StreamingModelCache.probing(CacheProbe())
@@ -1664,3 +1664,65 @@ private actor PushableSource: LiveAudioSource {
     func cancel() async {}
 }
 #endif
+
+private final class EndHandlerBox: Sendable {
+    private let handler = OSAllocatedUnfairLock<(@Sendable (any Error) -> Void)?>(initialState: nil)
+    func register(_ new: @escaping @Sendable (any Error) -> Void) { handler.withLock { $0 = new } }
+    func end() { handler.withLock { $0 }?(CaptionCaptureError(text: FixedFailureText.systemAudioStopped)) }
+}
+
+@Suite("Capture end event order")
+struct CaptureEndEventOrderTests {
+    @Test("a line confirmed by the decode in flight at the end reaches the stream before .failed", .timeLimit(.minutes(1)), arguments: 0..<20)
+    func confirmedBeforeFailed(_ round: Int) async throws {
+        let session = StreamingTranscriptionSession()
+        let harness = TakeHarness()
+        let signal = EndHandlerBox()
+        let gate = UninterruptibleGate()
+        var configuration = StreamingRealtimeLoop.Configuration()
+        configuration.useVAD = false
+        let loopConfiguration = configuration
+        let events = await session.launch(options: TranscriptionOptions(), speakerLabeler: nil, persister: nil) { sink, confirmed in
+            StreamingRealtimeLoop(
+                configuration: loopConfiguration,
+                decodingOptions: DecodingOptions(),
+                dependencies: .init(
+                    requestPermission: { true },
+                    startCapture: { ingest in harness.install { _ = ingest($0) } },
+                    stopCapture: {},
+                    whenCaptureEnds: { signal.register($0) },
+                    transcribe: { samples, _, _ in
+                        await gate.wait()
+                        harness.recordDecode(sampleCount: samples.count)
+                        return TranscriptionResult(
+                            text: "", segments: [
+                                TranscriptionSegment(start: 0, end: 1, text: " one"),
+                                TranscriptionSegment(start: 1, end: 2, text: " two"),
+                                TranscriptionSegment(start: 2, end: 3, text: " three"),
+                            ], language: "en", timings: TranscriptionTimings()
+                        )
+                    },
+                    tick: { try await Task.sleep(nanoseconds: 1_000_000) }
+                ),
+                onPartial: { sink.handlePartial(text: $0) },
+                onEnergy: { sink.handleEnergy(last: $0) },
+                onConfirmed: { confirmed.yield($0) }
+            )
+        }
+        await harness.captureStarted.wait("capture to start")
+        harness.push([Float](repeating: 0.5, count: 32_000))
+        await gate.arrivals.wait(atLeast: 1, "the decode to park")
+        signal.end()
+        try await Task.sleep(for: .milliseconds(20))
+        gate.open()
+        var order: [String] = []
+        for await event in events {
+            switch event {
+            case .confirmed(let segment): order.append("confirmed:\(segment.text)")
+            case .failed: order.append("failed")
+            default: break
+            }
+        }
+        #expect(order == ["confirmed:one", "confirmed:two", "confirmed:three", "failed"], "round \(round): \(order)")
+    }
+}

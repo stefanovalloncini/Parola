@@ -271,7 +271,10 @@ actor StreamingRealtimeLoop {
                 guard stopRequested, flushesOnStop else { return .failed(error) }
             }
         }
-        if let captureEndError { return endedRun(captureEndError) }
+        if let captureEndError {
+            if flushesOnStop { await finalFlush(with: decoder) }
+            return endedRun(captureEndError)
+        }
         guard flushesOnStop else { return .cancelled }
         // Runs on this task, never from stop(): a flush entering the actor mid-iterate
         // would race the in-flight decode on the shared TranscribeTask.

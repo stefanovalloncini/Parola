@@ -83,7 +83,6 @@ public struct LiveCaptionsState: Sendable, Equatable {
             error = msg
         case .failed(let msg):
             error = msg
-            partial = ""
             isActive = false
             isLoading = false
             downloadFraction = nil

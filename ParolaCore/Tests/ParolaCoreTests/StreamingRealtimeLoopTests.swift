@@ -1267,3 +1267,118 @@ struct StreamingLoopCaptureEndTests {
         #expect(capture.stopCount == 1)
     }
 }
+
+@Suite("Streaming loop capture end, held words and races")
+struct StreamingLoopCaptureEndRaceTests {
+    private func heldLoop(_ signal: EndSignal) -> (StreamingRealtimeLoop, FakeCapture, TranscribeScript, EventRecorder) {
+        let capture = FakeCapture()
+        let script = TranscribeScript(responses: [[segment(0, 1, " one"), segment(1, 2, " two"), segment(2, 3, " three")]])
+        let recorder = EventRecorder()
+        var config = StreamingRealtimeLoop.Configuration()
+        config.useVAD = false
+        let loop = StreamingRealtimeLoop(
+            configuration: config,
+            decodingOptions: DecodingOptions(),
+            dependencies: .init(
+                requestPermission: { true },
+                startCapture: { capture.install($0) },
+                stopCapture: { capture.markStopped() },
+                whenCaptureEnds: { signal.register($0) },
+                transcribe: { samples, options, _ in try await script.invoke(samples, options) },
+                tick: { try await Task.sleep(nanoseconds: 1_000_000) }
+            ),
+            onPartial: { recorder.recordPartial($0) },
+            onEnergy: { _ in },
+            onConfirmed: { recorder.recordBatch($0) }
+        )
+        return (loop, capture, script, recorder)
+    }
+
+    @Test("an end confirms the held words the way a stop does, then fails", .timeLimit(.minutes(1)), arguments: [false, true])
+    func endFlushesHeldWords(ending: Bool) async {
+        let signal = EndSignal()
+        let (loop, capture, script, recorder) = heldLoop(signal)
+        let run = LoopRun(loop)
+        _ = await eventually { capture.installed && signal.registered }
+        capture.push(seconds: 3, value: 0.5)
+        _ = await eventually { await script.callCount >= 1 && recorder.batches.count >= 1 }
+        if ending { signal.end() } else { await loop.stop() }
+        let outcome = await run.outcome()
+        if ending {
+            guard case .failed = outcome else {
+            Issue.record("expected .failed, got \(String(describing: outcome))")
+            return
+        }
+        }
+        #expect(recorder.batches.flatMap { $0.segments.map(\.text) } == [" one", " two", " three"])
+    }
+
+    @Test("an end that arrives after a stop is ignored even while a decode is still running", .timeLimit(.minutes(1)))
+    func endAfterStopDuringDecode() async throws {
+        let signal = EndSignal()
+        let capture = FakeCapture()
+        let gate = UninterruptibleGate()
+        var config = StreamingRealtimeLoop.Configuration()
+        config.useVAD = false
+        let loop = StreamingRealtimeLoop(
+            configuration: config,
+            decodingOptions: DecodingOptions(),
+            dependencies: .init(
+                requestPermission: { true },
+                startCapture: { capture.install($0) },
+                stopCapture: { capture.markStopped() },
+                whenCaptureEnds: { signal.register($0) },
+                transcribe: { _, _, _ in
+                    await gate.wait()
+                    return TranscriptionResult(text: "", segments: [], language: "en", timings: TranscriptionTimings())
+                },
+                tick: { try await Task.sleep(nanoseconds: 1_000_000) }
+            ),
+            onPartial: { _ in },
+            onEnergy: { _ in },
+            onConfirmed: { _ in }
+        )
+        let run = LoopRun(loop)
+        _ = await eventually { capture.installed && signal.registered }
+        capture.push(seconds: 2, value: 0.5)
+        await gate.arrivals.wait(atLeast: 1, "the decode to park")
+        await loop.stop()
+        signal.end()
+        try await Task.sleep(for: .milliseconds(20))
+        gate.open()
+        guard case .stopped = await run.outcome() else {
+            Issue.record("a late end turned a stop into a failure")
+            return
+        }
+    }
+
+    @Test("an end that lands while the capture is still starting fails the run once it is up", .timeLimit(.minutes(1)))
+    func endDuringStart() async throws {
+        let signal = EndSignal()
+        let capture = FakeCapture()
+        let loop = StreamingRealtimeLoop(
+            configuration: .init(),
+            decodingOptions: DecodingOptions(),
+            dependencies: .init(
+                requestPermission: { true },
+                startCapture: {
+                    capture.install($0)
+                    signal.end()
+                    try await Task.sleep(for: .milliseconds(20))
+                },
+                stopCapture: { capture.markStopped() },
+                whenCaptureEnds: { signal.register($0) },
+                transcribe: { _, _, _ in TranscriptionResult(text: "", segments: [], language: "en", timings: TranscriptionTimings()) },
+                tick: { try await Task.sleep(nanoseconds: 1_000_000) }
+            ),
+            onPartial: { _ in },
+            onEnergy: { _ in },
+            onConfirmed: { _ in }
+        )
+        guard case .failed = await LoopRun(loop).outcome() else {
+            Issue.record("the end during the start was lost")
+            return
+        }
+        #expect(capture.stopCount == 1)
+    }
+}
