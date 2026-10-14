@@ -8,6 +8,8 @@ package struct ReplacementRule: Sendable {
         case substring
         /// `find` taken literally, anchored at each edge that is a letter or digit, or `_` when `underscoreIsWordCharacter`.
         case literalWord(underscoreIsWordCharacter: Bool)
+        /// As `literalWord(underscoreIsWordCharacter: false)`, and a composed "é" also matches a decomposed one, as `substring` does.
+        case wholeWord
         /// `find` is a regular expression and `replace` a template.
         case regex
     }
@@ -38,15 +40,34 @@ package struct ReplacementRule: Sendable {
         case .regex:
             return RegexCache.shared.regex(find, caseSensitive: caseSensitive).map { CompiledReplacement(rule: self, regex: $0) }
         case .literalWord(let underscoreIsWordCharacter):
-            guard let first = find.first, let last = find.last else { return nil }
-            let isWord: (Character) -> Bool = { $0.isLetter || $0.isNumber || (underscoreIsWordCharacter && $0 == "_") }
-            let wordClass = underscoreIsWordCharacter ? "[\\p{L}\\p{N}_]" : "[\\p{L}\\p{N}]"
-            // An anchor on a punctuation edge ("...", "(c)") could never match next to a letter, so only word edges get one.
-            let lead = isWord(first) ? "(?<!\(wordClass))" : ""
-            let trail = isWord(last) ? "(?!\(wordClass))" : ""
-            let pattern = lead + NSRegularExpression.escapedPattern(for: find) + trail
-            return RegexCache.shared.regex(pattern, caseSensitive: caseSensitive).map { CompiledReplacement(rule: self, regex: $0) }
+            return compiledWord(underscoreIsWordCharacter: underscoreIsWordCharacter, canonicallyEquivalent: false)
+        case .wholeWord:
+            return compiledWord(underscoreIsWordCharacter: false, canonicallyEquivalent: true)
         }
+    }
+
+    private func compiledWord(underscoreIsWordCharacter: Bool, canonicallyEquivalent: Bool) -> CompiledReplacement? {
+        guard let first = find.first, let last = find.last else { return nil }
+        let isWord: (Character) -> Bool = { $0.isLetter || $0.isNumber || (underscoreIsWordCharacter && $0 == "_") }
+        let wordClass = underscoreIsWordCharacter ? "[\\p{L}\\p{N}_]" : "[\\p{L}\\p{N}]"
+        let edgeClass = canonicallyEquivalent ? "[\\p{L}\\p{N}\\p{M}]" : wordClass
+        // An anchor on a punctuation edge ("...", "(c)") could never match next to a letter, so only word edges get one.
+        let lead = isWord(first) ? "(?<!\(edgeClass))" : ""
+        let trail = isWord(last) ? "(?!\(edgeClass))" : ""
+        let body = canonicallyEquivalent ? Self.canonicallyEquivalentPattern(for: find) : NSRegularExpression.escapedPattern(for: find)
+        return RegexCache.shared.regex(lead + body + trail, caseSensitive: caseSensitive).map { CompiledReplacement(rule: self, regex: $0) }
+    }
+}
+
+extension ReplacementRule {
+    /// ICU doesn't equate "é" with "e\u{301}", so each character that has two forms matches either.
+    fileprivate static func canonicallyEquivalentPattern(for text: String) -> String {
+        text.map { character in
+            let composed = String(character).precomposedStringWithCanonicalMapping
+            let decomposed = String(character).decomposedStringWithCanonicalMapping
+            guard !composed.unicodeScalars.elementsEqual(decomposed.unicodeScalars) else { return NSRegularExpression.escapedPattern(for: composed) }
+            return "(?:\(NSRegularExpression.escapedPattern(for: composed))|\(NSRegularExpression.escapedPattern(for: decomposed)))"
+        }.joined()
     }
 }
 
@@ -79,8 +100,10 @@ package struct CompiledReplacement: Sendable {
     }
 
     private static func template(for replacement: String, match: ReplacementRule.Match) -> String {
-        guard case .literalWord = match else { return replacement }
-        return NSRegularExpression.escapedTemplate(for: replacement)
+        switch match {
+        case .substring, .regex: return replacement
+        case .literalWord, .wholeWord: return NSRegularExpression.escapedTemplate(for: replacement)
+        }
     }
 }
 
@@ -94,8 +117,8 @@ private final class RegexCache: Sendable {
         let caseSensitive: Bool
     }
 
-    /// Enough for every rule a user keeps; past it the cache starts over rather than growing with each edit.
-    private static let limit = 512
+    /// Enough for a rule list imported from a file; past it the cache starts over rather than growing with each edit.
+    private static let limit = 4096
 
     private let entries = OSAllocatedUnfairLock<[Key: NSRegularExpression?]>(initialState: [:])
 

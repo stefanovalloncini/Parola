@@ -18,19 +18,19 @@ public struct TranscriptMatch: Hashable, Sendable, Identifiable {
 
 public extension Transcript {
     /// Returns every occurrence of `query` in any segment. Empty query → empty result.
-    func findMatches(_ query: String, caseSensitive: Bool = false) -> [TranscriptMatch] {
+    func findMatches(_ query: String, caseSensitive: Bool = false, wholeWords: Bool = false) -> [TranscriptMatch] {
         guard !query.isEmpty else { return [] }
         return segments.flatMap { segment in
-            Self.matchRanges(of: query, in: segment.text, caseSensitive: caseSensitive).map {
+            Self.matchRanges(of: query, in: segment.text, caseSensitive: caseSensitive, wholeWords: wholeWords).map {
                 TranscriptMatch(segmentID: segment.id, range: $0.location..<NSMaxRange($0))
             }
         }
     }
 
     /// Whether any of `segments` holds a match `findMatches` would return, stopping at the first segment that does.
-    static func containsMatch(_ query: String, caseSensitive: Bool = false, in segments: [TranscriptSegment]) -> Bool {
+    static func containsMatch(_ query: String, caseSensitive: Bool = false, wholeWords: Bool = false, in segments: [TranscriptSegment]) -> Bool {
         guard !query.isEmpty else { return false }
-        return segments.contains { !matchRanges(of: query, in: $0.text, caseSensitive: caseSensitive).isEmpty }
+        return segments.contains { !matchRanges(of: query, in: $0.text, caseSensitive: caseSensitive, wholeWords: wholeWords).isEmpty }
     }
 
     /// Returns a new transcript with `match` replaced by `replacement`.
@@ -45,11 +45,11 @@ public extension Transcript {
     }
 
     /// Returns a new transcript with every match `findMatches` returns replaced.
-    func replacingAll(_ query: String, with replacement: String, caseSensitive: Bool = false) -> Transcript {
+    func replacingAll(_ query: String, with replacement: String, caseSensitive: Bool = false, wholeWords: Bool = false) -> Transcript {
         guard !query.isEmpty else { return self }
         var copy = self
         for i in copy.segments.indices {
-            let ranges = Self.matchRanges(of: query, in: copy.segments[i].text, caseSensitive: caseSensitive)
+            let ranges = Self.matchRanges(of: query, in: copy.segments[i].text, caseSensitive: caseSensitive, wholeWords: wholeWords)
             guard !ranges.isEmpty else { continue }
             let rewritten = NSMutableString(string: copy.segments[i].text)
             for range in ranges.reversed() { rewritten.replaceCharacters(in: range, with: replacement) }
@@ -62,7 +62,7 @@ public extension Transcript {
     }
 
     /// NSString's hits as UTF-16 ranges, minus any that cut a character (👍🏽's modifier): Replace can't apply half of one.
-    private static func matchRanges(of query: String, in string: String, caseSensitive: Bool) -> [NSRange] {
+    private static func matchRanges(of query: String, in string: String, caseSensitive: Bool, wholeWords: Bool) -> [NSRange] {
         let options: NSString.CompareOptions = caseSensitive ? [] : [.caseInsensitive]
         let text = string as NSString
         let length = text.length
@@ -71,7 +71,9 @@ public extension Transcript {
         while location < length {
             let found = text.range(of: query, options: options, range: NSRange(location: location, length: length - location))
             guard found.location != NSNotFound else { break }
-            guard isCharacterBoundary(found.location, in: string), isCharacterBoundary(NSMaxRange(found), in: string) else {
+            guard isCharacterBoundary(found.location, in: string), isCharacterBoundary(NSMaxRange(found), in: string),
+                  !wholeWords || isWholeWord(found, in: string)
+            else {
                 location = found.location + 1
                 continue
             }
@@ -79,6 +81,17 @@ public extension Transcript {
             location = max(NSMaxRange(found), location + 1)
         }
         return out
+    }
+
+    /// An edge of the match that is a letter or digit must not touch another one; punctuation edges aren't anchored.
+    private static func isWholeWord(_ range: NSRange, in text: String) -> Bool {
+        guard let span = Range(range, in: text) else { return false }
+        let lo = span.lowerBound, hi = span.upperBound
+        let isWord: (Character) -> Bool = { $0.isLetter || $0.isNumber }
+        let matched = text[lo..<hi]
+        if let first = matched.first, isWord(first), lo > text.startIndex, isWord(text[text.index(before: lo)]) { return false }
+        if let last = matched.last, isWord(last), hi < text.endIndex, isWord(text[hi]) { return false }
+        return true
     }
 
     private static func isCharacterBoundary(_ utf16Offset: Int, in text: String) -> Bool {

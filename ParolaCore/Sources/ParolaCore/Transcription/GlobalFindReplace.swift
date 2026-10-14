@@ -6,6 +6,7 @@ public struct FindReplaceRule: Codable, Sendable, Identifiable, Hashable {
     public var replace: String
     public var caseSensitive: Bool
     public var regex: Bool
+    public var wholeWord: Bool
     public var enabled: Bool
 
     public init(
@@ -14,6 +15,7 @@ public struct FindReplaceRule: Codable, Sendable, Identifiable, Hashable {
         replace: String,
         caseSensitive: Bool = false,
         regex: Bool = false,
+        wholeWord: Bool = false,
         enabled: Bool = true
     ) {
         self.id = id
@@ -21,7 +23,34 @@ public struct FindReplaceRule: Codable, Sendable, Identifiable, Hashable {
         self.replace = replace
         self.caseSensitive = caseSensitive
         self.regex = regex
+        self.wholeWord = wholeWord
         self.enabled = enabled
+    }
+
+    /// Regex and whole words exclude each other: turning one on turns the other off.
+    public mutating func setRegex(_ on: Bool) {
+        regex = on
+        if on { wholeWord = false }
+    }
+
+    public mutating func setWholeWord(_ on: Bool) {
+        wholeWord = on
+        if on { regex = false }
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, find, replace, caseSensitive, regex, wholeWord, enabled
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        find = try c.decode(String.self, forKey: .find)
+        replace = try c.decode(String.self, forKey: .replace)
+        caseSensitive = try c.decode(Bool.self, forKey: .caseSensitive)
+        regex = try c.decode(Bool.self, forKey: .regex)
+        wholeWord = try c.decodeIfPresent(Bool.self, forKey: .wholeWord) ?? false
+        enabled = try c.decode(Bool.self, forKey: .enabled)
     }
 }
 
@@ -67,6 +96,7 @@ public enum GlobalFindReplace {
 extension FindReplaceRule {
     /// Foundation's substring search for a plain rule, so "café" still finds a decomposed "café".
     var replacementRule: ReplacementRule {
-        ReplacementRule(find: find, replace: replace, match: regex ? .regex : .substring, caseSensitive: caseSensitive)
+        let match: ReplacementRule.Match = regex ? .regex : wholeWord ? .wholeWord : .substring
+        return ReplacementRule(find: find, replace: replace, match: match, caseSensitive: caseSensitive)
     }
 }

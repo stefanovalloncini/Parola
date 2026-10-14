@@ -19,18 +19,20 @@ public struct TermPackRule: Codable, Sendable, Hashable {
     public let replace: String
     public let caseSensitive: Bool
     public let regex: Bool
+    public let wholeWord: Bool
     public let enabled: Bool
 
-    public init(find: String, replace: String, caseSensitive: Bool = false, regex: Bool = false, enabled: Bool = true) {
+    public init(find: String, replace: String, caseSensitive: Bool = false, regex: Bool = false, wholeWord: Bool = false, enabled: Bool = true) {
         self.find = find
         self.replace = replace
         self.caseSensitive = caseSensitive
         self.regex = regex
+        self.wholeWord = wholeWord
         self.enabled = enabled
     }
 
     private enum CodingKeys: String, CodingKey {
-        case find, replace, caseSensitive, regex, enabled
+        case find, replace, caseSensitive, regex, wholeWord, enabled
     }
 
     public init(from decoder: any Decoder) throws {
@@ -39,6 +41,7 @@ public struct TermPackRule: Codable, Sendable, Hashable {
         replace = try c.decode(String.self, forKey: .replace)
         caseSensitive = try c.decodeIfPresent(Bool.self, forKey: .caseSensitive) ?? false
         regex = try c.decodeIfPresent(Bool.self, forKey: .regex) ?? false
+        wholeWord = try c.decodeIfPresent(Bool.self, forKey: .wholeWord) ?? false
         enabled = try c.decodeIfPresent(Bool.self, forKey: .enabled) ?? true
     }
 }
@@ -61,6 +64,7 @@ public enum TermPackIO {
                 replace: rule.replace,
                 caseSensitive: rule.caseSensitive,
                 regex: rule.regex,
+                wholeWord: rule.wholeWord,
                 enabled: rule.enabled
             )
         }
@@ -69,7 +73,7 @@ public enum TermPackIO {
 
     public static func merge(pack: TermPack, into existing: [FindReplaceRule]) -> [FindReplaceRule] {
         var out = existing
-        let key: (FindReplaceRule) -> String = { "\($0.find)|\($0.caseSensitive)|\($0.regex)" }
+        let key: (FindReplaceRule) -> String = { "\($0.find)|\($0.caseSensitive)|\($0.regex)|\($0.wholeWord)" }
         var seen = Set(out.map(key))
         for rule in pack.rules where !rule.find.isEmpty {
             var candidate = FindReplaceRule(
@@ -77,6 +81,7 @@ public enum TermPackIO {
                 replace: rule.replace,
                 caseSensitive: rule.caseSensitive,
                 regex: rule.regex,
+                wholeWord: rule.wholeWord && !rule.regex,
                 enabled: rule.enabled
             )
             // An invalid regex silently no-ops in GlobalFindReplace.apply, so import it disabled rather than looking active.
