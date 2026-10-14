@@ -53,6 +53,46 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("Parakeet v2 captions in a language it doesn't speak fail at start, and Try Again fails the same way", .timeLimit(.minutes(1)))
+        func parakeetRefusesAnotherLanguage() async throws {
+            try await withMocksCleared(.streaming) {
+                let controller = LiveCaptionsController(showsPanel: false)
+                let options = TranscriptionOptions(model: "nvidia_parakeet-tdt-0.6b-v2", language: "it")
+                await controller.start(options: options)
+                await waitUntil { controller.state.error != nil }
+
+                let reason = try #require(controller.state.error)
+                #expect(reason.hasSuffix("does not support \"it\""), "\(reason)")
+                #expect(controller.isPanelShown)
+                #expect(!controller.state.isActive)
+
+                await controller.tryAgain()
+                await waitUntil { !controller.state.isActive && controller.state.error != nil }
+                #expect(controller.state.error == reason)
+            }
+        }
+
+        @Test("Translate to English on a running Parakeet session fails in the panel with the translation sentence", .timeLimit(.minutes(1)))
+        func parakeetRefusesTranslateOnTheFlip() async throws {
+            try await withMocksCleared(.streaming) {
+                MockStreamingTranscriberRegistry.shared.install(MockTranscriberResponse(partials: ["hello"], delayMs: 300))
+                let controller = LiveCaptionsController(showsPanel: false)
+                await controller.start(options: TranscriptionOptions(model: "nvidia_parakeet-tdt-0.6b-v3"))
+                await waitUntil { !controller.state.partial.isEmpty }
+                MockStreamingTranscriberRegistry.shared.clear()
+
+                await controller.setTranslate(true)
+                await waitUntil { controller.state.error != nil }
+
+                let expected = FailureText.message(
+                    for: ParolaError.unsupportedForEngine(FixedFailureText.cannotTranslate("Parakeet"))
+                )
+                #expect(controller.state.error == expected)
+                #expect(!controller.state.isActive)
+                #expect(controller.isPanelShown, "the panel stays so Retry is there")
+            }
+        }
+
         @Test("closing a failed panel hides it", .timeLimit(.minutes(1)))
         func closingAFailedPanel() async throws {
             try await withMocksCleared(.streaming) {

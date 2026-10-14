@@ -100,13 +100,13 @@
         }
       }
     },
-    "%@ can't stream Live Captions. Pick a Whisper model first.": {
+    "%@ can't show Live Captions. Pick a Whisper or Parakeet model.": {
       "extractionState": "manual",
       "localizations": {
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@ non può fare i sottotitoli in tempo reale. Scegli prima un modello Whisper."
+            "value": "%@ non può mostrare i sottotitoli in tempo reale. Scegli un modello Whisper o Parakeet."
           }
         }
       }

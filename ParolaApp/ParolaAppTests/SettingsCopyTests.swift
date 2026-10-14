@@ -78,18 +78,29 @@ struct SettingsCopyTests {
         #expect(italian.localizedString(forKey: key, value: "MISSING", table: nil) != "MISSING")
     }
 
+    @Test("Live Captions are available on Whisper and Parakeet, and the reason names the model that isn't")
+    func captionsAvailability() {
+        let model = makeModel("settings-copy-captions-availability")
+        for id in ["openai_whisper-tiny", "nvidia_parakeet-tdt-0.6b-v2", "nvidia_parakeet-tdt-0.6b-v3"] {
+            model.selectedModel = id
+            #expect(model.liveCaptionsUnavailableReason == nil, "\(id)")
+        }
+        model.selectedModel = "apple-speech-analyzer"
+        #expect(model.liveCaptionsUnavailableReason != nil)
+    }
+
     @Test("the Live Captions and Translation panes' model warnings have their Italian")
     func modelWarningsAreTranslated() throws {
         let model = makeModel("settings-copy-model-warnings")
-        model.selectedModel = "nvidia_parakeet-tdt-0.6b-v3"
+        model.selectedModel = "apple-speech-analyzer"
         model.translate = true
         let captions = try #require(model.liveCaptionsUnavailableReason)
-        #expect(captions.hasSuffix(" can't stream Live Captions. Pick a Whisper model first."), "\(captions)")
+        #expect(captions.hasSuffix(" can't show Live Captions. Pick a Whisper or Parakeet model."), "\(captions)")
         let translate = try #require(model.translateMismatchWarning)
         #expect(translate.hasSuffix(" can't translate, so transcriptions stay in the source language."), "\(translate)")
         let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
         let italian = try #require(Bundle(path: path))
-        for key in ["%@ can't stream Live Captions. Pick a Whisper model first.", "%@ can't translate, so transcriptions stay in the source language."] {
+        for key in ["%@ can't show Live Captions. Pick a Whisper or Parakeet model.", "%@ can't translate, so transcriptions stay in the source language."] {
             #expect(italian.localizedString(forKey: key, value: "MISSING", table: nil) != "MISSING", "\(key)")
         }
     }

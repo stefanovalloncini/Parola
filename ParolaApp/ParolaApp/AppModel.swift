@@ -1143,10 +1143,10 @@ final class AppModel {
         }
     }
 
-    /// Nil when the selected model can stream live captions; otherwise the user-facing reason.
+    /// Nil when the selected model can show live captions; otherwise the user-facing reason.
     var liveCaptionsUnavailableReason: String? {
-        guard !ModelCatalog.canStream(id: selectedModel) else { return nil }
-        return String(localized: "\(AppModel.modelLabel(selectedModel)) can't stream Live Captions. Pick a Whisper model first.")
+        guard !ModelCatalog.canCaption(id: selectedModel) else { return nil }
+        return String(localized: "\(AppModel.modelLabel(selectedModel)) can't show Live Captions. Pick a Whisper or Parakeet model.")
     }
 
     func toggleLiveCaptions() {
@@ -2350,8 +2350,10 @@ final class AppModel {
 
     private func applyLiveCaptionsTranslateChange() {
         // Same capability gate as makeOptions: engines that can't translate would
-        // otherwise get .translate re-instated by the captions controller.
-        let enabled = liveCaptionsTranslate && selectedModelCapabilities.supportsTranslate
+        // otherwise get .translate re-instated by the captions controller. Parakeet passes
+        // so the captions panel says it can't, instead of the switch silently doing nothing.
+        let parakeet = ModelCatalog.variant(id: selectedModel)?.engineID == .parakeet
+        let enabled = liveCaptionsTranslate && (selectedModelCapabilities.supportsTranslate || parakeet)
         Task { await liveCaptions?.setTranslate(enabled) }
     }
 
