@@ -542,7 +542,8 @@ struct CaptionCutRepeatTests {
         var configuration = configuration
         configuration.requiredSegmentsForConfirmation = 1
         let (loop, mic, calls, confirmed, partials) = scripted(
-            [[spoken(0, 5, first), spoken(5, 9, held)], second.map(inSecondWindow)], configuration: configuration
+            [[spoken(0, 5, first), spoken(5, 9, held)], second.map(inSecondWindow), second.map(inSecondWindow)],
+            configuration: configuration
         )
         let run = Task { await loop.run() }
         #expect(await eventually { mic.installed })
@@ -550,8 +551,9 @@ struct CaptionCutRepeatTests {
         #expect(await eventually { confirmed.withLock { $0.count } == 1 })
         mic.push(seconds: 2)
         #expect(await eventuallyAsync { await calls.clips.count == 2 })
-        _ = await eventually { partials.withLock { $0.last } != nil }
-        let shown = Shown(partial: partials.withLock { $0.last }, clip: await calls.clips.last?.first)
+        mic.push(seconds: 1)
+        #expect(await eventuallyAsync { await calls.clips.count == 3 })
+        let shown = Shown(partial: partials.withLock { $0.last }, clip: await calls.clips[1].first)
         await loop.cancel()
         _ = await run.value
         return shown
@@ -591,12 +593,21 @@ struct CaptionCutRepeatTests {
         #expect(shown.partial == "that is exactly")
     }
 
-    @Test("a repeat after a sentence end stays, whatever the timing")
+    @Test("after a sentence end the decode starts at the held audio, and a repeat of the last word stays")
     func repeatAfterASentenceStays() async throws {
+        let shown = try await afterTheSecondDecode(
+            first: "Is that okay?", held: "Okay,", second: [spoken(5.05, 9, "Okay, let's move on")]
+        )
+        #expect(shown.partial == "Okay, let's move on")
+        #expect(shown.clip == 3.5)
+    }
+
+    @Test("nothing is dropped when the decode started at the held audio, whatever it returns")
+    func repeatAfterASentenceStaysWithContext() async throws {
         let shown = try await afterTheSecondDecode(
             first: "Is that okay?", held: "Okay,", second: [spoken(3, 9, "that okay? Okay, let's move on")]
         )
-        #expect(shown.partial == "Okay, let's move on")
+        #expect(shown.partial == "that okay? Okay, let's move on")
     }
 
     @Test("a repeat right after the confirmed word stays even when the context starts on that word")
@@ -757,11 +768,15 @@ struct ParakeetCaptionsSessionTests {
         #expect(whisper.maxDecodeSeconds == nil)
         #expect(whisper.minNewAudioSeconds == 1)
         #expect(whisper.heldSegmentBackoffSeconds == nil)
+        #expect(whisper.leftContextSeconds == nil)
+        #expect(whisper.purgePadSeconds == 2)
         let parakeet = parakeetConfiguration()
         #expect(parakeet.requiredSegmentsForConfirmation == 1)
         #expect(parakeet.forceConfirmAfterSeconds == 8)
         #expect(parakeet.maxDecodeSeconds == 15)
         #expect(parakeet.minNewAudioSeconds == 0.7)
         #expect(parakeet.heldSegmentBackoffSeconds == 0.08)
+        #expect(parakeet.leftContextSeconds == 2)
+        #expect(parakeet.purgePadSeconds == 3.5)
     }
 }

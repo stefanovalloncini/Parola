@@ -149,6 +149,7 @@ actor StreamingRealtimeLoop {
     private var currentText = ""
     private var recentConfirmedWords: [String] = []
     private var lastConfirmedSegmentStart: Double?
+    private var confirmedEndedSentence = false
     private var confirmations = 0
     private var heldAnchorSeconds: Double?
     private var isRunning = false
@@ -592,7 +593,7 @@ actor StreamingRealtimeLoop {
             return shifted
         }
         if config.leftContextSeconds != nil {
-            dropContextWords(from: &segments, keepFrom: keepFrom)
+            if clipSeconds < keepFrom { dropContextWords(from: &segments, keepFrom: keepFrom) }
             if !decoder.options.wordTimestamps { segments = segments.map { var bare = $0; bare.words = nil; return bare } }
         }
         if confirmAll {
@@ -624,7 +625,10 @@ actor StreamingRealtimeLoop {
     }
 
     private func confirm(_ batch: ConfirmedAudioBatch) {
-        if let last = batch.segments.last { lastConfirmedSegmentStart = Double(last.start) }
+        if let last = batch.segments.last {
+            lastConfirmedSegmentStart = Double(last.start)
+            confirmedEndedSentence = last.text.trimmingCharacters(in: .whitespaces).last.map { ".?!…".contains($0) } ?? false
+        }
         let words = batch.segments.flatMap { $0.text.split(whereSeparator: \.isWhitespace).map(Self.comparable) }
         recentConfirmedWords = Array((recentConfirmedWords + words).suffix(Self.confirmedWordsKept))
         confirmations += 1
@@ -640,7 +644,7 @@ actor StreamingRealtimeLoop {
     }
 
     private func decodeStartSeconds(keepFrom: Double, windowStart: Double, decodedEnd: Double) -> Double {
-        guard let context = config.leftContextSeconds else { return keepFrom }
+        guard let context = config.leftContextSeconds, !confirmedEndedSentence else { return keepFrom }
         var start = keepFrom - context
         if let segmentStart = lastConfirmedSegmentStart, segmentStart <= keepFrom, keepFrom - segmentStart <= Self.contextSegmentReachSeconds {
             start = segmentStart
