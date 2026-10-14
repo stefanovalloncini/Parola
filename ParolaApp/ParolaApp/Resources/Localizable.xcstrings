@@ -14709,6 +14709,17 @@
         }
       }
     },
+    "Serif font for transcripts": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Font con grazie per le trascrizioni"
+          }
+        }
+      }
+    },
     "Service": {
       "extractionState": "manual",
       "localizations": {
@@ -15391,6 +15402,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mostra un conto 3-2-1 prima di iniziare a registrare. Premi Esc per annullare."
+          }
+        }
+      }
+    },
+    "Shows transcripts in New York, a serif typeface.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostra le trascrizioni in New York, un carattere con grazie."
           }
         }
       }

@@ -164,7 +164,7 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
             ]
         case .customization:
             return [
-                "appTheme", "monospacedTimestamps", "appAccentColor",
+                "appTheme", "monospacedTimestamps", "serifTranscript", "appAccentColor",
                 "themeIsCustom", "themeCustomPaletteJSON"
             ]
         case .watchedFolders:

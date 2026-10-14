@@ -3,6 +3,7 @@ import ParolaCore
 
 /// The window's flowing-text mode: the same chunks the main pane builds, seeking this window's player.
 struct EntryViewerContinuous: View {
+    @Environment(\.serifTranscript) private var serif
     let session: EntryWindowSession
     let onEditAttempt: () -> Void
 
@@ -78,7 +79,7 @@ struct EntryViewerContinuous: View {
 
     private func chunkText(_ text: AttributedString) -> some View {
         Text(text)
-            .font(model.transcriptCompact ? DS.Font.transcriptCompact : DS.Font.transcript)
+            .font(model.transcriptCompact ? DS.Font.transcriptCompact(serif: serif) : DS.Font.transcript(serif: serif))
             .lineSpacing(model.transcriptCompact ? DS.Spacing.transcriptLeadingCompact : DS.Spacing.transcriptLeading)
             .textSelection(.enabled)
             // Definite height; without it the layout pass re-typesets the chunk Text in a loop on long audio.

@@ -52,6 +52,11 @@ struct CustomizationPane: View {
                     Toggle("", isOn: $model.monospacedTimestamps).labelsHidden()
                         .axLeaf("Customization.Toggle.MonospacedTimestamps")
                 }
+                SettingRow("Serif font for transcripts",
+                           description: "Shows transcripts in New York, a serif typeface.") {
+                    Toggle("", isOn: $model.serifTranscript).labelsHidden()
+                        .axLeaf("Customization.Toggle.SerifTranscript")
+                }
             }
             ResetPaneButton(scope: .customization)
         }

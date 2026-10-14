@@ -26,6 +26,7 @@ struct SettingsPaneScopeTests {
     func customizationDefaultsKeys() {
         let keys = SettingsPaneScope.customization.defaultsKeys
         #expect(keys.contains("appTheme"))
+        #expect(keys.contains("serifTranscript"))
         #expect(keys.contains("appAccentColor"))
         #expect(keys.contains("themeIsCustom"))
         #expect(keys.contains("themeCustomPaletteJSON"))
@@ -351,5 +352,22 @@ struct SettingsExportServiceTests {
 
         #expect(payload["appTheme"] as? String == "graphite")
         #expect(payload["useStreaming"] == nil)
+    }
+
+    @Test("the serif transcript switch is exported and imported")
+    func serifTranscriptRoundTrips() {
+        let (src, srcName) = makeSuite()
+        let (dst, dstName) = makeSuite()
+        defer {
+            UserDefaults.standard.removePersistentDomain(forName: srcName)
+            UserDefaults.standard.removePersistentDomain(forName: dstName)
+        }
+
+        src.set(true, forKey: "serifTranscript")
+        let payload = SettingsExportService.exportPayload(defaults: src)
+        #expect(payload["serifTranscript"] as? Bool == true)
+
+        SettingsExportService.apply(payload, defaults: dst)
+        #expect(dst.bool(forKey: "serifTranscript") == true)
     }
 }

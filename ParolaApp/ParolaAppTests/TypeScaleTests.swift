@@ -43,8 +43,8 @@ struct TypeScaleTests {
         #expect(measured(DS.Font.body) != measured(DS.Font.bodyStrong))
         #expect(measured(DS.Font.secondary) != measured(DS.Font.mono))
         // transcriptEmphasis is the transcript face at semibold: same line, wider glyphs.
-        #expect(height(DS.Font.transcriptEmphasis) == height(DS.Font.transcript))
-        #expect(measured(DS.Font.transcriptEmphasis) != measured(DS.Font.transcript))
+        #expect(height(DS.Font.transcriptEmphasis(serif: false)) == height(DS.Font.transcript))
+        #expect(measured(DS.Font.transcriptEmphasis(serif: false)) != measured(DS.Font.transcript))
     }
 
     /// A `Font` carries no readable weight or design, so a tier is pinned by rendering equal to its reference.
@@ -68,11 +68,29 @@ struct TypeScaleTests {
     func readingTierIsSF() {
         #expect(measured(DS.Font.transcript) == measured(.system(size: 17)))
         #expect(measured(DS.Font.transcript) != measured(.system(size: 17, design: .serif)))
-        #expect(measured(DS.Font.transcriptEmphasis) == measured(.system(size: 17, weight: .semibold)))
+        #expect(measured(DS.Font.transcriptEmphasis(serif: false)) == measured(.system(size: 17, weight: .semibold)))
         #expect(measured(DS.Font.transcriptCompact) == measured(.system(size: 15)))
         #expect(measured(DS.Font.excerpt) == measured(.system(size: 14)))
         #expect(measured(DS.Font.excerpt) != measured(.system(size: 14, design: .serif)))
         #expect(measured(DS.Font.body) == measured(.system(size: 13)))
+    }
+
+    @Test("the serif option moves only the transcript tiers to New York")
+    func serifOptionIsNewYork() {
+        #expect(measured(DS.Font.transcript(serif: true)) == measured(.system(size: 17, design: .serif)))
+        #expect(measured(DS.Font.transcript(serif: false)) == measured(DS.Font.transcript))
+        #expect(measured(DS.Font.transcriptCompact(serif: true)) == measured(.system(size: 15, design: .serif)))
+        #expect(measured(DS.Font.transcriptCompact(serif: false)) == measured(DS.Font.transcriptCompact))
+        #expect(measured(DS.Font.transcriptEmphasis(serif: true)) == measured(.system(size: 17, weight: .semibold, design: .serif)))
+    }
+
+    @Test("a transcript view follows the environment value and the other surfaces ignore it")
+    func environmentReachesTranscriptViews() {
+        func size(_ serif: Bool) -> CGSize {
+            NSHostingView(rootView: SkeletonLines().serifTranscript(serif)).fittingSize
+        }
+        #expect(size(true) != size(false))
+        #expect(NSHostingView(rootView: SkeletonLines()).fittingSize == size(false))
     }
 
     @Test("the recording timer is rounded and its digits are all one width")

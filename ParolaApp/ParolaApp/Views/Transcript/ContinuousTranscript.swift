@@ -19,6 +19,7 @@ struct ContinuousTranscriptView: View {
 }
 
 struct ContinuousChunks: View {
+    @Environment(\.serifTranscript) private var serif
     struct SegmentRun {
         let offsets: Range<Int>
         let baseColor: Color?
@@ -154,7 +155,7 @@ struct ContinuousChunks: View {
 
     private func chunkText(_ text: AttributedString) -> some View {
         Text(text)
-            .font(model.transcriptCompact ? DS.Font.transcriptCompact : DS.Font.transcript)
+            .font(model.transcriptCompact ? DS.Font.transcriptCompact(serif: serif) : DS.Font.transcript(serif: serif))
             .lineSpacing(model.transcriptCompact ? DS.Spacing.transcriptLeadingCompact : DS.Spacing.transcriptLeading)
             .textSelection(.enabled)
             // Definite height; without it the inspector's constraint pass re-typesets the chunk Text in a loop (main-thread freeze on long audio).

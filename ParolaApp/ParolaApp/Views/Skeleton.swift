@@ -2,6 +2,7 @@ import AppKit
 import SwiftUI
 
 struct SkeletonLines: View {
+    @Environment(\.serifTranscript) private var serif
     var count: Int = 4
 
     private static let lines = [
@@ -17,7 +18,7 @@ struct SkeletonLines: View {
         VStack(alignment: .leading, spacing: DS.Spacing.small) {
             ForEach(0..<count, id: \.self) { index in
                 Text(Self.lines[index % Self.lines.count])
-                    .font(DS.Font.transcript)
+                    .font(DS.Font.transcript(serif: serif))
                     .lineSpacing(DS.Spacing.transcriptLeading)
             }
         }

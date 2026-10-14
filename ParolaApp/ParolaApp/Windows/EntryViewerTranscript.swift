@@ -65,6 +65,7 @@ struct EntryViewerSegments: View {
 }
 
 private struct EntryViewerSegmentRow: View {
+    @Environment(\.serifTranscript) private var serif
     let segment: TranscriptSegment
     let isCurrent: Bool
     let isFavorite: Bool
@@ -163,14 +164,14 @@ private struct EntryViewerSegmentRow: View {
             matches: matches,
             currentMatchID: currentMatchID
         ))
-        .font(DS.Font.transcript)
+        .font(DS.Font.transcript(serif: serif))
         .lineSpacing(DS.Spacing.transcriptLeading)
         .textSelection(.enabled)
     }
 
     private func translationText(_ value: String) -> some View {
         Text(verbatim: value.trimmingCharacters(in: .whitespacesAndNewlines))
-            .font(DS.Font.transcript)
+            .font(DS.Font.transcript(serif: serif))
             .lineSpacing(DS.Spacing.transcriptLeading)
             .foregroundStyle(DS.Color.secondaryText)
             .textSelection(.enabled)

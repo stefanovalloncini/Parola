@@ -28,6 +28,21 @@ struct ReloadSettingsTests {
         #expect(model.diarize == true)
     }
 
+    @Test("the serif transcript switch defaults off, follows an import and falls back on a reset")
+    func serifTranscriptReload() {
+        let defaults = temporaryDefaults()
+        let model = makeModel(defaults)
+        #expect(model.serifTranscript == false)
+
+        defaults.set(true, forKey: "serifTranscript")
+        model.reloadSettings()
+        #expect(model.serifTranscript == true)
+
+        defaults.removeObject(forKey: "serifTranscript")
+        model.reloadSettings()
+        #expect(model.serifTranscript == false)
+    }
+
     @Test("picks up appAccentColor via its storage key (which maps to appAccentRaw)")
     func accentKeyDrift() {
         let defaults = temporaryDefaults()

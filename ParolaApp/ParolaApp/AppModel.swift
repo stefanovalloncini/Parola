@@ -1199,6 +1199,7 @@ final class AppModel {
 
     var appTheme: String = "system" { didSet { defaults.set(appTheme, forKey: "appTheme") } }  // "system" | "light" | "dark"
     var monospacedTimestamps: Bool = true { didSet { defaults.set(monospacedTimestamps, forKey: "monospacedTimestamps") } }
+    var serifTranscript: Bool = false { didSet { defaults.set(serifTranscript, forKey: "serifTranscript") } }
 
     var transcriptDisplayModeRaw: String = TranscriptDisplayMode.transcript.rawValue {
         didSet { defaults.set(transcriptDisplayModeRaw, forKey: "transcriptDisplayMode") }
@@ -1301,6 +1302,7 @@ final class AppModel {
         self.translate = defaults.bool(forKey: "translate")
         self.appTheme = defaults.string(forKey: "appTheme") ?? "system"
         self.monospacedTimestamps = readBool("monospacedTimestamps", default: true)
+        self.serifTranscript = readBool("serifTranscript", default: false)
         self.appAccentRaw = Self.migratedAccentRaw(from: defaults)
         self.themeIsCustom = defaults.bool(forKey: "themeIsCustom")
         self.themeCustomPaletteJSON = defaults.string(forKey: "themeCustomPaletteJSON") ?? ""

@@ -96,8 +96,16 @@ struct KaraokeTextTests {
         let attr = SegmentCard.karaokeText(words: words, activeWordID: "0-1")
         let active = attr.runs.first { $0.link == URL(string: "parola-seek-time://0.5") }
         let inactive = attr.runs.first { $0.link == URL(string: "parola-seek-time://0.0") }
-        #expect(active?.font == DS.Font.transcriptEmphasis)
+        #expect(active?.font == DS.Font.transcriptEmphasis(serif: false))
         #expect(inactive?.font == nil)
+    }
+
+    @Test("the active word follows the serif setting")
+    func activeWordFollowsSerif() {
+        let words = [timedWord("0-0", "ciao", start: 0, end: 0.5)]
+        let attr = SegmentCard.karaokeText(words: words, activeWordID: "0-0", serif: true)
+        #expect(attr.runs.first?.font == DS.Font.transcriptEmphasis(serif: true))
+        #expect(attr.runs.first?.font != DS.Font.transcriptEmphasis(serif: false))
     }
 
     // MARK: - Synthetic karaoke
@@ -141,7 +149,7 @@ struct KaraokeTextTests {
     func syntheticSpokenTokenTakesTheEmphasisTier() {
         let attr = SegmentCard.syntheticKaraokeText(tokens: ["uno", "due", "tre"], spokenIndex: 1)
         let fonts = attr.runs.compactMap(\.font)
-        #expect(fonts == [DS.Font.transcriptEmphasis])
+        #expect(fonts == [DS.Font.transcriptEmphasis(serif: false)])
     }
 
     @Test("exactly one token carries the highlight")

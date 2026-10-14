@@ -87,6 +87,7 @@ struct ParolaApp: App {
                 .demoPlayback()
                 .tint(DS.Color.accent)
                 .environment(model)
+                .serifTranscript(model.serifTranscript)
                 .environment(liveCaptions)
                 .frame(minWidth: MainWindowLayout.minimumWidth, minHeight: MainWindowLayout.minimumHeight)
                 .bindsEntryWindowOpening(to: model)
@@ -174,6 +175,7 @@ struct ParolaApp: App {
             EntryWindowView(entryID: entryID)
                 .tint(DS.Color.accent)
                 .environment(model)
+                .serifTranscript(model.serifTranscript)
                 .preferredColorScheme(model.preferredColorScheme)
                 .bindsMainWindowOpening(to: model)
         }
