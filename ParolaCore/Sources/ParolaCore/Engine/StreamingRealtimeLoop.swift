@@ -29,6 +29,8 @@ actor StreamingRealtimeLoop {
         var forceConfirmAfterSeconds: Double?
         /// A decode never starts earlier than this long before the end of the window. Nil decodes from the oldest unconfirmed audio.
         var maxDecodeSeconds: Double?
+        /// A decode that starts inside the word a forced cut ended on hears its tail again; this drops that repeat from the new text.
+        var dropsWordRepeatedAtCut = false
     }
 
     typealias Transcribe = @Sendable ([Float], DecodingOptions, @escaping TranscriptionCallback) async throws -> TranscriptionResult
@@ -141,6 +143,7 @@ actor StreamingRealtimeLoop {
     private var lastConfirmedEndSeconds: Float = 0
     private var unconfirmedSegments: [TranscriptionSegment] = []
     private var currentText = ""
+    private var lastConfirmedWord: String?
     private var isRunning = false
     private var didStopCapture = false
     private var startingCapture = false
@@ -333,7 +336,7 @@ actor StreamingRealtimeLoop {
         if let last = unconfirmedSegments.last, last.end > lastConfirmedEndSeconds {
             lastConfirmedEndSeconds = last.end
         }
-        onConfirmed(makeBatch(unconfirmedSegments))
+        confirm(makeBatch(unconfirmedSegments))
         unconfirmedSegments = []
     }
 
@@ -539,9 +542,10 @@ actor StreamingRealtimeLoop {
         let offsetSeconds = Double(windowStartSample) / Double(config.sampleRate)
         let decodedEndSeconds = Float(offsetSeconds + Double(decoded.count) / Double(config.sampleRate))
         confirmStaleSegments(decodedEnd: Double(decodedEndSeconds))
+        let clipSeconds = decodeFloorSeconds(decodedEnd: Double(decodedEndSeconds))
         var options = decoder.options
         // clipTimestamps is window-relative; everything emitted from here back out must be absolute.
-        options.clipTimestamps = [Float(max(0, decodeFloorSeconds(decodedEnd: Double(decodedEndSeconds)) - offsetSeconds))]
+        options.clipTimestamps = [Float(max(0, clipSeconds - offsetSeconds))]
         let emitProgressPartials = unconfirmedSegments.isEmpty
         let onPartial = self.onPartial
         let compressionCheckWindow = config.compressionCheckWindow
@@ -565,7 +569,7 @@ actor StreamingRealtimeLoop {
         }
         currentText = ""
         let offset = Float(offsetSeconds)
-        let segments = result.segments.map { segment -> TranscriptionSegment in
+        var segments = result.segments.map { segment -> TranscriptionSegment in
             var shifted = segment
             shifted.start += offset
             shifted.end += offset
@@ -577,12 +581,13 @@ actor StreamingRealtimeLoop {
             }
             return shifted
         }
+        if config.dropsWordRepeatedAtCut { dropWordRepeatedAtCut(from: &segments, decodeStart: clipSeconds) }
         if confirmAll {
             if let last = segments.last, last.end > lastConfirmedEndSeconds {
                 lastConfirmedEndSeconds = last.end
             }
             if !segments.isEmpty {
-                onConfirmed(makeBatch(segments))
+                confirm(makeBatch(segments))
             }
             unconfirmedSegments = []
         } else if confirmCount(of: segments, decodedEnd: decodedEndSeconds) > 0 {
@@ -593,7 +598,7 @@ actor StreamingRealtimeLoop {
             if let furthestEnd = confirmable.map(\.end).max() {
                 // Whisper pads the window to 30 s, so an end past the audio actually decoded is a hallucinated timestamp: taking it would start the next decode beyond speech nobody has read yet.
                 lastConfirmedEndSeconds = max(lastConfirmedEndSeconds, min(furthestEnd, decodedEndSeconds))
-                onConfirmed(makeBatch(confirmable))
+                confirm(makeBatch(confirmable))
             }
             unconfirmedSegments = Array(segments.dropFirst(held))
         } else {
@@ -602,6 +607,31 @@ actor StreamingRealtimeLoop {
         emitPartial()
         purgeConfirmedAudio()
         return false
+    }
+
+    private func confirm(_ batch: ConfirmedAudioBatch) {
+        if let word = batch.segments.last?.text.split(separator: " ").last { lastConfirmedWord = Self.comparable(word) }
+        onConfirmed(batch)
+    }
+
+    private static func comparable(_ word: Substring) -> String {
+        word.lowercased().trimmingCharacters(in: .punctuationCharacters)
+    }
+
+    private func dropWordRepeatedAtCut(from segments: inout [TranscriptionSegment], decodeStart: Double) {
+        guard let repeated = lastConfirmedWord, var first = segments.first, Double(first.start) - decodeStart < 0.3,
+              let head = first.text.split(separator: " ", maxSplits: 1).first, Self.comparable(head) == repeated else { return }
+        let rest = first.text.drop { !$0.isWhitespace }.drop { $0.isWhitespace }
+        guard !rest.isEmpty else {
+            segments.removeFirst()
+            return
+        }
+        first.text = String(rest)
+        if let words = first.words, words.count > 1 {
+            first.words = Array(words.dropFirst())
+            first.start = first.words?.first?.start ?? first.start
+        }
+        segments[0] = first
     }
 
     private func confirmCount(of segments: [TranscriptionSegment], decodedEnd: Float) -> Int {
@@ -632,7 +662,7 @@ actor StreamingRealtimeLoop {
             lastConfirmedEndSeconds = max(lastConfirmedEndSeconds, min(furthest, Float(decodedEnd)))
         }
         unconfirmedSegments = kept
-        onConfirmed(makeBatch(stale))
+        confirm(makeBatch(stale))
     }
 
     private func makeBatch(_ segments: [TranscriptionSegment]) -> ConfirmedAudioBatch {

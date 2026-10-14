@@ -163,6 +163,15 @@ private func eventually(_ condition: @escaping @Sendable () -> Bool) async -> Bo
     return condition()
 }
 
+private func eventuallyAsync(_ condition: @escaping @Sendable () async -> Bool) async -> Bool {
+    let deadline = ContinuousClock.now + .seconds(30)
+    while ContinuousClock.now < deadline {
+        if await condition() { return true }
+        try? await Task.sleep(for: .milliseconds(1))
+    }
+    return await condition()
+}
+
 private func parakeetConfiguration() -> StreamingRealtimeLoop.Configuration {
     StreamingTranscriptionSession.loopConfiguration(engine: .parakeet, wantsConfirmedAudio: false, waitsForModelOnStop: false)
 }
@@ -273,8 +282,9 @@ private actor Calls {
 
 private func scripted(
     _ responses: [[TranscriptionSegment]], configuration: StreamingRealtimeLoop.Configuration
-) -> (loop: StreamingRealtimeLoop, mic: Mic, calls: Calls, confirmed: OSAllocatedUnfairLock<[String]>) {
+) -> (loop: StreamingRealtimeLoop, mic: Mic, calls: Calls, confirmed: OSAllocatedUnfairLock<[String]>, partials: OSAllocatedUnfairLock<[String]>) {
     let mic = Mic()
+    let partials = OSAllocatedUnfairLock<[String]>(initialState: [])
     let calls = Calls(responses)
     let confirmed = OSAllocatedUnfairLock<[String]>(initialState: [])
     var config = configuration
@@ -289,11 +299,11 @@ private func scripted(
             transcribe: { _, options, _ in await calls.next(clip: options.clipTimestamps) },
             tick: { try await Task.sleep(nanoseconds: 1_000_000) }
         ),
-        onPartial: { _ in },
+        onPartial: { text in partials.withLock { $0.append(text) } },
         onEnergy: { _ in },
         onConfirmed: { batch in confirmed.withLock { $0.append(contentsOf: batch.segments.map(\.text)) } }
     )
-    return (loop, mic, calls, confirmed)
+    return (loop, mic, calls, confirmed, partials)
 }
 
 private func segment(_ start: Float, _ end: Float, _ text: String) -> TranscriptionSegment {
@@ -304,7 +314,7 @@ private func segment(_ start: Float, _ end: Float, _ text: String) -> Transcript
 struct CaptionConfirmationTests {
     @Test("Whisper holds back two segments and never force-confirms an old one")
     func whisperUnchanged() async throws {
-        let (loop, mic, calls, confirmed) = scripted(
+        let (loop, mic, calls, confirmed, _) = scripted(
             [[segment(0, 2, "a"), segment(2, 4, "b"), segment(4, 6, "c"), segment(6, 7, "d")]],
             configuration: StreamingRealtimeLoop.Configuration()
         )
@@ -322,7 +332,7 @@ struct CaptionConfirmationTests {
 
     @Test("Parakeet holds back one recent segment")
     func parakeetHoldback() async throws {
-        let (loop, mic, _, confirmed) = scripted(
+        let (loop, mic, _, confirmed, _) = scripted(
             [[segment(0, 2, "a"), segment(27, 29, "b")]], configuration: parakeetConfiguration()
         )
         let run = Task { await loop.run() }
@@ -338,7 +348,7 @@ struct CaptionConfirmationTests {
 
     @Test("Parakeet confirms the held-back segment too once it ended more than 8 s before the window end")
     func parakeetForceConfirmsOldSegment() async throws {
-        let (loop, mic, _, confirmed) = scripted(
+        let (loop, mic, _, confirmed, _) = scripted(
             [[segment(0, 2, "a"), segment(2, 4, "b")]], configuration: parakeetConfiguration()
         )
         let run = Task { await loop.run() }
@@ -354,7 +364,7 @@ struct CaptionConfirmationTests {
 
     @Test("a held-back segment that went stale is confirmed before the next decode, which starts at most 15 s back")
     func staleSegmentConfirmedFirst() async throws {
-        let (loop, mic, calls, confirmed) = scripted(
+        let (loop, mic, calls, confirmed, _) = scripted(
             [[segment(0, 4, "a"), segment(4, 9, "b")], []],
             configuration: parakeetConfiguration()
         )
@@ -373,6 +383,35 @@ struct CaptionConfirmationTests {
         #expect(clips.last == [7])
         await loop.cancel()
         _ = await run.value
+    }
+}
+
+@Suite("Caption cuts inside a word")
+struct CaptionCutRepeatTests {
+    @Test("the tail of the word a forced cut ended on is dropped from the next decode, while Whisper keeps it")
+    func repeatedWordAtTheCut() async throws {
+        for (name, configuration, expected) in [
+            ("parakeet", parakeetConfiguration(), "following now"),
+            ("whisper", StreamingRealtimeLoop.Configuration(), "The following now"),
+        ] {
+            var configuration = configuration
+            configuration.requiredSegmentsForConfirmation = 1
+            let (loop, mic, calls, confirmed, partials) = scripted(
+                [[segment(0, 5, "if nothing the"), segment(5, 9, "following")], [segment(2.05, 9, "The following now")]],
+                configuration: configuration
+            )
+            let run = Task { await loop.run() }
+            #expect(await eventually { mic.installed })
+
+            mic.push(seconds: 10)
+            #expect(await eventually { confirmed.withLock { $0.count } == 1 })
+            mic.push(seconds: 2)
+            #expect(await eventuallyAsync { await calls.clips.count == 2 })
+
+            #expect(await eventually { partials.withLock { $0.last } == expected }, "\(name): \(partials.withLock { $0 })")
+            await loop.cancel()
+            _ = await run.value
+        }
     }
 }
 

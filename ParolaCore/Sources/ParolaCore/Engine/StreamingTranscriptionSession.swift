@@ -227,6 +227,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
             configuration.requiredSegmentsForConfirmation = 1
             configuration.forceConfirmAfterSeconds = 8
             configuration.maxDecodeSeconds = 15
+            configuration.dropsWordRepeatedAtCut = true
         }
         return configuration
     }
