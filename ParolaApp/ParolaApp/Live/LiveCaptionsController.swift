@@ -137,6 +137,7 @@ final class LiveCaptionsController {
         consumer?.cancel()
         await consumer?.value
         consumer = nil
+        state.partial = ""
         hideWindow()
     }
 

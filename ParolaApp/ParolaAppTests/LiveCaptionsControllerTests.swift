@@ -194,6 +194,23 @@ extension TranscriberMockSuites {
             #expect(!controller.translateToEnglish)
         }
 
+        @Test("Stop leaves no partial behind, so Save Captions holds no duplicate of the last line", .timeLimit(.minutes(1)))
+        func stopClearsThePartial() async throws {
+            try await withMocksCleared(.streaming) {
+                MockStreamingTranscriberRegistry.shared.install(MockTranscriberResponse(partials: ["hello"], delayMs: 300))
+                let controller = LiveCaptionsController(showsPanel: false)
+                await controller.start(options: TranscriptionOptions())
+                await waitUntil { controller.state.isActive }
+                controller.state.apply(.confirmed(TranscriptSegment(id: 0, start: 0, end: 1, text: "Last line.")))
+                controller.state.apply(.partial(text: "Last line"))
+
+                await controller.stop()
+
+                #expect(controller.state.partial.isEmpty)
+                #expect(controller.state.historyText == "Last line.")
+            }
+        }
+
         @Test("closing a failed panel hides it", .timeLimit(.minutes(1)))
         func closingAFailedPanel() async throws {
             try await withMocksCleared(.streaming) {
