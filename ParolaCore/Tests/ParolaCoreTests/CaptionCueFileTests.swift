@@ -322,7 +322,7 @@ struct CaptionCueFileTests {
         let vocabulary = CaptionCueFixtures.longText.split(separator: " ").map(String.init)
         var checked = 0
         for round in 0..<300 {
-            var sources: [CaptionSource] = []
+            var sources: [CaptionCueSource] = []
             var clock = 0.0
             for id in 0..<4 {
                 let words = (0..<Int.random(in: 1...45, using: &random)).map { _ in vocabulary.randomElement(using: &random)! }
@@ -338,8 +338,8 @@ struct CaptionCueFileTests {
                 }
                 let end = max(clock + span, (timings?.last?.end ?? 0))
                 let translation = round % 3 == 1 ? words.reversed().joined(separator: " ") : nil
-                sources.append(CaptionSource(
-                    parts: [CaptionSource.Part(text: text, start: clock, end: end, words: timings, translation: translation)],
+                sources.append(CaptionCueSource(
+                    parts: [CaptionCueSource.Part(text: text, start: clock, end: end, words: timings, translation: translation)],
                     speaker: nil, tag: id
                 ))
                 clock = end + Double.random(in: 0...3, using: &random)

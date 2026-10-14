@@ -20,10 +20,10 @@ public enum SubtitleQC {
         for segment: TranscriptSegment, captionLength: CaptionLength, speaker: String? = nil, translation: String? = nil
     ) -> [Issue] {
         guard let limit = captionLength.maxCharsPerLine else { return asIsIssues(text: segment.text, duration: segment.duration) }
-        let part = CaptionSource.Part(
+        let part = CaptionCueSource.Part(
             text: segment.text, start: segment.start, end: segment.end, words: segment.words, translation: translation
         )
-        return judge([CaptionSource(parts: [part], speaker: speaker, tag: segment.id)], limit: limit)[segment.id] ?? []
+        return judge([CaptionCueSource(parts: [part], speaker: speaker, tag: segment.id)], limit: limit)[segment.id] ?? []
     }
 
     /// Each segment judged by the cues an export would write for it, set among the segments around it.
@@ -38,18 +38,18 @@ public enum SubtitleQC {
                 if !issues.isEmpty { found[segment.id] = issues }
             }
         }
-        let sources = segments.map { segment -> CaptionSource in
-            let part = CaptionSource.Part(
+        let sources = segments.map { segment -> CaptionCueSource in
+            let part = CaptionCueSource.Part(
                 text: segment.text, start: segment.start, end: segment.end, words: segment.words,
                 translation: translations[segment.id], language: language
             )
             let speaker = showsSpeakers ? Format.presentationSpeakerLabel(segment.speaker) : nil
-            return CaptionSource(parts: [part], speaker: speaker, tag: segment.id)
+            return CaptionCueSource(parts: [part], speaker: speaker, tag: segment.id)
         }
         return judge(sources, limit: limit)
     }
 
-    private static func judge(_ sources: [CaptionSource], limit: Int) -> [Int: [Issue]] {
+    private static func judge(_ sources: [CaptionCueSource], limit: Int) -> [Int: [Issue]] {
         let label: (String) -> String = { "\($0): " }
         guard let cues = try? CaptionCues.cues(for: sources, breaker: .characters(limit), speakerPrefix: label) else { return [:] }
         var byTag: [Int: [CaptionCue]] = [:]

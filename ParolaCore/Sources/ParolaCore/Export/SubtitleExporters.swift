@@ -19,7 +19,7 @@ public struct SrtExporter: TranscriptExporter {
         return try written(CaptionCues.sources(from: transcript, spec: spec), limit: limit)
     }
 
-    private func written(_ sources: [CaptionSource], limit: Int) throws -> Data {
+    private func written(_ sources: [CaptionCueSource], limit: Int) throws -> Data {
         let cues = try CaptionCues.cues(for: sources, breaker: .characters(limit), speakerPrefix: { "\($0): " })
         var out = ""
         for (index, cue) in cues.enumerated() {
@@ -74,7 +74,7 @@ public struct VttExporter: TranscriptExporter {
         return try written(CaptionCues.sources(from: transcript, spec: spec), limit: limit)
     }
 
-    private func written(_ sources: [CaptionSource], limit: Int) throws -> Data {
+    private func written(_ sources: [CaptionCueSource], limit: Int) throws -> Data {
         let cues = try CaptionCues.cues(for: sources, breaker: .characters(limit), speakerPrefix: { _ in "" })
         var out = "WEBVTT\n\n"
         for cue in cues {

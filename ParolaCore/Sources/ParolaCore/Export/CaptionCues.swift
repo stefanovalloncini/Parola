@@ -20,7 +20,7 @@ struct CaptionCue: Equatable {
 }
 
 /// A speaker's run of segments; each part is split and timed against its own span.
-struct CaptionSource {
+struct CaptionCueSource {
     struct Part {
         var text: String
         var start: Double
@@ -59,26 +59,26 @@ enum CaptionCues {
     static let maxLinesPerCue = 2
 
     /// The sources a transcript's captions are cut from: segments grouped as the spec asks, or one source per segment.
-    static func sources(from transcript: Transcript, spec: ExportSpec, grouped: Bool = true) -> [CaptionSource] {
+    static func sources(from transcript: Transcript, spec: ExportSpec, grouped: Bool = true) -> [CaptionCueSource] {
         var ungrouped = spec
         ungrouped.options.grouping = .none
         return sources(prepared: ungrouped.prepared(transcript), spec: spec, grouped: grouped)
     }
 
     /// Sources from a transcript the spec has already prepared; a merged segment is one part, timed over its whole span.
-    static func sources(prepared: Transcript, spec: ExportSpec, grouped: Bool) -> [CaptionSource] {
+    static func sources(prepared: Transcript, spec: ExportSpec, grouped: Bool) -> [CaptionCueSource] {
         let both = spec.resolvedContent == .both
         let translated = spec.resolvedContent == .translation
         let runs = grouped ? spec.options.grouping.runs(of: prepared.segments) : prepared.segments.map { [$0] }
         let language = translated ? prepared.translation?.targetLanguage ?? prepared.language : prepared.language
         return runs.compactMap { run in
-            let parts = run.compactMap { segment -> CaptionSource.Part? in
+            let parts = run.compactMap { segment -> CaptionCueSource.Part? in
                 let text = segment.text.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !text.isEmpty else { return nil }
                 let translation = both
                     ? prepared.translation?.segments[segment.id]?.trimmingCharacters(in: .whitespacesAndNewlines)
                     : nil
-                return CaptionSource.Part(
+                return CaptionCueSource.Part(
                     text: text, start: segment.start, end: segment.end, words: segment.words,
                     translation: translation.flatMap { $0.isEmpty ? nil : $0 },
                     language: language, translationLanguage: prepared.translation?.targetLanguage
@@ -86,7 +86,7 @@ enum CaptionCues {
             }
             guard !parts.isEmpty else { return nil }
             let speaker = spec.options.speakers ? Format.presentationSpeakerLabel(run[0].speaker) : nil
-            return CaptionSource(parts: parts, speaker: speaker)
+            return CaptionCueSource(parts: parts, speaker: speaker)
         }
     }
 
@@ -98,7 +98,7 @@ enum CaptionCues {
 
     /// The cues a file or the burn shows: split, timed to the speech, then made readable alongside their neighbours.
     static func cues(
-        for sources: [CaptionSource], breaker: CaptionBreaker, speakerPrefix: (String) -> String,
+        for sources: [CaptionCueSource], breaker: CaptionBreaker, speakerPrefix: (String) -> String,
         verifying: Verification? = nil
     ) throws -> [CaptionCue] {
         settle(try packed(sources, breaker: breaker, speakerPrefix: speakerPrefix, verifying: verifying))
@@ -106,7 +106,7 @@ enum CaptionCues {
 
     /// Cues as split and timed from the speech, before the pass that fits them in beside the cues around them.
     static func packed(
-        _ sources: [CaptionSource], breaker: CaptionBreaker, speakerPrefix: (String) -> String,
+        _ sources: [CaptionCueSource], breaker: CaptionBreaker, speakerPrefix: (String) -> String,
         verifying: Verification? = nil
     ) throws -> [CaptionCue] {
         let tokenizer = CaptionTokenizer()
@@ -147,7 +147,7 @@ enum CaptionCues {
     }
 
     private static func partCues(
-        _ part: CaptionSource.Part, prefix: String, breaker: CaptionBreaker, tokenizer: CaptionTokenizer, source: Int
+        _ part: CaptionCueSource.Part, prefix: String, breaker: CaptionBreaker, tokenizer: CaptionTokenizer, source: Int
     ) -> [CaptionCue] {
         let start = max(part.start, 0)
         let end = max(part.end, start)
