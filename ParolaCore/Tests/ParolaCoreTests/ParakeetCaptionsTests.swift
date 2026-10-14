@@ -449,6 +449,28 @@ struct CaptionConfirmationTests {
         await loop.cancel()
         _ = await run.value
     }
+
+    @Test("a reach that lands inside a confirmed word starts the decode at the word's end")
+    func clampSnapsForward() async throws {
+        let (loop, mic, calls, confirmed, _) = scripted(
+            [[segment(0, 4, "a"), spoken(4, 9, "b c d e f", words: [
+                ("b", 4, 5), ("c", 5, 6), ("d", 6, 6.9), ("e", 6.9, 7.6), ("f", 7.6, 9),
+            ])], []],
+            configuration: parakeetConfiguration()
+        )
+        let run = Task { await loop.run() }
+        #expect(await eventually { mic.installed })
+        mic.push(seconds: 10)
+        #expect(await eventually { confirmed.withLock { $0.count } == 1 })
+        mic.push(seconds: 12)
+        #expect(await eventually { confirmed.withLock { $0.count } == 2 })
+
+        // The reach is 7 s and the window starts at 0.5 s; "e" spans 6.9 to 7.6 s.
+        let started = try #require(await calls.clips.last?.first)
+        #expect(abs(started - 7.1) < 0.001, "\(started)")
+        await loop.cancel()
+        _ = await run.value
+    }
 }
 
 @Suite("Held segment anchor")
@@ -690,7 +712,7 @@ struct CaptionCutRepeatTests {
 
     @Test("a doubled phrase never reaches a confirmed line")
     func doubledContextIsNotConfirmed() async throws {
-        let (loop, mic, calls, confirmed, _) = scripted(
+        let (loop, mic, _, confirmed, _) = scripted(
             [[spoken(0, 5, "as we were testing on real machines, and ship"), spoken(5, 9, "the following Monday.")],
              [inSecondWindow(spoken(3, 7, "real machines, and shipped the following Monday.", words: [
                 ("real", 3.0, 3.4), ("machines,", 3.4, 4.0), ("and", 4.0, 4.3), ("shipped", 4.3, 4.9),
@@ -706,7 +728,6 @@ struct CaptionCutRepeatTests {
         #expect(await eventually { confirmed.withLock { $0.count } == 2 })
 
         #expect(confirmed.withLock { $0 } == ["as we were testing on real machines, and ship", "the following Monday."])
-        _ = await calls.clips
         await loop.cancel()
         _ = await run.value
     }
@@ -730,6 +751,40 @@ struct CaptionCutRepeatTests {
             second: [spoken(5.0, 9, "logs, then the build")]
         )
         #expect(shown.partial == "logs, then the build")
+    }
+
+    @Test("an early copy of the last confirmed word does not win when the decode revised that word")
+    func earlyCopyOfTheLastWordIsNotTrusted() async throws {
+        let (loop, mic, _, confirmed, _) = scripted(
+            [[spoken(0, 5, "we saw that the cat and the", words: [
+                ("we", 0, 0.6), ("saw", 0.6, 1.2), ("that", 1.2, 2.9), ("the", 3.0, 3.4),
+                ("cat", 3.4, 3.9), ("and", 3.9, 4.4), ("the", 4.4, 5.0),
+              ]), spoken(5, 9, "dog ran.")],
+             [inSecondWindow(spoken(3, 6, "the cat and a dog ran.", words: [
+                ("the", 3.0, 3.4), ("cat", 3.4, 3.9), ("and", 3.9, 4.4), ("a", 4.4, 4.9),
+                ("dog", 5.0, 5.5), ("ran.", 5.5, 6.0),
+              ])), inSecondWindow(spoken(6.2, 7.2, "Next one."))]],
+            configuration: parakeetConfiguration()
+        )
+        let run = Task { await loop.run() }
+        #expect(await eventually { mic.installed })
+        mic.push(seconds: 10)
+        #expect(await eventually { confirmed.withLock { $0.count } == 1 })
+        mic.push(seconds: 2)
+        #expect(await eventually { confirmed.withLock { $0.count } == 2 })
+
+        #expect(confirmed.withLock { $0 } == ["we saw that the cat and the", "dog ran."])
+        await loop.cancel()
+        _ = await run.value
+    }
+
+    @Test("a lone dash before the boundary does not head the partial")
+    func leadingDashIsSkipped() async throws {
+        let shown = try await afterTheSecondDecode(
+            first: spoken(0, 5, "so then", words: [("so", 0, 2.9), ("then", 3.0, 5.0)]), held: "go on",
+            second: [spoken(3, 7, "then — go on", words: [("then", 3.0, 4.9), ("—", 4.9, 4.98), ("go", 5.0, 5.5), ("on", 5.5, 6.0)])]
+        )
+        #expect(shown.partial == "go on")
     }
 
     @Test("the context run is the longest suffix of the confirmed words, earliest on a tie")

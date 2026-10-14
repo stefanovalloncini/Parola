@@ -712,10 +712,12 @@ actor StreamingRealtimeLoop {
         let norms = heard.map { Self.comparable(Substring(decoded[$0.segment][$0.word].text)) }
         let heardBefore = heard.prefix { Double(decoded[$0.segment][$0.word].start + decoded[$0.segment][$0.word].end) / 2 < keepFrom }.count
         let aligned = Self.contextRunEnd(decoded: norms, confirmed: recentConfirmedWords.map(\.text))
-        guard let runEnd = aligned ?? (heardBefore > 0 ? heardBefore - 1 : nil) else { return }
+        let clearlyBefore = Float(keepFrom - Self.contextJitterSeconds)
+        let trusted = aligned.flatMap { end in heard[(end + 1)...].contains { decoded[$0.segment][$0.word].end <= clearlyBefore } ? nil : end }
+        guard let runEnd = trusted ?? (heardBefore > 0 ? heardBefore - 1 : nil) else { return }
         let last = heard[runEnd]
         var kept = Array(segments.dropFirst(last.segment))
-        let words = Array(decoded[last.segment].dropFirst(last.word + 1))
+        let words = Array(decoded[last.segment].dropFirst(last.word + 1).drop { Self.comparable(Substring($0.text)).isEmpty && Double($0.start) < keepFrom })
         guard let first = words.first else {
             kept.removeFirst()
             segments = kept
@@ -725,7 +727,7 @@ actor StreamingRealtimeLoop {
         trimmed.text = words.map(\.text).joined(separator: " ")
         trimmed.start = first.start
         let original = kept[0].words ?? []
-        trimmed.words = original.count == decoded[last.segment].count ? Array(original.dropFirst(last.word + 1)) : nil
+        trimmed.words = original.count == decoded[last.segment].count ? Array(original.suffix(words.count)) : nil
         kept[0] = trimmed
         segments = kept
     }
