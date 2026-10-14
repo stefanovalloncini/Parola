@@ -15,8 +15,14 @@ enum CaptionFailure {
                 localized: "Allow Parola in System Audio Recording Only to caption one app.",
                 bundle: bundle
             )
+        case FixedFailureText.systemAudioStopped:
+            return String(localized: "The system audio stopped.", bundle: bundle)
         default:
             break
+        }
+        if text.hasSuffix(FixedFailureText.appQuitSuffix) {
+            let name = appName(String(text.dropLast(FixedFailureText.appQuitSuffix.count)))
+            return String(localized: "\(name) quit.", bundle: bundle)
         }
         let suffix = FixedFailureText.appNotPlayingAudioSuffix
         if text.hasSuffix(suffix) {

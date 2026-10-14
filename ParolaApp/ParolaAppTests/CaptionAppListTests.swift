@@ -126,11 +126,25 @@ struct CaptionFailureTests {
         #expect(text == "Zoom isn't playing any audio. Try again once it is.")
     }
 
+    @Test("the ended sentences name the source, and a quit app is named by its display name")
+    func ended() {
+        #expect(CaptionFailure.message(for: FixedFailureText.systemAudioStopped, appName: { $0 }) == "The system audio stopped.")
+        let quit = CaptionFailure.message(
+            for: FixedFailureText.appQuit("us.zoom.xos"), appName: { $0 == "us.zoom.xos" ? "Zoom" : $0 }
+        )
+        #expect(quit == "Zoom quit.")
+        #expect(CaptionFailure.permission(for: FixedFailureText.systemAudioStopped) == nil)
+        #expect(CaptionFailure.permission(for: FixedFailureText.appQuit("us.zoom.xos")) == nil)
+    }
+
     @Test("Italian covers the captions failures")
     func italian() throws {
         let it = try #require(Bundle.main.path(forResource: "it", ofType: "lproj").flatMap(Bundle.init(path:)))
         let notPlaying = CaptionFailure.message(for: FixedFailureText.appNotPlayingAudio("x"), appName: { _ in "Zoom" }, bundle: it)
         #expect(notPlaying == "Zoom non sta riproducendo audio. Riprova quando parte.")
+        let quit = CaptionFailure.message(for: FixedFailureText.appQuit("x"), appName: { _ in "Zoom" }, bundle: it)
+        #expect(quit == "L'app Zoom è stata chiusa.")
+        #expect(CaptionFailure.message(for: FixedFailureText.systemAudioStopped, appName: { $0 }, bundle: it) == "L'audio di sistema si è fermato.")
         for fixed in [FixedFailureText.systemAudioNotAllowed, FixedFailureText.appAudioNotAllowed] {
             let text = CaptionFailure.message(for: fixed, appName: { $0 }, bundle: it)
             #expect(text != fixed && text.hasPrefix("Consenti l'accesso a Parola"), "\(text)")

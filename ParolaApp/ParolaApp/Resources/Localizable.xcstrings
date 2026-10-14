@@ -276,6 +276,17 @@
         }
       }
     },
+    "%@ quit.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L'app %@ è stata chiusa."
+          }
+        }
+      }
+    },
     "%@ refused the download (HTTP %lld).": {
       "extractionState": "manual",
       "localizations": {
@@ -17531,6 +17542,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "L'audio di sistema si è fermato, quindi Parola ha fermato la registrazione."
+          }
+        }
+      }
+    },
+    "The system audio stopped.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L'audio di sistema si è fermato."
           }
         }
       }
