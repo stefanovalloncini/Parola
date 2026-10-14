@@ -125,6 +125,21 @@ struct ParakeetStreamingDecoderTests {
         #expect(abs(words[1].start - 2.4) < 0.001)
     }
 
+    @Test("a slice never exceeds one encoder pass, whatever the clip says")
+    func sliceIsClamped() async throws {
+        let seen = OSAllocatedUnfairLock<[Int]>(initialState: [])
+        let decoder = ParakeetStreamingDecoder.decoder(options: Self.options()) { samples in
+            seen.withLock { $0.append(samples.count) }
+            return result([])
+        }
+        var decoding = decoder.options
+        decoding.clipTimestamps = [1]
+
+        _ = try await decoder.transcribe([Float](repeating: 0.1, count: 20 * sampleRate), decoding) { _ in true }
+
+        #expect(seen.withLock { $0 } == [ASRConstants.maxModelSamples])
+    }
+
     @Test("a slice shorter than the model's minimum is an empty result, not an error")
     func tinySliceIsEmpty() async throws {
         let called = OSAllocatedUnfairLock(initialState: false)
@@ -176,26 +191,39 @@ private func parakeetConfiguration() -> StreamingRealtimeLoop.Configuration {
     StreamingTranscriptionSession.loopConfiguration(engine: .parakeet, wantsConfirmedAudio: false, waitsForModelOnStop: false)
 }
 
-/// Speech that never pauses: a word every half second, as heard up to `heard` seconds, with a sentence end every eight words when `punctuated`.
+/// Speech that never pauses: a word every half second, as heard up to `heard` seconds. `segmentable` gives the decoder token timings, with a sentence end every eight words when `punctuated`; without it each decode is one unbroken segment.
 private final class NonstopSpeech: Sendable {
+    struct Decode: Sendable {
+        var sliceStart: Double
+        var sliceSeconds: Double
+        var confirmedEnd: Double
+    }
+
     private struct State {
         var heard = 0.0
-        var decodedSeconds: [Double] = []
+        var confirmedEnd = 0.0
+        var decodes: [Decode] = []
     }
 
     private let state = OSAllocatedUnfairLock(initialState: State())
     let punctuated: Bool
+    let segmentable: Bool
 
-    init(punctuated: Bool) { self.punctuated = punctuated }
+    init(punctuated: Bool, segmentable: Bool = true) {
+        self.punctuated = punctuated
+        self.segmentable = segmentable
+    }
 
-    var decodedSeconds: [Double] { state.withLock { $0.decodedSeconds } }
-    var decodeCount: Int { state.withLock { $0.decodedSeconds.count } }
+    var decodes: [Decode] { state.withLock { $0.decodes } }
+    var decodedSeconds: [Double] { decodes.map(\.sliceSeconds) }
+    var decodeCount: Int { state.withLock { $0.decodes.count } }
     func hear(_ seconds: Double) { state.withLock { $0.heard += seconds } }
+    func confirm(end: Double) { state.withLock { $0.confirmedEnd = max($0.confirmedEnd, end) } }
 
     func recognize(_ samples: [Float]) -> ASRResult {
         let (heard, sliceSeconds) = state.withLock { state -> (Double, Double) in
             let seconds = Double(samples.count) / Double(sampleRate)
-            state.decodedSeconds.append(seconds)
+            state.decodes.append(Decode(sliceStart: state.heard - seconds, sliceSeconds: seconds, confirmedEnd: state.confirmedEnd))
             return (state.heard, seconds)
         }
         let sliceStart = heard - sliceSeconds
@@ -207,14 +235,22 @@ private final class NonstopSpeech: Sendable {
             if punctuated, index % 8 == 7 { timings.append(token(".", start + 0.45, start + 0.46)) }
             index += 1
         }
+        guard segmentable else {
+            return ASRResult(text: timings.map(\.token).joined(), confidence: 0.9, duration: sliceSeconds, processingTime: 0)
+        }
         return result(timings, duration: sliceSeconds)
     }
 }
 
 @Suite("Parakeet captions in the realtime loop")
 struct ParakeetCaptionsLoopTests {
-    private func runNonstop(punctuated: Bool) async throws -> (speech: NonstopSpeech, words: [Int]) {
-        let speech = NonstopSpeech(punctuated: punctuated)
+    private struct Run {
+        var speech: NonstopSpeech
+        var words: [Int]
+        var windowSamples: [Int]
+    }
+
+    private func runNonstop(speech: NonstopSpeech, steps: Int = 60) async throws -> Run {
         let decoder = ParakeetStreamingDecoder.decoder(options: TranscriptionOptions(language: "en")) { speech.recognize($0) }
         let mic = Mic()
         let confirmed = OSAllocatedUnfairLock<[String]>(initialState: [])
@@ -228,42 +264,60 @@ struct ParakeetCaptionsLoopTests {
                 startCapture: { mic.install($0) },
                 stopCapture: {},
                 transcribe: decoder.transcribe,
-                tick: { try await Task.sleep(nanoseconds: 1_000_000) }
+                tick: { try await Task.sleep(nanoseconds: 200_000) }
             ),
             onPartial: { _ in },
             onEnergy: { _ in },
-            onConfirmed: { batch in confirmed.withLock { $0.append(contentsOf: batch.segments.map(\.text)) } }
+            onConfirmed: { batch in
+                speech.confirm(end: Double(batch.segments.map(\.end).max() ?? 0))
+                confirmed.withLock { $0.append(contentsOf: batch.segments.map(\.text)) }
+            }
         )
         let run = Task { await loop.run() }
         #expect(await eventually { mic.installed })
 
-        for step in 1...60 {
+        var windowSamples: [Int] = []
+        for step in 1...steps {
             speech.hear(1.5)
             mic.push(seconds: 1.5)
             #expect(await eventually { speech.decodeCount >= step })
+            windowSamples.append(await loop.windowSampleCount())
         }
         await loop.stop()
         _ = await run.value
 
         let words = confirmed.withLock { $0 }.flatMap { $0.split(separator: " ") }
             .compactMap { Int($0.trimmingCharacters(in: CharacterSet(charactersIn: ".")).dropFirst()) }
-        return (speech, words)
+        return Run(speech: speech, words: words, windowSamples: windowSamples)
     }
 
     @Test("nonstop punctuated speech keeps every decode within one encoder pass and loses no word")
     func nonstopPunctuated() async throws {
-        let (speech, words) = try await runNonstop(punctuated: true)
-        #expect(speech.decodedSeconds.allSatisfy { $0 <= 15.001 }, "\(speech.decodedSeconds.max() ?? 0)")
-        #expect(words == Array(0..<words.count), "confirmed words skip or repeat")
-        #expect(words.count >= 170)
+        let run = try await runNonstop(speech: NonstopSpeech(punctuated: true))
+        #expect(run.speech.decodedSeconds.allSatisfy { $0 <= 15.001 }, "\(run.speech.decodedSeconds.max() ?? 0)")
+        #expect(run.words == Array(0..<run.words.count), "confirmed words skip or repeat")
+        #expect(run.words.count >= 170)
     }
 
     @Test("nonstop speech with no punctuation is cut by length and still loses no word")
     func nonstopUnpunctuated() async throws {
-        let (speech, words) = try await runNonstop(punctuated: false)
-        #expect(speech.decodedSeconds.allSatisfy { $0 <= 15.001 }, "\(speech.decodedSeconds.max() ?? 0)")
-        #expect(words == Array(0..<words.count), "confirmed words skip or repeat")
-        #expect(words.count >= 170)
+        let run = try await runNonstop(speech: NonstopSpeech(punctuated: false))
+        #expect(run.speech.decodedSeconds.allSatisfy { $0 <= 15.001 }, "\(run.speech.decodedSeconds.max() ?? 0)")
+        #expect(run.words == Array(0..<run.words.count), "confirmed words skip or repeat")
+        #expect(run.words.count >= 170)
+    }
+
+    @Test("speech the segmenter can't cut runs past 60 s on force-confirm alone, with a bounded window and no skipped audio")
+    func nonstopUncuttable() async throws {
+        let run = try await runNonstop(speech: NonstopSpeech(punctuated: false, segmentable: false), steps: 50)
+        let decodes = run.speech.decodes
+        #expect(decodes.allSatisfy { $0.sliceSeconds <= 15.001 }, "\(run.speech.decodedSeconds.max() ?? 0)")
+        #expect(decodes.map(\.sliceSeconds).max() ?? 0 > 10, "the held segment never grew, so the reach rule wasn't exercised")
+        #expect(decodes.allSatisfy { $0.sliceStart >= $0.confirmedEnd - 0.001 }, "a decode went back over confirmed audio")
+        let bound = Int((15 + 2 + 1.5) * Double(sampleRate))
+        #expect(run.windowSamples.allSatisfy { $0 <= bound }, "\(run.windowSamples.max() ?? 0)")
+        #expect(run.words == Array(0..<run.words.count), "confirmed words skip or repeat")
+        #expect(run.words.count >= 140)
     }
 }
 
@@ -386,13 +440,34 @@ struct CaptionConfirmationTests {
     }
 }
 
+@Suite("Caption decode gate")
+struct CaptionDecodeGateTests {
+    @Test("a decode runs once the new audio reaches the engine's minimum, not only past it")
+    func gateIsInclusive() async throws {
+        for (configuration, seconds) in [
+            (StreamingRealtimeLoop.Configuration(), 1.0),
+            (parakeetConfiguration(), 0.7),
+        ] {
+            let (loop, mic, calls, _, _) = scripted([[]], configuration: configuration)
+            let run = Task { await loop.run() }
+            #expect(await eventually { mic.installed })
+
+            mic.push(seconds: seconds)
+
+            #expect(await eventuallyAsync { await calls.clips.count == 1 }, "\(seconds) s")
+            await loop.cancel()
+            _ = await run.value
+        }
+    }
+}
+
 @Suite("Caption cuts inside a word")
 struct CaptionCutRepeatTests {
-    @Test("the tail of the word a forced cut ended on is dropped from the next decode, while Whisper keeps it")
+    @Test("a hard cut's repeated tail word is dropped, while Whisper keeps both")
     func repeatedWordAtTheCut() async throws {
-        for (name, configuration, expected) in [
-            ("parakeet", parakeetConfiguration(), "following now"),
-            ("whisper", StreamingRealtimeLoop.Configuration(), "The following now"),
+        for (name, configuration, expected, clip) in [
+            ("parakeet", parakeetConfiguration(), "following now", Float(2)),
+            ("whisper", StreamingRealtimeLoop.Configuration(), "The following now", Float(2)),
         ] {
             var configuration = configuration
             configuration.requiredSegmentsForConfirmation = 1
@@ -409,6 +484,35 @@ struct CaptionCutRepeatTests {
             #expect(await eventuallyAsync { await calls.clips.count == 2 })
 
             #expect(await eventually { partials.withLock { $0.last } == expected }, "\(name): \(partials.withLock { $0 })")
+            let started = try #require(await calls.clips.last?.first)
+            #expect(abs(started - clip) < 0.001, "\(name) started at \(started)")
+            await loop.cancel()
+            _ = await run.value
+        }
+    }
+
+    @Test("a repeated word after a sentence end or a pause is real speech and stays")
+    func repeatedWordAfterASentenceStays() async throws {
+        for (first, second, start) in [
+            ("Is that okay?", "Okay, let's move on", Float(2.05)),
+            ("I said that,", "that is fine", Float(2.3)),
+        ] {
+            let (loop, mic, calls, confirmed, partials) = scripted(
+                [[segment(0, 5, first), segment(5.2, 9, String(second.prefix(upTo: second.index(second.startIndex, offsetBy: 5))))],
+                 [segment(start, 9, second)]],
+                configuration: parakeetConfiguration()
+            )
+            let run = Task { await loop.run() }
+            #expect(await eventually { mic.installed })
+
+            mic.push(seconds: 10)
+            #expect(await eventually { confirmed.withLock { $0.count } == 1 })
+            mic.push(seconds: 2)
+            #expect(await eventuallyAsync { await calls.clips.count == 2 })
+
+            #expect(await eventually { partials.withLock { $0.last } == second }, "\(partials.withLock { $0 })")
+            let started = try #require(await calls.clips.last?.first)
+            #expect(abs(started - 2.12) < 0.001, "the decode starts 0.08 s before the held segment, at \(started)")
             await loop.cancel()
             _ = await run.value
         }
@@ -463,7 +567,9 @@ struct ParakeetCaptionsSessionTests {
     func appleSpeechRefused() async throws {
         let apple = try #require(ModelCatalog.all.first { $0.engineID == .appleSpeech })
         let text = await Self.rejection(TranscriptionOptions(model: apple.id))
-        #expect(text?.contains("can't stream") == true, "\(text ?? "nil")")
+        #expect(text?.contains("Whisper or Parakeet") == true, "\(text ?? "nil")")
+        let take = await Self.rejection(TranscriptionOptions(model: apple.id), purpose: .take)
+        #expect(take?.contains("Parakeet") == false, "\(take ?? "nil")")
     }
 
     @Test("the loop is configured per engine")
@@ -474,9 +580,13 @@ struct ParakeetCaptionsSessionTests {
         #expect(whisper.requiredSegmentsForConfirmation == 2)
         #expect(whisper.forceConfirmAfterSeconds == nil)
         #expect(whisper.maxDecodeSeconds == nil)
+        #expect(whisper.minNewAudioSeconds == 1)
+        #expect(whisper.heldSegmentBackoffSeconds == nil)
         let parakeet = parakeetConfiguration()
         #expect(parakeet.requiredSegmentsForConfirmation == 1)
         #expect(parakeet.forceConfirmAfterSeconds == 8)
         #expect(parakeet.maxDecodeSeconds == 15)
+        #expect(parakeet.minNewAudioSeconds == 0.7)
+        #expect(parakeet.heldSegmentBackoffSeconds == 0.08)
     }
 }

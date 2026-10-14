@@ -31,7 +31,7 @@ actor ParakeetTranscriber: Transcriber {
         return .unsupportedForEngine("\(label) does not support \"\(language)\"")
     }
 
-    nonisolated static let translationRejection = ParolaError.unsupportedForEngine("Parakeet does not support translation")
+    nonisolated static let translationRejection = ParolaError.unsupportedForEngine(FixedFailureText.cannotTranslate("Parakeet"))
 
     /// The language a finished run is stamped with, and what the run can tell the user about it —
     /// nothing when they named it or the model speaks only English, which was never choosing. A
@@ -78,6 +78,7 @@ actor ParakeetTranscriber: Transcriber {
         do {
             return try await AsrModels.downloadAndLoad(to: targetDir, version: version)
         } catch {
+            if isCancellation(error) { throw CancellationError() }
             throw loadFailure(error, model: model)
         }
     }
@@ -263,8 +264,7 @@ actor ParakeetTranscriber: Transcriber {
     static let segmentGapThreshold: TimeInterval = 0.8
     static let maxTokensPerSegment: Int = 80
 
-    /// Extra places a run is cut, always between words. Live captions need short segments so confirmation can keep up with
-    /// nonstop speech: past `softSpanSeconds` a short pause is enough, and past `maxSpanSeconds` any word boundary is.
+    /// Extra cuts for live captions, always between words, so confirmation keeps up with nonstop speech.
     struct SegmentSplitting: Sendable {
         var endsOnSentenceEnd = false
         var softSpanSeconds: TimeInterval?

@@ -31,6 +31,10 @@ actor StreamingRealtimeLoop {
         var maxDecodeSeconds: Double?
         /// A decode that starts inside the word a forced cut ended on hears its tail again; this drops that repeat from the new text.
         var dropsWordRepeatedAtCut = false
+        /// A decode starts this far before the first held-back segment instead of at the confirmed end. Nil starts at the confirmed end.
+        var heldSegmentBackoffSeconds: Double?
+        /// How much audio must arrive since the last decode before the next one runs.
+        var minNewAudioSeconds: Double = 1
     }
 
     typealias Transcribe = @Sendable ([Float], DecodingOptions, @escaping TranscriptionCallback) async throws -> TranscriptionResult
@@ -144,6 +148,7 @@ actor StreamingRealtimeLoop {
     private var unconfirmedSegments: [TranscriptionSegment] = []
     private var currentText = ""
     private var lastConfirmedWord: String?
+    private var lastConfirmedEndedSentence = false
     private var isRunning = false
     private var didStopCapture = false
     private var startingCapture = false
@@ -484,8 +489,9 @@ actor StreamingRealtimeLoop {
         drainInbox()
         enforceWindowCap()
         let totalSamples = windowStartSample + window.count
-        let newSeconds = Float(totalSamples - lastTranscribedTotal) / Float(config.sampleRate)
-        guard newSeconds > 1 else {
+        let newSamples = totalSamples - lastTranscribedTotal
+        let newSeconds = Float(newSamples) / Float(config.sampleRate)
+        guard newSamples >= Int((config.minNewAudioSeconds * Double(config.sampleRate)).rounded()) else {
             markWaitingForSpeech()
             return try await deps.tick()
         }
@@ -610,7 +616,10 @@ actor StreamingRealtimeLoop {
     }
 
     private func confirm(_ batch: ConfirmedAudioBatch) {
-        if let word = batch.segments.last?.text.split(separator: " ").last { lastConfirmedWord = Self.comparable(word) }
+        if let text = batch.segments.last?.text.trimmingCharacters(in: .whitespaces) {
+            lastConfirmedWord = text.split(separator: " ").last.map(Self.comparable)
+            lastConfirmedEndedSentence = text.last.map { ".?!…".contains($0) } ?? false
+        }
         onConfirmed(batch)
     }
 
@@ -618,8 +627,10 @@ actor StreamingRealtimeLoop {
         word.lowercased().trimmingCharacters(in: .punctuationCharacters)
     }
 
+    /// Only after a hard cut: no sentence end and no pause between the confirmed text and the new one.
     private func dropWordRepeatedAtCut(from segments: inout [TranscriptionSegment], decodeStart: Double) {
-        guard let repeated = lastConfirmedWord, var first = segments.first, Double(first.start) - decodeStart < 0.3,
+        guard let repeated = lastConfirmedWord, !lastConfirmedEndedSentence, var first = segments.first,
+              Double(first.start) - decodeStart < 0.16, Double(first.start) - Double(lastConfirmedEndSeconds) < 0.25,
               let head = first.text.split(separator: " ", maxSplits: 1).first, Self.comparable(head) == repeated else { return }
         let rest = first.text.drop { !$0.isWhitespace }.drop { $0.isWhitespace }
         guard !rest.isEmpty else {
@@ -642,8 +653,12 @@ actor StreamingRealtimeLoop {
     }
 
     private func decodeFloorSeconds(decodedEnd: Double) -> Double {
-        guard let maxDecode = config.maxDecodeSeconds else { return retainedFloorSeconds }
-        return max(retainedFloorSeconds, decodedEnd - maxDecode)
+        var floor = retainedFloorSeconds
+        if let backoff = config.heldSegmentBackoffSeconds, let held = unconfirmedSegments.map({ Double($0.start) }).min() {
+            floor = max(Double(lastConfirmedEndSeconds), held - backoff)
+        }
+        guard let maxDecode = config.maxDecodeSeconds else { return floor }
+        return max(floor, decodedEnd - maxDecode)
     }
 
     /// Held-back segments the next decode could no longer reach: too old to wait for a successor, or before the part of the window it decodes.

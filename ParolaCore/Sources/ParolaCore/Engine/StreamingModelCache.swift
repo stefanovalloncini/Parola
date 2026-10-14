@@ -45,11 +45,7 @@ public final class StreamingModelLease: Sendable {
     }
 }
 
-/// Keeps loaded streaming models alive across sessions so a dictation press or live-captions
-/// start doesn't pay the model load again. Borrowers share one instance per model name and
-/// hold a lease while they decode; loads are single-flight. A model with no lease out unloads
-/// after `idleTimeout` or on memory pressure. A WhisperKit model keeps its kit, so the next
-/// borrow reloads only the CoreML models; a Parakeet model is dropped and loaded again.
+/// Keeps loaded streaming models across sessions: one shared instance per name, leased while decoding, unloaded when idle or under pressure.
 actor StreamingModelCache {
     static let shared = StreamingModelCache()
 

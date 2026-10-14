@@ -16,7 +16,7 @@ enum ParakeetStreamingDecoder {
         }
         if options.task == .translate {
             ParolaLog.notice(.streaming, "rejected translate: unsupported")
-            throw ParolaError.unsupportedForEngine(FixedFailureText.cannotTranslate("Parakeet"))
+            throw ParakeetTranscriber.translationRejection
         }
         ParolaLog.info(.streaming, "streaming session starting on parakeet", [.model: .safe(ModelToken(model))])
     }
@@ -41,7 +41,8 @@ enum ParakeetStreamingDecoder {
         let includeWords = options.wordTimestamps
         let minimum = ASRConstants.minimumRequiredSamples(forSampleRate: WhisperKit.sampleRate)
         return StreamingRealtimeLoop.Decoder(options: decoding) { samples, decodeOptions, _ in
-            let clip = min(samples.count, Int(Double(decodeOptions.clipTimestamps.first ?? 0) * sampleRate))
+            let requested = Int(Double(decodeOptions.clipTimestamps.first ?? 0) * sampleRate)
+            let clip = max(min(samples.count, requested), samples.count - ASRConstants.maxModelSamples)
             guard samples.count - clip >= minimum else {
                 return TranscriptionResult(text: "", segments: [], language: language, timings: TranscriptionTimings())
             }

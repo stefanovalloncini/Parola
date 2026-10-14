@@ -150,8 +150,9 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         let allowed = purpose == .captions ? ModelCatalog.canCaption(id: modelName) : ModelCatalog.canStream(id: modelName)
         if !allowed, let variant = ModelCatalog.variant(id: modelName) {
             ParolaLog.notice(.streaming, "engine \(variant.engineID) cannot stream")
+            let runsOn = purpose == .captions ? "Whisper and Parakeet models" : "Whisper models"
             throw ParolaError.unsupportedForEngine(
-                "Live transcription runs on Whisper models; \(variant.displayName) can't stream. Pick a Whisper model and try again."
+                "Live transcription runs on \(runsOn); \(variant.displayName) can't stream. Pick \(purpose == .captions ? "a Whisper or Parakeet" : "a Whisper") model and try again."
             )
         }
         if engine == .parakeet {
@@ -228,6 +229,8 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
             configuration.forceConfirmAfterSeconds = 8
             configuration.maxDecodeSeconds = 15
             configuration.dropsWordRepeatedAtCut = true
+            configuration.heldSegmentBackoffSeconds = 0.08
+            configuration.minNewAudioSeconds = 0.7
         }
         return configuration
     }
