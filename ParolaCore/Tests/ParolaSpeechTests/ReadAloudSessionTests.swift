@@ -684,6 +684,21 @@ struct ReadAloudSessionTests {
         await h.session.stop()
     }
 
+    @Test("a cold first sample doesn't push a warm unit that plays after it into a hold")
+    func baselineStaysOutOfTheAverage() async throws {
+        let h = harness(
+            [sentence(10), sentence(100), sentence(100), sentence(100)], startLatency: .seconds(2)
+        )
+        await h.session.play()
+        try await startRenderingAhead(h, afterUnit: 0, sleeps: 1, of: .seconds(2))
+        try #require(h.sink.completeNextUnit() != nil)
+        try #require(await h.log.waitForStarts(2))
+        await drive(h.clock, sleeps: 1, of: .seconds(2))
+        try #require(await h.renderLog.wait(for: .started(unitID: 2)))
+        #expect(!h.log.events.value.contains(.waiting(.slow)))
+        await h.session.stop()
+    }
+
     @Test("units rendered ahead of playback never hold the reading, however slow they are")
     func lookAheadNeverHolds() async throws {
         let h = harness(

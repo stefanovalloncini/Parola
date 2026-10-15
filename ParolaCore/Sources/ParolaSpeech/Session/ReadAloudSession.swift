@@ -647,11 +647,13 @@ public actor ReadAloudSession {
     private func measure(_ renderTime: Duration, of job: RenderJob) {
         guard let audio = cache[job.unit], audio.duration > 0 else { return }
         let sample = renderTime.secondsValue / audio.duration
+        if isBaselinePending {
+            isBaselinePending = false
+            return
+        }
         let smoothed = rtf.map { $0 + Self.rtfSmoothing * (sample - $0) } ?? sample
         rtf = smoothed
-        let isBaseline = isBaselinePending
-        isBaselinePending = false
-        guard !isBaseline, phase == .playing, job.unit == current, job.unit < units.count - 1, smoothed * speed > 1 else { return }
+        guard phase == .playing, job.unit == current, job.unit < units.count - 1, smoothed * speed > 1 else { return }
         slowHold = job.unit
         ParolaLog.notice(
             .readAloud, "the voice renders slower than it plays; the reading waits",
