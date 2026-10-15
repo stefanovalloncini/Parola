@@ -464,8 +464,7 @@ struct ChatPane: View {
                 model.recordChat(history: kept, for: entryID)
             }
         case .unanswered:
-            displayedHistory.removeAll { $0.id == live.question.id }
-            if input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { input = live.question.text }
+            giveBack(live.question)
         }
     }
 
@@ -477,6 +476,17 @@ struct ChatPane: View {
     enum StoppedTurn: Equatable {
         case keep(ChatMessage)
         case unanswered
+    }
+
+    static func takingBack(_ question: ChatMessage, from history: [ChatMessage], draft: String) -> (history: [ChatMessage], draft: String) {
+        let blank = draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        return (history.filter { $0.id != question.id }, blank ? question.text : draft)
+    }
+
+    private func giveBack(_ question: ChatMessage) {
+        let taken = Self.takingBack(question, from: displayedHistory, draft: input)
+        displayedHistory = taken.history
+        input = taken.draft
     }
 
     /// A stopped reply stays with the words it had said; one stopped before its first word hands the question back.
@@ -531,6 +541,7 @@ struct ChatPane: View {
             } catch {
                 guard !Task.isCancelled, entryID == model.selectedEntryID else { return }
                 liveReply.end()
+                giveBack(question)
                 turnError = FailureText.message(for: error)
             }
         }

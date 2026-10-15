@@ -82,6 +82,20 @@ struct LiveReplyTests {
         live.end()
     }
 
+    @Test("a question that got no answer leaves the history and returns to an empty composer, never over a draft")
+    func unansweredQuestionGoesBack() {
+        let kept = ChatMessage(role: .user, text: "earlier")
+        let question = ChatMessage(role: .user, text: "What was decided?")
+
+        let blank = ChatPane.takingBack(question, from: [kept, question], draft: "  ")
+        #expect(blank.history == [kept])
+        #expect(blank.draft == "What was decided?")
+
+        let typing = ChatPane.takingBack(question, from: [kept, question], draft: "something else")
+        #expect(typing.history == [kept])
+        #expect(typing.draft == "something else")
+    }
+
     @Test("the live bubble follows the search and sender filters like any other")
     func liveBubbleObeysFilters() {
         let reply = ChatMessage(role: .assistant, text: "We ship on Friday")
