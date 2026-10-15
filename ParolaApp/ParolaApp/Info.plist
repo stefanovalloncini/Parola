@@ -89,10 +89,17 @@
 	<string>public.app-category.productivity</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
 	<key>NSAppleEventsUsageDescription</key>
 	<string>Parola reads the active tab URL from your browser to pick the right per-app dictation prompt.</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Parola sends a transcript to a webhook or an Obsidian vault on your local network when you add one in Send To settings.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Parola records audio from the microphone to transcribe it locally.</string>
 	<key>NSScreenCaptureUsageDescription</key>

@@ -190,6 +190,47 @@ struct DeliveryCommandsTests {
         withExtendedLifetime(server) {}
     }
 
+    @Test("setDestinations takes a webhook envelope and setDestinationSecret fills its header")
+    func webhookEnvelopeAndSecret() async throws {
+        let (model, server, context, commands) = try makeRig()
+
+        _ = try await run(
+            commands, "setDestinations",
+            ["destinations": .array([
+                .object([
+                    "kind": .string("webhook"),
+                    "config": .object([
+                        "id": .string("6C9C1E1E-0000-0000-0000-0000000000DD"),
+                        "name": .string("Hook"),
+                        "urlText": .string("http://127.0.0.1:9/hook"),
+                        "headers": .array([.object(["name": .string("X-Key"), "secretRef": .string("bridge-ref")])]),
+                    ]),
+                ]),
+            ])],
+            context
+        )
+        _ = try await run(commands, "setDestinationSecret", ["reference": .string("bridge-ref"), "value": .string("hunter2")], context)
+
+        guard case .webhook(let hook)? = model.destinations.first else {
+            Issue.record("expected a webhook, got \(model.destinations)")
+            return
+        }
+        #expect(hook.headers.map(\.secretRef) == ["bridge-ref"])
+        #expect(try await model.deliveryEnvironment.secrets.get("bridge-ref") == "hunter2")
+        let state = ParolaAutomationServer.destinationsState(model)
+        #expect(!String(describing: state).contains("hunter2"))
+        withExtendedLifetime(server) {}
+    }
+
+    @Test("setDestinationSecret is test-mode only")
+    func secretCommandNeedsTestMode() async throws {
+        let (_, server, context, commands) = try makeRig(mode: .normal)
+        await #expect(throws: AutomationError.self) {
+            _ = try await run(commands, "setDestinationSecret", ["reference": .string("r"), "value": .string("v")], context)
+        }
+        withExtendedLifetime(server) {}
+    }
+
     @Test("outside test mode a vaultPath is left alone")
     func vaultPathIsTestModeOnly() async throws {
         let (model, server, context, commands) = try makeRig(mode: .normal)

@@ -111,7 +111,7 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
         case .exportFormats: return ["preset", "format", "export formats", "txt", "srt", "vtt", "csv", "tsv", "docx", "pdf", "markdown", "html", "json", "jsonl", "fcpxml", "final cut", "lrc", "lyrics", "subtitles", "line length", "qc", "timestamps", "html theme"]
         case .batchExport: return ["batch", "multiple files", "drag drop", "queue", "folder", "preset"]
         case .autoExport: return ["auto export", "rule", "preset", "folder"]
-        case .sendTo: return ["obsidian", "vault", "send", "destination", "note", "markdown", "frontmatter", "wikilink"]
+        case .sendTo: return ["obsidian", "vault", "send", "destination", "note", "markdown", "frontmatter", "wikilink", "webhook", "zapier", "make", "n8n", "notion", "rest", "api", "json"]
         case .integrations: return ["yt-dlp", "youtube", "homebrew", "install", "link", "video", "integrations"]
         case .aiServices: return ["openai", "anthropic", "claude", "groq", "cerebras", "ollama", "local model", "api key", "endpoint", "llm", "summary", "chat", "cleanup", "apple intelligence", "privacy", "cloud", "on this mac", "online"]
         case .prompts: return ["prompt", "cleanup", "translate", "bullet", "action", "trigger words", "assistant", "rewrite"]

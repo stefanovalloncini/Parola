@@ -144,6 +144,18 @@ enum FailureText {
             return String(localized: "Parola couldn't reach \(place). Pick the folder again in Send To settings.", bundle: bundle)
         case .writeFailed(let path, let text):
             return String(localized: "Parola couldn't write to \(path). \(text)", bundle: bundle)
+        case .httpStatus(let name, let status, let detail):
+            return detail.isEmpty
+                ? String(localized: "\(name) answered HTTP \(status).", bundle: bundle)
+                : String(localized: "\(name) answered HTTP \(status). \(detail)", bundle: bundle)
+        case .networkFailed(let host, let text):
+            return String(localized: "Parola couldn't reach \(host). \(text)", bundle: bundle)
+        case .missingSecret(let name):
+            return String(localized: "\(name) has no saved key. Enter it again in Send To settings.", bundle: bundle)
+        case .invalidSetup(let name, let text):
+            return String(localized: "\(name) isn't set up correctly. \(text)", bundle: bundle)
+        case .partialDelivery(let name, let sent, let total, let text):
+            return String(localized: "\(name) got \(sent) of \(total) blocks before it failed, and the page stays there. \(text)", bundle: bundle)
         }
     }
 

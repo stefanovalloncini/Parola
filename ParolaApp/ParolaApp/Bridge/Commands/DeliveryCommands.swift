@@ -99,6 +99,24 @@ extension ParolaAutomationServer {
             ),
 
             AutomationCommand(
+                name: "setDestinationSecret",
+                area: .test,
+                summary: "Stores a destination secret under its reference, in the in-memory store. Test-mode only.",
+                kind: .mutating,
+                args: [
+                    .init(name: "reference", kind: .string(), required: true, summary: "secretRef from the destination's config"),
+                    .init(name: "value", kind: .string(), required: true, summary: "The secret"),
+                ],
+                handler: { args, ctx in
+                    guard ctx.model.mode == .test else {
+                        throw AutomationError.precondition("only available in --test-mode")
+                    }
+                    try await ctx.model.deliveryEnvironment.secrets.set(try args.string("value"), for: try args.string("reference"))
+                    return .object(["stored": .bool(true)])
+                }
+            ),
+
+            AutomationCommand(
                 name: "readMockDeliveries",
                 area: .test,
                 summary: "What the mock destinations were handed, and the receipts they gave back. Test-mode only.",

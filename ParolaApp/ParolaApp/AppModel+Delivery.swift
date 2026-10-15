@@ -58,8 +58,15 @@ extension AppModel {
     /// does the bridge.
     func setDestinations(_ destinations: [AnyDestination]) {
         guard destinationsEnabled else { return }
-        self.destinations = destinations
-        writeJSON(destinations.filter(\.isPersistable), forKey: "destinations")
+        let bound = destinations.map { $0.bound(to: deliveryEnvironment) }
+        let kept = Set(bound.flatMap(\.secretRefs))
+        let orphaned = self.destinations.flatMap(\.secretRefs).filter { !kept.contains($0) }
+        self.destinations = bound
+        writeJSON(bound.filter(\.isPersistable), forKey: "destinations")
+        if !orphaned.isEmpty {
+            let secrets = deliveryEnvironment.secrets
+            Task { await secrets.remove(orphaned) }
+        }
     }
 
     func addDestination(_ destination: AnyDestination) {

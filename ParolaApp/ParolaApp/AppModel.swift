@@ -1084,6 +1084,12 @@ final class AppModel {
     /// A notice waiting to be dismissed that a newer one went over: it comes back once the strip is clear again. One deep, never a queue.
     @ObservationIgnored var coveredNotice: ExportNotice?
     @ObservationIgnored lazy var deliveryEngine: DeliveryEngine = makeDeliveryEngine()
+    /// A sandbox or a test keeps destination secrets in memory, the way it keeps API keys.
+    @ObservationIgnored lazy var deliveryEnvironment = DeliveryEnvironment(
+        secrets: apiKeyStore is InMemoryAPIKeyStore ? InMemorySecretStore() : KeychainSecretStore.shared,
+        transport: { URLSessionTransport(trust: $0) },
+        clock: clock
+    )
     @ObservationIgnored var volumeMountObservation: NotificationObservation?
 
     // MARK: - Watched folders

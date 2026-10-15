@@ -18,6 +18,23 @@
         }
       }
     },
+    "NSLocalNetworkUsageDescription" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parola sends a transcript to a webhook or an Obsidian vault on your local network when you add one in Send To settings."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parola invia una trascrizione a un webhook o a un vault Obsidian sulla tua rete locale quando ne aggiungi uno nelle impostazioni di Invia a."
+          }
+        }
+      }
+    },
     "NSMicrophoneUsageDescription" : {
       "extractionState" : "manual",
       "localizations" : {

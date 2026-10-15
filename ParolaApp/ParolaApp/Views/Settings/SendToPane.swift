@@ -1,9 +1,44 @@
 import SwiftUI
 import ParolaCore
 
+private enum DestinationDraft: Identifiable {
+    case folder(ObsidianVaultFolderDestination)
+    case rest(ObsidianLocalRESTDestination)
+    case webhook(WebhookDestination)
+    case notion(NotionDestination)
+
+    var id: UUID {
+        switch self {
+        case .folder(let value): return value.id
+        case .rest(let value): return value.id
+        case .webhook(let value): return value.id
+        case .notion(let value): return value.id
+        }
+    }
+
+    var stored: AnyDestination {
+        switch self {
+        case .folder(let value): return .obsidianFolder(value)
+        case .rest(let value): return .obsidianREST(value)
+        case .webhook(let value): return .webhook(value)
+        case .notion(let value): return .notion(value)
+        }
+    }
+
+    init?(_ stored: AnyDestination) {
+        switch stored {
+        case .obsidianFolder(let value): self = .folder(value)
+        case .obsidianREST(let value): self = .rest(value)
+        case .webhook(let value): self = .webhook(value)
+        case .notion(let value): self = .notion(value)
+        case .mock, .unsupported: return nil
+        }
+    }
+}
+
 struct SendToPane: View {
     @Environment(AppModel.self) private var model
-    @State private var editing: ObsidianVaultFolderDestination?
+    @State private var editing: DestinationDraft?
     @State private var isNew = false
     @State private var selection: AnyDestination.ID?
 
@@ -30,40 +65,88 @@ struct SendToPane: View {
                     leafPrefix: "SendTo", addLabel: "Add Destination", removeLabel: "Remove Destination",
                     canRemove: model.destinations.contains { $0.id == selection },
                     addMenu: {
-                        Button("Obsidian Vault Folder") {
-                            isNew = true
-                            editing = ObsidianVaultFolderDestination(
-                                name: String(localized: "Obsidian"),
-                                vaultBookmark: Data(),
-                                vaultPath: ""
-                            )
-                        }
-                        .accessibilityIdentifier("SendTo.Button.AddObsidian")
+                        addButton(
+                            "Obsidian Vault Folder", line: "Writes a note into a vault folder on this Mac.",
+                            leaf: "SendTo.Button.AddObsidian",
+                            draft: .folder(ObsidianVaultFolderDestination(
+                                name: String(localized: "Obsidian"), vaultBookmark: Data(), vaultPath: ""
+                            ))
+                        )
+                        addButton(
+                            "Obsidian Local REST", line: "Sends a note to an open vault through the plugin.",
+                            leaf: "SendTo.Button.AddObsidianREST",
+                            draft: .rest(ObsidianLocalRESTDestination(name: String(localized: "Obsidian REST")))
+                        )
+                        addButton(
+                            "Webhook", line: "Posts JSON to Zapier, Make, n8n or your own server.",
+                            leaf: "SendTo.Button.AddWebhook",
+                            draft: .webhook(WebhookDestination(name: String(localized: "Webhook")))
+                        )
+                        addButton(
+                            "Notion", line: "Adds a page under a Notion page you choose.",
+                            leaf: "SendTo.Button.AddNotion",
+                            draft: .notion(NotionDestination(name: String(localized: "Notion")))
+                        )
                     },
                     onRemove: removeSelected
                 )
             }
 
-            SettingHelper(text: "A destination writes a Markdown note when you send a transcript to it. Turn on Send automatically to write one as soon as a transcription finishes. A batch run is not sent automatically.")
+            SettingHelper(text: "A destination receives the transcript when you send it: a Markdown note, a page or a JSON post. Turn on Send automatically to send as soon as a transcription finishes. A batch run is not sent automatically.")
 
             ResetPaneButton(scope: .sendTo)
         }
-        .sheet(item: $editing) { destination in
-            ObsidianDestinationEditor(
-                destination: destination,
-                isNew: isNew,
-                onSave: { saved in
-                    if isNew {
-                        model.addDestination(.obsidianFolder(saved))
-                    } else {
-                        model.updateDestination(.obsidianFolder(saved))
-                    }
-                    editing = nil
-                },
-                onCancel: { editing = nil }
-            )
-            .environment(model)
+        .sheet(item: $editing) { draft in
+            editor(for: draft)
+                .environment(model)
         }
+    }
+
+    @ViewBuilder
+    private func editor(for draft: DestinationDraft) -> some View {
+        switch draft {
+        case .folder(let value):
+            ObsidianDestinationEditor(
+                destination: value, isNew: isNew,
+                onSave: { commit(.obsidianFolder($0)) }, onCancel: { editing = nil }
+            )
+        case .rest(let value):
+            ObsidianRESTDestinationEditor(
+                destination: value, isNew: isNew,
+                onSave: { commit(.obsidianREST($0)) }, onCancel: { editing = nil }
+            )
+        case .webhook(let value):
+            WebhookDestinationEditor(
+                destination: value, isNew: isNew,
+                onSave: { commit(.webhook($0)) }, onCancel: { editing = nil }
+            )
+        case .notion(let value):
+            NotionDestinationEditor(
+                destination: value, isNew: isNew,
+                onSave: { commit(.notion($0)) }, onCancel: { editing = nil }
+            )
+        }
+    }
+
+    private func addButton(_ title: LocalizedStringKey, line: LocalizedStringKey, leaf: String, draft: DestinationDraft) -> some View {
+        Button {
+            isNew = true
+            editing = draft
+        } label: {
+            Text(title)
+            Text(line)
+        }
+        .help(line)
+        .axLeaf(leaf)
+    }
+
+    private func commit(_ saved: AnyDestination) {
+        if isNew {
+            model.addDestination(saved)
+        } else {
+            model.updateDestination(saved)
+        }
+        editing = nil
     }
 
     private func removeSelected() {
@@ -77,9 +160,9 @@ struct SendToPane: View {
     }
 
     private func edit(_ stored: AnyDestination) {
-        guard case .obsidianFolder(let destination) = stored else { return }
+        guard let draft = DestinationDraft(stored) else { return }
         isNew = false
-        editing = destination
+        editing = draft
     }
 }
 
@@ -167,65 +250,86 @@ private struct DestinationRow: View {
 
             Spacer(minLength: 8)
 
-            Picker("Note name", selection: titleFormatBinding) {
-                ForEach(TitleFormat.allCases) { format in
-                    Text(LocalizedStringKey(format.displayName)).tag(format)
+            if stored.kind != .webhook {
+                Picker("Note name", selection: titleFormatBinding) {
+                    ForEach(TitleFormat.allCases) { format in
+                        Text(LocalizedStringKey(format.displayName)).tag(format)
+                    }
                 }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .frame(width: 150, alignment: .trailing)
+                .axLeaf(leaf("Picker.TitleFormat"))
             }
-            .labelsHidden()
-            .pickerStyle(.menu)
-            .frame(width: 150, alignment: .trailing)
-            .axLeaf(leaf("Picker.TitleFormat"))
         }
     }
 
     private var subtitle: String {
-        guard case .obsidianFolder(let destination) = stored else {
+        guard let kind = stored.kind, stored.destination != nil else {
             return String(localized: "Not supported in this version of Parola.")
         }
-        let folder = destination.vaultPath.isEmpty
-            ? String(localized: "No folder picked")
-            : destination.vaultPath
-        return destination.subfolder.isEmpty ? folder : "\(folder)/\(destination.subfolder)"
+        return detail.isEmpty ? kind.localizedName : "\(kind.localizedName) · \(detail)"
+    }
+
+    private var detail: String {
+        switch stored {
+        case .obsidianFolder(let destination):
+            let folder = destination.vaultPath.isEmpty
+                ? String(localized: "No folder picked")
+                : destination.vaultPath
+            return destination.subfolder.isEmpty ? folder : "\(folder)/\(destination.subfolder)"
+        case .obsidianREST(let destination):
+            let host = URL(string: destination.baseURLText)?.host ?? destination.baseURLText
+            return destination.folder.isEmpty ? host : "\(host)/\(destination.folder)"
+        case .webhook(let destination):
+            return URL(string: destination.urlText)?.host ?? String(localized: "No address")
+        case .notion(let destination):
+            return destination.parentPageID.isEmpty
+                ? String(localized: "No page")
+                : String(localized: "Page ending \(String(destination.parentPageID.suffix(6)))")
+        case .mock, .unsupported:
+            return ""
+        }
     }
 
     private var enabledBinding: Binding<Bool> {
         Binding(
             get: { stored.isEnabled },
-            set: { newValue in mutate { $0.isEnabled = newValue } }
+            set: { newValue in mutate { $0.updating(isEnabled: newValue) } }
         )
     }
 
     private var autoSendBinding: Binding<Bool> {
         Binding(
             get: { stored.autoSend },
-            set: { newValue in mutate { $0.autoSend = newValue } }
+            set: { newValue in mutate { $0.updating(autoSend: newValue) } }
         )
     }
 
     private var titleFormatBinding: Binding<TitleFormat> {
         Binding(
             get: { stored.titleFormat },
-            set: { newValue in mutate { $0.titleFormat = newValue } }
+            set: { newValue in mutate { $0.updating(titleFormat: newValue) } }
         )
     }
 
     private func toggle(_ category: EntryCategory) {
         mutate { destination in
-            if destination.categories.contains(category) {
-                destination.categories.remove(category)
+            var categories = destination.categories
+            if categories.contains(category) {
+                categories.remove(category)
             } else {
-                destination.categories.insert(category)
+                categories.insert(category)
             }
+            return destination.updating(categories: categories)
         }
     }
 
     // Resolved by id on every write: the row's position can change under a move before the
     // toggle's write lands.
-    private func mutate(_ change: (inout ObsidianVaultFolderDestination) -> Void) {
-        guard case .obsidianFolder(var destination) = model.destination(id: stored.id) else { return }
-        change(&destination)
-        model.updateDestination(.obsidianFolder(destination))
+    private func mutate(_ change: (AnyDestination) -> AnyDestination) {
+        guard let current = model.destination(id: stored.id) else { return }
+        model.updateDestination(change(current))
     }
 }
 

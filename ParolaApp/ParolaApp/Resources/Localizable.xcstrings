@@ -78,6 +78,28 @@
         }
       }
     },
+    "%@ answered HTTP %lld.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ ha risposto HTTP %lld."
+          }
+        }
+      }
+    },
+    "%@ answered HTTP %lld. %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ ha risposto HTTP %lld. %@"
+          }
+        }
+      }
+    },
     "%@ can't detect speakers, so speaker detection is skipped.": {
       "extractionState": "manual",
       "localizations": {
@@ -96,6 +118,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@ non sa distinguere gli speaker."
+          }
+        }
+      }
+    },
+    "%@ got %lld of %lld blocks before it failed, and the page stays there. %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ ha ricevuto %lld blocchi su %lld prima di fallire, e la pagina resta lì. %@"
+          }
+        }
+      }
+    },
+    "%@ has no saved key. Enter it again in Send To settings.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ non ha una chiave salvata. Inseriscila di nuovo nelle impostazioni di Invia a."
           }
         }
       }
@@ -206,6 +250,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@ non sta riproducendo audio. Riprova quando parte."
+          }
+        }
+      }
+    },
+    "%@ isn't set up correctly. %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ non è configurato correttamente. %@"
           }
         }
       }
@@ -1359,13 +1414,13 @@
         }
       }
     },
-    "A destination writes a Markdown note when you send a transcript to it. Turn on Send automatically to write one as soon as a transcription finishes. A batch run is not sent automatically.": {
+    "A destination receives the transcript when you send it: a Markdown note, a page or a JSON post. Turn on Send automatically to send as soon as a transcription finishes. A batch run is not sent automatically.": {
       "extractionState": "manual",
       "localizations": {
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Una destinazione scrive una nota Markdown quando le mandi una trascrizione. Attiva Invia automaticamente per scriverla appena la trascrizione è pronta. Un batch non viene inviato automaticamente."
+            "value": "Una destinazione riceve la trascrizione quando la invii: una nota Markdown, una pagina o un invio JSON. Attiva Invia automaticamente per inviare appena finisce una trascrizione. Un'elaborazione in batch non viene inviata in automatico."
           }
         }
       }
@@ -1474,6 +1529,50 @@
         }
       }
     },
+    "Add Header": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aggiungi intestazione"
+          }
+        }
+      }
+    },
+    "Address": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Indirizzo"
+          }
+        }
+      }
+    },
+    "Adds a page under a Notion page you choose.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aggiunge una pagina sotto una pagina Notion a tua scelta."
+          }
+        }
+      }
+    },
+    "Adds each segment with its start, end and speaker. Off sends the text only.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aggiunge ogni segmento con inizio, fine e interlocutore. Se è spento, invia solo il testo."
+          }
+        }
+      }
+    },
     "AI": {
       "extractionState": "manual",
       "localizations": {
@@ -1514,6 +1613,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Titolo AI"
+          }
+        }
+      }
+    },
+    "An address on the internet has to start with https://. Plain http:// is only for this Mac and your local network.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Un indirizzo su internet deve iniziare con https://. http:// semplice vale solo per questo Mac e la tua rete locale."
           }
         }
       }
@@ -3400,6 +3510,270 @@
           "stringUnit": {
             "state": "translated",
             "value": "Per modello"
+          }
+        }
+      }
+    },
+    "Check Connection": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verifica la connessione"
+          }
+        }
+      }
+    },
+    "Connected to the Local REST API plugin.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connesso al plugin Local REST API."
+          }
+        }
+      }
+    },
+    "Connected. Parola can add pages under that page.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connesso. Parola può aggiungere pagine sotto quella pagina."
+          }
+        }
+      }
+    },
+    "Connected. Parola can add pages under “%@”.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connesso. Parola può aggiungere pagine sotto “%@”."
+          }
+        }
+      }
+    },
+    "Content": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Contenuto"
+          }
+        }
+      }
+    },
+    "Copy it from the plugin's settings in Obsidian. It is kept in the Keychain.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copiala dalle impostazioni del plugin in Obsidian. Resta nel Portachiavi."
+          }
+        }
+      }
+    },
+    "Create an integration in Notion and copy its secret here. It is kept in the Keychain.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Crea un'integrazione in Notion e copia qui il suo segreto. Resta nel Portachiavi."
+          }
+        }
+      }
+    },
+    "Header values are kept in the Keychain.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I valori delle intestazioni restano nel Portachiavi."
+          }
+        }
+      }
+    },
+    "Headers": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Intestazioni"
+          }
+        }
+      }
+    },
+    "Include segments": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Includi i segmenti"
+          }
+        }
+      }
+    },
+    "Inside the vault. Leave empty to write into the vault root.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dentro il vault. Lascia vuoto per scrivere nella radice del vault."
+          }
+        }
+      }
+    },
+    "Integration secret": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Segreto dell'integrazione"
+          }
+        }
+      }
+    },
+    "No address": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nessun indirizzo"
+          }
+        }
+      }
+    },
+    "No page": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nessuna pagina"
+          }
+        }
+      }
+    },
+    "Not encrypted. Anyone on the network can read what Parola sends.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non cifrato. Chiunque sulla rete può leggere ciò che Parola invia."
+          }
+        }
+      }
+    },
+    "Notion can't see that page. Open it in Notion, choose the ••• menu, then Connections, and add your integration.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notion non vede quella pagina. Aprila in Notion, scegli il menu •••, poi Connessioni, e aggiungi la tua integrazione."
+          }
+        }
+      }
+    },
+    "Notion didn't accept the secret. Copy it again from your integration's settings.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notion non ha accettato il segreto. Copialo di nuovo dalle impostazioni della tua integrazione."
+          }
+        }
+      }
+    },
+    "Obsidian REST": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Obsidian REST"
+          }
+        }
+      }
+    },
+    "Page ending %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pagina che finisce con %@"
+          }
+        }
+      }
+    },
+    "Parent page": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pagina principale"
+          }
+        }
+      }
+    },
+    "Parola can't find a page ID in that. Paste the page's link.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parola non trova l'ID di una pagina qui. Incolla il link della pagina."
+          }
+        }
+      }
+    },
+    "Parola couldn't reach %@. %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parola non raggiunge %@. %@"
+          }
+        }
+      }
+    },
+    "Paste the key": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Incolla la chiave"
+          }
+        }
+      }
+    },
+    "Paste the link of a Notion page. Each transcript becomes a page under it. Share that page with your integration.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Incolla il link di una pagina Notion. Ogni trascrizione diventa una pagina al suo interno. Condividi quella pagina con la tua integrazione."
           }
         }
       }
@@ -12776,6 +13150,17 @@
         }
       }
     },
+    "Posts JSON to Zapier, Make, n8n or your own server.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Invia JSON a Zapier, Make, n8n o a un tuo server."
+          }
+        }
+      }
+    },
     "Prefix each Markdown paragraph with its start time.": {
       "extractionState": "manual",
       "localizations": {
@@ -13922,6 +14307,17 @@
         }
       }
     },
+    "Remove Header": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rimuovi intestazione"
+          }
+        }
+      }
+    },
     "Remove Label": {
       "extractionState": "manual",
       "localizations": {
@@ -14506,6 +14902,50 @@
           "stringUnit": {
             "state": "translated",
             "value": "Esegue di nuovo lo stesso modello e la stessa lingua, con le Impostazioni attuali"
+          }
+        }
+      }
+    },
+    "Saved in Keychain": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Salvato nel Portachiavi"
+          }
+        }
+      }
+    },
+    "Saved in Keychain. Type to replace.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Salvato nel Portachiavi. Scrivi per sostituirlo."
+          }
+        }
+      }
+    },
+    "Send Test": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Invia prova"
+          }
+        }
+      }
+    },
+    "Sends a note to an open vault through the plugin.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Invia una nota a un vault aperto tramite il plugin."
           }
         }
       }
@@ -17120,6 +17560,61 @@
         }
       }
     },
+    "That isn't a web address.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questo non è un indirizzo web."
+          }
+        }
+      }
+    },
+    "The address has to start with https:// or http://.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L'indirizzo deve iniziare con https:// o http://."
+          }
+        }
+      }
+    },
+    "The plugin answered, but it didn't accept the API key.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il plugin ha risposto, ma non ha accettato la chiave API."
+          }
+        }
+      }
+    },
+    "The server answered HTTP %lld, so it did not take the sample.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il server ha risposto HTTP %lld, quindi non ha accettato l'esempio."
+          }
+        }
+      }
+    },
+    "The server answered HTTP %lld.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il server ha risposto HTTP %lld."
+          }
+        }
+      }
+    },
     "TSV": {
       "extractionState": "manual",
       "localizations": {
@@ -19582,6 +20077,17 @@
         }
       }
     },
+    "Use an https:// address, or an http:// one on this Mac or your local network.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usa un indirizzo https://, oppure uno http:// su questo Mac o sulla tua rete locale."
+          }
+        }
+      }
+    },
     "Use Captions": {
       "extractionState": "manual",
       "localizations": {
@@ -19743,6 +20249,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Utente"
+          }
+        }
+      }
+    },
+    "Value": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Valore"
           }
         }
       }
@@ -20097,6 +20614,17 @@
         }
       }
     },
+    "Where the Local REST API plugin listens. Obsidian has to be open. Its certificate is self-signed, and Parola trusts it only on this Mac.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dove ascolta il plugin Local REST API. Obsidian deve essere aperto. Il suo certificato è autofirmato e Parola si fida solo su questo Mac."
+          }
+        }
+      }
+    },
     "Whether Parola translates transcripts into English as it works.": {
       "extractionState": "manual",
       "localizations": {
@@ -20327,6 +20855,17 @@
         }
       }
     },
+    "Works with the catch hooks in Zapier, Make and n8n, or any server that takes a JSON POST.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Funziona con i catch hook di Zapier, Make e n8n, o con qualsiasi server che accetta un POST JSON."
+          }
+        }
+      }
+    },
     "Wraps long segments into shorter cues.": {
       "extractionState": "manual",
       "localizations": {
@@ -20356,6 +20895,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Scrivi gli orari al millisecondo."
+          }
+        }
+      }
+    },
+    "Writes a note into a vault folder on this Mac.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scrive una nota in una cartella di un vault su questo Mac."
           }
         }
       }
@@ -20411,6 +20961,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Scritta in %@"
+          }
+        }
+      }
+    },
+    "Wrote a test note to the vault.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nota di prova scritta nel vault."
           }
         }
       }

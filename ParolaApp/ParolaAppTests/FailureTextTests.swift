@@ -95,6 +95,19 @@ struct FailureTextTests {
             == "Parola non è riuscita a leggere la trascrizione da inviare. Questa trascrizione è stata eliminata, quindi non c'è nulla da inviare.")
     }
 
+    @Test("network delivery failures read in Italian")
+    func networkDeliveryErrors() throws {
+        let it = try bundle("it")
+        #expect(FailureText.message(for: DeliveryError.httpStatus("Zap", 503, ""), bundle: it) == "Zap ha risposto HTTP 503.")
+        #expect(FailureText.message(for: DeliveryError.httpStatus("Notion", 400, "Bad block."), bundle: it) == "Notion ha risposto HTTP 400. Bad block.")
+        #expect(FailureText.message(for: DeliveryError.networkFailed("example.com", "Offline."), bundle: it)
+            == "Parola non raggiunge example.com. Offline.")
+        #expect(FailureText.message(for: DeliveryError.missingSecret("Notion"), bundle: it)
+            == "Notion non ha una chiave salvata. Inseriscila di nuovo nelle impostazioni di Invia a.")
+        #expect(FailureText.message(for: DeliveryError.partialDelivery("Notion", sent: 100, total: 250, reason: "Zap."), bundle: it)
+            == "Notion ha ricevuto 100 blocchi su 250 prima di fallire, e la pagina resta lì. Zap.")
+    }
+
     @Test("an interrupted capture reads in Italian")
     func captureInterrupted() throws {
         let it = try bundle("it")
@@ -141,6 +154,12 @@ struct FailureTextTests {
             ParolaError.transcriptionFailed("boom"),
             DeliveryError.vaultUnavailable("Vault", ""),
             DeliveryError.writeFailed("/tmp/x", "No space."),
+            DeliveryError.httpStatus("Zap", 503, ""),
+            DeliveryError.httpStatus("Notion", 400, "Bad block."),
+            DeliveryError.networkFailed("example.com", "Offline."),
+            DeliveryError.missingSecret("Notion"),
+            DeliveryError.invalidSetup("Zap", "Enter the webhook address."),
+            DeliveryError.partialDelivery("Notion", sent: 100, total: 250, reason: "Zap."),
             DeliveryPayloadError.entryGone("x"),
             CloudLLMError.disabledByPolicy,
             CloudLLMError.malformedResponse(provider: .custom),

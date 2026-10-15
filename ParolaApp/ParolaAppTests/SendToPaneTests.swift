@@ -48,6 +48,69 @@ struct SendToPaneTests {
         #expect(destination.vaultPath == "/tmp/parola-sendto/Vault")
     }
 
+    @Test("a network destination is wired to the app's secrets, and removing it deletes them")
+    func secretsFollowTheList() async throws {
+        let model = makeModel()
+        let secrets = model.deliveryEnvironment.secrets
+        let header = WebhookHeader(name: "X-Key", secretRef: "ref-header")
+        try await secrets.set("header-value", for: "ref-header")
+        try await secrets.set("notion-secret", for: "ref-notion")
+        let hook = WebhookDestination(name: "Hook", urlText: "https://example.com/h", headers: [header])
+        let notion = NotionDestination(name: "Notion", parentPageID: "p", secretRef: "ref-notion")
+
+        model.setDestinations([.webhook(hook), .notion(notion)])
+        #expect(model.destinations.flatMap(\.secretRefs).sorted() == ["ref-header", "ref-notion"])
+        let stored = String(decoding: try JSONEncoder().encode(model.destinations), as: UTF8.self)
+        #expect(!stored.contains("header-value"))
+        #expect(!stored.contains("notion-secret"))
+
+        model.removeDestination(id: notion.id)
+        var gone = false
+        for _ in 0..<200 where !gone {
+            gone = try await secrets.get("ref-notion") == nil
+            if !gone { try await Task.sleep(for: .milliseconds(10)) }
+        }
+        #expect(gone)
+        #expect(try await secrets.get("ref-header") == "header-value")
+    }
+
+    @Test("a header removed in an edit loses its secret")
+    func removedHeaderLosesItsSecret() async throws {
+        let model = makeModel()
+        let secrets = model.deliveryEnvironment.secrets
+        let keep = WebhookHeader(name: "A", secretRef: "ref-a")
+        let drop = WebhookHeader(name: "B", secretRef: "ref-b")
+        try await secrets.set("a", for: "ref-a")
+        try await secrets.set("b", for: "ref-b")
+        var hook = WebhookDestination(name: "Hook", urlText: "https://example.com/h", headers: [keep, drop])
+        model.setDestinations([.webhook(hook)])
+
+        hook.headers = [keep]
+        model.updateDestination(.webhook(hook))
+
+        var gone = false
+        for _ in 0..<200 where !gone {
+            gone = try await secrets.get("ref-b") == nil
+            if !gone { try await Task.sleep(for: .milliseconds(10)) }
+        }
+        #expect(gone)
+        #expect(try await secrets.get("ref-a") == "a")
+    }
+
+    @Test("the row settings work on a network destination")
+    func rowSettingsOnNetworkKinds() {
+        let model = makeModel()
+        let hook = WebhookDestination(name: "Hook", urlText: "https://example.com/h")
+        model.setDestinations([.webhook(hook)])
+
+        model.updateDestination(model.destination(id: hook.id)!.updating(autoSend: true, categories: [.meeting]))
+
+        #expect(model.destinations.first?.autoSend == true)
+        #expect(model.destinations.first?.categories == [.meeting])
+        #expect(model.hasAutoSendDestination)
+        #expect(model.sendableDestinations.count == 1)
+    }
+
     @Test("add, update, remove and move all go through setDestinations")
     func listEditing() {
         let model = makeModel()

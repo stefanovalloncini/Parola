@@ -31,8 +31,9 @@ struct ObsidianDestinationEditor: View {
             Form {
                 folderSection
                 namingSection
-                frontmatterSection
-                bodySection
+                ObsidianNoteOptionsSections(
+                    frontmatter: $draft.frontmatter, noteBody: $draft.body, wikilinks: $draft.wikilinks
+                )
                 testSection
             }
             .formStyle(.grouped)
@@ -103,35 +104,6 @@ struct ObsidianDestinationEditor: View {
         }
     }
 
-    private var frontmatterSection: some View {
-        SettingsSection("Frontmatter") {
-            toggleRow("Title", isOn: $draft.frontmatter.title, leaf: "Title")
-            toggleRow("Date", isOn: $draft.frontmatter.date, leaf: "Date")
-            toggleRow("Duration", isOn: $draft.frontmatter.duration, leaf: "Duration")
-            toggleRow("Source", isOn: $draft.frontmatter.source, leaf: "Source")
-            toggleRow("Language", isOn: $draft.frontmatter.language, leaf: "Language")
-            toggleRow("Model", isOn: $draft.frontmatter.model, leaf: "Model")
-            toggleRow("Speakers", isOn: $draft.frontmatter.speakers, leaf: "FrontmatterSpeakers")
-            toggleRow("Tags", isOn: $draft.frontmatter.tags, leaf: "Tags")
-            toggleRow("Summary", isOn: $draft.frontmatter.summary, leaf: "FrontmatterSummary")
-        }
-    }
-
-    private var bodySection: some View {
-        SettingsSection("Note body") {
-            toggleRow("Summary", isOn: $draft.body.summary, leaf: "BodySummary")
-            toggleRow("Transcript", isOn: $draft.body.transcript, leaf: "BodyTranscript")
-            toggleRow("Timestamps", isOn: $draft.body.timestamps, leaf: "BodyTimestamps")
-            toggleRow("Speaker names", isOn: $draft.body.speakers, leaf: "BodySpeakers")
-            toggleRow("Favorites", isOn: $draft.body.favorites, leaf: "BodyFavorites")
-            SettingRow("Link speaker names", description: "Writes a speaker as [[Name]] so Obsidian links the note to a person.") {
-                Toggle("", isOn: $draft.wikilinks)
-                    .labelsHidden()
-                    .axLeaf("SendTo.Toggle.Wikilinks")
-            }
-        }
-    }
-
     private var testSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
@@ -167,18 +139,6 @@ struct ObsidianDestinationEditor: View {
             case nil:
                 EmptyView()
             }
-        }
-    }
-
-    private func toggleRow(
-        _ title: LocalizedStringKey,
-        isOn: Binding<Bool>,
-        leaf: String
-    ) -> some View {
-        SettingRow(title) {
-            Toggle("", isOn: isOn)
-                .labelsHidden()
-                .axLeaf("SendTo.Toggle.\(leaf)")
         }
     }
 
