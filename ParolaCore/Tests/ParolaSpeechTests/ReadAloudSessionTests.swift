@@ -312,6 +312,19 @@ struct ReadAloudSessionTests {
         await h.session.stop()
     }
 
+    @Test("time played in a finished unit doesn't count toward the next one's Previous")
+    func previousAfterBoundary() async throws {
+        let h = harness(Array(repeating: sentence(100), count: 4))
+        await h.session.play()
+        await h.session.settle()
+        h.clock.advance(by: .seconds(3))
+        try await complete(h, startsTotal: 2)
+        h.clock.advance(by: .milliseconds(400))
+        await h.session.previous()
+        #expect(h.log.started == [0, 1, 0])
+        await h.session.stop()
+    }
+
     @Test("Previous replays the last two played units from memory and drops older audio")
     func previousCache() async throws {
         let h = harness(Array(repeating: sentence(100), count: 8))
@@ -617,10 +630,13 @@ struct ReadAloudSessionTests {
         #expect(await h.renderer.rendered.map(\.unitID) == [0, 1])
         #expect(h.sink.finishedUnits == [0, 1])
 
-        try await complete(h, startsTotal: 3)
+        try #require(h.sink.completeNextUnit() != nil)
+        await h.session.settle()
+        #expect(h.log.started == [0, 1])
         #expect(await h.renderer.rendered.map(\.unitID) == [0, 1])
 
         await h.session.continueReading()
+        try #require(await h.log.waitForStarts(3))
         await drive(h.clock, sleeps: 6, of: .milliseconds(500))
         try #require(await h.log.wait(for: .waiting(.slow), count: 2))
         await h.session.settle()

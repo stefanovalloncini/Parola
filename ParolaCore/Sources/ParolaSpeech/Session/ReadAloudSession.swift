@@ -134,6 +134,7 @@ public actor ReadAloudSession {
 
     private var rtf: Double?
     private var isBaselinePending = true
+    private var isAnnouncePending = false
     private var slowHold: Int?
     private var failure: (unit: Int, message: String)?
     private var pendingSwitch: VoiceSwitch?
@@ -248,6 +249,10 @@ public actor ReadAloudSession {
         guard slowHold != nil else { return }
         slowHold = nil
         rtf = nil
+        if isAnnouncePending {
+            isAnnouncePending = false
+            announce()
+        }
         kickRenderer()
         requestPump()
     }
@@ -300,7 +305,11 @@ public actor ReadAloudSession {
         current = next
         resetTimer()
         trimCache()
-        announce()
+        if let slowHold, next > slowHold {
+            isAnnouncePending = true
+        } else {
+            announce()
+        }
         kickRenderer()
         requestPump()
     }
@@ -367,6 +376,7 @@ public actor ReadAloudSession {
         scheduledChunks = 0
         failure = nil
         isBaselinePending = true
+        isAnnouncePending = false
         resetTimer()
         trimCache()
         announce()
