@@ -101,6 +101,28 @@ struct LibraryCommandsTests {
         #expect(first["displayTitle"] == .string(LibraryEntryDisplay.title(raw: "audio", createdAt: created)))
     }
 
+    @Test("listEntries' displayTitle is the AI title when the rows show it, the file title when they don't")
+    func displayTitleFollowsTheAITitleSetting() async throws {
+        let (model, server, context, commands) = try makeRig()
+        await model.libraryRefreshTask?.value
+        var manifest = ParolaDocument.Manifest(originalAudioName: "kickoff.m4a", title: "Kickoff call", modelName: "stub", language: "en")
+        manifest.aiTitle = "Weekly planning"
+        model.libraryEntries = [LibraryEntry(id: "a", bundleURL: URL(fileURLWithPath: "/tmp/a.parola"), manifest: manifest)]
+        let command = try #require(commands["listEntries"])
+
+        func displayTitle() async throws -> AutomationValue? {
+            let result = try await command.handler(try command.validate(AutomationArgs()), context)
+            guard case .array(let items) = result, case .object(let first) = items.first else { return nil }
+            return first["displayTitle"]
+        }
+
+        model.showAITitles = true
+        #expect(try await displayTitle() == .string("Weekly planning"))
+        model.showAITitles = false
+        #expect(try await displayTitle() == .string("Kickoff call"))
+        withExtendedLifetime(server) {}
+    }
+
     @Test("listEntries carries the AI title and summary, null when absent")
     func listEntriesCarriesCardMetadata() async throws {
         let (model, server, context, commands) = try makeRig()
