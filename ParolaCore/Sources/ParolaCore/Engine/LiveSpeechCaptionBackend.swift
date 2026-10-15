@@ -41,12 +41,8 @@ enum LiveSpeechCaption {
 @available(macOS 26.0, iOS 26.0, *)
 extension LiveSpeechCaption {
     private static func transcriber(for locale: Locale) -> SpeechTranscriber {
-        SpeechTranscriber(
-            locale: locale,
-            transcriptionOptions: [],
-            reportingOptions: [.volatileResults],
-            attributeOptions: [.audioTimeRange]
-        )
+        // Without the preset's fast results, volatile text lands in ~4 s bursts, a median 1.9 s behind the speaker.
+        SpeechTranscriber(locale: locale, preset: .timeIndexedProgressiveTranscription)
     }
 
     static func prepare(_ requested: Locale, progress: @escaping @Sendable (Double) -> Void) async throws -> Locale {
