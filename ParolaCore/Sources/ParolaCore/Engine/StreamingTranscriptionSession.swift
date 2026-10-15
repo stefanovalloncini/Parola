@@ -17,7 +17,7 @@ public protocol StreamingSpeakerLabeler: Sendable {
     ) async -> String?
 }
 
-/// What a streaming session is for. Captions are the only purpose a Parakeet model can serve.
+/// What a streaming session is for. Captions are the only purpose a Parakeet or Apple Speech model can serve.
 public enum StreamingPurpose: Sendable {
     case take
     case captions
@@ -147,13 +147,14 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
 
         let modelName = options.model ?? ModelCatalog.fallbackModelID
         let engine = ModelCatalog.variant(id: modelName)?.engineID ?? .whisperKit
-        let allowed = purpose == .captions ? ModelCatalog.canCaption(id: modelName) : ModelCatalog.canStream(id: modelName)
-        if !allowed, let variant = ModelCatalog.variant(id: modelName) {
+        if purpose == .take, !ModelCatalog.canStream(id: modelName), let variant = ModelCatalog.variant(id: modelName) {
             ParolaLog.notice(.streaming, "engine \(variant.engineID) cannot stream")
-            let runsOn = purpose == .captions ? "Whisper and Parakeet models" : "Whisper models"
             throw ParolaError.unsupportedForEngine(
-                "Live transcription runs on \(runsOn); \(variant.displayName) can't stream. Pick \(purpose == .captions ? "a Whisper or Parakeet" : "a Whisper") model and try again."
+                "Live transcription runs on Whisper models; \(variant.displayName) can't stream. Pick a Whisper model and try again."
             )
+        }
+        if engine == .appleSpeech {
+            throw ParolaError.unsupportedForEngine("Apple Speech captions run in their own session, not this one.")
         }
         if engine == .parakeet {
             try ParakeetStreamingDecoder.admit(options, model: modelName)

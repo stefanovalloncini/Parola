@@ -49,6 +49,18 @@ public enum FixedFailureText {
         "\(engineName) does not support translation."
     }
 
+    public static let appleSpeechNoModelPrefix = "Apple Speech has no model for "
+    public static let appleSpeechDownloadFailedPrefix = "Apple Speech couldn't download its model for "
+    public static let appleSpeechDownloadFailedSuffix = ". Check your connection and try again."
+
+    public static func appleSpeechNoModel(_ locale: String) -> String {
+        appleSpeechNoModelPrefix + locale + "."
+    }
+
+    public static func appleSpeechDownloadFailed(_ locale: String) -> String {
+        appleSpeechDownloadFailedPrefix + locale + appleSpeechDownloadFailedSuffix
+    }
+
     public static func cannotLabelSpeakers(_ engineName: String) -> String {
         "\(engineName) does not support speaker labels."
     }

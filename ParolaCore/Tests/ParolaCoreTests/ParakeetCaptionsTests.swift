@@ -875,13 +875,13 @@ struct ParakeetCaptionsSessionTests {
         #expect(text?.contains("can't stream") == true, "\(text ?? "nil")")
     }
 
-    @Test("Apple Speech is refused for captions too")
+    @Test("Apple Speech has its own caption session, so this one refuses it")
     func appleSpeechRefused() async throws {
         let apple = try #require(ModelCatalog.all.first { $0.engineID == .appleSpeech })
         let text = await Self.rejection(TranscriptionOptions(model: apple.id))
-        #expect(text?.contains("Whisper or Parakeet") == true, "\(text ?? "nil")")
+        #expect(text?.contains("their own session") == true, "\(text ?? "nil")")
         let take = await Self.rejection(TranscriptionOptions(model: apple.id), purpose: .take)
-        #expect(take?.contains("Parakeet") == false, "\(take ?? "nil")")
+        #expect(take?.contains("can't stream") == true, "\(take ?? "nil")")
     }
 
     @Test("the loop is configured per engine")

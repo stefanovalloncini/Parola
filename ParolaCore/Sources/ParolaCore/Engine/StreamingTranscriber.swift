@@ -37,12 +37,16 @@ public enum StreamingTranscriberFactory {
         source: CaptionSource? = nil,
         persistAudio: Bool = false,
         waitsForModelOnStop: Bool = false,
-        purpose: StreamingPurpose = .take
+        purpose: StreamingPurpose = .take,
+        model: String? = nil
     ) -> any StreamingTranscriber {
         let source = source ?? .microphone(deviceUID: deviceUID)
         if let response = MockStreamingTranscriberRegistry.shared.resolve() {
             MockStreamingTranscriberRegistry.shared.recordMade(source: source)
             return MockStreamingTranscriber(response: response, clock: clock, source: source)
+        }
+        if purpose == .captions, ModelCatalog.variant(id: model ?? ModelCatalog.fallbackModelID)?.engineID == .appleSpeech {
+            return AppleSpeechCaptionSession(source: source)
         }
         return StreamingTranscriptionSession(
             modelStore: modelStore, persistAudio: persistAudio, source: source, waitsForModelOnStop: waitsForModelOnStop,
