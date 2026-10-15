@@ -43,7 +43,8 @@ public actor MediaSession {
     private let ownPlayback: (any OwnPlaybackControl)?
     private var ownPlaybackPaused = false
 
-    private var active: Bool = false
+    private var holders = 0
+    private var generation = 0
     private var wasMutedBeforeEnter: Bool?
     private var pauseIssued: Bool = false
 
@@ -57,33 +58,53 @@ public actor MediaSession {
         self.ownPlayback = ownPlayback
     }
 
+    /// The first holder applies the mute and pauses; later holders (a dictation during a take) only count.
     public func enterRecording(config: MediaSessionConfig) async {
-        guard !active else { return }
-        active = true
+        holders += 1
+        guard holders == 1 else { return }
+        let ticket = generation
 
         if config.muteSystemAudio {
             let already = await muter.isMuted()
+            guard generation == ticket else { return }
             wasMutedBeforeEnter = already
             if !already {
                 await muter.setMuted(true)
+                guard generation == ticket else {
+                    await muter.setMuted(false)
+                    return
+                }
             }
         }
 
         if config.pausePlayback, let ownPlayback {
-            ownPlaybackPaused = await ownPlayback.pausePlaying()
+            let paused = await ownPlayback.pausePlaying()
+            guard generation == ticket else {
+                if paused { await ownPlayback.resumePaused() }
+                return
+            }
+            ownPlaybackPaused = paused
         }
 
         // Only pause (and later resume) when something was actually playing, mirroring
         // the mute path's snapshot — a blind play on exit would start paused media.
-        if config.pausePlayback, await player.isPlaying() {
+        if config.pausePlayback {
+            let playing = await player.isPlaying()
+            guard generation == ticket, playing else { return }
             await player.pause()
+            guard generation == ticket else {
+                await player.play()
+                return
+            }
             pauseIssued = true
         }
     }
 
     public func exitRecording() async {
-        guard active else { return }
-        active = false
+        guard holders > 0 else { return }
+        holders -= 1
+        guard holders == 0 else { return }
+        generation += 1
 
         if let was = wasMutedBeforeEnter, was == false {
             await muter.setMuted(false)

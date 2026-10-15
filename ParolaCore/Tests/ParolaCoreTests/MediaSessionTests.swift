@@ -75,6 +75,91 @@ struct MediaSessionTests {
         #expect(await own.resumeCalls == 0)
     }
 
+    private actor Gate {
+        private var isOpen = false
+        private var waiters: [CheckedContinuation<Void, Never>] = []
+        private var arrivals = 0
+        private var arrivalWaiters: [CheckedContinuation<Void, Never>] = []
+
+        func pass() async {
+            arrivals += 1
+            for waiter in arrivalWaiters { waiter.resume() }
+            arrivalWaiters.removeAll()
+            guard !isOpen else { return }
+            await withCheckedContinuation { waiters.append($0) }
+        }
+
+        func waitForArrival() async {
+            guard arrivals == 0 else { return }
+            await withCheckedContinuation { arrivalWaiters.append($0) }
+        }
+
+        func open() {
+            isOpen = true
+            for waiter in waiters { waiter.resume() }
+            waiters.removeAll()
+        }
+    }
+
+    private actor SlowOwnPlayback: OwnPlaybackControl {
+        let gate = Gate()
+        private(set) var resumeCalls = 0
+
+        func pausePlaying() async -> Bool {
+            await gate.pass()
+            return true
+        }
+
+        func resumePaused() async { resumeCalls += 1 }
+    }
+
+    @Test("a take and a dictation share one pause: the first to end leaves it in place")
+    func overlappingHoldersKeepThePause() async {
+        let muter = SpyMuter(startMuted: false)
+        let player = SpyPlayer()
+        let own = SpyOwnPlayback(pausesSomething: true)
+        let session = MediaSession(muter: muter, player: player, ownPlayback: own)
+        let config = MediaSessionConfig(muteSystemAudio: true, pausePlayback: true)
+
+        await session.enterRecording(config: config)
+        await session.enterRecording(config: config)
+        #expect(await muter.setMutedCalls == [true])
+        #expect(await own.pauseCalls == 1)
+
+        await session.exitRecording()
+        #expect(await muter.setMutedCalls == [true])
+        #expect(await own.resumeCalls == 0)
+        #expect(await player.playCalls == 0)
+
+        await session.exitRecording()
+        #expect(await muter.setMutedCalls == [true, false])
+        #expect(await own.resumeCalls == 1)
+        #expect(await player.playCalls == 1)
+    }
+
+    @Test("an exit while a start is still pausing undoes what the start does afterwards")
+    func exitDuringEnter() async {
+        let muter = SpyMuter(startMuted: false)
+        let player = SpyPlayer()
+        let own = SlowOwnPlayback()
+        let session = MediaSession(muter: muter, player: player, ownPlayback: own)
+        let config = MediaSessionConfig(muteSystemAudio: true, pausePlayback: true)
+
+        let entering = Task { await session.enterRecording(config: config) }
+        await own.gate.waitForArrival()
+        await session.exitRecording()
+        await own.gate.open()
+        await entering.value
+
+        #expect(await muter.current == false)
+        #expect(await own.resumeCalls == 1)
+        #expect(await player.pauseCalls == 0)
+
+        await session.enterRecording(config: config)
+        await session.exitRecording()
+        #expect(await own.resumeCalls == 2)
+    }
+
     @Test("both flags on mutes and pauses once")
     func enterWithBothFlags() async {
         let muter = SpyMuter(startMuted: false)
