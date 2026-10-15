@@ -33,6 +33,10 @@ struct ContinuousChunks: View {
         let runs: [TranscriptSegment.ID: SegmentRun]
         /// The speaker this run belongs to, so the chunk can offer to assign it.
         var speaker: String?
+
+        var firstSegmentID: TranscriptSegment.ID? {
+            runs.min { $0.value.offsets.lowerBound < $1.value.offsets.lowerBound }?.key
+        }
     }
 
     /// Holds the signature of the chunks currently on screen. A build that never lands must not claim one.
@@ -142,6 +146,10 @@ struct ContinuousChunks: View {
                     }
                 }
             }
+        }
+        .accessibilityAction(named: Text("Read Aloud from Here")) {
+            guard let first = chunk.firstSegmentID, model.readingBlockedReason == nil else { return }
+            Task { await model.readAloud(ReadAloudRequest(kind: .transcript, fromSegment: first)) }
         }
         .modifier(ChunkSpeakerAssignment(
             speaker: chunk.speaker,

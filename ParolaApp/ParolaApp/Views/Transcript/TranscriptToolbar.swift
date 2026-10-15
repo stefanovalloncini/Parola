@@ -24,7 +24,7 @@ struct TranscriptActionItems: ToolbarContent {
     var body: some ToolbarContent {
         ToolbarItemGroup(placement: .primaryAction) {
             TranscriptFormatMenu()
-            ReadAloudToolbarButton()
+            ReadAloudButton(source: model.transcriptPaneMode)
             if model.features.isEnabled(.ai) {
                 AskAIMenu()
             }
@@ -114,32 +114,6 @@ struct TranscriptFormatItems: View {
             get: { model.transcriptDisplayMode },
             set: { model.showTranscriptLayout($0) }
         )
-    }
-}
-
-/// Reads the whole transcript out; a source-aware Read Aloud button replaces this view as a unit.
-struct ReadAloudToolbarButton: View {
-    @Environment(AppModel.self) private var model
-    @State private var speaker = TranscriptSpeaker()
-
-    var body: some View {
-        Button(action: toggle) {
-            Label(title, systemImage: speaker.isSpeaking ? "speaker.wave.2.fill" : "speaker.wave.2")
-        }
-        .disabled(!model.hasTranscript)
-        .help(help)
-        .axLeaf("Toolbar.Transcript.Button.ReadAloud")
-    }
-
-    private var title: LocalizedStringKey { speaker.isSpeaking ? "Stop Reading" : "Read Aloud" }
-    private var help: LocalizedStringKey { speaker.isSpeaking ? "Stop reading" : "Read aloud" }
-
-    private func toggle() {
-        if speaker.isSpeaking {
-            speaker.stop()
-        } else if model.transcript != nil {
-            speaker.speak(model.transcriptText, languageCode: model.transcript?.language)
-        }
     }
 }
 

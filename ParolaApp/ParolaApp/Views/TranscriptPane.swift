@@ -10,6 +10,7 @@ struct PlayerSurface: NSViewRepresentable {
         view.player = player
         view.controlsStyle = .none
         view.showsFullScreenToggleButton = false
+        view.updatesNowPlayingInfoCenter = false
         return view
     }
 
@@ -100,6 +101,9 @@ struct TranscriptPane: View {
 
             if TranslationStrip.shows(model.translationState) {
                 TranslationStrip()
+                Divider()
+            } else if model.hasTranslation, model.transcriptPaneMode == .transcript {
+                TranslationReadRow()
                 Divider()
             }
 

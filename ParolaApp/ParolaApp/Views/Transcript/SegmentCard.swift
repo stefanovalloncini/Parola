@@ -424,6 +424,9 @@ struct SegmentCard: View {
                 .axLeaf("Card.Button.Merge")
             Button("Copy Link to This Segment") { copyDeeplink() }
                 .axLeaf("Card.Button.CopyLink")
+            Button("Read Aloud from Here") { readFromHere() }
+                .disabled(model.readingBlockedReason != nil)
+                .axLeaf("Card.Button.ReadFromHere")
             Divider()
             assignSegmentMenu
             Divider()
@@ -481,6 +484,9 @@ struct SegmentCard: View {
         Button("Copy Link to This Segment") { copyDeeplink() }
             .disabled(model.selectedEntryID == nil)
             .axLeaf("Card.MenuItem.CopyLink")
+        Button("Read Aloud from Here") { readFromHere() }
+            .disabled(model.readingBlockedReason != nil)
+            .axLeaf("Card.MenuItem.ReadFromHere")
         Divider()
         assignSegmentMenu
         Divider()
@@ -499,6 +505,7 @@ struct SegmentCard: View {
             Button("Play from Here") { model.seek(to: segment) }
         }
         Button("Copy Segment") { copySegment() }
+        Button("Read Aloud from Here") { readFromHere() }
         Button("Split Segment") { splitSegment() }
         if !isLastSegment {
             Button("Merge with Next Segment") { model.mergeSegmentWithNext(id: segment.id) }
@@ -547,6 +554,10 @@ struct SegmentCard: View {
 
     private func splitSegment() {
         model.splitAtPlayingWord(segment)
+    }
+
+    private func readFromHere() {
+        Task { await model.readAloud(ReadAloudRequest(kind: .transcript, fromSegment: segment.id)) }
     }
 
     private func beginEditing() {
