@@ -35,6 +35,46 @@ struct MediaSessionTests {
         func play() async { playCalls += 1 }
     }
 
+    private actor SpyOwnPlayback: OwnPlaybackControl {
+        let pausesSomething: Bool
+        private(set) var pauseCalls = 0
+        private(set) var resumeCalls = 0
+
+        init(pausesSomething: Bool) { self.pausesSomething = pausesSomething }
+
+        func pausePlaying() async -> Bool {
+            pauseCalls += 1
+            return pausesSomething
+        }
+
+        func resumePaused() async { resumeCalls += 1 }
+    }
+
+    @Test("with pause on, the app's own playback is paused at the start and resumed at the end")
+    func ownPlaybackPausesAndResumes() async {
+        let own = SpyOwnPlayback(pausesSomething: true)
+        let session = MediaSession(muter: SpyMuter(startMuted: false), player: SpyPlayer(), ownPlayback: own)
+
+        await session.enterRecording(config: MediaSessionConfig(muteSystemAudio: false, pausePlayback: true))
+        #expect(await own.pauseCalls == 1)
+        #expect(await own.resumeCalls == 0)
+        await session.exitRecording()
+        #expect(await own.resumeCalls == 1)
+    }
+
+    @Test("with pause off, or when nothing of the app's own was playing, nothing is resumed")
+    func ownPlaybackLeftAlone() async {
+        let own = SpyOwnPlayback(pausesSomething: false)
+        let session = MediaSession(muter: SpyMuter(startMuted: false), player: SpyPlayer(), ownPlayback: own)
+
+        await session.enterRecording(config: MediaSessionConfig(muteSystemAudio: true, pausePlayback: false))
+        await session.exitRecording()
+        await session.enterRecording(config: MediaSessionConfig(muteSystemAudio: false, pausePlayback: true))
+        await session.exitRecording()
+        #expect(await own.pauseCalls == 1)
+        #expect(await own.resumeCalls == 0)
+    }
+
     @Test("both flags on mutes and pauses once")
     func enterWithBothFlags() async {
         let muter = SpyMuter(startMuted: false)

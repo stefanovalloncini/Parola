@@ -31,9 +31,17 @@ public extension MediaPlaybackToggler {
     func isPlaying() async -> Bool { true }
 }
 
+/// The app's own players, which the system-wide pause doesn't reach.
+public protocol OwnPlaybackControl: Sendable {
+    func pausePlaying() async -> Bool
+    func resumePaused() async
+}
+
 public actor MediaSession {
     private let muter: any SystemAudioMuter
     private let player: any MediaPlaybackToggler
+    private let ownPlayback: (any OwnPlaybackControl)?
+    private var ownPlaybackPaused = false
 
     private var active: Bool = false
     private var wasMutedBeforeEnter: Bool?
@@ -41,10 +49,12 @@ public actor MediaSession {
 
     public init(
         muter: (any SystemAudioMuter)? = nil,
-        player: (any MediaPlaybackToggler)? = nil
+        player: (any MediaPlaybackToggler)? = nil,
+        ownPlayback: (any OwnPlaybackControl)? = nil
     ) {
         self.muter = muter ?? CoreAudioMute()
         self.player = player ?? MediaRemotePauseAdapter()
+        self.ownPlayback = ownPlayback
     }
 
     public func enterRecording(config: MediaSessionConfig) async {
@@ -57,6 +67,10 @@ public actor MediaSession {
             if !already {
                 await muter.setMuted(true)
             }
+        }
+
+        if config.pausePlayback, let ownPlayback {
+            ownPlaybackPaused = await ownPlayback.pausePlaying()
         }
 
         // Only pause (and later resume) when something was actually playing, mirroring
@@ -75,6 +89,11 @@ public actor MediaSession {
             await muter.setMuted(false)
         }
         wasMutedBeforeEnter = nil
+
+        if ownPlaybackPaused, let ownPlayback {
+            ownPlaybackPaused = false
+            await ownPlayback.resumePaused()
+        }
 
         if pauseIssued {
             await player.play()
