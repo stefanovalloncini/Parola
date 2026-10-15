@@ -70,7 +70,7 @@ struct MediaRemotePauseAdapter: MediaPlaybackToggler {
     }
 
     static func liveOutputActivityProbe() -> [OutputProcess] {
-        outputProcesses(AudioProcessObjectList.current(), pid: pid(of:), isRunningOutput: isRunningOutput(of:))
+        outputProcesses(AudioProcessObjectList.current(), pid: pid(of:), isRunningOutput: AudioProcessObjectList.isRunningOutput)
     }
 
     private static func pid(of processObject: AudioObjectID) -> pid_t? {
@@ -83,18 +83,6 @@ struct MediaRemotePauseAdapter: MediaPlaybackToggler {
         var size = UInt32(MemoryLayout<pid_t>.size)
         guard AudioObjectGetPropertyData(processObject, &address, 0, nil, &size, &value) == noErr else { return nil }
         return value
-    }
-
-    private static func isRunningOutput(of processObject: AudioObjectID) -> Bool? {
-        var address = AudioObjectPropertyAddress(
-            mSelector: kAudioProcessPropertyIsRunningOutput,
-            mScope: kAudioObjectPropertyScopeGlobal,
-            mElement: kAudioObjectPropertyElementMain
-        )
-        var value: UInt32 = 0
-        var size = UInt32(MemoryLayout<UInt32>.size)
-        guard AudioObjectGetPropertyData(processObject, &address, 0, nil, &size, &value) == noErr else { return nil }
-        return value != 0
     }
     #else
     static func liveNowPlayingQuery() async -> Bool { true }

@@ -3,7 +3,7 @@ import Foundation
 /// A source that can tell its watched processes are gone; system-audio sources don't, so their `whenCaptureEnds` stays as it was.
 public protocol TargetsGoneReporting: LiveAudioSource {
     func whenTargetsGone(_ handler: @escaping @Sendable () -> Void) async
-    /// The process objects the tap is built on.
+    /// The process objects watched now.
     func watchedProcessObjects() async -> [UInt32]
     /// Watches only `survivors` from here on, reporting the next departure to `handler`.
     func rewatchTargets(_ survivors: [UInt32], _ handler: @escaping @Sendable () -> Void) async

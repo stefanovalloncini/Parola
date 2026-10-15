@@ -55,21 +55,9 @@ public actor ProcessTapAudioSource: LiveAudioSource, TargetsGoneReporting {
         targets.contains { bundleID == $0 || bundleID.hasPrefix($0 + ".") }
     }
 
-    /// Whether the process is playing audio now.
+    /// Whether the process has an output stream running; true through silence.
     public static func isRunningOutput(_ processObject: AudioObjectID) -> Bool {
-        var address = AudioObjectPropertyAddress(
-            mSelector: kAudioProcessPropertyIsRunningOutput,
-            mScope: kAudioObjectPropertyScopeGlobal,
-            mElement: kAudioObjectPropertyElementMain
-        )
-        var value: UInt32 = 0
-        var dataSize = UInt32(MemoryLayout<UInt32>.size)
-        return AudioObjectGetPropertyData(processObject, &address, 0, nil, &dataSize, &value) == noErr && value != 0
-    }
-
-    /// The live process list for an app-only capture of `targets`.
-    public static func liveProbe(targets: Set<String>) -> TapEnd.Probe {
-        TapEnd.Probe(objects: { audioProcessObjects(matching: targets) }, isRunningOutput: { isRunningOutput($0) })
+        AudioProcessObjectList.isRunningOutput(processObject) ?? false
     }
 
     private static func bundleID(of processObject: AudioObjectID) -> String? {
@@ -507,6 +495,18 @@ enum AudioProcessObjectList {
             return []
         }
         return Array(objects.prefix(Int(dataSize) / MemoryLayout<AudioObjectID>.size))
+    }
+
+    static func isRunningOutput(_ processObject: AudioObjectID) -> Bool? {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioProcessPropertyIsRunningOutput,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var value: UInt32 = 0
+        var size = UInt32(MemoryLayout<UInt32>.size)
+        guard AudioObjectGetPropertyData(processObject, &address, 0, nil, &size, &value) == noErr else { return nil }
+        return value != 0
     }
 }
 
