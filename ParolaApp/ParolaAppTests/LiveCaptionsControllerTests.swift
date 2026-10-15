@@ -158,6 +158,8 @@ extension TranscriberMockSuites {
 
         @Test("Apple Speech captions refuse Translate at start and on the flip, with Retry on the panel", .timeLimit(.minutes(1)))
         func appleSpeechRefusesTranslate() async throws {
+            StreamingTranscriberFactory.useOfflineAppleSpeechCaptions(true)
+            defer { StreamingTranscriberFactory.useOfflineAppleSpeechCaptions(false) }
             try await withMocksCleared(.streaming) {
                 let expected = FailureText.message(
                     for: ParolaError.unsupportedForEngine(FixedFailureText.cannotTranslate("Apple Speech"))
@@ -236,10 +238,10 @@ extension TranscriberMockSuites {
                 await controller.start(options: TranscriptionOptions())
                 await waitUntil { controller.state.error != nil }
 
-                controller.unavailableReason = { "Apple Speech can't show Live Captions. Pick a Whisper or Parakeet model." }
+                controller.unavailableReason = { "Parakeet TDT 0.6B v2 is English-only. Pick a multilingual model (like Whisper) to transcribe other languages." }
                 await controller.tryAgain()
 
-                #expect(controller.state.error == "Apple Speech can't show Live Captions. Pick a Whisper or Parakeet model.")
+                #expect(controller.state.error == "Parakeet TDT 0.6B v2 is English-only. Pick a multilingual model (like Whisper) to transcribe other languages.")
                 #expect(!controller.state.isActive)
                 #expect(controller.isPanelShown)
             }

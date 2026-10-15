@@ -231,6 +231,10 @@ enum FailureText {
             #endif
         case FixedFailureText.speakerModelUnavailable:
             return String(localized: "The speaker labelling model isn't available.", bundle: bundle)
+        case FixedFailureText.appleSpeechStoppedListening:
+            return String(localized: "Apple Speech stopped listening.", bundle: bundle)
+        case FixedFailureText.appleSpeechCouldNotStart:
+            return String(localized: "Apple Speech couldn't start. Try again.", bundle: bundle)
         case "Apple Speech does not support translation":
             return String(localized: "This engine can't translate. Pick a Whisper model.", bundle: bundle)
         case FixedFailureText.engineModelNotLoaded, "Parakeet model not loaded", "Apple Speech engine not loaded":
@@ -251,7 +255,7 @@ enum FailureText {
         for ending in [" does not support translation.", " does not support translation"] where text.hasSuffix(ending) {
             return String(localized: "This engine can't translate. Pick a Whisper model.", bundle: bundle)
         }
-        if text.hasPrefix(FixedFailureText.appleSpeechNoModelPrefix), text.hasSuffix(".") {
+        if text.hasPrefix(FixedFailureText.appleSpeechNoModelPrefix), text.hasSuffix("."), !text.contains(":") {
             let locale = String(text.dropFirst(FixedFailureText.appleSpeechNoModelPrefix.count).dropLast())
             return String(localized: "Apple Speech has no model for \(locale).", bundle: bundle)
         }

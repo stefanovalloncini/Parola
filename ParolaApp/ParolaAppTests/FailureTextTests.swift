@@ -70,6 +70,12 @@ struct FailureTextTests {
         #expect(FailureText.message(for: download, bundle: it)
             == "Apple Speech non è riuscito a scaricare il modello per it_IT. Controlla la connessione e riprova.")
         #expect(FailureText.message(for: download) == FixedFailureText.appleSpeechDownloadFailed("it_IT"))
+        #expect(FailureText.message(for: ParolaError.unsupportedForEngine(FixedFailureText.appleSpeechStoppedListening), bundle: it)
+            == "Apple Speech ha smesso di ascoltare.")
+        #expect(FailureText.message(for: ParolaError.unsupportedForEngine(FixedFailureText.appleSpeechCouldNotStart), bundle: it)
+            == "Apple Speech non è riuscito ad avviarsi. Riprova.")
+        let batch = ParolaError.unsupportedForEngine("Apple Speech has no model for it_IT: The operation couldn't be completed.")
+        #expect(FailureText.message(for: batch, bundle: it) == "Apple Speech has no model for it_IT: The operation couldn't be completed.")
         let translate = ParolaError.unsupportedForEngine(FixedFailureText.cannotTranslate("Apple Speech"))
         #expect(FailureText.message(for: translate, bundle: it) == "Questo motore non traduce. Scegli un modello Whisper.")
     }

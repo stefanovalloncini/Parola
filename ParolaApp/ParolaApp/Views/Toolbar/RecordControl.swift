@@ -113,7 +113,7 @@ struct RecordControl: View {
         .axLeaf("Toolbar.Menu.RecordModes")
     }
 
-    /// Captions already running can always be stopped; starting them needs a model that streams.
+    /// Captions already running can always be stopped; starting them needs a model that fits the language.
     private var liveCaptionsItem: some View {
         let active = model.liveCaptions?.isActive == true
         let reason = model.liveCaptionsUnavailableReason

@@ -169,7 +169,7 @@ struct MenuBarItemsTests {
 
     @Test("Live Captions is disabled with the unavailable reason as its tooltip")
     func captionsDisabledWithReason() {
-        let reason = "Apple Speech can't show Live Captions. Pick a Whisper or Parakeet model."
+        let reason = "Parakeet TDT 0.6B v2 is English-only. Pick a multilingual model (like Whisper) to transcribe other languages."
         let snapshot = fullSnapshot(captionsUnavailableReason: reason)
         let items = MenuBarController.items(for: snapshot, target: nil)
         let captions = items.first { $0.title.contains("Live Captions") }
@@ -217,7 +217,7 @@ struct MenuBarItemsTests {
 
     @Test("a disabled item stays disabled after AppKit revalidates the menu")
     func autoenablingIsOffEverywhere() {
-        let reason = "Apple Speech can't show Live Captions. Pick a Whisper or Parakeet model."
+        let reason = "Parakeet TDT 0.6B v2 is English-only. Pick a multilingual model (like Whisper) to transcribe other languages."
         let snapshot = fullSnapshot(detectedMeetingApp: "Zoom", captionsUnavailableReason: reason)
         let menu = MenuBarController.menu(for: snapshot, target: nil)
         #expect(menu.autoenablesItems == false)

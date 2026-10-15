@@ -2604,6 +2604,28 @@
         }
       }
     },
+    "Apple Speech couldn't start. Try again.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Speech non è riuscito ad avviarsi. Riprova."
+          }
+        }
+      }
+    },
+    "Apple Speech stopped listening.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Speech ha smesso di ascoltare."
+          }
+        }
+      }
+    },
     "Apple Speech has no model for %@.": {
       "extractionState": "manual",
       "localizations": {
