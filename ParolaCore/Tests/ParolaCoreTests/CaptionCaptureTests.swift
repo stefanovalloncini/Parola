@@ -152,7 +152,11 @@ private actor StubSource: LiveAudioSource, TargetsGoneReporting {
         watched = survivors
         rewatches += 1
         endHandler = handler
+        if firesOnRewatch { handler() }
     }
+
+    private(set) var firesOnRewatch = false
+    func fireOnRewatch() { firesOnRewatch = true }
 
     func end() { endHandler?() }
 
@@ -521,6 +525,29 @@ struct ExternalCaptionCaptureTests {
         await fake.clock.waitForSleeper()
         fake.clock.advance(by: .seconds(1))
         await ended.wait(until: { $0.count == 1 }, "the end to be reported")
+        #expect(ended.value == [FixedFailureText.appQuit("us.zoom.xos")])
+    }
+
+    @Test("a survivor that leaves while the watch moves still ends the capture", .timeLimit(.minutes(1)))
+    func survivorLeavesAsTheWatchMoves() async throws {
+        let fake = FakeEnvironment(processObjects: [1, 2])
+        fake.setOutputting([1])
+        let capture = CaptionCapture.external(app, environment: fake.environment)
+        let ended = Awaitable<[String]>([])
+        capture.whenEnded?({ text in ended.update { $0.append(text) } })
+        _ = await capture.requestPermission()
+        try await capture.start { _ in }
+        let stub = try #require(fake.sources.first)
+        await stub.fireOnRewatch()
+        fake.setProcessObjects([1])
+        await stub.end()
+        await fake.clock.waitForSleeper()
+        fake.clock.advance(by: .seconds(1))
+        await pollUntil("the watch to move") { await stub.rewatches == 1 }
+        fake.setProcessObjects([])
+        await fake.clock.waitForSleeper()
+        fake.clock.advance(by: .seconds(1))
+        await ended.wait(until: { $0.count == 1 }, "the end to be reported", timeout: .seconds(5))
         #expect(ended.value == [FixedFailureText.appQuit("us.zoom.xos")])
     }
 

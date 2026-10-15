@@ -2786,7 +2786,13 @@ extension TranscriberMockSuites.MeetingSecondTrackTests {
             #expect(model.recording?.state == .recording)
             #expect(!model.takeMacAudioStopped)
             #expect(model.exportNotice == nil)
-            await model.discardTake()
+
+            model.takeAppProcessObjects = { _ in [] }
+            await tap.targetsLeave()
+
+            let notice = await waitForNotice(model)
+            #expect(notice?.message == "\(Self.appID) quit, so Parola stopped the recording.")
+            #expect(model.takeStoppedOnItsOwn)
         }
     }
 
