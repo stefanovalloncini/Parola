@@ -156,6 +156,36 @@ extension TranscriberMockSuites {
             }
         }
 
+        @Test("Apple Speech captions refuse Translate at start and on the flip, with Retry on the panel", .timeLimit(.minutes(1)))
+        func appleSpeechRefusesTranslate() async throws {
+            try await withMocksCleared(.streaming) {
+                let expected = FailureText.message(
+                    for: ParolaError.unsupportedForEngine(FixedFailureText.cannotTranslate("Apple Speech"))
+                )
+                let apple = TranscriptionOptions(model: "apple-speech-analyzer")
+
+                let flipped = LiveCaptionsController(showsPanel: false)
+                MockStreamingTranscriberRegistry.shared.install(MockTranscriberResponse(partials: ["hello"], delayMs: 300))
+                await flipped.start(options: apple)
+                await waitUntil { !flipped.state.partial.isEmpty }
+                MockStreamingTranscriberRegistry.shared.clear()
+                await flipped.setTranslate(true)
+                await waitUntil { flipped.state.error != nil }
+                #expect(flipped.state.error == expected)
+                #expect(!flipped.state.isActive)
+                #expect(flipped.isPanelShown, "the panel stays so Retry is there")
+
+                await flipped.tryAgain()
+                await waitUntil { !flipped.state.isActive && flipped.state.error != nil }
+                #expect(flipped.state.error == expected)
+
+                let atStart = LiveCaptionsController(showsPanel: false)
+                await atStart.start(options: TranscriptionOptions(model: "apple-speech-analyzer", task: .translate))
+                await waitUntil { atStart.state.error != nil }
+                #expect(atStart.state.error == expected)
+            }
+        }
+
         @Test("Retry uses the current translate setting, not the one the failed start had", .timeLimit(.minutes(1)))
         func retryAfterTranslateIsTurnedOff() async throws {
             try await withMocksCleared(.streaming) {
@@ -235,7 +265,7 @@ extension TranscriberMockSuites {
             }
         }
 
-        @Test("flipping Translate in the app reaches the controller for Parakeet, and still not for Apple Speech", .timeLimit(.minutes(1)))
+        @Test("flipping Translate in the app reaches the controller for Parakeet and for Apple Speech", .timeLimit(.minutes(1)))
         func appModelFlipReachesTheController() async throws {
             let model = AppModel(bootstrap: AppBootstrap(
                 mode: .test, library: makeTempLibraryURL("captions-flip"), defaultsOverride: temporaryDefaults(),
@@ -254,8 +284,8 @@ extension TranscriberMockSuites {
             await waitUntil { !controller.translateToEnglish }
             model.selectedModel = "apple-speech-analyzer"
             model.liveCaptionsTranslate = true
-            await Task.yield()
-            #expect(!controller.translateToEnglish)
+            await waitUntil { controller.translateToEnglish }
+            #expect(controller.translateToEnglish)
         }
 
         @Test("Stop leaves no partial behind, so Save Captions holds no duplicate of the last line", .timeLimit(.minutes(1)))

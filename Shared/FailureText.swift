@@ -251,6 +251,16 @@ enum FailureText {
         for ending in [" does not support translation.", " does not support translation"] where text.hasSuffix(ending) {
             return String(localized: "This engine can't translate. Pick a Whisper model.", bundle: bundle)
         }
+        if text.hasPrefix(FixedFailureText.appleSpeechNoModelPrefix), text.hasSuffix(".") {
+            let locale = String(text.dropFirst(FixedFailureText.appleSpeechNoModelPrefix.count).dropLast())
+            return String(localized: "Apple Speech has no model for \(locale).", bundle: bundle)
+        }
+        if text.hasPrefix(FixedFailureText.appleSpeechDownloadFailedPrefix),
+           text.hasSuffix(FixedFailureText.appleSpeechDownloadFailedSuffix) {
+            let locale = String(text.dropFirst(FixedFailureText.appleSpeechDownloadFailedPrefix.count)
+                .dropLast(FixedFailureText.appleSpeechDownloadFailedSuffix.count))
+            return String(localized: "Apple Speech couldn't download its model for \(locale). Check your connection and try again.", bundle: bundle)
+        }
         let labels = " does not support speaker labels."
         if text.hasSuffix(labels) {
             return String(localized: "\(String(text.dropLast(labels.count))) can't label speakers.", bundle: bundle)

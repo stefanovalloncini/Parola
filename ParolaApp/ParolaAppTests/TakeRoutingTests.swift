@@ -553,7 +553,8 @@ struct TakeRoutingTests {
         let model = makeModel()
         let captions = LiveCaptionsController(showsPanel: false)
         model.liveCaptions = captions
-        model.selectedModel = "apple-speech-analyzer"
+        model.selectedModel = "nvidia_parakeet-tdt-0.6b-v2"
+        model.selectedLanguage = "it"
         #expect(model.liveCaptionsUnavailableReason != nil)
         model.installTestTake(source: .microphone)
 

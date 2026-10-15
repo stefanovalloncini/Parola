@@ -101,7 +101,7 @@ final class LiveCaptionsController {
         state.isActive = true
         state.isLoading = true
 
-        let s = StreamingTranscriberFactory.make(source: source, purpose: .captions)
+        let s = StreamingTranscriberFactory.make(source: source, purpose: .captions, model: options.model)
         session = s
         showWindow()
 

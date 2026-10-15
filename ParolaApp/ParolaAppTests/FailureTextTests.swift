@@ -60,6 +60,20 @@ struct FailureTextTests {
             == AppModel.linkFailureMessage(failure, bundle: it))
     }
 
+    @Test("Apple Speech caption failures read in Italian")
+    func appleSpeechCaptionFailures() throws {
+        let it = try bundle("it")
+        let noModel = ParolaError.unsupportedForEngine(FixedFailureText.appleSpeechNoModel("sv_SE"))
+        #expect(FailureText.message(for: noModel, bundle: it) == "Apple Speech non ha un modello per sv_SE.")
+        #expect(FailureText.message(for: noModel) == "Apple Speech has no model for sv_SE.")
+        let download = ParolaError.unsupportedForEngine(FixedFailureText.appleSpeechDownloadFailed("it_IT"))
+        #expect(FailureText.message(for: download, bundle: it)
+            == "Apple Speech non è riuscito a scaricare il modello per it_IT. Controlla la connessione e riprova.")
+        #expect(FailureText.message(for: download) == FixedFailureText.appleSpeechDownloadFailed("it_IT"))
+        let translate = ParolaError.unsupportedForEngine(FixedFailureText.cannotTranslate("Apple Speech"))
+        #expect(FailureText.message(for: translate, bundle: it) == "Questo motore non traduce. Scegli un modello Whisper.")
+    }
+
     @Test("delivery failures read in Italian")
     func deliveryErrors() throws {
         let it = try bundle("it")

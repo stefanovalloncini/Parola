@@ -78,15 +78,13 @@ struct SettingsCopyTests {
         #expect(italian.localizedString(forKey: key, value: "MISSING", table: nil) != "MISSING")
     }
 
-    @Test("Live Captions are available on Whisper and Parakeet, and the reason names the model that isn't")
+    @Test("Live Captions are available on every engine, so no model is refused for its engine")
     func captionsAvailability() {
         let model = makeModel("settings-copy-captions-availability")
-        for id in ["openai_whisper-tiny", "nvidia_parakeet-tdt-0.6b-v2", "nvidia_parakeet-tdt-0.6b-v3"] {
+        for id in ["openai_whisper-tiny", "nvidia_parakeet-tdt-0.6b-v2", "nvidia_parakeet-tdt-0.6b-v3", "apple-speech-analyzer"] {
             model.selectedModel = id
             #expect(model.liveCaptionsUnavailableReason == nil, "\(id)")
         }
-        model.selectedModel = "apple-speech-analyzer"
-        #expect(model.liveCaptionsUnavailableReason != nil)
     }
 
     @Test("English-only Parakeet v2 is unavailable for captions in another language, with the translated language advice")
@@ -108,18 +106,16 @@ struct SettingsCopyTests {
         #expect(download == "Download del modello %lld %%")
     }
 
-    @Test("the Live Captions and Translation panes' model warnings have their Italian")
+    @Test("the Translation pane's model warning has its Italian")
     func modelWarningsAreTranslated() throws {
         let model = makeModel("settings-copy-model-warnings")
         model.selectedModel = "apple-speech-analyzer"
         model.translate = true
-        let captions = try #require(model.liveCaptionsUnavailableReason)
-        #expect(captions.hasSuffix(" can't show Live Captions. Pick a Whisper or Parakeet model."), "\(captions)")
         let translate = try #require(model.translateMismatchWarning)
         #expect(translate.hasSuffix(" can't translate, so transcriptions stay in the source language."), "\(translate)")
         let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
         let italian = try #require(Bundle(path: path))
-        for key in ["%@ can't show Live Captions. Pick a Whisper or Parakeet model.", "%@ can't translate, so transcriptions stay in the source language."] {
+        for key in ["%@ can't translate, so transcriptions stay in the source language."] {
             #expect(italian.localizedString(forKey: key, value: "MISSING", table: nil) != "MISSING", "\(key)")
         }
     }

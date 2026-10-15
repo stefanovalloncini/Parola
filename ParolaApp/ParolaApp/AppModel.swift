@@ -1150,13 +1150,8 @@ final class AppModel {
 
     /// Nil when the selected model can show live captions; otherwise the user-facing reason.
     var liveCaptionsUnavailableReason: String? {
-        guard ModelCatalog.canCaption(id: selectedModel) else { return unsupportedCaptionReason }
         if ModelCatalog.variant(id: selectedModel)?.engineID == .parakeet { return languageMismatchWarning }
         return nil
-    }
-
-    private var unsupportedCaptionReason: String {
-        String(localized: "\(AppModel.modelLabel(selectedModel)) can't show Live Captions. Pick a Whisper or Parakeet model.")
     }
 
     func toggleLiveCaptions() {
@@ -2366,9 +2361,9 @@ final class AppModel {
     }
 
     private func applyLiveCaptionsTranslateChange() {
-        // Parakeet passes so the panel reports it can't translate, instead of the switch doing nothing.
-        let parakeet = ModelCatalog.variant(id: selectedModel)?.engineID == .parakeet
-        let enabled = liveCaptionsTranslate && (selectedModelCapabilities.supportsTranslate || parakeet)
+        // These engines pass so the panel reports they can't translate, instead of the switch doing nothing.
+        let reportsRefusal = [.parakeet, .appleSpeech].contains(ModelCatalog.variant(id: selectedModel)?.engineID)
+        let enabled = liveCaptionsTranslate && (selectedModelCapabilities.supportsTranslate || reportsRefusal)
         Task { await liveCaptions?.setTranslate(enabled) }
     }
 

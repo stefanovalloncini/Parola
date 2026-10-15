@@ -100,17 +100,6 @@
         }
       }
     },
-    "%@ can't show Live Captions. Pick a Whisper or Parakeet model.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ non può mostrare i sottotitoli in tempo reale. Scegli un modello Whisper o Parakeet."
-          }
-        }
-      }
-    },
     "%@ is English-only. Pick a multilingual model (like Whisper) to transcribe other languages.": {
       "extractionState": "manual",
       "localizations": {
@@ -2600,6 +2589,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Audio"
+          }
+        }
+      }
+    },
+    "Apple Speech couldn't download its model for %@. Check your connection and try again.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Speech non è riuscito a scaricare il modello per %@. Controlla la connessione e riprova."
+          }
+        }
+      }
+    },
+    "Apple Speech has no model for %@.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Speech non ha un modello per %@."
           }
         }
       }
