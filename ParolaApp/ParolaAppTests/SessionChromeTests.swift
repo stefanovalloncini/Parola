@@ -1556,6 +1556,8 @@ private func withChatModel(_ body: @MainActor () async throws -> Void) async thr
 /// The test host's own app: its real main menu and main window, its status item and pill off for the test.
 @MainActor
 private func withHostApp(_ body: @MainActor (AppModel, NSWindow) async throws -> Void) async throws {
+    let opened = await waitUntil(timeoutMs: 30_000) { AppDelegate.launchModel?.mainWindow != nil }
+    try #require(opened, "the host's main window opened")
     let host = try #require(AppDelegate.launchModel)
     let library = host.library.libraryURL.standardizedFileURL.path
     try #require(library == TestHostSandbox.current.library.standardizedFileURL.path, "the host's library is the test sandbox, whose entries this empties")
