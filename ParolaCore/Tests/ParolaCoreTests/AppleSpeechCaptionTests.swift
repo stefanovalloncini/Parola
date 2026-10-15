@@ -770,7 +770,7 @@ struct CaptionSentencesTests {
         let pieces = CaptionSentences.split(final(runs.map(\.text).joined(), 0, 2.5, runs: runs))
         #expect(pieces.map(\.text) == ["Hello there.", "How are you?"])
         #expect(pieces[0].start == 0 && pieces[0].end == 1.5)
-        #expect(pieces[1].start == 0.5 && pieces[1].end == 2.5)
+        #expect(pieces[1].start == 1.6 && pieces[1].end == 2.5)
     }
 
     @Test("without runs the times are proportional to where each sentence sits")

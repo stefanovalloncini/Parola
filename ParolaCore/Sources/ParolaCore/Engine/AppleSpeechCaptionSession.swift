@@ -211,12 +211,12 @@ actor AppleSpeechCaptionSession: StreamingTranscriber {
         } catch {
             startingCapture = false
             ParolaLog.error(.streaming, "streaming capture failed to start", [.error: .error(error)])
-            stopCapture()
+            stop(capture)
             if phase == .running { await fail(error.localizedDescription) }
             return
         }
         startingCapture = false
-        if phase != .running { stopCapture() }
+        if phase != .running { stop(capture) }
     }
 
     private func apply(_ recognition: CaptionRecognition) {
@@ -335,20 +335,23 @@ actor AppleSpeechCaptionSession: StreamingTranscriber {
         intake.close()
         let race = FirstResult<Bool>()
         settling = race
-        if cancelledWhileEnding { race.resolve(false) }
         let limit = settleLimit
         let clock = clock
-        Task {
-            let finalized = await AsyncTimeout.run(limit, clock: clock) { () async -> Bool in
-                do {
-                    try await analyzer.finalize()
-                    return true
-                } catch {
-                    ParolaLog.error(.streaming, "apple speech failed to finalize", [.error: .error(error)])
-                    return false
+        if cancelledWhileEnding {
+            race.resolve(false)
+        } else {
+            Task {
+                let finalized = await AsyncTimeout.run(limit, clock: clock) { () async -> Bool in
+                    do {
+                        try await analyzer.finalize()
+                        return true
+                    } catch {
+                        ParolaLog.error(.streaming, "apple speech failed to finalize", [.error: .error(error)])
+                        return false
+                    }
                 }
+                race.resolve(finalized ?? false)
             }
-            race.resolve(finalized ?? false)
         }
         let settled = await race.wait()
         settling = nil
@@ -401,7 +404,13 @@ actor AppleSpeechCaptionSession: StreamingTranscriber {
     }
 
     private func stopCapture() {
-        guard !didStopCapture, let capture else { return }
+        guard let capture else { return }
+        stop(capture)
+    }
+
+    /// Through the caller's own handle: a session that failed mid-start has already dropped `self.capture`.
+    private func stop(_ capture: CaptionCapture) {
+        guard !didStopCapture else { return }
         didStopCapture = true
         capture.stop()
     }

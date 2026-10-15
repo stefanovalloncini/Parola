@@ -7,6 +7,9 @@ protocol AssetInstalling: Sendable {
 }
 
 enum AssetInstall {
+    /// Past this the download is done and Speech is unpacking, which reports no progress of its own.
+    private static let installingFraction = 0.99
+
     private struct Stalled: Error {}
 
     /// Runs the install, reporting progress. A stop cancels the request, and so does progress that stays put for `stallLimit`.
@@ -38,7 +41,7 @@ enum AssetInstall {
                     last = now
                     still = .zero
                     progress(now)
-                } else {
+                } else if now < installingFraction {
                     still += poll
                     if still >= stallLimit {
                         race.resolve(.failure(Stalled()))

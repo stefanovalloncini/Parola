@@ -11,37 +11,34 @@ enum CaptionSentences {
         guard ranges.count > 1 else { return [recognition] }
 
         let total = max(1, text.count)
-        let spans = runSpans(recognition.runs, totalCharacters: text.count)
+        let bounds = ranges.map { (text.distance(from: text.startIndex, to: $0.lowerBound), text.distance(from: text.startIndex, to: $0.upperBound)) }
+        let owned = runsBySentence(recognition.runs, text: text, bounds: bounds)
         var pieces: [CaptionRecognition] = []
-        for range in ranges {
+        for (index, range) in ranges.enumerated() {
             let piece = text[range].trimmingCharacters(in: .whitespacesAndNewlines)
             guard !piece.isEmpty else { continue }
-            let low = text.distance(from: text.startIndex, to: range.lowerBound)
-            let high = text.distance(from: text.startIndex, to: range.upperBound)
-            let timed = spans.filter { $0.low < high && $0.high > low }
+            let timed = owned[index]
             let span = recognition.end - recognition.start
-            let start = timed.compactMap(\.start).min() ?? recognition.start + span * Double(low) / Double(total)
-            let end = timed.compactMap(\.end).max() ?? recognition.start + span * Double(high) / Double(total)
+            let start = timed.compactMap(\.start).min() ?? recognition.start + span * Double(bounds[index].0) / Double(total)
+            let end = timed.compactMap(\.end).max() ?? recognition.start + span * Double(bounds[index].1) / Double(total)
             pieces.append(CaptionRecognition(text: piece, start: start, end: end, isFinal: recognition.isFinal))
         }
         return pieces
     }
 
-    private struct Span {
-        var low: Int
-        var high: Int
-        var start: Double?
-        var end: Double?
-    }
-
-    private static func runSpans(_ runs: [CaptionRecognition.Run], totalCharacters: Int) -> [Span] {
-        var spans: [Span] = []
+    /// Each run belongs to the sentence holding its first non-space character: Speech puts the space before a word, and the tokenizer keeps it with the sentence before.
+    private static func runsBySentence(
+        _ runs: [CaptionRecognition.Run], text: String, bounds: [(Int, Int)]
+    ) -> [[CaptionRecognition.Run]] {
+        var owned = [[CaptionRecognition.Run]](repeating: [], count: bounds.count)
+        guard runs.reduce(0, { $0 + $1.text.count }) == text.count else { return owned }
         var offset = 0
         for run in runs {
-            let length = run.text.count
-            spans.append(Span(low: offset, high: offset + length, start: run.start, end: run.end))
-            offset += length
+            defer { offset += run.text.count }
+            guard let lead = run.text.firstIndex(where: { !$0.isWhitespace }) else { continue }
+            let position = offset + run.text.distance(from: run.text.startIndex, to: lead)
+            if let index = bounds.firstIndex(where: { position >= $0.0 && position < $0.1 }) { owned[index].append(run) }
         }
-        return offset == totalCharacters ? spans : []
+        return owned
     }
 }

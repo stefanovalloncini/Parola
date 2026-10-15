@@ -28,9 +28,10 @@ extension AppleSpeechCaptionBackend {
 enum LiveSpeechCaption {
     static let needsNewerOS = ParolaError.unsupportedForEngine("Apple SpeechAnalyzer requires macOS 26 or iOS 26.")
 
-    /// The language as the person reads it, falling back to the identifier.
+    /// The language as the person reads it, without its region, falling back to the identifier.
     static func languageName(_ locale: Locale) -> String {
-        Locale.current.localizedString(forIdentifier: locale.identifier) ?? locale.identifier
+        let code = locale.language.languageCode?.identifier ?? ""
+        return Locale.current.localizedString(forLanguageCode: code) ?? locale.identifier
     }
 
     /// Only for a locale or audio format Speech has no model for.
