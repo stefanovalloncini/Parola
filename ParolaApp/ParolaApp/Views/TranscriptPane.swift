@@ -102,9 +102,6 @@ struct TranscriptPane: View {
             if TranslationStrip.shows(model.translationState) {
                 TranslationStrip()
                 Divider()
-            } else if model.hasTranslation, model.transcriptPaneMode == .transcript {
-                TranslationReadRow()
-                Divider()
             }
 
             transcriptBody

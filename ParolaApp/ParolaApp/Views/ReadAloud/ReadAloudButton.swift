@@ -128,7 +128,7 @@ struct ReadAloudButton: View {
                     Task { await model.readAloud(ReadAloudRequest(kind: .translation)) }
                 }
                 .disabled(blocked)
-                .axLeaf("Toolbar.Transcript.MenuItem.ReadTranslation")
+                .axLeaf("Translation.Button.ReadAloud")
             }
             Button("Read from Current Segment") {
                 Task { await model.readAloud(ReadAloudRequest(kind: .transcript, fromSegment: model.currentSegmentID)) }
