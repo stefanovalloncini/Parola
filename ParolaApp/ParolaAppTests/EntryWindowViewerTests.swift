@@ -31,6 +31,40 @@ struct EntryWindowViewerTests {
         #expect(session.contentSignature != before)
     }
 
+    @Test("the window's title follows a rename, a late AI title and the AI-title setting")
+    func windowFollowsTheTitleTheRowsShow() async throws {
+        let model = EntryWindowTestSupport.makeModel("viewertitle")
+        let entry = try await EntryWindowTestSupport.seed(
+            model, texts: ["alpha"], speakers: [nil], audio: nil
+        )
+        let session = await EntryWindowTestSupport.openSession(model, entry)
+        let store = EntryWindowTestSupport.store(model)
+        let original = session.title
+
+        _ = try await store.setCardMetadata(aiTitle: "Weekly planning", shortSummary: nil, for: entry.id)
+        await EntryWindowTestSupport.syncLibrary(model)
+        session.reloadIfEntryChanged()
+        #expect(session.title == "Weekly planning")
+
+        model.showAITitles = false
+        session.reloadIfEntryChanged()
+        #expect(session.title == original)
+
+        model.showAITitles = true
+        session.reloadIfEntryChanged()
+        #expect(session.title == "Weekly planning")
+
+        try await store.renameEntry(entry.id, to: "Kickoff call")
+        await EntryWindowTestSupport.syncLibrary(model)
+        session.reloadIfEntryChanged()
+        #expect(session.title == LibraryEntryDisplay.listTitle(
+            for: try #require(model.libraryEntry(id: entry.id)), showsAITitle: true
+        ))
+        model.showAITitles = false
+        session.reloadIfEntryChanged()
+        #expect(session.title == "Kickoff call")
+    }
+
     @Test("the window's text, speakers, words and flowing key are taken at load and follow a reload")
     func derivationsFollowTheLoad() async throws {
         let model = EntryWindowTestSupport.makeModel("viewerderived")

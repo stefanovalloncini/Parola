@@ -141,6 +141,8 @@ final class EntryWindowSession {
             if !loadFailed { reload() }
             return
         }
+        let shown = LibraryEntryDisplay.listTitle(for: entry, showsAITitle: model.showAITitles)
+        if shown != title { title = shown }
         guard entry.updatedAt != appliedUpdatedAt else { return }
         reload()
     }
