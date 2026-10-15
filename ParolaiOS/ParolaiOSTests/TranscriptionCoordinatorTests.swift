@@ -191,6 +191,45 @@ struct TranscriptionCoordinatorTests {
         #expect(FileManager.default.fileExists(atPath: picked.path), "the user's file stays where it was")
     }
 
+    @Test("a file run is counted against the model residency while it runs, and not after")
+    func fileRunIsCountedByTheResidency() async throws {
+        await MockTranscriberRegistry.shared.install(
+            engineID: .appleSpeech,
+            response: MockTranscriberResponse(segments: [.init(start: 0, end: 1, text: "hello there")])
+        )
+        let tmp = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-coord-tests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+        let library = LibraryStore(libraryURL: tmp.appendingPathComponent("Library", isDirectory: true))
+        let settings = UserSettings(defaults: UserDefaults(suiteName: "test-\(UUID().uuidString)")!)
+        settings.modelName = "apple-speech-analyzer"
+        let coord = TranscriptionCoordinator(library: library, settings: settings)
+        #expect(coord.modelResidency.hasFileSession, "the residency knows the coordinator's session")
+        let picked = tmp.appendingPathComponent("counted.wav")
+        try FileManager.default.copyItem(
+            at: try #require(Bundle(for: CoordinatorBundleAnchor.self).url(forResource: "sample", withExtension: "wav")),
+            to: picked
+        )
+        var duringRun: Int?
+        let (landings, landing) = AsyncStream.makeStream(of: LibraryEntry.self)
+        coord.onComplete = { [coord] entry in
+            duringRun = coord.modelResidency.activeRunCount
+            landing.yield(entry)
+        }
+        let giveUp = Task {
+            try? await Task.sleep(for: .seconds(30))
+            landing.finish()
+        }
+
+        coord.startFileTranscription(at: picked)
+        for await _ in landings { break }
+        giveUp.cancel()
+        try await pollUntil { coord.modelResidency.activeRunCount == 0 }
+        await MockTranscriberRegistry.shared.clear()
+
+        #expect(duringRun == 1)
+    }
+
     @Test("removing an import copy leaves a file outside an import folder alone")
     func removeImportCopyIsScoped() throws {
         let stray = FileManager.default.temporaryDirectory

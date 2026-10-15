@@ -11,6 +11,7 @@ final class AppModel {
     let playback = PlaybackController()
 
     var availableModels: [ModelInfo] = []
+    var modelsBeingDeleted: Set<String> = []
     var libraryEntries: [LibraryEntry] = []
     var deletedEntries: [LibraryEntry] = []
     var searchResults: [LibraryEntry]?

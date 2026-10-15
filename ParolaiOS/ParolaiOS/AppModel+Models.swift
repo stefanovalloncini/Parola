@@ -20,11 +20,13 @@ extension AppModel {
     }
 
     @discardableResult
-    func deleteModel(_ name: String, in store: ModelStore = .shared) -> Task<Void, Never> {
-        Task { [weak self] in
+    func deleteModel(_ name: String, in store: ModelStore = .shared) -> Task<Void, Never>? {
+        guard modelsBeingDeleted.insert(name).inserted else { return nil }
+        return Task { [weak self] in
             await self?.coordinator.modelResidency.free(name)
             try? store.deleteLeftovers(variant: name)
             try? store.delete(variant: name)
+            self?.modelsBeingDeleted.remove(name)
             self?.refreshModelList()
         }
     }

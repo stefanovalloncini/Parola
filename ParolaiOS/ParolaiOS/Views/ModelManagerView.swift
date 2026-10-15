@@ -91,6 +91,7 @@ struct ModelManagerView: View {
                 } label: {
                     Image(systemName: "trash")
                 }
+                .disabled(model.modelsBeingDeleted.contains(entry.name))
                 .accessibilityLabel(Text("Delete model"))
             }
         }

@@ -181,6 +181,7 @@ final class ModelResidencyCoordinator {
 #if DEBUG
     var isWarming: Bool { warmTask != nil }
     var activeRunCount: Int { activeFileRuns }
+    var hasFileSession: Bool { fileSession != nil }
     var pendingUnloadCount: Int { pendingUnloads.values.reduce(0) { $0 + $1.count } }
 
     func awaitFileWarm() async {
