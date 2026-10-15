@@ -60,6 +60,7 @@ public actor MockSpeechRenderer: SpeechRenderer {
     private let clock: any Clock<Duration>
     private let sampleRate: Double
     private let secondsPerCharacter: Double
+    private let secondsPerUnit: Double?
     private let realTimeFactor: Double
     private let realTimeFactors: [Int: Double]
     private let startLatency: Duration
@@ -90,6 +91,7 @@ public actor MockSpeechRenderer: SpeechRenderer {
         clock: any Clock<Duration> = ContinuousClock(),
         sampleRate: Double = 24_000,
         secondsPerCharacter: Double = 0.06,
+        secondsPerUnit: Double? = nil,
         realTimeFactor: Double = 0,
         realTimeFactors: [Int: Double] = [:],
         startLatency: Duration = .zero,
@@ -103,6 +105,7 @@ public actor MockSpeechRenderer: SpeechRenderer {
         self.clock = clock
         self.sampleRate = sampleRate
         self.secondsPerCharacter = secondsPerCharacter
+        self.secondsPerUnit = secondsPerUnit
         self.realTimeFactor = realTimeFactor
         self.realTimeFactors = realTimeFactors
         self.startLatency = startLatency
@@ -149,7 +152,8 @@ public actor MockSpeechRenderer: SpeechRenderer {
         peakConcurrentRenders = max(peakConcurrentRenders, activeRenders)
         observer?(.started(unitID: unitID))
 
-        let totalSamples = Int((Double(text.count) * secondsPerCharacter * sampleRate).rounded())
+        let seconds = secondsPerUnit ?? Double(text.count) * secondsPerCharacter
+        let totalSamples = Int((seconds * sampleRate).rounded())
         let (stream, continuation) = AsyncThrowingStream.makeStream(of: PCMChunk.self, throwing: (any Error).self)
         let id = UUID()
         let task = Task {

@@ -62,6 +62,16 @@ struct MockSpeechRendererTests {
         #expect(rendered == [.init(unitID: 3, text: "Hello there", voice: voice, language: "en")])
     }
 
+    @Test("a fixed unit length wins over the text length")
+    func fixedUnitLength() async throws {
+        let renderer = MockSpeechRenderer(sampleRate: 16_000, secondsPerCharacter: 0.05, secondsPerUnit: 0.3, chunkSeconds: 0.1)
+        let stream = try await renderer.render(text: "A much longer sentence than the fixed length", unitID: 1, voice: voice, language: "en")
+        let collector = Collector(stream)
+        try await collector.task.value("the render to finish")
+
+        #expect(collector.chunks.value.map(\.samples.count) == [1_600, 1_600, 1_600])
+    }
+
     @Test("a tone is a continuous sine across chunks")
     func tone() async throws {
         let renderer = MockSpeechRenderer(
