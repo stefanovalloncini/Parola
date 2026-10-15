@@ -70,7 +70,7 @@ struct ReadAloudButtonStatusTests {
             ("Read aloud", "Leggi ad alta voce"),
             ("Reading waits until the recording ends.", "La lettura attende la fine della registrazione."),
             ("Reading waits until dictation ends.", "La lettura attende la fine della dettatura."),
-            ("Reading waits until live captions stop.", "La lettura attende lo stop dei sottotitoli in tempo reale."),
+            ("Reading waits until live captions stop.", "La lettura attende la fine dei sottotitoli in tempo reale."),
             ("Read from Current Segment", "Leggi dal segmento corrente"),
             ("Read Aloud from Here", "Leggi ad alta voce da qui"),
             ("Read Translation (%@)", "Leggi la traduzione (%@)"),

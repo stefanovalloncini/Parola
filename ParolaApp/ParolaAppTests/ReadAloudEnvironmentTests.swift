@@ -30,4 +30,16 @@ struct ReadAloudEnvironmentTests {
         inventory.refreshIfStale { refreshes += 1 }
         #expect(refreshes == 1)
     }
+
+    @Test("a list read when the renderer is built is fresh, so an earlier activation costs no second read")
+    func freshAfterBuild() {
+        let inventory = StaleVoiceInventory()
+        var refreshes = 0
+
+        inventory.markStale()
+        inventory.markFresh()
+        inventory.refreshIfStale { refreshes += 1 }
+
+        #expect(refreshes == 0)
+    }
 }

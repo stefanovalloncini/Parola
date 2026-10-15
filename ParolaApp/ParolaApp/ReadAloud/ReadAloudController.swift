@@ -331,7 +331,7 @@ final class ReadAloudController {
         Task { await session.setSpeed(allowed) }
     }
 
-    /// Withdraws Now Playing and marks the paused before the first suspension; the task ends once the output has paused.
+    /// Withdraws Now Playing and marks the reading paused before the first suspension; the task ends once the output has paused.
     @discardableResult
     func yieldNow(to reason: PauseReason, fade: Bool = false) -> Task<Void, Never>? {
         guard beginYield(to: reason) else { return nil }

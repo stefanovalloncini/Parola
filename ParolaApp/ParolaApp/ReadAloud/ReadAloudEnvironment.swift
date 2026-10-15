@@ -70,6 +70,7 @@ final class LiveReadAloudSystem {
         }
         let made = AppleSpeechRenderer()
         apple = made
+        voices.markFresh()
         return made
     }
 
@@ -92,6 +93,10 @@ final class StaleVoiceInventory {
 
     func markStale() {
         isStale = true
+    }
+
+    func markFresh() {
+        isStale = false
     }
 
     func refreshIfStale(_ refresh: () -> Void) {
