@@ -1961,7 +1961,14 @@ final class AppModel {
     @ObservationIgnored let session = TranscriptionSession()
     @ObservationIgnored var modelResidency = ModelResidencyCoordinator(streaming: LiveStreamingModelResidency())
     @ObservationIgnored private let store = ModelStore.shared
-    @ObservationIgnored let mediaSession = MediaSession()
+    @ObservationIgnored lazy var mediaSession = MediaSession(
+        ownPlayback: OwnPlayerPause { [weak self] in self?.ownPlayers() ?? [] }
+    )
+
+    func ownPlayers() -> [PlayerHandle] {
+        let windowPlayers = entryWindows.sessions.values.compactMap(\.player)
+        return ([player].compactMap { $0 } + windowPlayers).map(PlayerHandle.init)
+    }
 
     func mediaSessionConfig(allowMute: Bool) -> MediaSessionConfig {
         MediaSessionConfig(
