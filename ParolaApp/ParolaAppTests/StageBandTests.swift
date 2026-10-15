@@ -513,7 +513,7 @@ extension TranscriberMockSuites {
                 window.contentView = view
                 window.orderFront(nil)
                 defer { window.orderOut(nil) }
-                let feed = TapeFeed(model: model, cadence: .glides, markers: [], micState: nil, macStopped: false)
+                let feed = TapeFeed(model: model, cadence: .glides, markers: [], micState: nil, macEnd: nil)
                 view.follow(feed, ink: CGColor(gray: 0, alpha: 0.85), accent: CGColor(srgbRed: 0.2, green: 0.4, blue: 0.9, alpha: 1))
                 let first = view.built?.newest ?? -1
                 let followed = await waitUntil {

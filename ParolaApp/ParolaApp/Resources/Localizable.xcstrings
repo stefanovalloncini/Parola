@@ -20998,6 +20998,39 @@
           }
         }
       }
+    },
+    "%@ quit": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ è stata chiusa"
+          }
+        }
+      }
+    },
+    "%@ stopped sending audio": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ ha smesso di inviare audio"
+          }
+        }
+      }
+    },
+    "%@ stopped sending audio before anything was recorded.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ ha smesso di inviare audio prima che venisse registrato qualcosa."
+          }
+        }
+      }
     }
   },
   "version": "1.1"

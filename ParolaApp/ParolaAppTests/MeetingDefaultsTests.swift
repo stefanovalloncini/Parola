@@ -77,14 +77,14 @@ struct MeetingDefaultsTests {
         let mic = TakeLevelHistory()
         mac.append(0.5)
         mic.append(0.5)
-        #expect(StageBand.stoppedMacNote(false) == nil)
-        #expect(StageBand.tape(levels: mac, micLevels: mic, micState: .recording, markers: [], paused: false, macStopped: true).macLost == "System audio stopped")
+        #expect(StageBand.stoppedMacNote(nil) == nil)
+        #expect(StageBand.tape(levels: mac, micLevels: mic, micState: .recording, markers: [], paused: false, macEnd: .systemAudio).macLost == "System audio stopped")
         let before = StageTape(levels: [0.1], micLevels: [0.2], flags: [], newest: 4, paused: false)
         #expect(before != StageTape(levels: [0.1], micLevels: [0.2], macLost: "System audio stopped", flags: [], newest: 4, paused: false))
 
         let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
         let it = try #require(Bundle(path: path))
-        #expect(StageBand.stoppedMacNote(true, bundle: it) == "Audio di sistema fermato")
+        #expect(StageBand.stoppedMacNote(.systemAudio, bundle: it) == "Audio di sistema fermato")
         #expect(AppModel.macAudioStoppedMessage(bundle: it) == "L'audio di sistema si è fermato. Il tuo microfono continua a registrare.")
         #expect(AppModel.macAudioStoppedTakeMessage(bundle: it) == "L'audio di sistema si è fermato, quindi Parola ha fermato la registrazione.")
     }

@@ -79,8 +79,8 @@ enum TakeRemote {
         if model.recordingDiskSpaceLow {
             return Warning(message: String(localized: "Low disk space — recording stops automatically below 200 MB."), symbol: "internaldrive")
         }
-        if model.takeMacAudioStopped, take.isCapturing {
-            return Warning(message: String(localized: "System audio stopped"), symbol: StageBand.stoppedMacSymbol)
+        if let end = model.takeMacAudioEnd, take.isCapturing {
+            return Warning(message: end.shortNote(), symbol: StageBand.stoppedMacSymbol)
         }
         guard model.recordingIsSilent else { return nil }
         return Warning(

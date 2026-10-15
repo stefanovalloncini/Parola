@@ -277,7 +277,11 @@ final class AppModel {
     /// Where a meeting's microphone track stands; nil for a take that records none.
     var takeMicTrackState: MicTrackState?
     /// The take's Mac audio capture ended by itself; while the take still captures, your microphone records on. Lasts as long as the session.
-    var takeMacAudioStopped = false
+    var takeMacAudioEnd: MacAudioEnd?
+    var takeMacAudioStopped: Bool {
+        get { takeMacAudioEnd != nil }
+        set { takeMacAudioEnd = newValue ? (takeMacAudioEnd ?? .systemAudio) : nil }
+    }
     /// Why the take stopped without a Stop, because what it recorded ended by itself: its notice's sentence. Lasts as long as the session.
     var takeStopReason: String?
     var takeStoppedOnItsOwn: Bool { takeStopReason != nil }
@@ -295,6 +299,10 @@ final class AppModel {
     @ObservationIgnored var takeAppProcessObjects: @Sendable (Set<String>) -> [AudioObjectID] = { targets in
         guard #available(macOS 14.2, *) else { return [] }
         return ProcessTapAudioSource.audioProcessObjects(matching: targets)
+    }
+    @ObservationIgnored var takeAppIsRunningOutput: @Sendable (UInt32) -> Bool = { object in
+        guard #available(macOS 14.2, *) else { return false }
+        return ProcessTapAudioSource.isRunningOutput(object)
     }
     @ObservationIgnored var takeEndSettle: Duration = .seconds(1)
     /// Test seam: when set, stands in for the capture a take records to a file, so a test decides when it comes up and what it meters.
@@ -4252,9 +4260,6 @@ final class AppModel {
                     let sys = await makeTakeCapture(.systemAudio, take: take)
                     tapsApps = sys is ProcessTapAudioSource
                     await sys.whenCaptureEnds(macCaptureEndHandler(take: take.id))
-                    if let tap = sys as? any TargetsGoneReporting {
-                        await tap.whenTargetsGone(appTargetsGoneHandler(take: take))
-                    }
                     // Tap setup blocks indefinitely while macOS waits for the System Audio
                     // Recording consent; abandon it after 20s so Stop never goes dead.
                     let started: Result<Void, any Error>? = await AsyncTimeout.run(.seconds(20)) {
@@ -4270,6 +4275,9 @@ final class AppModel {
                         throw SystemAudioDidNotStart()
                     }
                     guard await adoptLiveSource(sys, take: take) else { return }
+                    if let tap = sys as? any TargetsGoneReporting {
+                        await tap.whenTargetsGone(appTargetsGoneHandler(take: take, tap: tap))
+                    }
                     startMicTrack(for: activeTake ?? take, pairedWith: liveRecordingAudioURL)
                 }
                 startRecordingWatch(checkpoints: false)

@@ -744,7 +744,7 @@ extension AppModel {
         guard activeTake?.id == takeID, liveSource != nil, let session = recording, session.takeID == takeID, session.isRunning,
               !takeMacAudioStopped else { return }
         ParolaLog.notice(.audioRecording, "a take's Mac audio stopped on its own")
-        takeMacAudioStopped = true
+        takeMacAudioEnd = ending
         let micRecords = micTrack?.takeID == takeID && micTrack?.capture != nil && takeMicTrackState?.isLost != true
         guard micRecords else {
             stopTakeOnItsOwn(takeID, saying: ending.stoppedTakeMessage(), unheard: ending.beforeSoundMessage())
@@ -765,16 +765,17 @@ extension AppModel {
     }
 
     /// What an app-only take's tap calls when a process it watches leaves; the end is told once the app has settled.
-    func appTargetsGoneHandler(take: TakeContext) -> @Sendable () -> Void {
+    func appTargetsGoneHandler(take: TakeContext, tap: any TargetsGoneReporting) -> @Sendable () -> Void {
         let targets = take.captureTargets
         let appBundleID = take.sourceAppBundleID ?? targets.sorted().first ?? ""
         return { [weak self] in
             Task { @MainActor in
                 guard let self else { return }
                 let objects = self.takeAppProcessObjects
-                guard let end = await TapEnd.settled(
-                    after: self.takeEndSettle, on: self.clock, processesLeft: { !objects(targets).isEmpty }
-                ) else { return }
+                let playing = self.takeAppIsRunningOutput
+                let probe = TapEnd.Probe(objects: { objects(targets).map { UInt32($0) } }, isRunningOutput: playing)
+                let again = self.appTargetsGoneHandler(take: take, tap: tap)
+                guard let end = await TapEnd.resolve(tap, after: self.takeEndSettle, on: self.clock, probe: probe, rearm: again) else { return }
                 let name = CaptionAppList.installedName(forBundleID: appBundleID) ?? appBundleID
                 self.macCaptureEnded(take: take.id, ending: end == .quit ? .appQuit(name) : .appStoppedSending(name))
             }
@@ -808,7 +809,17 @@ extension AppModel {
             switch self {
             case .systemAudio: AppModel.macAudioStoppedBeforeSoundMessage(bundle: bundle)
             case .appQuit(let name): String(localized: "\(name) quit before anything was recorded.", bundle: bundle)
-            case .appStoppedSending: stoppedTakeMessage(bundle: bundle)
+            case .appStoppedSending(let name):
+                String(localized: "\(name) stopped sending audio before anything was recorded.", bundle: bundle)
+            }
+        }
+
+        /// The few words the Stage, the pill and the menu bar show while the take records on.
+        func shortNote(bundle: Bundle = .main) -> String {
+            switch self {
+            case .systemAudio: String(localized: "System audio stopped", bundle: bundle)
+            case .appQuit(let name): String(localized: "\(name) quit", bundle: bundle)
+            case .appStoppedSending(let name): String(localized: "\(name) stopped sending audio", bundle: bundle)
             }
         }
     }

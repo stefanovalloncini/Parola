@@ -79,7 +79,7 @@ struct StageBand: View {
             Canvas { context, size in Self.drawPlayhead(in: &context, size: size) }
                 .accessibilityHidden(true)
             if micLane.shown {
-                StageLaneNames(micState: micLane.state, macStopped: model.takeMacAudioStopped)
+                StageLaneNames(micState: micLane.state, macEnd: model.takeMacAudioEnd)
             }
         }
         .saturation(take.isPaused || Self.greys(take.state) ? 0 : 1)
@@ -109,20 +109,20 @@ struct StageBand: View {
     private var tape: StageTape {
         Self.tape(
             levels: model.takeLevels, micLevels: model.takeMicLevels, micState: model.takeMicTrackState,
-            markers: take.markers, paused: take.isPaused, macStopped: model.takeMacAudioStopped
+            markers: take.markers, paused: take.isPaused, macEnd: model.takeMacAudioEnd
         )
     }
 
     private func feed(_ cadence: Cadence) -> TapeFeed {
         TapeFeed(
-            model: model, cadence: cadence, markers: take.markers, micState: model.takeMicTrackState, macStopped: model.takeMacAudioStopped
+            model: model, cadence: cadence, markers: take.markers, micState: model.takeMicTrackState, macEnd: model.takeMacAudioEnd
         )
     }
 
     /// The band's bars as of the newest sample: the take's own levels, or for a meeting that records your microphone, its levels as "You" over the Mac audio.
     static func tape(
         levels: TakeLevelHistory?, micLevels: TakeLevelHistory?, micState: MicTrackState?, markers: [TimeInterval], paused: Bool,
-        macStopped: Bool = false
+        macEnd: AppModel.MacAudioEnd? = nil
     ) -> StageTape {
         let count = levels.map { min(visibleSamples, $0.sampleCount, $0.recentCapacity) } ?? 0
         let newest = (levels?.sampleCount ?? 0) - 1
@@ -130,7 +130,7 @@ struct StageBand: View {
             levels: levels?.recent(count) ?? [],
             micLevels: micLevels?.recent(count),
             micLost: lostMicNote(micState),
-            macLost: stoppedMacNote(macStopped),
+            macLost: stoppedMacNote(macEnd),
             flags: markers.compactMap { markerOffset($0, newestSample: newest) },
             newest: newest,
             paused: paused
@@ -153,8 +153,8 @@ struct StageBand: View {
     }
 
     /// What the Mac audio lane says once its capture ended by itself while your microphone records on.
-    nonisolated static func stoppedMacNote(_ stopped: Bool, bundle: Bundle = .main) -> String? {
-        stopped ? String(localized: "System audio stopped", bundle: bundle) : nil
+    nonisolated static func stoppedMacNote(_ end: AppModel.MacAudioEnd?, bundle: Bundle = .main) -> String? {
+        end?.shortNote(bundle: bundle)
     }
 
     /// The one sign for Mac audio that stopped, on its lane and on the warning line alike; the silence warning's speaker stays its own.
@@ -448,13 +448,13 @@ struct TapeFeed: Equatable {
     let cadence: StageBand.Cadence
     let markers: [TimeInterval]
     let micState: MicTrackState?
-    let macStopped: Bool
+    let macEnd: AppModel.MacAudioEnd?
 
     @MainActor
     func tape() -> StageTape {
         StageBand.tape(
             levels: model.takeLevels, micLevels: model.takeMicLevels, micState: micState, markers: markers, paused: false,
-            macStopped: macStopped
+            macEnd: macEnd
         )
     }
 
@@ -466,7 +466,7 @@ struct TapeFeed: Equatable {
 
     nonisolated static func == (lhs: TapeFeed, rhs: TapeFeed) -> Bool {
         lhs.model === rhs.model && lhs.cadence == rhs.cadence && lhs.markers == rhs.markers && lhs.micState == rhs.micState
-            && lhs.macStopped == rhs.macStopped
+            && lhs.macEnd == rhs.macEnd
     }
 }
 
@@ -518,7 +518,7 @@ struct StageTape: Equatable {
 /// "You" and "System audio" just past the playhead, each beside its lane; each says so once its side isn't in the take.
 private struct StageLaneNames: View {
     let micState: MicTrackState?
-    let macStopped: Bool
+    let macEnd: AppModel.MacAudioEnd?
 
     var body: some View {
         GeometryReader { proxy in
@@ -551,7 +551,7 @@ private struct StageLaneNames: View {
 
     @ViewBuilder
     private var mac: some View {
-        if let stopped = StageBand.stoppedMacNote(macStopped) {
+        if let stopped = StageBand.stoppedMacNote(macEnd) {
             Label(stopped, systemImage: StageBand.stoppedMacSymbol)
         } else {
             Text("System audio")
