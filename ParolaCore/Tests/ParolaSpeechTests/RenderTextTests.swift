@@ -19,6 +19,15 @@ struct RenderTextTests {
         #expect(raw == ["I have 3 cats."])
     }
 
+    @Test("non-speech is stripped for a renderer that expands numbers and for one that does not", arguments: [true, false])
+    func stripsNonSpeechForEveryRenderer(expandsNumbers: Bool) {
+        let pieces = RenderText.pieces(
+            of: "So [Music] see https://example.com 🎉 now.", language: "en",
+            capabilities: capabilities(expandsNumbers: expandsNumbers)
+        )
+        #expect(pieces == ["So see now."])
+    }
+
     @Test("a unit with nothing to say has no pieces", arguments: [
         ("🎉 🎉", false), ("[Music]", false), ("https://example.com/a", false), ("  \n ", true), ("🎉", true), ("…", true),
     ])

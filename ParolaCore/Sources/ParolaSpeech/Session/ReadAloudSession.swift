@@ -13,7 +13,7 @@ public enum ReadAloudSessionEvent: Sendable, Hashable {
     case waiting(WaitReason)
     case interrupted
     case finished
-    case failed(String)
+    case failed(String, unit: Int)
 }
 
 /// One reading of a script through a renderer and the shared sink. It renders units one at a time, a few
@@ -39,7 +39,7 @@ public actor ReadAloudSession {
     private enum Ending {
         case finished
         case stopped
-        case failed(String)
+        case failed(String, unit: Int)
     }
 
     private struct UnitAudio {
@@ -209,7 +209,7 @@ public actor ReadAloudSession {
                 requestPump()
                 return
             case .failed(let error):
-                await end(.failed(String(describing: error)))
+                await end(.failed(String(describing: error), unit: current))
                 return
             case .superseded:
                 guard epoch == resumeEpoch, isActive, phase == .playing || isSuperseded else { return }
@@ -299,7 +299,7 @@ public actor ReadAloudSession {
             return
         }
         if let failure, failure.unit == next {
-            await end(.failed(failure.message))
+            await end(.failed(failure.message, unit: failure.unit))
             return
         }
         current = next
@@ -420,7 +420,7 @@ public actor ReadAloudSession {
         case .superseded:
             if epoch == resumeEpoch { markSuperseded() }
         case .failed(let error):
-            await end(.failed(String(describing: error)))
+            await end(.failed(String(describing: error), unit: current))
         }
     }
 
@@ -445,7 +445,7 @@ public actor ReadAloudSession {
         cache.removeAll()
         switch ending {
         case .finished: emit(.finished)
-        case .failed(let message): emit(.failed(message))
+        case .failed(let message, let unit): emit(.failed(message, unit: unit))
         case .stopped: break
         }
         continuation.finish()
@@ -633,7 +633,7 @@ public actor ReadAloudSession {
             )
             let message = String(describing: error)
             if job.unit == current {
-                await end(.failed(message))
+                await end(.failed(message, unit: current))
             } else {
                 failure = (job.unit, message)
             }

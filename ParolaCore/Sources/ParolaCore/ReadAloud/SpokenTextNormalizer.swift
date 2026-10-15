@@ -15,6 +15,11 @@ public enum SpokenTextNormalizer {
         }
     }
 
+    /// Drops emoji, URLs and bracketed non-speech markers for any renderer, whether or not it expands numbers.
+    public static func strippingNonSpeechText(_ text: String) -> String {
+        finish(strippingNonSpeech(text))
+    }
+
     // MARK: - English
 
     private static let englishAbbreviations: [(String, String)] = [

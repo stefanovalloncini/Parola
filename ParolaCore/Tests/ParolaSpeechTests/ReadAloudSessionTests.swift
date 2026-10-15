@@ -209,11 +209,11 @@ struct ReadAloudSessionTests {
         await h.session.stop()
     }
 
-    @Test("a long Chinese run and a long URL reach the renderer in pieces of at most 70, as one unit")
+    @Test("a long Chinese run and a long unbroken word reach the renderer in pieces of at most 70, as one unit")
     func renderTimeSplit() async {
         let chinese = String(String(repeating: "这是一个没有标点的长句子", count: 84).prefix(1_000))
-        let url = "https://example.com/" + String(repeating: "abcdefghij", count: 28)
-        let h = harness([chinese, url], maxUnitChars: 70, language: "zh")
+        let word = String(repeating: "abcdefghij", count: 30)
+        let h = harness([chinese, word], maxUnitChars: 70, language: "zh")
         await h.session.play()
         await h.session.settle()
 
@@ -222,7 +222,7 @@ struct ReadAloudSessionTests {
         let second = rendered.filter { $0.unitID == 1 }.map(\.text)
         #expect(first.count == 15)
         #expect(first.joined() == chinese)
-        #expect(second.joined() == url)
+        #expect(second.joined() == word)
         #expect(rendered.allSatisfy { $0.text.count <= 70 })
         #expect(h.sink.finishedUnits == [0, 1])
         await expectSingleFlight(h.renderer)
@@ -813,7 +813,7 @@ struct ReadAloudSessionTests {
         await h.session.play()
 
         try #require(await h.log.waitForEnd())
-        #expect(h.log.events.value.last == .failed(String(describing: MockSpeechRenderer.Failure(unitID: 0))))
+        #expect(h.log.events.value.last == .failed(String(describing: MockSpeechRenderer.Failure(unitID: 0)), unit: 0))
         #expect(h.sink.calls.last == .stop)
     }
 
@@ -829,7 +829,7 @@ struct ReadAloudSessionTests {
         try #require(h.sink.completeNextUnit() != nil)
         try #require(await h.log.waitForEnd())
         await expectStarts(h, [0, 1])
-        #expect(h.log.events.value.last == .failed(String(describing: MockSpeechRenderer.Failure(unitID: 2))))
+        #expect(h.log.events.value.last == .failed(String(describing: MockSpeechRenderer.Failure(unitID: 2)), unit: 2))
         #expect(h.sink.calls.last == .stop)
     }
 }

@@ -7,7 +7,9 @@ enum RenderText {
     private static let fullWidthMarks: Set<Character> = ["、", "，", "；", "：", "。"]
 
     static func pieces(of text: String, language: String, capabilities: SpeechRendererCapabilities) -> [String] {
-        let spoken = capabilities.expandsNumbers ? text : SpokenTextNormalizer.normalize(text, language: language)
+        let spoken = capabilities.expandsNumbers
+            ? SpokenTextNormalizer.strippingNonSpeechText(text)
+            : SpokenTextNormalizer.normalize(text, language: language)
         return split(spoken, maxLength: capabilities.maxUnitChars).filter(isSpoken)
     }
 
