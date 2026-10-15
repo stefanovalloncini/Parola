@@ -57,6 +57,7 @@ private final class FakeBackend: Sendable {
         var unsupported: Set<String> = []
         var installFails = false
         var parksPrepare = false
+        var creationError: (any Error)?
     }
 
     private let state = OSAllocatedUnfairLock(initialState: State())
@@ -76,6 +77,11 @@ private final class FakeBackend: Sendable {
 
     func rejecting(_ identifier: String) -> Self {
         state.withLock { _ = $0.unsupported.insert(identifier) }
+        return self
+    }
+
+    func failingCreation(with error: any Error) -> Self {
+        state.withLock { $0.creationError = error }
         return self
     }
 
@@ -109,6 +115,7 @@ private final class FakeBackend: Sendable {
             makeAnalyzer: { [self] _ in
                 analyzerRequested.fire()
                 if let creationGate { await creationGate.wait() }
+                if let error = state.withLock({ $0.creationError }) { throw error }
                 state.withLock { $0.analyzers.append(analyzerToMake) }
                 return analyzerToMake
             }
@@ -321,6 +328,18 @@ struct AppleSpeechCaptionTests {
         #expect(fake.analyzersMade == 0)
     }
 
+    @Test("an analyzer that fails to start for any other reason reads as a start failure, not a missing model")
+    func analyzerStartFailure() async throws {
+        struct Unexpected: Error {}
+        let capture = StandInCapture()
+        let live = session(FakeBackend().failingCreation(with: Unexpected()), capture)
+        let events = Events()
+        events.collect(try await live.start(options: options()))
+        await events.wait("the stream to end") { Events.ended($0) }
+        #expect(events.texts() == ["failed:\(FixedFailureText.appleSpeechCouldNotStart)"])
+        #expect(!capture.started.fired)
+    }
+
     @Test("an analyzer that dies mid-run fails the session")
     func analyzerFailure() async throws {
         let fake = FakeBackend()
@@ -359,7 +378,7 @@ struct AppleSpeechCaptionTests {
         let fake = FakeBackend().rejecting("it_IT")
         let live = session(fake)
         let text = await startFailure(live, options(language: "it"))
-        #expect(text == FixedFailureText.appleSpeechNoModel("it_IT"))
+        #expect(text == FixedFailureText.appleSpeechNoModel(LiveSpeechCaption.languageName(Locale(identifier: "it_IT"))))
         #expect(fake.analyzersMade == 0)
     }
 
@@ -367,7 +386,7 @@ struct AppleSpeechCaptionTests {
     func installFailure() async {
         let fake = FakeBackend().failingInstall()
         let text = await startFailure(session(fake), options())
-        #expect(text == FixedFailureText.appleSpeechDownloadFailed("en_US"))
+        #expect(text == FixedFailureText.appleSpeechDownloadFailed(LiveSpeechCaption.languageName(Locale(identifier: "en_US"))))
         #expect(fake.prepared.map(\.identifier) == ["en_US"])
     }
 
@@ -652,24 +671,6 @@ struct AppleSpeechCaptionTests {
 @Suite("Apple Speech caption gating", .timeLimit(.minutes(1)))
 struct AppleSpeechCaptionGatingTests {
     private static let apple = AppleSpeechTranscriber.syntheticModelID
-
-    @Test("every catalog engine can caption")
-    func everyEngineCaptions() {
-        for variant in ModelCatalog.all {
-            #expect(ModelCatalog.canCaption(id: variant.id), "\(variant.id)")
-        }
-        #expect(!ModelCatalog.canStream(id: Self.apple))
-    }
-
-    @Test("captions on Apple Speech get the Apple Speech session and takes get the refusing one")
-    func factoryRouting() {
-        let captions = StreamingTranscriberFactory.make(purpose: .captions, model: Self.apple)
-        #expect(captions is AppleSpeechCaptionSession)
-        let whisper = StreamingTranscriberFactory.make(purpose: .captions, model: "openai_whisper-tiny")
-        #expect(whisper is StreamingTranscriptionSession)
-        let take = StreamingTranscriberFactory.make(purpose: .take, model: Self.apple)
-        #expect(take is StreamingTranscriptionSession)
-    }
 
     @Test("a dictation or live take on Apple Speech is still refused")
     func takesStayRefused() async {

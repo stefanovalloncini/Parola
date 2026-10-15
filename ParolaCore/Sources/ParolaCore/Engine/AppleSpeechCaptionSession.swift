@@ -33,6 +33,13 @@ struct AppleSpeechCaptionBackend: Sendable {
     var makeAnalyzer: @Sendable (_ locale: Locale) async throws -> any CaptionAnalyzing
 }
 
+extension AppleSpeechCaptionBackend {
+    static let offline = AppleSpeechCaptionBackend(
+        prepare: { _, _ in throw LiveSpeechCaption.startFailed },
+        makeAnalyzer: { _ in throw LiveSpeechCaption.startFailed }
+    )
+}
+
 /// Live Captions on Apple Speech: the analyzer does its own windowing, so this session feeds it the capture and maps its results.
 actor AppleSpeechCaptionSession: StreamingTranscriber {
     typealias CaptureFor = @Sendable (CaptionSource) -> CaptionCapture

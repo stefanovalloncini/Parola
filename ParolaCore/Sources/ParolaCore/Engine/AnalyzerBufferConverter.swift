@@ -1,9 +1,9 @@
 import AVFoundation
 import Foundation
 
+// @unchecked is safe: the capture delivers one chunk at a time, so the converter's state is never touched concurrently.
 /// Turns the capture's 16 kHz mono `[Float]` chunks into buffers in the format an analyzer asks for.
 final class AnalyzerBufferConverter: @unchecked Sendable {
-    // The capture delivers one chunk at a time, so the converter's state is never touched concurrently.
     static let captureFormat = AVAudioFormat(
         commonFormat: .pcmFormatFloat32, sampleRate: 16_000, channels: 1, interleaved: false
     )!

@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 public protocol StreamingTranscriber: Sendable {
     func start(
@@ -30,6 +31,13 @@ public extension StreamingTranscriber {
 }
 
 public enum StreamingTranscriberFactory {
+    private static let offlineAppleSpeech = OSAllocatedUnfairLock(initialState: false)
+
+    /// Test seam: Apple Speech captions get a backend that fails every start, so a test never reaches the speech service.
+    public static func useOfflineAppleSpeechCaptions(_ on: Bool) {
+        offlineAppleSpeech.withLock { $0 = on }
+    }
+
     public static func make(
         modelStore: ModelStore = .shared,
         clock: any Clock<Duration> = ContinuousClock(),
@@ -46,7 +54,7 @@ public enum StreamingTranscriberFactory {
             return MockStreamingTranscriber(response: response, clock: clock, source: source)
         }
         if purpose == .captions, ModelCatalog.variant(id: model ?? ModelCatalog.fallbackModelID)?.engineID == .appleSpeech {
-            return AppleSpeechCaptionSession(source: source)
+            return AppleSpeechCaptionSession(source: source, backend: offlineAppleSpeech.withLock { $0 } ? .offline : .live)
         }
         return StreamingTranscriptionSession(
             modelStore: modelStore, persistAudio: persistAudio, source: source, waitsForModelOnStop: waitsForModelOnStop,

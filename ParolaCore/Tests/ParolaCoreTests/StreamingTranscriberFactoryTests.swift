@@ -14,6 +14,39 @@ struct StreamingTranscriberFactoryTests {
         MockStreamingTranscriberRegistry.shared.clear()
     }
 
+    @Test("captions on Apple Speech get the Apple Speech session and takes get the refusing one")
+    func appleSpeechRouting() {
+        MockStreamingTranscriberRegistry.shared.clear()
+        let apple = AppleSpeechTranscriber.syntheticModelID
+        #expect(StreamingTranscriberFactory.make(purpose: .captions, model: apple) is AppleSpeechCaptionSession)
+        #expect(StreamingTranscriberFactory.make(purpose: .captions, model: "openai_whisper-tiny") is StreamingTranscriptionSession)
+        #expect(StreamingTranscriberFactory.make(purpose: .captions) is StreamingTranscriptionSession)
+        #expect(StreamingTranscriberFactory.make(purpose: .take, model: apple) is StreamingTranscriptionSession)
+    }
+
+    @Test("an installed mock still wins over the Apple Speech session")
+    func mockBeatsAppleSpeech() {
+        MockStreamingTranscriberRegistry.shared.install(MockTranscriberResponse(partials: ["x"]))
+        defer { MockStreamingTranscriberRegistry.shared.clear() }
+        #expect(StreamingTranscriberFactory.make(purpose: .captions, model: AppleSpeechTranscriber.syntheticModelID) is MockStreamingTranscriber)
+    }
+
+    @Test("offline Apple Speech captions never reach the speech service")
+    func offlineAppleSpeech() async {
+        MockStreamingTranscriberRegistry.shared.clear()
+        StreamingTranscriberFactory.useOfflineAppleSpeechCaptions(true)
+        defer { StreamingTranscriberFactory.useOfflineAppleSpeechCaptions(false) }
+        let session = StreamingTranscriberFactory.make(purpose: .captions, model: AppleSpeechTranscriber.syntheticModelID)
+        do {
+            _ = try await session.start(options: TranscriptionOptions(model: AppleSpeechTranscriber.syntheticModelID, language: "en"), speakerLabeler: nil, downloadProgress: nil)
+            Issue.record("an offline session started")
+        } catch let ParolaError.unsupportedForEngine(text) {
+            #expect(text == FixedFailureText.appleSpeechCouldNotStart)
+        } catch {
+            Issue.record("unexpected \(error)")
+        }
+    }
+
     @Test("a device UID reaches the session it builds")
     func deviceUIDReachesSession() {
         MockStreamingTranscriberRegistry.shared.clear()

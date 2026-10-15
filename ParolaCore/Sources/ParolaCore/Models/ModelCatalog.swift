@@ -216,11 +216,6 @@ public enum ModelCatalog {
         (variant(id: id)?.engineID ?? .whisperKit) == .whisperKit
     }
 
-    /// Whether Live Captions can run on this model: Whisper streams, Parakeet re-decodes a rolling window, and Apple Speech's analyzer streams on its own.
-    public static func canCaption(id: String) -> Bool {
-        canStream(id: id) || [.parakeet, .appleSpeech].contains(variant(id: id)?.engineID)
-    }
-
     /// Entries kept for people who already downloaded them; the pickers list them only when installed.
     public static let hiddenUnlessInstalled: Set<String> = ["nvidia_parakeet-tdt-0.6b-v2"]
 

@@ -260,20 +260,4 @@ struct ModelCatalogLookupTests {
         #expect(!ModelCatalog.canStream(id: "nvidia_parakeet-tdt-0.6b-v3"))
         #expect(ModelCatalog.canStream(id: "openai_whisper-custom-finetune"))
     }
-
-    @Test("Live Captions run on every engine, and dictation and live takes still only on Whisper")
-    func canCaptionAddsParakeet() throws {
-        let apple = try #require(ModelCatalog.all.first { $0.engineID == .appleSpeech })
-        let table: [(id: String, canStream: Bool, canCaption: Bool)] = [
-            ("openai_whisper-tiny", true, true),
-            ("openai_whisper-custom-finetune", true, true),
-            ("nvidia_parakeet-tdt-0.6b-v2", false, true),
-            ("nvidia_parakeet-tdt-0.6b-v3", false, true),
-            (apple.id, false, true),
-        ]
-        for row in table {
-            #expect(ModelCatalog.canStream(id: row.id) == row.canStream, "\(row.id)")
-            #expect(ModelCatalog.canCaption(id: row.id) == row.canCaption, "\(row.id)")
-        }
-    }
 }
