@@ -146,9 +146,24 @@ private actor StubSource: LiveAudioSource, TargetsGoneReporting {
 
     func whenTargetsGone(_ handler: @escaping @Sendable () -> Void) async { endHandler = handler }
 
+    func watchedProcessObjects() async -> [UInt32] { watched }
+
+    func rewatchTargets(_ survivors: [UInt32], _ handler: @escaping @Sendable () -> Void) async {
+        watched = survivors
+        rewatches += 1
+        endHandler = handler
+    }
+
     func end() { endHandler?() }
 
-    init(sink: @escaping @Sendable ([Float]) -> Void, gate: UninterruptibleGate? = nil, startFailure: (any Error)? = nil) {
+    private(set) var rewatches = 0
+    private var watched: [UInt32]
+
+    init(
+        sink: @escaping @Sendable ([Float]) -> Void, watched: [UInt32] = [], gate: UninterruptibleGate? = nil,
+        startFailure: (any Error)? = nil
+    ) {
+        self.watched = watched
         self.sink = sink
         self.gate = gate
         self.startFailure = startFailure
@@ -172,12 +187,14 @@ private final class FakeEnvironment: Sendable {
         var probes = 0
         var sources: [StubSource] = []
         var processObjects: [UInt32] = [7]
+        var outputting: Set<UInt32> = []
         var fixture: URL?
     }
 
     private let state = OSAllocatedUnfairLock(initialState: State())
 
     func setProcessObjects(_ objects: [UInt32]) { state.withLock { $0.processObjects = objects } }
+    func setOutputting(_ objects: Set<UInt32>) { state.withLock { $0.outputting = objects } }
     let probeGate: UninterruptibleGate?
     let startGate: UninterruptibleGate?
     let startFailure: (any Error)?
@@ -217,14 +234,15 @@ private final class FakeEnvironment: Sendable {
             fixtureURL: { [self] in state.withLock { $0.fixture } },
             processObjects: { [self] _ in state.withLock { $0.processObjects.map { $0 } } },
             makeSystemSource: { [self] sink in make(sink) },
-            makeTapSource: { [self] _, sink in make(sink) },
+            makeTapSource: { [self] objects, sink in make(sink, watched: objects) },
             startTimeout: .seconds(15),
-            clock: clock
+            clock: clock,
+            isRunningOutput: { [self] object in state.withLock { $0.outputting.contains(object) } }
         )
     }
 
-    private func make(_ sink: @escaping @Sendable ([Float]) -> Void) -> StubSource {
-        let source = StubSource(sink: sink, gate: startGate, startFailure: startFailure)
+    private func make(_ sink: @escaping @Sendable ([Float]) -> Void, watched: [UInt32] = []) -> StubSource {
+        let source = StubSource(sink: sink, watched: watched, gate: startGate, startFailure: startFailure)
         state.withLock { $0.sources.append(source) }
         return source
     }
@@ -447,6 +465,65 @@ struct ExternalCaptionCaptureTests {
         #expect(ended.value == [FixedFailureText.appStoppedSending("us.zoom.xos")])
     }
 
+    @Test("a helper that leaves while the main process still plays does not end the capture, and the watch moves to the survivors")
+    func helperLeavesMainStillPlays() async throws {
+        let fake = FakeEnvironment(processObjects: [1, 2])
+        fake.setOutputting([1])
+        let capture = CaptionCapture.external(app, environment: fake.environment)
+        let ended = Awaitable<[String]>([])
+        capture.whenEnded?({ text in ended.update { $0.append(text) } })
+        _ = await capture.requestPermission()
+        try await capture.start { _ in }
+        let stub = try #require(fake.sources.first)
+        fake.setProcessObjects([1])
+        await stub.end()
+        await fake.clock.waitForSleeper()
+        fake.clock.advance(by: .seconds(1))
+        await pollUntil("the watch to move") { await stub.rewatches == 1 }
+        #expect(ended.value.isEmpty)
+        #expect(await stub.watchedProcessObjects() == [1])
+    }
+
+    @Test("survivors that are all quiet are not an end either")
+    func survivorsQuiet() async throws {
+        let fake = FakeEnvironment(processObjects: [1, 2])
+        let capture = CaptionCapture.external(app, environment: fake.environment)
+        let ended = Awaitable<[String]>([])
+        capture.whenEnded?({ text in ended.update { $0.append(text) } })
+        _ = await capture.requestPermission()
+        try await capture.start { _ in }
+        let stub = try #require(fake.sources.first)
+        fake.setProcessObjects([1])
+        await stub.end()
+        await fake.clock.waitForSleeper()
+        fake.clock.advance(by: .seconds(1))
+        await pollUntil("the watch to move") { await stub.rewatches == 1 }
+        #expect(ended.value.isEmpty)
+    }
+
+    @Test("after the watch moves, the app quitting later still ends the capture once")
+    func quitAfterRearm() async throws {
+        let fake = FakeEnvironment(processObjects: [1, 2])
+        fake.setOutputting([1])
+        let capture = CaptionCapture.external(app, environment: fake.environment)
+        let ended = Awaitable<[String]>([])
+        capture.whenEnded?({ text in ended.update { $0.append(text) } })
+        _ = await capture.requestPermission()
+        try await capture.start { _ in }
+        let stub = try #require(fake.sources.first)
+        fake.setProcessObjects([1])
+        await stub.end()
+        await fake.clock.waitForSleeper()
+        fake.clock.advance(by: .seconds(1))
+        await pollUntil("the watch to move") { await stub.rewatches == 1 }
+        fake.setProcessObjects([])
+        await stub.end()
+        await fake.clock.waitForSleeper()
+        fake.clock.advance(by: .seconds(1))
+        await ended.wait(until: { $0.count == 1 }, "the end to be reported")
+        #expect(ended.value == [FixedFailureText.appQuit("us.zoom.xos")])
+    }
+
     @Test("a stop during the settle wait cancels it")
     func stopCancelsTheSettle() async throws {
         let fake = FakeEnvironment(processObjects: [1])
@@ -652,9 +729,9 @@ struct CaptureEndDetectionTests {
         live()
     }
 
-    @Test("a tap source that a meeting watches through the shared hook never ends its take")
+    @Test("a tap source ignores the system-audio end hook, so only the targets-gone signal ends it")
     @available(macOS 14.2, *)
-    func meetingTapDoesNotEnd() async {
+    func tapWhenCaptureEndsIsNoOp() async {
         let list = ProcessList([7])
         let source = ProcessTapAudioSource(
             processObjects: [7], samples: { _ in }, processList: { list.current }, subscribeToProcessList: list.subscribe

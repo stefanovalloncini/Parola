@@ -13,6 +13,7 @@ import os
 @available(macOS 14.2, *)
 public actor ProcessTapAudioSource: LiveAudioSource, TargetsGoneReporting {
     private let processObjects: [AudioObjectID]
+    private var watchedObjects: [AudioObjectID]
     private let outputURL: URL?
     private let outputFormat: AVAudioFormat
     private let callbackQueue = DispatchQueue(label: "com.parola.process-tap")
@@ -52,6 +53,23 @@ public actor ProcessTapAudioSource: LiveAudioSource, TargetsGoneReporting {
     /// so multi-process vendors whose audio comes from a helper are still captured.
     public static func matchesTarget(bundleID: String, targets: Set<String>) -> Bool {
         targets.contains { bundleID == $0 || bundleID.hasPrefix($0 + ".") }
+    }
+
+    /// Whether the process is playing audio now.
+    public static func isRunningOutput(_ processObject: AudioObjectID) -> Bool {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioProcessPropertyIsRunningOutput,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var value: UInt32 = 0
+        var dataSize = UInt32(MemoryLayout<UInt32>.size)
+        return AudioObjectGetPropertyData(processObject, &address, 0, nil, &dataSize, &value) == noErr && value != 0
+    }
+
+    /// The live process list for an app-only capture of `targets`.
+    public static func liveProbe(targets: Set<String>) -> TapEnd.Probe {
+        TapEnd.Probe(objects: { audioProcessObjects(matching: targets) }, isRunningOutput: { isRunningOutput($0) })
     }
 
     private static func bundleID(of processObject: AudioObjectID) -> String? {
@@ -100,6 +118,7 @@ public actor ProcessTapAudioSource: LiveAudioSource, TargetsGoneReporting {
         self.subscribeToProcessList = subscribeToProcessList
         self.sink = sink
         self.processObjects = processObjects
+        self.watchedObjects = processObjects
         self.outputURL = sink == nil ? RecordingScratch.fileURL(prefix: "parola-system") : nil
         guard let format = AVAudioFormat(
             commonFormat: .pcmFormatFloat32,
@@ -275,10 +294,21 @@ public actor ProcessTapAudioSource: LiveAudioSource, TargetsGoneReporting {
     }
 
     public func whenTargetsGone(_ handler: @escaping @Sendable () -> Void) async {
+        await watch(watchedObjects, handler)
+    }
+
+    public func watchedProcessObjects() async -> [UInt32] { watchedObjects }
+
+    public func rewatchTargets(_ survivors: [UInt32], _ handler: @escaping @Sendable () -> Void) async {
+        await watch(survivors, handler)
+    }
+
+    private func watch(_ objects: [AudioObjectID], _ handler: @escaping @Sendable () -> Void) async {
         endWatch?.cancel()
         guard !cancelled else { return }
+        watchedObjects = objects
         endWatch = ProcessEndWatch(
-            objects: processObjects, currentObjects: processList, subscribe: subscribeToProcessList, onGone: handler
+            objects: objects, currentObjects: processList, subscribe: subscribeToProcessList, onGone: handler
         )
     }
 

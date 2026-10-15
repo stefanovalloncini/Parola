@@ -94,6 +94,7 @@ struct CaptionCaptureEnvironment: Sendable {
     var makeTapSource: @Sendable (_ objects: [AudioObjectID], _ sink: @escaping @Sendable ([Float]) -> Void) throws -> any TargetsGoneReporting
     var startTimeout: Duration
     var clock: any Clock<Duration>
+    var isRunningOutput: @Sendable (_ processObject: UInt32) -> Bool = { _ in false }
     /// How long the process list gets to settle after a watched process leaves, before the app reads as quit or as still there.
     var endSettle: Duration = .seconds(1)
 
@@ -111,14 +112,13 @@ struct CaptionCaptureEnvironment: Sendable {
                 return ProcessTapAudioSource(processObjects: objects, samples: sink)
             },
             startTimeout: .seconds(15),
-            clock: clock
+            clock: clock,
+            isRunningOutput: { object in
+                guard #available(macOS 14.2, *) else { return false }
+                return ProcessTapAudioSource.isRunningOutput(object)
+            }
         )
     }
-}
-
-/// A source that can tell its watched processes are gone; system-audio sources don't, so their `whenCaptureEnds` stays as it was.
-public protocol TargetsGoneReporting: LiveAudioSource {
-    func whenTargetsGone(_ handler: @escaping @Sendable () -> Void) async
 }
 
 extension CaptionCapture {
@@ -127,11 +127,6 @@ extension CaptionCapture {
         let run = ExternalRun()
         let bundleID: String? = if case .app(let id) = source { id } else { nil }
         let fixtureEndText = bundleID.map(FixedFailureText.appQuit) ?? FixedFailureText.systemAudioStopped
-        let endText: @Sendable () -> String = {
-            guard let bundleID else { return FixedFailureText.systemAudioStopped }
-            return TapEnd(processesLeft: !env.processObjects(bundleID).isEmpty) == .quit
-                ? FixedFailureText.appQuit(bundleID) : FixedFailureText.appStoppedSending(bundleID)
-        }
         let deniedText = bundleID == nil ? FixedFailureText.systemAudioNotAllowed : FixedFailureText.appAudioNotAllowed
         return CaptionCapture(
             requestPermission: {
@@ -168,10 +163,10 @@ extension CaptionCapture {
                     await live.cancel()
                     return
                 }
-                if let tap {
-                    await tap.whenTargetsGone(run.endReporter(settleFor: env.endSettle, on: env.clock, endText))
+                if let tap, let bundleID {
+                    await tap.whenTargetsGone(run.tapEndReporter(tap, bundleID: bundleID, environment: env))
                 } else {
-                    await live.whenCaptureEnds(run.endReporter(endText))
+                    await live.whenCaptureEnds(run.endReporter { FixedFailureText.systemAudioStopped })
                 }
                 try await Self.boundedStart(of: live, run: run, deniedText: deniedText, environment: env)
                 if run.isStopped { await live.cancel() }
@@ -278,6 +273,8 @@ private final class ExternalRun: Sendable {
         var endHandler: (@Sendable (String) -> Void)?
         var pendingEnd: String?
         var settling: Task<Void, Never>?
+        var settleToken = 0
+        var settleCount = 0
         var ended = false
     }
 
@@ -322,27 +319,47 @@ private final class ExternalRun: Sendable {
     }
 
     /// A callback for a source to hold; it keeps nothing of the run alive.
-    func endReporter(
-        settleFor settle: Duration? = nil, on clock: (any Clock<Duration>)? = nil, _ text: @escaping @Sendable () -> String
-    ) -> @Sendable () -> Void {
-        { [weak self] in
-            guard let self else { return }
-            guard let settle, let clock else { return captureEnded(text()) }
-            settleThenEnd(after: settle, on: clock, text)
-        }
+    func endReporter(_ text: @escaping @Sendable () -> String) -> @Sendable () -> Void {
+        { [weak self] in self?.captureEnded(text()) }
     }
 
-    private func settleThenEnd(after settle: Duration, on clock: any Clock<Duration>, _ text: @escaping @Sendable () -> String) {
+    /// A callback for a tap to hold: a departure is settled, and ends the run only if the app quit or stopped playing.
+    func tapEndReporter(
+        _ tap: any TargetsGoneReporting, bundleID: String, environment env: CaptionCaptureEnvironment
+    ) -> @Sendable () -> Void {
+        { [weak self] in self?.settleThenEnd(tap, bundleID: bundleID, environment: env) }
+    }
+
+    private func settleThenEnd(_ tap: any TargetsGoneReporting, bundleID: String, environment env: CaptionCaptureEnvironment) {
+        let token = state.withLock { state -> Int in
+            state.settleCount += 1
+            return state.settleCount
+        }
+        let probe = TapEnd.Probe(objects: { env.processObjects(bundleID) }, isRunningOutput: env.isRunningOutput)
         let waiting = Task { [weak self] in
-            guard (try? await clock.sleep(for: settle)) != nil else { return }
-            self?.captureEnded(text())
+            let again = self?.tapEndReporter(tap, bundleID: bundleID, environment: env)
+            let end = await TapEnd.resolve(tap, after: env.endSettle, on: env.clock, probe: probe) { [weak self] in
+                self?.settleOver(token)
+                again?()
+            }
+            self?.settleOver(token)
+            guard let end else { return }
+            self?.captureEnded(end == .quit ? FixedFailureText.appQuit(bundleID) : FixedFailureText.appStoppedSending(bundleID))
         }
         let accepted = state.withLock { state -> Bool in
             guard !state.stopped, state.settling == nil else { return false }
             state.settling = waiting
+            state.settleToken = token
             return true
         }
         if !accepted { waiting.cancel() }
+    }
+
+    private func settleOver(_ token: Int) {
+        state.withLock { state in
+            guard state.settleToken == token else { return }
+            state.settling = nil
+        }
     }
 
     /// Passes `text` to the end handler once, and not at all after a stop.
