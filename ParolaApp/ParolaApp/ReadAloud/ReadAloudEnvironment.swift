@@ -61,9 +61,13 @@ struct ReadAloudEnvironment {
 final class LiveReadAloudSystem {
     private var apple: AppleSpeechRenderer?
     private var output: ReadAloudOutput?
+    private let voices = StaleVoiceInventory()
 
     func renderer() -> any SpeechRenderer {
-        if let apple { return apple }
+        if let apple {
+            voices.refreshIfStale(apple.refreshVoices)
+            return apple
+        }
         let made = AppleSpeechRenderer()
         apple = made
         return made
@@ -77,12 +81,27 @@ final class LiveReadAloudSystem {
     }
 
     func refreshVoices() {
-        apple?.refreshVoices()
+        voices.markStale()
     }
 }
 
-/// The silent voice a sandbox or a test reads with: every unit lasts `msPerUnit`, and a language outside
-/// `languages` has no voice.
+/// Reading the installed voices costs about 170 ms on main, so a change only marks the list stale and the next Read re-reads it.
+@MainActor
+final class StaleVoiceInventory {
+    private var isStale = false
+
+    func markStale() {
+        isStale = true
+    }
+
+    func refreshIfStale(_ refresh: () -> Void) {
+        guard isStale else { return }
+        isStale = false
+        refresh()
+    }
+}
+
+/// The silent voice a sandbox or a test reads with: a unit lasts `msPerUnit`; a language outside `languages` has no voice.
 @MainActor
 final class MockVoiceSettings {
     static let defaultMsPerUnit = 300
@@ -116,8 +135,7 @@ final class MockVoiceSettings {
     }
 }
 
-/// An offline output that renders on its own in real time while it plays, so a sandbox reading advances
-/// unit by unit without opening an audio device.
+/// An offline output that renders itself in real time while it plays, so a sandbox reading advances with no audio device.
 @MainActor
 final class PumpedOfflineSink: ReadAloudOutputSink {
     static let slice: AVAudioFrameCount = 2_400

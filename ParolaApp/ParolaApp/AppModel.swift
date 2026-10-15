@@ -451,6 +451,10 @@ final class AppModel {
     var wordTimestamps: Bool = false { didSet { defaults.set(wordTimestamps, forKey: "wordTimestamps") } }
     var readAloudRate: Double = 1 {
         didSet {
+            guard ReadAloudController.speeds.contains(readAloudRate) else {
+                readAloudRate = 1
+                return
+            }
             defaults.set(readAloudRate, forKey: "readAloudRate")
             readAloud.setSpeed(readAloudRate)
         }
@@ -1153,6 +1157,7 @@ final class AppModel {
                 return makeOptions(task: .transcribe, model: selectedModel, language: selectedLanguage)
             }
             liveCaptions?.unavailableReason = { [weak self] in self?.liveCaptionsUnavailableReason }
+            readAloud.refocus()
         }
     }
 
@@ -1295,7 +1300,8 @@ final class AppModel {
         self.useStreaming = readBool("useStreaming", default: true)
         self.wordTimestamps = defaults.bool(forKey: "wordTimestamps")
         self.karaokeHighlight = readBool("karaokeHighlight", default: true)
-        self.readAloudRate = readDouble("readAloudRate", default: 1)
+        let storedRate = readDouble("readAloudRate", default: 1)
+        self.readAloudRate = ReadAloudController.speeds.contains(storedRate) ? storedRate : 1
         self.initialPrompt = defaults.string(forKey: "initialPrompt") ?? ""
         self.diarize = defaults.bool(forKey: "diarize")
         self.expectedSpeakersRaw = defaults.integer(forKey: "expectedSpeakersRaw")

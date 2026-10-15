@@ -264,6 +264,103 @@ struct ReadAloudModelTests {
         await model.stopReading()
     }
 
+    @Test("a Read whose script is still building when a take starts is refused and never plays through the take")
+    func takeDuringTheScriptBuild() async {
+        let model = makeModel()
+        load(model, transcript(segments: 3_000))
+
+        let reading = Task { await model.readAloud(ReadAloudRequest(kind: .transcript)) }
+        await Task.yield()
+        model.installTestTake(source: .microphone, liveSource: StubSource())
+        let refusal = await reading.value
+
+        #expect(refusal == .blocked(.take))
+        #expect(model.readAloud.state == .idle)
+        model.endTestTake()
+        await settle()
+        #expect(model.readAloud.state == .idle)
+    }
+
+    @Test("live captions attached after launch still pause the reading, and open the refusal window when they stop")
+    func captionsAttachedLate() async {
+        let model = makeModel()
+        load(model, transcript())
+        await model.readAloud(ReadAloudRequest(kind: .transcript))
+        await waitUntil { model.readAloud.state == .reading }
+        let captions = LiveCaptionsController(showsPanel: false)
+        model.liveCaptions = captions
+
+        captions.state.isActive = true
+        await waitUntil { model.readAloud.state == .paused(.captions) }
+        #expect(model.readingBlockedReason == .captions)
+        #expect(await model.readAloud(ReadAloudRequest(kind: .transcript)) == .blocked(.captions))
+        #expect(await model.resumeReading() == .blocked(.captions))
+
+        captions.state.isActive = false
+        await waitUntil { model.readAloud.isInRefusalWindow }
+        #expect(model.readAloud.nowPlayingRefused)
+        await model.stopReading()
+    }
+
+    @Test("deleting the entry being read stops the reading")
+    func deletingTheEntryStopsIt() async throws {
+        let model = makeModel()
+        let entry = try await model.library.add(transcript: transcript(), audioSource: nil)
+        model.readAloud.mockVoice?.install(msPerUnit: 60_000, failAtUnit: nil)
+        await model.readAloud(ReadAloudRequest(kind: .transcript, entryID: entry.id))
+        await waitUntil { model.readAloud.state == .reading }
+        #expect(model.readAloud.item?.entryID == entry.id)
+
+        model.deleteEntry(entry.id)
+
+        await waitUntil { model.readAloud.state == .idle }
+        #expect(model.readAloud.item == nil)
+    }
+
+    @Test("the introduction appearing stops the reading")
+    func introductionStopsIt() async {
+        let model = makeModel()
+        load(model, transcript())
+        model.readAloud.mockVoice?.install(msPerUnit: 60_000, failAtUnit: nil)
+        await model.readAloud(ReadAloudRequest(kind: .transcript))
+        await waitUntil { model.readAloud.state == .reading }
+
+        model.introduction.restart()
+
+        await waitUntil { model.readAloud.state == .idle }
+    }
+
+    @Test("resuming a paused take pauses a reading that slipped past the block")
+    func resumeTakeBackstop() async {
+        let model = makeModel()
+        load(model, transcript())
+        await model.readAloud(ReadAloudRequest(kind: .transcript))
+        await waitUntil { model.readAloud.state == .reading }
+        model.readAloud.bind(blocked: { nil }, introductionShown: { false }, players: { [] })
+        model.installTestTake(source: .microphone, liveSource: StubSource())
+        #expect(model.pauseTake())
+        #expect(model.readAloud.state == .reading)
+
+        #expect(model.resumeTake())
+
+        #expect(model.readAloud.state == .paused(.take))
+        model.endTestTake()
+        await model.stopReading()
+    }
+
+    @Test("a stored speed outside the five falls back to 1, and so does one set directly")
+    func speedIsClamped() {
+        let defaults = temporaryDefaults()
+        defaults.set(3.0, forKey: "readAloudRate")
+        let model = makeModel(defaults: defaults)
+        #expect(model.readAloudRate == 1)
+
+        model.readAloudRate = 0.5
+        #expect(model.readAloudRate == 1)
+        model.readAloudRate = 1.25
+        #expect(model.readAloudRate == 1.25)
+    }
+
     private struct StubSource: AudioSource {
         func prepare() async throws -> URL { URL(fileURLWithPath: "/tmp/stub-\(UUID()).wav") }
         func cancel() async {}

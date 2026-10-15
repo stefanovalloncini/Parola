@@ -33,7 +33,7 @@ extension ParolaAutomationServer {
             AutomationCommand(
                 name: "pauseReading",
                 area: .readAloud,
-                summary: "Pauses the reading as the Pause button does. Replies {paused} with the state after.",
+                summary: "Pauses the reading as the Pause button does. Replies {state} with the state after.",
                 kind: .mutating,
                 handler: { _, ctx in
                     await ctx.model.pauseReading()
@@ -44,7 +44,7 @@ extension ParolaAutomationServer {
             AutomationCommand(
                 name: "resumeReading",
                 area: .readAloud,
-                summary: "Resumes a paused reading. Replies {resumed: true}, or {resumed: false, reason, blockedReason} while a take, dictation or live captions block reading.",
+                summary: "Resumes a paused reading. Replies {resumed: true, state}, or {resumed: false, reason, blockedReason, state} while a take, dictation or live captions block reading.",
                 kind: .mutating,
                 handler: { _, ctx in
                     let refusal = await ctx.model.resumeReading()

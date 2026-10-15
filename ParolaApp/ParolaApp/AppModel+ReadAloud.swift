@@ -78,6 +78,7 @@ extension AppModel {
         }
         let units = await readingUnits(source, of: transcript, language: language)
         guard !units.isEmpty else { return .nothingToRead }
+        if let blocked = readingBlockedReason { return .blocked(blocked) }
         await readAloud.start(ReadAloudController.Plan(
             entryID: material.id, source: source, title: material.title, language: language, units: units
         ))

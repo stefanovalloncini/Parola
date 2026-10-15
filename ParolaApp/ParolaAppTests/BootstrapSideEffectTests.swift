@@ -24,14 +24,14 @@ struct BootstrapSideEffectTests {
         #expect(BootstrapSideEffect.testing == [.automationBridge])
     }
 
-    /// A sandbox instance writing diagnostics would put a second process into the shared cache
-    /// directory the real app owns.
     @Test("test mode never opts into the real Read Aloud output")
     func testingExcludesReadAloudSystem() {
         #expect(!BootstrapSideEffect.testing.contains(.readAloudSystem))
         #expect(BootstrapSideEffect.all.contains(.readAloudSystem))
     }
 
+    /// A sandbox instance writing diagnostics would put a second process into the shared cache
+    /// directory the real app owns.
     @Test("test mode installs no diagnostics sink")
     func testingExcludesDiagnosticsLog() {
         #expect(!BootstrapSideEffect.testing.contains(.diagnosticsLog))

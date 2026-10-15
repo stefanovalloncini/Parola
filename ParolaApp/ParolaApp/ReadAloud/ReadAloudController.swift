@@ -80,6 +80,7 @@ final class ReadAloudController {
     @ObservationIgnored private var session: ReadAloudSession?
     @ObservationIgnored private var eventsTask: Task<Void, Never>?
     @ObservationIgnored private var generation = 0
+    @ObservationIgnored private var focusGeneration = 0
     @ObservationIgnored private var hasPlayed = false
     @ObservationIgnored private var plan: Plan?
     @ObservationIgnored private var observers: [(center: NotificationCenter, token: any NSObjectProtocol)] = []
@@ -109,14 +110,22 @@ final class ReadAloudController {
         trackFocus()
     }
 
+    func refocus() {
+        focusChanged()
+        trackFocus()
+    }
+
     private func trackFocus() {
+        focusGeneration += 1
+        let mine = focusGeneration
         withObservationTracking {
             _ = blockedProvider()
             _ = introductionProvider()
         } onChange: { [weak self] in
             Task { @MainActor in
-                self?.focusChanged()
-                self?.trackFocus()
+                guard let self, mine == self.focusGeneration else { return }
+                self.focusChanged()
+                self.trackFocus()
             }
         }
     }
@@ -175,6 +184,7 @@ final class ReadAloudController {
     // MARK: - Reading
 
     func start(_ plan: Plan, startAt: Int = 0) async {
+        guard blockedProvider() == nil else { return }
         generation += 1
         let mine = generation
         self.plan = plan
@@ -270,6 +280,7 @@ final class ReadAloudController {
             guard let session else { return false }
             pausePlayers()
             await session.setBlocked(false)
+            guard case .paused = state, blockedProvider() == nil else { return false }
             if hasPlayed {
                 state = .reading
                 await session.resume()
@@ -312,8 +323,7 @@ final class ReadAloudController {
         Task { await session.setSpeed(allowed) }
     }
 
-    /// Withdraws Now Playing and marks the reading paused before the first suspension, so a take's media
-    /// pause and play never go to Parola; the returned task finishes once the output has paused.
+    /// Withdraws Now Playing and marks the paused before the first suspension; the task ends once the output has paused.
     @discardableResult
     func yieldNow(to reason: PauseReason, fade: Bool = false) -> Task<Void, Never>? {
         guard beginYield(to: reason) else { return nil }
@@ -417,8 +427,9 @@ final class ReadAloudController {
         case .finished:
             ParolaLog.info(.readAloud, "reading finished")
             finishReading()
-        case .failed:
+        case .failed(_, let unit):
             ParolaLog.error(.readAloud, "the reading failed")
+            item?.unitIndex = unit
             readingAnchors = []
             session = nil
             hasPlayed = false

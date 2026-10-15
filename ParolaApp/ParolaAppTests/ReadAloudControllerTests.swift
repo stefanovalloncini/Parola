@@ -98,6 +98,65 @@ struct ReadAloudControllerTests {
         #expect(stop != nil && subscribe != nil && stop! < subscribe!)
     }
 
+    @Test("a new reading waits for the old session's stop to finish before it subscribes to the output")
+    func replacementWaitsForTheStop() async throws {
+        let log = SpeechEventLog()
+        let rig = ReadAloudRig(events: log.observer, gatesCancel: true)
+        let gate = try #require(rig.cancelGate)
+        await rig.renderer.holdStart()
+        let first = Task { await rig.controller.start(ReadAloudRig.plan(entryID: "first")) }
+        await waitUntil { log.events.contains(.held(unitID: 0)) }
+        await first.value
+        await gate.holdCancel()
+        let subscribes = rig.sink.calls.filter { $0 == .subscribe }.count
+
+        let second = Task { await rig.controller.start(ReadAloudRig.plan(entryID: "second")) }
+        await waitUntil { await gate.cancelCalls > 0 }
+        await settle()
+        #expect(rig.sink.calls.filter { $0 == .subscribe }.count == subscribes)
+
+        await gate.releaseCancel()
+        await rig.renderer.releaseStart()
+        await second.value
+        #expect(rig.sink.calls.filter { $0 == .subscribe }.count > subscribes)
+        await rig.controller.stop()
+    }
+
+    @Test("a start that finds the reading blocked reads nothing, publishes nothing and never resumes the output")
+    func startWhileBlocked() async {
+        let rig = ReadAloudRig()
+        rig.blocked = .take
+
+        await rig.controller.start(ReadAloudRig.plan())
+        await settle()
+
+        #expect(rig.controller.state == .idle)
+        #expect(rig.controller.item == nil)
+        #expect(!rig.nowPlaying.isPublished)
+        #expect(rig.sink.resumeCount == 0)
+        #expect(rig.sink.scheduledCount == 0)
+
+        rig.blocked = nil
+        rig.controller.focusChanged()
+        await settle()
+        #expect(rig.sink.scheduledCount == 0)
+    }
+
+    @Test("a resume that finds the reading blocked once its await returns plays nothing")
+    func resumeRacingABlock() async {
+        let rig = ReadAloudRig()
+        await rig.start()
+        await rig.controller.pause()
+        let resumes = rig.sink.resumeCount
+        rig.blockedFromRead = rig.blockedReads + 2
+
+        let resumed = await rig.controller.resume()
+
+        #expect(!resumed)
+        #expect(rig.controller.state == .paused(.user))
+        #expect(rig.sink.resumeCount == resumes)
+    }
+
     @Test("a language with no voice reads nothing and says so")
     func noVoice() async {
         let rig = ReadAloudRig(languages: ["en"])
@@ -125,13 +184,14 @@ struct ReadAloudControllerTests {
 
         await rig.finishUnit()
         await waitUntil { rig.controller.state.name == "failed" }
-        #expect(rig.controller.item?.unitIndex == 1 || rig.controller.item?.unitIndex == 0)
+        #expect(rig.controller.item?.unitIndex == 1)
         #expect(!rig.nowPlaying.isPublished)
 
         await rig.renderer.setFailAtUnit(nil)
         await rig.controller.retry()
         await waitUntil { rig.controller.state == .reading }
         #expect(rig.controller.state == .reading)
+        #expect(rig.controller.item?.unitIndex == 1)
     }
 
     @Test("speed reaches the output, and a value outside the five falls back to 1")

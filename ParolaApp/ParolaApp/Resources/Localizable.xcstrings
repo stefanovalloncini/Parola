@@ -13218,7 +13218,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "La lettura riprende quando finisce la dettatura."
+            "value": "La lettura attende la fine della dettatura."
           }
         }
       }
@@ -13229,7 +13229,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "La lettura riprende quando si fermano i sottotitoli in tempo reale."
+            "value": "La lettura attende lo stop dei sottotitoli in tempo reale."
           }
         }
       }
@@ -13240,7 +13240,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "La lettura riprende quando finisce la registrazione."
+            "value": "La lettura attende la fine della registrazione."
           }
         }
       }
@@ -16673,17 +16673,6 @@
         }
       }
     },
-    "Stop reading": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ferma la lettura"
-          }
-        }
-      }
-    },
     "Stop recording and transcribe": {
       "extractionState": "manual",
       "localizations": {
@@ -17127,17 +17116,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Predefinito di sistema"
-          }
-        }
-      }
-    },
-    "Translated to %@": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Tradotto in %@"
           }
         }
       }

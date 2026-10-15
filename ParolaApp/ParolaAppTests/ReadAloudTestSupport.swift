@@ -86,6 +86,7 @@ final class FakeDeviceMonitor: OutputDeviceMonitoring {
     func simulateChange() { onChange?() }
 }
 
+// @unchecked: every mutable field sits behind `lock`.
 final class TestClock: Clock, @unchecked Sendable {
     struct Instant: InstantProtocol, Hashable {
         var offset: Swift.Duration
@@ -176,8 +177,11 @@ final class ReadAloudRig {
     let systemCenter = NotificationCenter()
     let appCenter = NotificationCenter()
     let renderer: MockSpeechRenderer
+    let cancelGate: CancelGateRenderer?
     let controller: ReadAloudController
     var blocked: ReadAloudController.BlockedReason?
+    private(set) var blockedReads = 0
+    var blockedFromRead: Int?
     var introShown = false
     var players: [PlayerHandle] = []
 
@@ -185,7 +189,8 @@ final class ReadAloudRig {
         languages: Set<String> = [],
         failAtUnit: Int? = nil,
         events: MockSpeechRenderer.Observer? = nil,
-        output: (any ReadAloudOutputSink)? = nil
+        output: (any ReadAloudOutputSink)? = nil,
+        gatesCancel: Bool = false
     ) {
         let renderer = MockSpeechRenderer(
             capabilities: SpeechRendererCapabilities(
@@ -196,13 +201,18 @@ final class ReadAloudRig {
             observer: events
         )
         self.renderer = renderer
+        let cancelGate = gatesCancel ? CancelGateRenderer(renderer) : nil
+        self.cancelGate = cancelGate
         let sink = sink
         let nowPlaying = nowPlaying
         let systemCenter = systemCenter
         let appCenter = appCenter
         let clock = clock
         controller = ReadAloudController(environment: ReadAloudEnvironment(
-            renderer: { renderer },
+            renderer: { () -> any SpeechRenderer in
+                if let cancelGate { return cancelGate }
+                return renderer
+            },
             sink: { output ?? sink },
             nowPlaying: { nowPlaying },
             refreshVoices: {},
@@ -212,7 +222,11 @@ final class ReadAloudRig {
             mockVoice: nil
         ))
         controller.bind(
-            blocked: { [unowned self] in self.blocked },
+            blocked: { [unowned self] in
+                self.blockedReads += 1
+                if let from = self.blockedFromRead, self.blockedReads >= from { return .take }
+                return self.blocked
+            },
             introductionShown: { [unowned self] in self.introShown },
             players: { [unowned self] in self.players }
         )
@@ -255,6 +269,7 @@ extension ReadAloudRig {
     }
 }
 
+// @unchecked: `stored` is only read or written under `lock`.
 final class SpeechEventLog: @unchecked Sendable {
     private let lock = NSLock()
     private var stored: [MockSpeechRenderer.Event] = []
@@ -271,5 +286,48 @@ final class SpeechEventLog: @unchecked Sendable {
             stored.append(event)
             lock.unlock()
         }
+    }
+}
+
+/// A renderer whose `cancel()` waits for the test, so a stop that must finish first can be seen not finishing.
+actor CancelGateRenderer: SpeechRenderer {
+    nonisolated let engine: SpeechEngineKind
+    nonisolated let capabilities: SpeechRendererCapabilities
+    private let inner: MockSpeechRenderer
+    private var isHolding = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+    private(set) var cancelCalls = 0
+
+    init(_ inner: MockSpeechRenderer) {
+        self.inner = inner
+        engine = inner.engine
+        capabilities = inner.capabilities
+    }
+
+    func holdCancel() {
+        isHolding = true
+    }
+
+    func releaseCancel() {
+        isHolding = false
+        let released = waiters
+        waiters.removeAll()
+        for waiter in released { waiter.resume() }
+    }
+
+    func render(
+        text: String, unitID: Int, voice: VoiceID, language: String
+    ) async throws -> AsyncThrowingStream<PCMChunk, any Error> {
+        try await inner.render(text: text, unitID: unitID, voice: voice, language: language)
+    }
+
+    func cancel() async {
+        cancelCalls += 1
+        if isHolding { await withCheckedContinuation { waiters.append($0) } }
+        await inner.cancel()
+    }
+
+    func prewarm(voice: VoiceID, language: String) async throws {
+        try await inner.prewarm(voice: voice, language: language)
     }
 }
