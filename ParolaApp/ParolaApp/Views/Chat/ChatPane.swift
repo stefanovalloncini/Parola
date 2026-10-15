@@ -480,7 +480,7 @@ struct ChatPane: View {
 
     static func takingBack(_ question: ChatMessage, from history: [ChatMessage], draft: String) -> (history: [ChatMessage], draft: String) {
         let blank = draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        return (history.filter { $0.id != question.id }, blank ? question.text : draft)
+        return blank ? (history.filter { $0.id != question.id }, question.text) : (history, draft)
     }
 
     private func giveBack(_ question: ChatMessage) {

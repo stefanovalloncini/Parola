@@ -82,7 +82,7 @@ struct LiveReplyTests {
         live.end()
     }
 
-    @Test("a question that got no answer leaves the history and returns to an empty composer, never over a draft")
+    @Test("a question that got no answer leaves the history and returns to an empty composer; over a draft it stays in the history")
     func unansweredQuestionGoesBack() {
         let kept = ChatMessage(role: .user, text: "earlier")
         let question = ChatMessage(role: .user, text: "What was decided?")
@@ -92,8 +92,15 @@ struct LiveReplyTests {
         #expect(blank.draft == "What was decided?")
 
         let typing = ChatPane.takingBack(question, from: [kept, question], draft: "something else")
-        #expect(typing.history == [kept])
+        #expect(typing.history == [kept, question])
         #expect(typing.draft == "something else")
+    }
+
+    @Test("a failed send hands its question back through the same helper")
+    func failedSendGivesTheQuestionBack() throws {
+        let path = #filePath.replacingOccurrences(of: "ParolaAppTests/LiveReplyTests.swift", with: "ParolaApp/Views/Chat/ChatPane.swift")
+        let pane = try String(contentsOfFile: path, encoding: .utf8).split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        #expect(pane.contains("giveBack(question) turnError = FailureText.message(for: error)"))
     }
 
     @Test("the live bubble follows the search and sender filters like any other")
