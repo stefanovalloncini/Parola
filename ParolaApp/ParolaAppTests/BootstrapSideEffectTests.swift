@@ -6,14 +6,15 @@ import ParolaCore
 @Suite("Bootstrap side-effect sets + launch flag parsing")
 struct BootstrapSideEffectTests {
 
-    @Test(".all contains all 16 cases")
-    func allHasSixteenCases() {
-        #expect(BootstrapSideEffect.all.count == 16)
+    @Test(".all contains all 17 cases")
+    func allHasSeventeenCases() {
+        #expect(BootstrapSideEffect.all.count == 17)
         let expected: Set<BootstrapSideEffect> = [
             .sparkle, .launchAtLogin, .menuBarExtra, .dockIconRegistration, .appIntentsDonation,
             .meetingDetector, .watchedFolders, .dictationHotkey, .micHotkey,
             .libraryPurgeOnLaunch, .refreshYtDlp, .liveCaptionsTranslateRestore,
             .automationBridge, .modelsPathSync, .diagnosticsLog, .staleWindowKeyPrune,
+            .capturePermissionChecks,
         ]
         #expect(BootstrapSideEffect.all == expected)
     }

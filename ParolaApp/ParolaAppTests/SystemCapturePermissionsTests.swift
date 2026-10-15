@@ -40,6 +40,27 @@ struct SystemCapturePermissionsTests {
         )
     }
 
+    @Test("a test-mode launch never reaches TCC, and a real launch does")
+    func launchGate() {
+        var reached = false
+        let sandbox = SystemCapturePermissions.forLaunch(sideEffects: BootstrapSideEffect.testing) {
+            reached = true
+            return make(Box())
+        }
+        #expect(!reached)
+        #expect(!sandbox.screenRecordingGranted)
+        #expect(sandbox.systemAudioStatus == .undetermined)
+
+        let box = Box()
+        box.screen = true
+        let real = SystemCapturePermissions.forLaunch(sideEffects: BootstrapSideEffect.all) {
+            reached = true
+            return make(box)
+        }
+        #expect(reached)
+        #expect(real.screenRecordingGranted)
+    }
+
     @Test("initial state mirrors the checks")
     func initialState() {
         let box = Box()

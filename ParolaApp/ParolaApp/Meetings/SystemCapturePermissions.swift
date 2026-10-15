@@ -116,6 +116,24 @@ final class SystemCapturePermissions {
         }
     }
 
+    /// A launch without `.capturePermissionChecks`, as in test mode, never reaches TCC: nothing reads as granted and nothing is asked.
+    static func forLaunch(
+        sideEffects: Set<BootstrapSideEffect>,
+        system: () -> SystemCapturePermissions = { SystemCapturePermissions(readsAtLaunch: false) }
+    ) -> SystemCapturePermissions {
+        guard sideEffects.contains(.capturePermissionChecks) else {
+            return SystemCapturePermissions(
+                screenCheck: { false },
+                screenRequest: { false },
+                audioCheck: { .undetermined },
+                consentProbe: {},
+                openSettingsPane: { _ in },
+                readsAtLaunch: false
+            )
+        }
+        return system()
+    }
+
     nonisolated static func openSystemSettings(pane: String) {
         guard let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?\(pane)") else { return }
         NSWorkspace.shared.open(url)

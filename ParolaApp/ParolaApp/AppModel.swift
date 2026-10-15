@@ -1562,7 +1562,7 @@ final class AppModel {
 
     @ObservationIgnored let dictationController = DictationController()
     @ObservationIgnored let dictationPermissions = DictationPermissions(readsAtLaunch: false)
-    @ObservationIgnored let capturePermissions = SystemCapturePermissions(readsAtLaunch: false)
+    @ObservationIgnored let capturePermissions: SystemCapturePermissions
 
     var dictationState: DictationCoordinator.State = .idle
     /// The meter the take in progress writes; set once per take, never per buffer.
@@ -2444,6 +2444,7 @@ final class AppModel {
         self.clock = bootstrap.clock
         self.fileReadDeadline = bootstrap.fileReadDeadline
         self.library = LibraryStore(libraryURL: bootstrap.library ?? LibraryStore.defaultLibraryURL)
+        self.capturePermissions = SystemCapturePermissions.forLaunch(sideEffects: bootstrap.sideEffects)
         // Takes must outlive a failed transcription, a crash, and the OS temp purge.
         RecordingScratch.setDirectory(library.libraryURL.appendingPathComponent("inflight", isDirectory: true))
         self.recoveryOwner = RecoveryOwner(

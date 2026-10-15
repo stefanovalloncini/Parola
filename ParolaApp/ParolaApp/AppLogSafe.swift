@@ -54,6 +54,7 @@ extension BootstrapSideEffect: LogSafe {
         case .modelsPathSync: return "modelsPathSync"
         case .diagnosticsLog: return "diagnosticsLog"
         case .staleWindowKeyPrune: return "staleWindowKeyPrune"
+        case .capturePermissionChecks: return "capturePermissionChecks"
         }
     }
 }
