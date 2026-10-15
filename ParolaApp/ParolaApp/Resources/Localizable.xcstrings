@@ -3404,6 +3404,39 @@
         }
       }
     },
+    "Couldn't open the audio output.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossibile aprire l'uscita audio."
+          }
+        }
+      }
+    },
+    "Couldn't read this aloud.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossibile leggere ad alta voce."
+          }
+        }
+      }
+    },
+    "Pause reading": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Metti in pausa la lettura"
+          }
+        }
+      }
+    },
     "Pick an app to caption only its sound.": {
       "extractionState": "manual",
       "localizations": {
@@ -12820,6 +12853,17 @@
         }
       }
     },
+    "Preparing…": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preparazione…"
+          }
+        }
+      }
+    },
     "Preset name": {
       "extractionState": "manual",
       "localizations": {
@@ -13131,6 +13175,72 @@
           "stringUnit": {
             "state": "translated",
             "value": "Esci e riapri Parola per usare la nuova cartella dei modelli. I modelli già scaricati restano nella vecchia cartella."
+          }
+        }
+      }
+    },
+    "Read Aloud from Here": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Leggi ad alta voce da qui"
+          }
+        }
+      }
+    },
+    "Read from Current Segment": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Leggi dal segmento corrente"
+          }
+        }
+      }
+    },
+    "Read Translation (%@)": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Leggi la traduzione (%@)"
+          }
+        }
+      }
+    },
+    "Reading waits until dictation ends.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La lettura riprende quando finisce la dettatura."
+          }
+        }
+      }
+    },
+    "Reading waits until live captions stop.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La lettura riprende quando si fermano i sottotitoli in tempo reale."
+          }
+        }
+      }
+    },
+    "Reading waits until the recording ends.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La lettura riprende quando finisce la registrazione."
           }
         }
       }
@@ -14253,6 +14363,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Riprendi"
+          }
+        }
+      }
+    },
+    "Resume reading": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Riprendi la lettura"
           }
         }
       }
@@ -17006,6 +17127,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Predefinito di sistema"
+          }
+        }
+      }
+    },
+    "Translated to %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tradotto in %@"
           }
         }
       }

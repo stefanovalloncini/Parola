@@ -6,15 +6,15 @@ import ParolaCore
 @Suite("Bootstrap side-effect sets + launch flag parsing")
 struct BootstrapSideEffectTests {
 
-    @Test(".all contains all 17 cases")
-    func allHasSeventeenCases() {
-        #expect(BootstrapSideEffect.all.count == 17)
+    @Test(".all contains all 18 cases")
+    func allHasEighteenCases() {
+        #expect(BootstrapSideEffect.all.count == 18)
         let expected: Set<BootstrapSideEffect> = [
             .sparkle, .launchAtLogin, .menuBarExtra, .dockIconRegistration, .appIntentsDonation,
             .meetingDetector, .watchedFolders, .dictationHotkey, .micHotkey,
             .libraryPurgeOnLaunch, .refreshYtDlp, .liveCaptionsTranslateRestore,
             .automationBridge, .modelsPathSync, .diagnosticsLog, .staleWindowKeyPrune,
-            .capturePermissionChecks,
+            .capturePermissionChecks, .readAloudSystem,
         ]
         #expect(BootstrapSideEffect.all == expected)
     }
@@ -26,6 +26,12 @@ struct BootstrapSideEffectTests {
 
     /// A sandbox instance writing diagnostics would put a second process into the shared cache
     /// directory the real app owns.
+    @Test("test mode never opts into the real Read Aloud output")
+    func testingExcludesReadAloudSystem() {
+        #expect(!BootstrapSideEffect.testing.contains(.readAloudSystem))
+        #expect(BootstrapSideEffect.all.contains(.readAloudSystem))
+    }
+
     @Test("test mode installs no diagnostics sink")
     func testingExcludesDiagnosticsLog() {
         #expect(!BootstrapSideEffect.testing.contains(.diagnosticsLog))

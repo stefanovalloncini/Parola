@@ -55,6 +55,7 @@ extension BootstrapSideEffect: LogSafe {
         case .diagnosticsLog: return "diagnosticsLog"
         case .staleWindowKeyPrune: return "staleWindowKeyPrune"
         case .capturePermissionChecks: return "capturePermissionChecks"
+        case .readAloudSystem: return "readAloudSystem"
         }
     }
 }
