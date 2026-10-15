@@ -17,9 +17,10 @@ struct OwnPlayerPauseTests {
 
         var handle: PlayerHandle {
             PlayerHandle(
-                isPlaying: { self.isPlaying },
-                pause: { self.pauseCount += 1; self.isPlaying = false },
-                resume: { self.resumeCount += 1; self.isPlaying = true }
+                id: ObjectIdentifier(self),
+                isPlaying: { [weak self] in self?.isPlaying ?? false },
+                pause: { [weak self] in self?.pauseCount += 1; self?.isPlaying = false },
+                resume: { [weak self] in self?.resumeCount += 1; self?.isPlaying = true }
             )
         }
     }
@@ -40,6 +41,25 @@ struct OwnPlayerPauseTests {
 
         await pause.resumePaused()
         #expect(playing.resumeCount == 1)
+    }
+
+    @Test("a player closed or replaced during the take is not played again")
+    func droppedPlayerStaysPaused() async {
+        let closed = FakePlayer(isPlaying: true)
+        let kept = FakePlayer(isPlaying: true)
+        let listed = Listed([closed.handle, kept.handle])
+        let pause = OwnPlayerPause { listed.handles }
+
+        #expect(await pause.pausePlaying() == true)
+        listed.handles = [kept.handle]
+        await pause.resumePaused()
+        #expect(closed.resumeCount == 0)
+        #expect(kept.resumeCount == 1)
+    }
+
+    @MainActor private final class Listed {
+        var handles: [PlayerHandle]
+        init(_ handles: [PlayerHandle]) { self.handles = handles }
     }
 
     @Test("nothing playing means nothing paused and nothing to resume")
@@ -64,11 +84,20 @@ struct OwnPlayerPauseTests {
     }
 
     @Test("the model offers its main player and every open window's player")
-    func modelPlayers() {
-        let model = AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("ownplayers"))
+    func modelPlayers() async throws {
+        let model = EntryWindowTestSupport.makeModel("ownplayers")
         #expect(model.ownPlayers().isEmpty)
         model.player = AVPlayer()
         #expect(model.ownPlayers().count == 1)
+
+        let entry = try await EntryWindowTestSupport.seed(
+            model, texts: ["alpha"], speakers: [nil], audio: try EntryWindowTestSupport.silentAudioFile()
+        )
+        let session = await EntryWindowTestSupport.openSession(model, entry)
+        let windowPlayer = try #require(session.player)
+        let ids = Set(model.ownPlayers().map(\.id))
+        #expect(ids.count == 2)
+        #expect(ids.contains(ObjectIdentifier(windowPlayer)))
     }
 
     private struct SilentToggler: MediaPlaybackToggler {
