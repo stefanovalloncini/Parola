@@ -383,6 +383,48 @@ struct AppModelLibraryTests {
         #expect(model.transcript?.summary?.chapters == summarized)
     }
 
+    @Test("Clear during a regenerate keeps the summary cleared, on screen and on disk")
+    func clearDuringRegenerateStaysCleared() async throws {
+        let model = makeModel()
+        let seedStore = LibraryStore(libraryURL: model.library.libraryURL, extraIndexer: nil)
+        let seeded = try await seedStore.add(
+            transcript: Transcript(
+                segments: [TranscriptSegment(id: 0, start: 0, end: 60, text: "hello")],
+                language: "en",
+                modelName: "stub",
+                summary: Summary(text: "first recap")
+            ),
+            audioSource: nil,
+            category: .transcription
+        )
+        model.loadEntry(seeded.id)
+        #expect(await waitUntil { model.selectedEntryID == seeded.id && model.transcript?.summary != nil })
+
+        let (release, releaseRun) = AsyncStream<Void>.makeStream()
+        let returned = OSAllocatedUnfairLock(initialState: false)
+        model.summariseOperation = { _, _ in
+            for await _ in release { break }
+            returned.withLock { $0 = true }
+            return Summary(text: "regenerated recap")
+        }
+        model.summariseTranscript()
+        #expect(model.isSummarising)
+
+        model.clearSummary()
+        #expect(model.transcript?.summary == nil)
+        #expect(!model.isSummarising)
+
+        releaseRun.yield()
+        #expect(await waitUntil { returned.withLock { $0 } })
+        await settle()
+
+        #expect(model.transcript?.summary == nil)
+        #expect(model.summaryError == nil)
+        #expect(await waitUntil {
+            (try? await model.library.load(seeded.id).document.transcript).map { $0.summary == nil } == true
+        })
+    }
+
     @Test("summarizing the latest entry adopts its chapters, not the previous entry's")
     func summarizeLatestEntryAdoptsItsOwnChapters() async throws {
         // Seed before the model exists: its init primes the store's list cache, and an empty one never refills.
