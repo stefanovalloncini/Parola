@@ -1,4 +1,5 @@
 import Foundation
+import NaturalLanguage
 import os
 
 /// One result from Apple's analyzer: volatile until the analyzer settles on it.
@@ -20,8 +21,8 @@ struct CaptionRecognition: Sendable, Equatable {
 /// A running analyzer, behind a seam so the session's rules can be tested without the system's speech model.
 protocol CaptionAnalyzing: Sendable {
     var recognitions: AsyncThrowingStream<CaptionRecognition, any Error> { get }
-    /// Takes the capture's 16 kHz mono chunks; safe to call from the capture thread.
-    func feed(_ samples: [Float])
+    /// Takes the capture's 16 kHz mono chunks; safe to call from the capture thread. False when the analyzer's input is full and the chunk was not queued.
+    func feed(_ samples: [Float]) -> Bool
     /// Ends the input and settles what the analyzer still holds; `recognitions` finishes afterwards.
     func finalize() async throws
     func cancel() async
@@ -191,7 +192,9 @@ actor AppleSpeechCaptionSession: StreamingTranscriber {
             return
         }
         analyzer = made
-        intake.open(analyzer: made, meter: levelMeter)
+        intake.open(analyzer: made, meter: levelMeter) { [weak self] in
+            Task { await self?.analyzerStalled() }
+        }
         collector = Task { [weak self] in
             do {
                 for try await recognition in made.recognitions { await self?.apply(recognition) }
@@ -233,7 +236,7 @@ actor AppleSpeechCaptionSession: StreamingTranscriber {
             return
         }
         lastPartial = ""
-        for piece in CaptionSentences.split(recognition) {
+        for piece in CaptionSentences.split(recognition, language: locale.language.languageCode.map { NLLanguage($0.identifier) }) {
             let segment = TranscriptSegment(
                 id: confirmed.count, start: piece.start, end: piece.end,
                 text: piece.text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -247,6 +250,11 @@ actor AppleSpeechCaptionSession: StreamingTranscriber {
         guard !lastPartial.isEmpty else { return }
         lastPartial = ""
         continuation?.yield(.partial(text: ""))
+    }
+
+    private func analyzerStalled() async {
+        guard phase == .running else { return }
+        await fail(FixedFailureText.appleSpeechStoppedListening)
     }
 
     private func recognitionsEnded() async {
@@ -432,15 +440,18 @@ private final class Intake: Sendable {
     private struct State {
         var analyzer: (any CaptionAnalyzing)?
         var meter: LevelMeter?
+        var onStall: (@Sendable () -> Void)?
         var paused = false
+        var stalled = false
     }
 
     private let state = OSAllocatedUnfairLock(initialState: State())
 
-    func open(analyzer: any CaptionAnalyzing, meter: LevelMeter) {
+    func open(analyzer: any CaptionAnalyzing, meter: LevelMeter, onStall: @escaping @Sendable () -> Void) {
         state.withLock {
             $0.analyzer = analyzer
             $0.meter = meter
+            $0.onStall = onStall
         }
     }
 
@@ -458,6 +469,14 @@ private final class Intake: Sendable {
         var sumSquares: Float = 0
         for sample in samples { sumSquares += sample * sample }
         meter?.record(AudioLevel.normalised(rms: (sumSquares / Float(samples.count)).squareRoot()))
-        analyzer.feed(samples)
+        let accepted = analyzer.feed(samples)
+        let (first, onStall) = state.withLock { state -> (Bool, (@Sendable () -> Void)?) in
+            let first = !accepted && !state.stalled
+            state.stalled = !accepted
+            return (first, state.onStall)
+        }
+        guard first else { return }
+        ParolaLog.notice(.engineAppleSpeech, "captions analyzer fell behind, so its oldest audio was dropped")
+        onStall?()
     }
 }

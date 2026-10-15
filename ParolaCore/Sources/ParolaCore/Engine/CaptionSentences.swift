@@ -3,10 +3,11 @@ import NaturalLanguage
 
 enum CaptionSentences {
     /// A final that holds several sentences as one line each, timed from the analyzer's runs where it gave them.
-    static func split(_ recognition: CaptionRecognition) -> [CaptionRecognition] {
+    static func split(_ recognition: CaptionRecognition, language: NLLanguage? = nil) -> [CaptionRecognition] {
         let text = recognition.text
         let tokenizer = NLTokenizer(unit: .sentence)
         tokenizer.string = text
+        if let language { tokenizer.setLanguage(language) }
         let ranges = tokenizer.tokens(for: text.startIndex..<text.endIndex)
         guard ranges.count > 1 else { return [recognition] }
 

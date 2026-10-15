@@ -115,7 +115,7 @@ extension LiveSpeechCaption {
             throw startFailed
         }
         return LiveCaptionAnalyzer(
-            analyzer: analyzer, converter: converter, input: input, recognitions: recognitions, forwarding: forwarding
+            analyzer: analyzer, converter: converter, input: input, recognitions: recognitions, output: output, forwarding: forwarding
         )
     }
 }
@@ -131,7 +131,7 @@ private struct LiveAssetRequest: AssetInstalling {
     func cancel() { request.progress.cancel() }
 }
 
-/// A minute of the capture's 100 ms chunks: past that the analyzer has stalled, and the oldest audio is dropped with a log line.
+/// A minute of the capture's 100 ms chunks: past that the analyzer has stalled, and the session fails.
 private let inputChunkLimit = 600
 
 @available(macOS 26.0, iOS 26.0, *)
@@ -140,12 +140,15 @@ private final class LiveCaptionAnalyzer: CaptionAnalyzing {
     private let analyzer: SpeechAnalyzer
     private let converter: AnalyzerBufferConverter
     private let input: AsyncStream<AnalyzerInput>.Continuation
+    private let output: AsyncThrowingStream<CaptionRecognition, any Error>.Continuation
     private let forwarding: Task<Void, Never>
 
     init(
         analyzer: SpeechAnalyzer, converter: AnalyzerBufferConverter, input: AsyncStream<AnalyzerInput>.Continuation,
-        recognitions: AsyncThrowingStream<CaptionRecognition, any Error>, forwarding: Task<Void, Never>
+        recognitions: AsyncThrowingStream<CaptionRecognition, any Error>,
+        output: AsyncThrowingStream<CaptionRecognition, any Error>.Continuation, forwarding: Task<Void, Never>
     ) {
+        self.output = output
         self.analyzer = analyzer
         self.converter = converter
         self.input = input
@@ -153,11 +156,10 @@ private final class LiveCaptionAnalyzer: CaptionAnalyzing {
         self.forwarding = forwarding
     }
 
-    func feed(_ samples: [Float]) {
-        guard let buffer = converter.buffer(from: samples) else { return }
-        if case .dropped = input.yield(AnalyzerInput(buffer: buffer)) {
-            ParolaLog.notice(.engineAppleSpeech, "captions analyzer fell behind, so its oldest audio was dropped")
-        }
+    func feed(_ samples: [Float]) -> Bool {
+        guard let buffer = converter.buffer(from: samples) else { return true }
+        if case .dropped = input.yield(AnalyzerInput(buffer: buffer)) { return false }
+        return true
     }
 
     func finalize() async throws {
@@ -166,6 +168,7 @@ private final class LiveCaptionAnalyzer: CaptionAnalyzing {
     }
 
     func cancel() async {
+        output.finish()
         input.finish()
         forwarding.cancel()
         await AnalyzerCancellation.stop(analyzer)

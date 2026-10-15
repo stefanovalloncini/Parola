@@ -11,8 +11,10 @@ private final class Analyzer: CaptionAnalyzing {
     let cancelled = TestSignal()
     let parksFinalize: Bool
     let heldFinal: String?
+    let dropsFeeds: Bool
 
-    init(parksFinalize: Bool = false, heldFinal: String? = nil) {
+    init(parksFinalize: Bool = false, heldFinal: String? = nil, dropsFeeds: Bool = false) {
+        self.dropsFeeds = dropsFeeds
         (recognitions, output) = AsyncThrowingStream<CaptionRecognition, any Error>.makeStream()
         self.parksFinalize = parksFinalize
         self.heldFinal = heldFinal
@@ -22,7 +24,7 @@ private final class Analyzer: CaptionAnalyzing {
         output.yield(CaptionRecognition(text: text, start: 0, end: 1, isFinal: false))
     }
 
-    func feed(_ samples: [Float]) {}
+    func feed(_ samples: [Float]) -> Bool { !dropsFeeds }
 
     func finalize() async throws {
         finalizeCalls.increment()
@@ -37,18 +39,27 @@ private final class Analyzer: CaptionAnalyzing {
     }
 }
 
-private final class Capture: Sendable {
+// @unchecked is safe: startThrows is set before the session starts.
+private final class Capture: @unchecked Sendable {
     let startGate = UninterruptibleGate()
     let stopped = Awaitable(0)
     let parksStart: Bool
+    var startThrows = false
     private let ended = OSAllocatedUnfairLock<(@Sendable (String) -> Void)?>(initialState: nil)
+    private let onBuffer = OSAllocatedUnfairLock<(@Sendable ([Float]) -> Void)?>(initialState: nil)
+
+    func push() { onBuffer.withLock { $0 }?([Float](repeating: 0.1, count: 1_600)) }
 
     init(parksStart: Bool) { self.parksStart = parksStart }
 
     var capture: CaptionCapture {
         CaptionCapture(
             requestPermission: { true }, deniedText: "denied",
-            start: { [self] _ in if parksStart { await startGate.wait() } },
+            start: { [self] handler in
+                onBuffer.withLock { $0 = handler }
+                if parksStart { await startGate.wait() }
+                if startThrows { throw CaptionCaptureError(text: "start failed") }
+            },
             stop: { [self] in stopped.increment() },
             interruptStart: nil,
             whenEnded: { [self] handler in ended.withLock { $0 = handler } }
@@ -107,6 +118,22 @@ struct AppleSpeechCaptionRound2Tests {
     func failDuringStartStopsCapture() async throws {
         let analyzer = Analyzer()
         let capture = Capture(parksStart: true)
+        let live = session(analyzer, capture)
+        let events = collect(try await live.start(options: opts))
+        await capture.startGate.arrivals.wait(atLeast: 1, "the capture start to park")
+        analyzer.output.finish(throwing: CaptionCaptureError(text: "analyzer crashed"))
+        await events.wait(until: { $0.last == "<end>" }, "the stream to end")
+        capture.startGate.open()
+        await capture.stopped.wait(atLeast: 1, "the capture to be stopped")
+        try await Task.sleep(for: .milliseconds(150))
+        #expect(capture.stopped.value == 1)
+    }
+
+    @Test("a capture start that throws after the session already failed still stops that capture")
+    func throwingStartAfterFailureStopsCapture() async throws {
+        let analyzer = Analyzer()
+        var capture = Capture(parksStart: true)
+        capture.startThrows = true
         let live = session(analyzer, capture)
         let events = collect(try await live.start(options: opts))
         await capture.startGate.arrivals.wait(atLeast: 1, "the capture start to park")
@@ -186,6 +213,24 @@ struct AppleSpeechCaptionRound2Tests {
         let began = ContinuousClock.now
         await gate.waitUntilSettled()
         #expect(ContinuousClock.now - began < .milliseconds(500))
+    }
+}
+
+@Suite("Apple Speech caption input stall", .timeLimit(.minutes(1)))
+struct AppleSpeechCaptionStallTests {
+    @Test("an analyzer that stops taking audio fails the session once, with Retry's sentence")
+    func fullInputFailsOnce() async throws {
+        let analyzer = Analyzer(dropsFeeds: true)
+        let capture = Capture(parksStart: false)
+        let live = session(analyzer, capture)
+        let events = collect(try await live.start(options: opts))
+        await events.wait(until: { _ in capture.stopped.value >= 0 && analyzer.dropsFeeds }, "a started session")
+        try await Task.sleep(for: .milliseconds(100))
+        for _ in 0..<5 { capture.push() }
+        await events.wait(until: { $0.last == "<end>" }, "the stream to end")
+        #expect(events.value == ["failed:\(FixedFailureText.appleSpeechStoppedListening)", "<end>"], "\(events.value)")
+        #expect(analyzer.cancelled.fired)
+        #expect(capture.stopped.value == 1)
     }
 }
 
@@ -288,6 +333,15 @@ struct CaptionSentenceRound2Tests {
         #expect(pieces.map(\.text) == ["Buongiorno a tutti.", "Grazie mille."])
         #expect(pieces.map(\.end) == [1.0, 2.2])
         #expect(pieces.map(\.start) == [0.0, 1.4])
+    }
+
+    @Test("the tokenizer reads the session's language, so an Italian abbreviation doesn't end a line")
+    func italianAbbreviation() {
+        let text = "Ha parlato il Sig. Rossi della riunione. Grazie a tutti."
+        let recognition = CaptionRecognition(text: text, start: 0, end: 5, isFinal: true)
+        let generic = CaptionSentences.split(recognition).map(\.text)
+        let italian = CaptionSentences.split(recognition, language: .italian).map(\.text)
+        #expect(italian == ["Ha parlato il Sig. Rossi della riunione.", "Grazie a tutti."], "generic: \(generic) italian: \(italian)")
     }
 
     @Test("the language name has no region, also for a region-override locale")

@@ -33,7 +33,10 @@ private final class FakeAnalyzer: CaptionAnalyzing {
         output.finish(throwing: CaptionCaptureError(text: "analyzer crashed"))
     }
 
-    func feed(_ samples: [Float]) { fed.increment() }
+    func feed(_ samples: [Float]) -> Bool {
+        fed.increment()
+        return true
+    }
 
     func finalize() async throws {
         finalized.fire()
@@ -191,6 +194,10 @@ private func startFailure(_ live: AppleSpeechCaptionSession, _ options: Transcri
     }
 }
 
+private func stopWithinTimeout(_ live: AppleSpeechCaptionSession) async throws {
+    _ = try await GuardedTask { await live.stop() }.value("the stop to return", timeout: .seconds(10))
+}
+
 private func options(language: String? = "en", task: TranscriptionTask = .transcribe) -> TranscriptionOptions {
     TranscriptionOptions(model: AppleSpeechTranscriber.syntheticModelID, language: language, task: task)
 }
@@ -265,7 +272,7 @@ struct AppleSpeechCaptionTests {
         fake.analyzer.say("last wor")
         await events.wait("the partial") { !$0.isEmpty }
 
-        await live.stop()
+        try await stopWithinTimeout(live)
         await events.wait("the stream to end") { Events.ended($0) }
         #expect(events.texts() == ["partial:last wor", "confirmed:last words", "finished"])
         #expect(fake.analyzer.finalized.fired)
@@ -419,7 +426,7 @@ struct AppleSpeechCaptionTests {
         let live = session(stopping)
         let started = GuardedTask { try await live.start(options: options()) }
         await stopping.preparing.wait("the install to park")
-        await live.stop()
+        try await stopWithinTimeout(live)
         let events = Events()
         events.collect(try #require(try await started.value("the stopped start")))
         await events.wait("the stream to end") { Events.ended($0) }
@@ -444,7 +451,7 @@ struct AppleSpeechCaptionTests {
         analyzer.say("held words")
         await events.wait("the partial") { !$0.isEmpty }
 
-        await live.stop()
+        try await stopWithinTimeout(live)
         await events.wait("the stream to end") { Events.ended($0) }
         #expect(events.texts() == ["partial:held words", "confirmed:held words", "finished"])
         #expect(analyzer.cancelled.fired)
@@ -479,7 +486,7 @@ struct AppleSpeechCaptionTests {
         analyzer.say("held words")
         await events.wait("the partial") { !$0.isEmpty }
 
-        await live.stop()
+        try await stopWithinTimeout(live)
         await events.wait("the stream to end") { Events.ended($0) }
         #expect(events.texts() == ["partial:held words", "confirmed:held words", "finished"])
         #expect(analyzer.cancelled.fired)
@@ -530,7 +537,7 @@ struct AppleSpeechCaptionTests {
         events.collect(try await live.start(options: options()))
         await fake.creationGate?.arrivals.wait(atLeast: 1, "creation to park")
 
-        await live.stop()
+        try await stopWithinTimeout(live)
         await events.wait("the stream to end") { Events.ended($0) }
         let waiting = GuardedTask { await gate.waitUntilSettled() }
         try await Task.sleep(for: .milliseconds(200))
@@ -570,7 +577,7 @@ struct AppleSpeechCaptionTests {
         events.collect(try await live.start(options: options()))
         await capture.permissionGate?.arrivals.wait(atLeast: 1, "the permission to park")
 
-        await live.stop()
+        try await stopWithinTimeout(live)
         capture.permissionGate?.open()
         try await Task.sleep(for: .milliseconds(150))
         #expect(fake.analyzersMade == 0)
@@ -603,7 +610,7 @@ struct AppleSpeechCaptionTests {
         let events = Events()
         events.collect(try await live.start(options: options()))
         await capture.started.wait("capture to start")
-        await live.stop()
+        try await stopWithinTimeout(live)
         await events.wait("the stream to end") { Events.ended($0) }
 
         capture.end(FixedFailureText.systemAudioStopped)
@@ -636,7 +643,7 @@ struct AppleSpeechCaptionTests {
         analyzer.say("second part.", 1, 2, final: true)
         await events.wait("both finals") { $0.count >= 2 }
 
-        await live.stop()
+        try await stopWithinTimeout(live)
         await events.wait("the stream to end") { Events.ended($0) }
         guard case .finished(let take)? = events.all.value.first(where: { if case .finished = $0 { true } else { false } }) else {
             Issue.record("no finished take")
