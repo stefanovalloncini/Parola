@@ -12,6 +12,7 @@ public struct DeliveryPayload: Codable, Sendable, Equatable {
     public var language: String
     public var modelName: String
     public var sourceURL: URL?
+    public var sourceAppBundleID: String?
     public var speakers: [String]
     public var labels: [String]
     public var category: EntryCategory
@@ -30,6 +31,7 @@ public struct DeliveryPayload: Codable, Sendable, Equatable {
         language: String,
         modelName: String,
         sourceURL: URL? = nil,
+        sourceAppBundleID: String? = nil,
         speakers: [String] = [],
         labels: [String] = [],
         category: EntryCategory = .transcription,
@@ -47,6 +49,7 @@ public struct DeliveryPayload: Codable, Sendable, Equatable {
         self.language = language
         self.modelName = modelName
         self.sourceURL = sourceURL
+        self.sourceAppBundleID = sourceAppBundleID
         self.speakers = speakers
         self.labels = labels
         self.category = category
@@ -73,6 +76,7 @@ public struct DeliveryPayload: Codable, Sendable, Equatable {
             language: entry.language,
             modelName: entry.modelName,
             sourceURL: document.transcript.sourceURL,
+            sourceAppBundleID: entry.sourceAppBundleID,
             speakers: document.transcript.uniqueSpeakers,
             labels: entry.labels,
             category: entry.category,

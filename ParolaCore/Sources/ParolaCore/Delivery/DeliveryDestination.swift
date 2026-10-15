@@ -1,7 +1,7 @@
 import Foundation
 
-/// The outbound integrations Parola knows the names of. Only ``obsidianFolder`` has an
-/// implementation; the others exist so a stored list written by another build still decodes.
+/// The outbound integrations Parola knows the names of. A kind this build does not know still
+/// decodes, as ``AnyDestination/unsupported(kind:config:)``.
 public enum DestinationKind: String, Codable, Sendable, CaseIterable, Identifiable {
     case obsidianFolder
     case obsidianREST
@@ -19,7 +19,7 @@ public enum DestinationKind: String, Codable, Sendable, CaseIterable, Identifiab
         }
     }
 
-    public var isImplemented: Bool { self == .obsidianFolder }
+    public var isImplemented: Bool { true }
 }
 
 /// How a destination names the note it writes.
@@ -99,10 +99,26 @@ public extension DeliveryDestination {
     }
 }
 
+/// The settings the Send To row edits on any destination.
+public protocol DeliveryDestinationSettings: DeliveryDestination {
+    var isEnabled: Bool { get set }
+    var autoSend: Bool { get set }
+    var categories: Set<EntryCategory> { get set }
+    var titleFormat: TitleFormat { get set }
+}
+
+extension ObsidianVaultFolderDestination: DeliveryDestinationSettings {}
+extension MockDestination: DeliveryDestinationSettings {}
+
 /// Why a delivery could not be made.
 public enum DeliveryError: Error, LocalizedError, Equatable {
     case vaultUnavailable(String, String)
     case writeFailed(String, String)
+    case httpStatus(String, Int, String)
+    case networkFailed(String, String)
+    case missingSecret(String)
+    case invalidSetup(String, String)
+    case partialDelivery(String, sent: Int, total: Int, reason: String)
 
     public var errorDescription: String? {
         switch self {
@@ -111,6 +127,17 @@ public enum DeliveryError: Error, LocalizedError, Equatable {
             return "Parola couldn't reach \(where_). Pick the folder again in Send To settings."
         case .writeFailed(let path, let reason):
             return "Parola couldn't write to \(path). \(reason)"
+        case .httpStatus(let name, let status, let detail):
+            let tail = detail.isEmpty ? "" : " \(detail)"
+            return "\(name) answered HTTP \(status).\(tail)"
+        case .networkFailed(let host, let reason):
+            return "Parola couldn't reach \(host). \(reason)"
+        case .missingSecret(let name):
+            return "\(name) has no saved key. Enter it again in Send To settings."
+        case .invalidSetup(let name, let reason):
+            return "\(name) isn't set up correctly. \(reason)"
+        case .partialDelivery(let name, let sent, let total, let reason):
+            return "\(name) got \(sent) of \(total) blocks before it failed, and the page stays there. \(reason)"
         }
     }
 }
@@ -172,6 +199,9 @@ public enum DestinationConfig: Codable, Sendable, Hashable {
 /// A stored destination: the kind it was written as, and its settings.
 public enum AnyDestination: Codable, Sendable, Identifiable {
     case obsidianFolder(ObsidianVaultFolderDestination)
+    case obsidianREST(ObsidianLocalRESTDestination)
+    case webhook(WebhookDestination)
+    case notion(NotionDestination)
     /// Test mode only: a destination that records what it was handed and writes nothing.
     case mock(MockDestination)
     /// A kind this build cannot run. Kept verbatim so it is still there after a round trip.
@@ -200,6 +230,9 @@ public enum AnyDestination: Codable, Sendable, Identifiable {
     public var destination: (any DeliveryDestination)? {
         switch self {
         case .obsidianFolder(let destination): return destination
+        case .obsidianREST(let destination): return destination
+        case .webhook(let destination): return destination
+        case .notion(let destination): return destination
         case .mock(let destination): return destination
         case .unsupported: return nil
         }
@@ -208,6 +241,9 @@ public enum AnyDestination: Codable, Sendable, Identifiable {
     public var kind: DestinationKind? {
         switch self {
         case .obsidianFolder, .mock: return .obsidianFolder
+        case .obsidianREST: return .obsidianREST
+        case .webhook: return .webhook
+        case .notion: return .notion
         case .unsupported(let raw, _): return DestinationKind(rawValue: raw)
         }
     }
@@ -225,6 +261,51 @@ public enum AnyDestination: Codable, Sendable, Identifiable {
     public var autoSend: Bool { destination?.autoSend ?? false }
     public var categories: Set<EntryCategory> { destination?.categories ?? [] }
     public var titleFormat: TitleFormat { destination?.titleFormat ?? .title }
+
+    /// The Keychain references this destination keeps secrets under.
+    public var secretRefs: [String] {
+        switch self {
+        case .obsidianREST(let value): return value.secretRefs
+        case .webhook(let value): return value.secretRefs
+        case .notion(let value): return value.secretRefs
+        case .obsidianFolder, .mock, .unsupported: return []
+        }
+    }
+
+    /// The same destination wired to this environment's secrets and transport.
+    public func bound(to environment: DeliveryEnvironment) -> AnyDestination {
+        switch self {
+        case .obsidianREST(var value): value.environment = environment; return .obsidianREST(value)
+        case .webhook(var value): value.environment = environment; return .webhook(value)
+        case .notion(var value): value.environment = environment; return .notion(value)
+        case .obsidianFolder, .mock, .unsupported: return self
+        }
+    }
+
+    /// The row-level settings every destination shares, changed in place.
+    public func updating(
+        isEnabled: Bool? = nil,
+        autoSend: Bool? = nil,
+        categories: Set<EntryCategory>? = nil,
+        titleFormat: TitleFormat? = nil
+    ) -> AnyDestination {
+        func apply<D: DeliveryDestinationSettings>(_ value: D) -> D {
+            var copy = value
+            if let isEnabled { copy.isEnabled = isEnabled }
+            if let autoSend { copy.autoSend = autoSend }
+            if let categories { copy.categories = categories }
+            if let titleFormat { copy.titleFormat = titleFormat }
+            return copy
+        }
+        switch self {
+        case .obsidianFolder(let value): return .obsidianFolder(apply(value))
+        case .obsidianREST(let value): return .obsidianREST(apply(value))
+        case .webhook(let value): return .webhook(apply(value))
+        case .notion(let value): return .notion(apply(value))
+        case .mock(let value): return .mock(apply(value))
+        case .unsupported: return self
+        }
+    }
 
     /// An unsupported entry keeps the id its config carries, so a build that does implement the
     /// kind recognises the same destination.
@@ -258,17 +339,27 @@ public enum AnyDestination: Codable, Sendable, Identifiable {
 /// rather than failing the whole list.
 public enum DestinationRegistry {
     public static func decode(kind: String, config: DestinationConfig) -> AnyDestination {
-        guard DestinationKind(rawValue: kind) == .obsidianFolder,
-              let destination: ObsidianVaultFolderDestination = try? decodeConfig(config) else {
-            return .unsupported(kind: kind, config: config)
+        let decoded: AnyDestination?
+        switch DestinationKind(rawValue: kind) {
+        case .obsidianFolder: decoded = (try? decodeConfig(config)).map(AnyDestination.obsidianFolder)
+        case .obsidianREST: decoded = (try? decodeConfig(config)).map(AnyDestination.obsidianREST)
+        case .webhook: decoded = (try? decodeConfig(config)).map(AnyDestination.webhook)
+        case .notion: decoded = (try? decodeConfig(config)).map(AnyDestination.notion)
+        case nil: decoded = nil
         }
-        return .obsidianFolder(destination)
+        return decoded ?? .unsupported(kind: kind, config: config)
     }
 
     public static func encode(_ destination: AnyDestination) -> (kind: String, config: DestinationConfig) {
         switch destination {
         case .obsidianFolder(let value):
             return (DestinationKind.obsidianFolder.rawValue, encodeConfig(value))
+        case .obsidianREST(let value):
+            return (DestinationKind.obsidianREST.rawValue, encodeConfig(value))
+        case .webhook(let value):
+            return (DestinationKind.webhook.rawValue, encodeConfig(value))
+        case .notion(let value):
+            return (DestinationKind.notion.rawValue, encodeConfig(value))
         case .mock(let value):
             return (DestinationKind.obsidianFolder.rawValue, encodeConfig(value.asObsidianDestination))
         case .unsupported(let kind, let config):
