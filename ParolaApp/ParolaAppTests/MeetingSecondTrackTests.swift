@@ -1,4 +1,5 @@
 import AVFoundation
+import CoreAudio
 import Foundation
 import Testing
 @testable import Parola
@@ -187,13 +188,13 @@ extension TranscriberMockSuites {
 
         private func startMeeting(
             _ model: AppModel, mac: ScriptedTrack, mic: ScriptedTrack?, category: EntryCategory = .meeting,
-            micOverride: (@MainActor () -> (any LiveAudioSource)?)? = nil
+            capture: (any LiveAudioSource)? = nil, micOverride: (@MainActor () -> (any LiveAudioSource)?)? = nil
         ) async throws {
             // The launch's model scan swaps a model that isn't installed for the default, which needn't be Whisper.
             await model.awaitModelListRefresh()
             model.useStreaming = false
             model.selectedModel = "openai_whisper-tiny"
-            model.takeCaptureOverride = { _ in mac }
+            model.takeCaptureOverride = { _ in capture ?? mac }
             model.micTrackCaptureOverride = micOverride ?? { mic }
             model.pendingRecordingCategory = category
             model.startRecording(source: .systemAudio)
@@ -2606,5 +2607,203 @@ extension TranscriberMockSuites.MeetingSecondTrackTests {
             #expect(asks.count == 1, "once for the take, not once more for the Mac audio")
             withExtendedLifetime(badge) {}
         }
+    }
+}
+
+/// A tap on one app: it is a ScriptedTrack until the test says the app's processes left.
+private actor ScriptedAppTap: LiveAudioSource, TargetsGoneReporting {
+    nonisolated let track: ScriptedTrack
+    nonisolated var levelMeter: LevelMeter { track.levelMeter }
+    private var gone: (@Sendable () -> Void)?
+
+    init(track: ScriptedTrack) { self.track = track }
+
+    func start() async throws { try await track.start() }
+    func prepare() async throws -> URL { try await track.prepare() }
+    func cancel() async { await track.cancel() }
+    func setPaused(_ paused: Bool) async { await track.setPaused(paused) }
+    func inFlightURL() async -> URL? { await track.inFlightURL() }
+    func whenCaptureEnds(_ handler: @escaping @Sendable () -> Void) async { await track.whenCaptureEnds(handler) }
+    func whenTargetsGone(_ handler: @escaping @Sendable () -> Void) async { gone = handler }
+    func targetsLeave() { gone?() }
+    var isWatching: Bool { gone != nil }
+}
+
+extension TranscriberMockSuites.MeetingSecondTrackTests {
+    private static let appID = "com.example.meetingapp"
+
+    private func appOnlyMeeting(
+        _ model: AppModel, withMic: Bool, processesLeft: Bool
+    ) async throws -> (tap: ScriptedAppTap, mic: ScriptedTrack?) {
+        model.micTrackStallTicks = 10_000
+        model.takeEndSettle = .zero
+        model.takeAppProcessObjects = { _ in processesLeft ? [AudioObjectID(7)] : [] }
+        model.pendingCaptureBundleIDs = [Self.appID]
+        let files = try meetingFiles(model)
+        let tap = ScriptedAppTap(track: ScriptedTrack(file: files.mac))
+        let mic = withMic ? ScriptedTrack(file: files.mic) : nil
+        if !withMic { model.meetingRecordsMicrophone = false }
+        try await startMeeting(model, mac: tap.track, mic: mic, capture: tap)
+        if withMic {
+            let micUp = await waitForMicTrack(model)
+            #expect(micUp)
+        }
+        #expect(await tap.isWatching)
+        return (tap, mic)
+    }
+
+    @Test("an app-only meeting whose app quits records on with the microphone and says so")
+    func appQuitsWithMic() async throws {
+        try await withMocksCleared([.audioSource, .transcriber]) {
+            let model = makeModel()
+            let (tap, _) = try await appOnlyMeeting(model, withMic: true, processesLeft: false)
+
+            await tap.targetsLeave()
+
+            let said = await waitUntil { model.exportNotice?.message == "\(Self.appID) quit. Your microphone is still recording." }
+            #expect(said)
+            #expect(model.exportNotice?.tone == .info)
+            #expect(model.recording?.state == .recording)
+            #expect(!model.takeStoppedOnItsOwn)
+            await model.discardTake()
+        }
+    }
+
+    @Test("an app-only meeting whose app quits stops and lands when no microphone records")
+    func appQuitsWithoutMic() async throws {
+        try await withMocksCleared([.audioSource, .transcriber]) {
+            await installMockTranscriber(segments: [(0, 1, "the app side")])
+            let model = makeModel()
+            let (tap, _) = try await appOnlyMeeting(model, withMic: false, processesLeft: false)
+
+            await tap.targetsLeave()
+
+            let notice = await waitForNotice(model)
+            #expect(notice?.message == "\(Self.appID) quit, so Parola stopped the recording.")
+            #expect(notice?.tone == .failure)
+            #expect(model.takeStoppedOnItsOwn)
+            #expect(await landedEntry(model) != nil)
+        }
+    }
+
+    @Test("an app-only meeting whose app quits before any sound ends with nothing saved")
+    func appQuitsBeforeSound() async throws {
+        try await withMocksCleared([.audioSource, .transcriber]) {
+            let model = makeModel()
+            model.takeEndSettle = .zero
+            model.takeAppProcessObjects = { _ in [] }
+            model.pendingCaptureBundleIDs = [Self.appID]
+            let files = try meetingFiles(model)
+            let tap = ScriptedAppTap(track: ScriptedTrack(file: files.mac))
+            await model.awaitModelListRefresh()
+            model.useStreaming = false
+            model.selectedModel = "openai_whisper-tiny"
+            model.meetingRecordsMicrophone = false
+            model.takeCaptureOverride = { _ in tap }
+            model.startRecording(source: .systemAudio)
+            let up = await waitUntil { model.liveSource != nil }
+            #expect(up)
+            model.goHome()
+
+            await tap.targetsLeave()
+
+            let message = "\(Self.appID) quit before anything was recorded."
+            let failed = await waitUntil { model.recording?.state == .failed(message: message) }
+            #expect(failed)
+            #expect(model.exportNotice?.message == message)
+            let released = await waitUntil { !model.recordingActive }
+            #expect(released)
+            await settle()
+            #expect(await model.library.list().isEmpty)
+        }
+    }
+
+    @Test("an app that is still running after its audio objects changed keeps a microphone take going")
+    func helperRespawnWithMic() async throws {
+        try await withMocksCleared([.audioSource, .transcriber]) {
+            let model = makeModel()
+            let (tap, _) = try await appOnlyMeeting(model, withMic: true, processesLeft: true)
+
+            await tap.targetsLeave()
+
+            let said = await waitUntil {
+                model.exportNotice?.message == "\(Self.appID) stopped sending audio. Your microphone is still recording."
+            }
+            #expect(said)
+            #expect(model.recording?.state == .recording)
+            await model.discardTake()
+        }
+    }
+
+    @Test("an app that is still running after its audio objects changed stops a take with no microphone")
+    func helperRespawnWithoutMic() async throws {
+        try await withMocksCleared([.audioSource, .transcriber]) {
+            await installMockTranscriber(segments: [(0, 1, "the app side")])
+            let model = makeModel()
+            let (tap, _) = try await appOnlyMeeting(model, withMic: false, processesLeft: true)
+
+            await tap.targetsLeave()
+
+            let notice = await waitForNotice(model)
+            #expect(notice?.message == "\(Self.appID) stopped sending audio, so Parola stopped the recording.")
+            #expect(model.takeStoppedOnItsOwn)
+        }
+    }
+
+    @Test("targets that go after Stop are ignored")
+    func targetsGoAfterStop() async throws {
+        try await withMocksCleared([.audioSource, .transcriber]) {
+            await installMockTranscriber(segments: [(0, 1, "the app side")])
+            let model = makeModel()
+            let (tap, _) = try await appOnlyMeeting(model, withMic: false, processesLeft: false)
+            model.stopRecordingAndTranscribe()
+            _ = await landedEntry(model)
+            let before = model.exportNotice?.message
+
+            await tap.targetsLeave()
+            await settle()
+
+            #expect(!model.takeStoppedOnItsOwn)
+            #expect(!model.takeMacAudioStopped)
+            #expect(model.exportNotice?.message == before)
+        }
+    }
+
+    @Test("a System Audio take registers no targets watch and keeps its own wording")
+    func systemAudioUnchanged() async throws {
+        try await withMocksCleared([.audioSource, .transcriber]) {
+            let model = makeModel()
+            model.micTrackStallTicks = 10_000
+            let files = try meetingFiles(model)
+            let mac = ScriptedTrack(file: files.mac)
+            try await startMeeting(model, mac: mac, mic: ScriptedTrack(file: files.mic))
+            let micUp = await waitForMicTrack(model)
+            #expect(micUp)
+
+            await mac.endByItself()
+
+            let said = await waitUntil { model.exportNotice?.message == AppModel.macAudioStoppedMessage() }
+            #expect(said)
+            #expect(AppModel.macAudioStoppedMessage() == "The system audio stopped. Your microphone is still recording.")
+            await model.discardTake()
+        }
+    }
+
+    @Test("the app-quit sentences read in English and Italian")
+    func appEndCopy() throws {
+        let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
+        let italian = try #require(Bundle(path: path))
+        let quit = AppModel.MacAudioEnd.appQuit("Zoom")
+        let respawn = AppModel.MacAudioEnd.appStoppedSending("Zoom")
+        #expect(quit.stillRecordingMessage() == "Zoom quit. Your microphone is still recording.")
+        #expect(quit.stoppedTakeMessage() == "Zoom quit, so Parola stopped the recording.")
+        #expect(quit.beforeSoundMessage() == "Zoom quit before anything was recorded.")
+        #expect(respawn.stillRecordingMessage() == "Zoom stopped sending audio. Your microphone is still recording.")
+        #expect(respawn.stoppedTakeMessage() == "Zoom stopped sending audio, so Parola stopped the recording.")
+        #expect(quit.stillRecordingMessage(bundle: italian) == "L'app Zoom è stata chiusa. Il tuo microfono continua a registrare.")
+        #expect(quit.stoppedTakeMessage(bundle: italian) == "L'app Zoom è stata chiusa, quindi Parola ha fermato la registrazione.")
+        #expect(quit.beforeSoundMessage(bundle: italian) == "L'app Zoom è stata chiusa prima che venisse registrato qualcosa.")
+        #expect(respawn.stillRecordingMessage(bundle: italian) == "Zoom ha smesso di inviare audio. Il tuo microfono continua a registrare.")
+        #expect(respawn.stoppedTakeMessage(bundle: italian) == "Zoom ha smesso di inviare audio, quindi Parola ha fermato la registrazione.")
     }
 }

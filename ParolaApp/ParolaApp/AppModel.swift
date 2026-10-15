@@ -1,3 +1,4 @@
+import CoreAudio
 import CoreGraphics
 import Foundation
 import SwiftUI
@@ -290,6 +291,12 @@ final class AppModel {
     @ObservationIgnored private var takeReadoutsOwner: Int?
     /// When the take's capture came up: its silence watch runs from here, and its clock falls back to it.
     @ObservationIgnored private var captureStart: CaptureStart?
+    /// Test seam: the process objects an app-only take's targets have now.
+    @ObservationIgnored var takeAppProcessObjects: @Sendable (Set<String>) -> [AudioObjectID] = { targets in
+        guard #available(macOS 14.2, *) else { return [] }
+        return ProcessTapAudioSource.audioProcessObjects(matching: targets)
+    }
+    @ObservationIgnored var takeEndSettle: Duration = .seconds(1)
     /// Test seam: when set, stands in for the capture a take records to a file, so a test decides when it comes up and what it meters.
     @ObservationIgnored var takeCaptureOverride: (@MainActor (RecordSource) -> any LiveAudioSource)?
     /// Test seam: whether Screen Recording is granted when a system-audio capture fails.
@@ -4245,6 +4252,9 @@ final class AppModel {
                     let sys = await makeTakeCapture(.systemAudio, take: take)
                     tapsApps = sys is ProcessTapAudioSource
                     await sys.whenCaptureEnds(macCaptureEndHandler(take: take.id))
+                    if let tap = sys as? any TargetsGoneReporting {
+                        await tap.whenTargetsGone(appTargetsGoneHandler(take: take))
+                    }
                     // Tap setup blocks indefinitely while macOS waits for the System Audio
                     // Recording consent; abandon it after 20s so Stop never goes dead.
                     let started: Result<Void, any Error>? = await AsyncTimeout.run(.seconds(20)) {

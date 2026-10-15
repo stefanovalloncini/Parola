@@ -276,6 +276,39 @@
         }
       }
     },
+    "%@ quit before anything was recorded.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L'app %@ è stata chiusa prima che venisse registrato qualcosa."
+          }
+        }
+      }
+    },
+    "%@ quit, so Parola stopped the recording.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L'app %@ è stata chiusa, quindi Parola ha fermato la registrazione."
+          }
+        }
+      }
+    },
+    "%@ quit. Your microphone is still recording.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L'app %@ è stata chiusa. Il tuo microfono continua a registrare."
+          }
+        }
+      }
+    },
     "%@ refused the download (HTTP %lld).": {
       "extractionState": "manual",
       "localizations": {
@@ -327,6 +360,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@ ha smesso di inviare audio."
+          }
+        }
+      }
+    },
+    "%@ stopped sending audio, so Parola stopped the recording.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ ha smesso di inviare audio, quindi Parola ha fermato la registrazione."
+          }
+        }
+      }
+    },
+    "%@ stopped sending audio. Your microphone is still recording.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ ha smesso di inviare audio. Il tuo microfono continua a registrare."
           }
         }
       }

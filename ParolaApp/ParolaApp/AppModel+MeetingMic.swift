@@ -740,20 +740,20 @@ extension AppModel {
     }
 
     /// The take's Mac audio ended by itself: the take records on with your microphone, or stops.
-    func macCaptureEnded(take takeID: Int) {
+    func macCaptureEnded(take takeID: Int, ending: MacAudioEnd = .systemAudio) {
         guard activeTake?.id == takeID, liveSource != nil, let session = recording, session.takeID == takeID, session.isRunning,
               !takeMacAudioStopped else { return }
         ParolaLog.notice(.audioRecording, "a take's Mac audio stopped on its own")
         takeMacAudioStopped = true
         let micRecords = micTrack?.takeID == takeID && micTrack?.capture != nil && takeMicTrackState?.isLost != true
         guard micRecords else {
-            stopTakeOnItsOwn(takeID, saying: Self.macAudioStoppedTakeMessage(), unheard: Self.macAudioStoppedBeforeSoundMessage())
+            stopTakeOnItsOwn(takeID, saying: ending.stoppedTakeMessage(), unheard: ending.beforeSoundMessage())
             return
         }
         // Over any notice already up: this one is about the recording in progress, the others about what is saved.
         let covered = exportNotice
         exportNotice = ExportNotice(
-            message: Self.macAudioStoppedMessage(), failures: [], folder: nil, tone: .info,
+            message: ending.stillRecordingMessage(), failures: [], folder: nil, tone: .info,
             actions: [ExportNotice.Action(title: String(localized: "Show"), handler: .showTake(takeID))], whileTakeRuns: true
         )
         keepCovered(covered, take: takeID)
@@ -762,6 +762,55 @@ extension AppModel {
     /// What a take's Mac capture calls if it ends by itself.
     func macCaptureEndHandler(take takeID: Int) -> @Sendable () -> Void {
         { [weak self] in Task { @MainActor in self?.macCaptureEnded(take: takeID) } }
+    }
+
+    /// What an app-only take's tap calls when a process it watches leaves; the end is told once the app has settled.
+    func appTargetsGoneHandler(take: TakeContext) -> @Sendable () -> Void {
+        let targets = take.captureTargets
+        let appBundleID = take.sourceAppBundleID ?? targets.sorted().first ?? ""
+        return { [weak self] in
+            Task { @MainActor in
+                guard let self else { return }
+                let objects = self.takeAppProcessObjects
+                guard let end = await TapEnd.settled(
+                    after: self.takeEndSettle, on: self.clock, processesLeft: { !objects(targets).isEmpty }
+                ) else { return }
+                let name = CaptionAppList.installedName(forBundleID: appBundleID) ?? appBundleID
+                self.macCaptureEnded(take: take.id, ending: end == .quit ? .appQuit(name) : .appStoppedSending(name))
+            }
+        }
+    }
+
+    enum MacAudioEnd: Equatable {
+        case systemAudio
+        case appQuit(String)
+        case appStoppedSending(String)
+
+        func stillRecordingMessage(bundle: Bundle = .main) -> String {
+            switch self {
+            case .systemAudio: AppModel.macAudioStoppedMessage(bundle: bundle)
+            case .appQuit(let name): String(localized: "\(name) quit. Your microphone is still recording.", bundle: bundle)
+            case .appStoppedSending(let name):
+                String(localized: "\(name) stopped sending audio. Your microphone is still recording.", bundle: bundle)
+            }
+        }
+
+        func stoppedTakeMessage(bundle: Bundle = .main) -> String {
+            switch self {
+            case .systemAudio: AppModel.macAudioStoppedTakeMessage(bundle: bundle)
+            case .appQuit(let name): String(localized: "\(name) quit, so Parola stopped the recording.", bundle: bundle)
+            case .appStoppedSending(let name):
+                String(localized: "\(name) stopped sending audio, so Parola stopped the recording.", bundle: bundle)
+            }
+        }
+
+        func beforeSoundMessage(bundle: Bundle = .main) -> String {
+            switch self {
+            case .systemAudio: AppModel.macAudioStoppedBeforeSoundMessage(bundle: bundle)
+            case .appQuit(let name): String(localized: "\(name) quit before anything was recorded.", bundle: bundle)
+            case .appStoppedSending: stoppedTakeMessage(bundle: bundle)
+            }
+        }
     }
 
     nonisolated static func macAudioStoppedMessage(bundle: Bundle = .main) -> String {

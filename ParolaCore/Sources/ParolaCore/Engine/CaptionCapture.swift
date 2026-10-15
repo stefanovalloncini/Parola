@@ -116,8 +116,8 @@ struct CaptionCaptureEnvironment: Sendable {
     }
 }
 
-/// A source that can tell its watched processes are gone; only captions ask, so a meeting's `whenCaptureEnds` stays as it was.
-protocol TargetsGoneReporting: LiveAudioSource {
+/// A source that can tell its watched processes are gone; system-audio sources don't, so their `whenCaptureEnds` stays as it was.
+public protocol TargetsGoneReporting: LiveAudioSource {
     func whenTargetsGone(_ handler: @escaping @Sendable () -> Void) async
 }
 
@@ -129,7 +129,7 @@ extension CaptionCapture {
         let fixtureEndText = bundleID.map(FixedFailureText.appQuit) ?? FixedFailureText.systemAudioStopped
         let endText: @Sendable () -> String = {
             guard let bundleID else { return FixedFailureText.systemAudioStopped }
-            return env.processObjects(bundleID).isEmpty
+            return TapEnd(processesLeft: !env.processObjects(bundleID).isEmpty) == .quit
                 ? FixedFailureText.appQuit(bundleID) : FixedFailureText.appStoppedSending(bundleID)
         }
         let deniedText = bundleID == nil ? FixedFailureText.systemAudioNotAllowed : FixedFailureText.appAudioNotAllowed

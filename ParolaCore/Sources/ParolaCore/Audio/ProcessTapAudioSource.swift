@@ -274,7 +274,7 @@ public actor ProcessTapAudioSource: LiveAudioSource, TargetsGoneReporting {
         handler?.setPaused(paused)
     }
 
-    func whenTargetsGone(_ handler: @escaping @Sendable () -> Void) async {
+    public func whenTargetsGone(_ handler: @escaping @Sendable () -> Void) async {
         endWatch?.cancel()
         guard !cancelled else { return }
         endWatch = ProcessEndWatch(
