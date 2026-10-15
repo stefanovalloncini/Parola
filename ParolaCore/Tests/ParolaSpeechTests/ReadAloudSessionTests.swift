@@ -22,6 +22,8 @@ struct ReadAloudSessionTests {
         expandsNumbers: Bool = true,
         maxUnitChars: Int = 400,
         realTimeFactor: Double = 0,
+        realTimeFactors: [Int: Double] = [:],
+        startLatency: Duration = .zero,
         failAtUnit: Int? = nil,
         language: String = "en",
         clock: TestClock = TestClock(),
@@ -30,7 +32,8 @@ struct ReadAloudSessionTests {
     ) -> Harness {
         let (renderer, renderLog) = existing ?? mockRenderer(
             clock: clock, expandsNumbers: expandsNumbers, maxUnitChars: maxUnitChars,
-            realTimeFactor: realTimeFactor, failAtUnit: failAtUnit
+            realTimeFactor: realTimeFactor, realTimeFactors: realTimeFactors, startLatency: startLatency,
+            failAtUnit: failAtUnit
         )
         let session = ReadAloudSession(
             units: units(texts), renderer: renderer, voice: voice, language: language, sink: sink, clock: clock
@@ -47,6 +50,8 @@ struct ReadAloudSessionTests {
         maxUnitChars: Int = 400,
         sampleRate: Double = 24_000,
         realTimeFactor: Double = 0,
+        realTimeFactors: [Int: Double] = [:],
+        startLatency: Duration = .zero,
         failAtUnit: Int? = nil
     ) -> (MockSpeechRenderer, RenderLog) {
         let renderLog = RenderLog()
@@ -58,6 +63,8 @@ struct ReadAloudSessionTests {
             clock: clock,
             sampleRate: sampleRate,
             realTimeFactor: realTimeFactor,
+            realTimeFactors: realTimeFactors,
+            startLatency: startLatency,
             failAtUnit: failAtUnit,
             observer: renderLog.observer
         )
@@ -590,44 +597,83 @@ struct ReadAloudSessionTests {
 
     // MARK: - Slow renderers
 
-    @Test("a renderer slower than playback finishes the unit, waits, and continueReading goes on")
+    private func startRenderingAhead(_ h: Harness, afterUnit: Int, sleeps: Int, of step: Duration) async throws {
+        await drive(h.clock, sleeps: sleeps, of: step)
+        try #require(await h.renderLog.wait(for: .started(unitID: afterUnit + 1)))
+        await h.session.settlePump()
+    }
+
+    @Test("a renderer slower than playback finishes the unit it is waited on for, waits, and continueReading goes on")
     func slowRendererWaits() async throws {
-        let h = harness(Array(repeating: sentence(25), count: 3), realTimeFactor: 2)
+        let h = harness(Array(repeating: sentence(25), count: 4), realTimeFactor: 2)
         await h.session.play()
+        try await startRenderingAhead(h, afterUnit: 0, sleeps: 6, of: .milliseconds(500))
+        try #require(h.sink.completeNextUnit() != nil)
+        try #require(await h.log.waitForStarts(2))
+
         await drive(h.clock, sleeps: 6, of: .milliseconds(500))
         try #require(await h.log.wait(for: .waiting(.slow)))
         await h.session.settle()
-        #expect(await h.renderer.rendered.map(\.unitID) == [0])
-        #expect(h.sink.finishedUnits == [0])
+        #expect(await h.renderer.rendered.map(\.unitID) == [0, 1])
+        #expect(h.sink.finishedUnits == [0, 1])
 
-        try await complete(h, startsTotal: 2)
-        #expect(await h.renderer.rendered.map(\.unitID) == [0])
-        #expect(h.sink.finishedUnits == [0])
+        try await complete(h, startsTotal: 3)
+        #expect(await h.renderer.rendered.map(\.unitID) == [0, 1])
 
         await h.session.continueReading()
         await drive(h.clock, sleeps: 6, of: .milliseconds(500))
         try #require(await h.log.wait(for: .waiting(.slow), count: 2))
         await h.session.settle()
-        #expect(await h.renderer.rendered.map(\.unitID) == [0, 1])
-        #expect(h.sink.finishedUnits == [0, 1])
+        #expect(await h.renderer.rendered.map(\.unitID) == [0, 1, 2])
         await h.session.stop()
     }
 
     @Test("the wait depends on render speed times playback speed", arguments: [(1.0, false), (1.5, true)])
     func slowDependsOnSpeed(speed: Double, waits: Bool) async throws {
-        let h = harness(Array(repeating: sentence(25), count: 3), realTimeFactor: 0.8)
+        let h = harness(Array(repeating: sentence(25), count: 4), realTimeFactor: 0.8)
         await h.session.setSpeed(speed)
         await h.session.play()
+        try await startRenderingAhead(h, afterUnit: 0, sleeps: 6, of: .milliseconds(200))
+        try #require(h.sink.completeNextUnit() != nil)
+        try #require(await h.log.waitForStarts(2))
         await drive(h.clock, sleeps: 6, of: .milliseconds(200))
 
         if waits {
             try #require(await h.log.wait(for: .waiting(.slow)))
             await h.session.settle()
-            #expect(await h.renderer.rendered.map(\.unitID) == [0])
+            #expect(await h.renderer.rendered.map(\.unitID) == [0, 1])
         } else {
-            try #require(await h.renderLog.wait(for: .started(unitID: 1)))
+            try #require(await h.renderLog.wait(for: .started(unitID: 2)))
             #expect(!h.log.events.value.contains(.waiting(.slow)))
         }
+        await h.session.stop()
+    }
+
+    @Test("a fixed latency on a short first unit is not a slow voice")
+    func firstUnitLatencyDoesNotHold() async throws {
+        let h = harness(
+            [sentence(10), sentence(100), sentence(100), sentence(100)], startLatency: .seconds(1)
+        )
+        await h.session.play()
+        await drive(h.clock, sleeps: 1, of: .seconds(1))
+        try #require(await h.renderLog.wait(for: .started(unitID: 1)))
+        await drive(h.clock, sleeps: 1, of: .seconds(1))
+        try #require(await h.renderLog.wait(for: .started(unitID: 2)))
+        #expect(!h.log.events.value.contains(.waiting(.slow)))
+        await h.session.stop()
+    }
+
+    @Test("units rendered ahead of playback never hold the reading, however slow they are")
+    func lookAheadNeverHolds() async throws {
+        let h = harness(
+            Array(repeating: sentence(25), count: 4), realTimeFactors: [0: 0, 1: 2, 2: 2, 3: 2]
+        )
+        await h.session.play()
+        await drive(h.clock, sleeps: 18, of: .milliseconds(500))
+        try #require(await h.renderLog.wait(for: .ended(unitID: 3)))
+        await h.session.settle()
+        #expect(await h.renderer.rendered.map(\.unitID) == [0, 1, 2, 3])
+        #expect(!h.log.events.value.contains(.waiting(.slow)))
         await h.session.stop()
     }
 

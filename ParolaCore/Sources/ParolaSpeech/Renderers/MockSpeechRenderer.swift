@@ -61,6 +61,8 @@ public actor MockSpeechRenderer: SpeechRenderer {
     private let sampleRate: Double
     private let secondsPerCharacter: Double
     private let realTimeFactor: Double
+    private let realTimeFactors: [Int: Double]
+    private let startLatency: Duration
     private let chunkSamples: Int
     private let toneFrequency: Double?
     private let observer: Observer?
@@ -89,6 +91,8 @@ public actor MockSpeechRenderer: SpeechRenderer {
         sampleRate: Double = 24_000,
         secondsPerCharacter: Double = 0.06,
         realTimeFactor: Double = 0,
+        realTimeFactors: [Int: Double] = [:],
+        startLatency: Duration = .zero,
         chunkSeconds: Double = 0.25,
         toneFrequency: Double? = nil,
         failAtUnit: Int? = nil,
@@ -100,6 +104,8 @@ public actor MockSpeechRenderer: SpeechRenderer {
         self.sampleRate = sampleRate
         self.secondsPerCharacter = secondsPerCharacter
         self.realTimeFactor = realTimeFactor
+        self.realTimeFactors = realTimeFactors
+        self.startLatency = startLatency
         self.chunkSamples = max(1, Int((chunkSeconds * sampleRate).rounded()))
         self.toneFrequency = toneFrequency
         self.failAtUnit = failAtUnit
@@ -200,13 +206,23 @@ public actor MockSpeechRenderer: SpeechRenderer {
             continuation.finish(throwing: Failure(unitID: unitID))
             return
         }
+        if startLatency > .zero {
+            do {
+                try await clock.sleep(for: startLatency, tolerance: nil)
+                try Task.checkCancellation()
+            } catch {
+                continuation.finish(throwing: CancellationError())
+                return
+            }
+        }
+        let factor = realTimeFactors[unitID] ?? realTimeFactor
         var produced = 0
         while produced < totalSamples {
             let count = min(chunkSamples, totalSamples - produced)
             let chunk = PCMChunk(unitID: unitID, samples: samples(from: produced, count: count), sampleRate: sampleRate)
             do {
-                if realTimeFactor > 0 {
-                    try await clock.sleep(for: .seconds(chunk.duration * realTimeFactor), tolerance: nil)
+                if factor > 0 {
+                    try await clock.sleep(for: .seconds(chunk.duration * factor), tolerance: nil)
                 }
                 try Task.checkCancellation()
             } catch {

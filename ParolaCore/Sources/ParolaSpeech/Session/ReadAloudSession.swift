@@ -133,6 +133,7 @@ public actor ReadAloudSession {
     private var renderEndWaiters: [CheckedContinuation<Void, Never>] = []
 
     private var rtf: Double?
+    private var isBaselinePending = true
     private var slowHold: Int?
     private var failure: (unit: Int, message: String)?
     private var pendingSwitch: VoiceSwitch?
@@ -320,6 +321,10 @@ public actor ReadAloudSession {
         await withCheckedContinuation { laneQueueWatchers.append((count, $0)) }
     }
 
+    func settlePump() async {
+        await pumpTask?.value
+    }
+
     func settle() async {
         while true {
             if let renderTask {
@@ -361,6 +366,7 @@ public actor ReadAloudSession {
         scheduledUnit = target
         scheduledChunks = 0
         failure = nil
+        isBaselinePending = true
         resetTimer()
         trimCache()
         announce()
@@ -384,6 +390,7 @@ public actor ReadAloudSession {
         gainDB = request.gainDB
         cache.removeAll()
         rtf = nil
+        isBaselinePending = true
         slowHold = nil
     }
 
@@ -632,7 +639,9 @@ public actor ReadAloudSession {
         let sample = renderTime.secondsValue / audio.duration
         let smoothed = rtf.map { $0 + Self.rtfSmoothing * (sample - $0) } ?? sample
         rtf = smoothed
-        guard phase == .playing, job.unit == current, job.unit < units.count - 1, smoothed * speed > 1 else { return }
+        let isBaseline = isBaselinePending
+        isBaselinePending = false
+        guard !isBaseline, phase == .playing, job.unit == current, job.unit < units.count - 1, smoothed * speed > 1 else { return }
         slowHold = job.unit
         ParolaLog.notice(
             .readAloud, "the voice renders slower than it plays; the reading waits",
