@@ -101,7 +101,7 @@ struct ReadAloudSessionTests {
 
     private func drive(_ clock: TestClock, sleeps: Int, of step: Duration) async {
         for _ in 0..<sleeps {
-            await clock.waitForSleeper()
+            guard await clock.waitForSleeper() else { return }
             clock.advance(by: step)
         }
     }

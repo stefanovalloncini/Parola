@@ -68,6 +68,7 @@ struct ReadAloudNowPlayingTests {
         #expect(received.values == [.toggle])
     }
 
+    // The target ignores its event, so a zeroed instance (init is refused) is never read and frees safely.
     private nonisolated static func event() -> MPRemoteCommandEvent {
         unsafeDowncast(class_createInstance(MPRemoteCommandEvent.self, 0)! as AnyObject, to: MPRemoteCommandEvent.self)
     }

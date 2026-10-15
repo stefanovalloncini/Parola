@@ -4,8 +4,7 @@ import ParolaCore
 
 /// Renders with the Apple voices installed on this Mac through `AVSpeechSynthesizer.write`, which makes
 /// buffers without playing them.
-// Must stay @MainActor: write()'s ObjC callbacks reach main only on a CFRunLoop host, and a closure
-// capturing an actor's self gets a Swift 6 executor check that traps on the first buffer.
+// Stays @MainActor: write() callbacks reach main only on a run-loop host, and a captured actor self traps on the first buffer.
 @MainActor
 public final class AppleSpeechRenderer: SpeechRenderer {
     public enum Failure: Error, Hashable {
