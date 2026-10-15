@@ -34,6 +34,7 @@ final class TranscriptionCoordinator {
     }
     @ObservationIgnored var onSalvage: (@MainActor () -> Void)?
     @ObservationIgnored private let session = TranscriptionSession(idleTimeout: ModelResidencyPolicy.idleTimeoutSeconds)
+    @ObservationIgnored var modelResidency = ModelResidencyCoordinator(streaming: LiveStreamingModelResidency())
     @ObservationIgnored private var streamingSession: (any StreamingTranscriber)?
     @ObservationIgnored private var finishingSession: (any StreamingTranscriber)?
     @ObservationIgnored private(set) var streamingTask: Task<Void, Never>?
@@ -45,6 +46,7 @@ final class TranscriptionCoordinator {
     init(library: LibraryStore, settings: UserSettings) {
         self.library = library
         self.settings = settings
+        modelResidency.attach(fileSession: session, dictationSession: { nil })
         Task { await StreamingTranscriberFactory.setIdleTimeout(ModelResidencyPolicy.idleTimeout) }
     }
 
@@ -112,6 +114,8 @@ final class TranscriptionCoordinator {
                     phase = .downloadingModel(name: settings.modelName, progress: 0)
                 }
                 phase = .transcribing(file: audio)
+                modelResidency.sessionRunBegan()
+                defer { modelResidency.sessionRunEnded() }
                 let result = try await session.transcribe(
                     source: FileAudioSource(url: audio),
                     options: currentOptions,

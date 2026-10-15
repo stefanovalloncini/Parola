@@ -19,9 +19,13 @@ extension AppModel {
         }
     }
 
-    func deleteModel(_ name: String) {
-        try? ModelStore.shared.deleteLeftovers(variant: name)
-        try? ModelStore.shared.delete(variant: name)
-        refreshModelList()
+    @discardableResult
+    func deleteModel(_ name: String, in store: ModelStore = .shared) -> Task<Void, Never> {
+        Task { [weak self] in
+            await self?.coordinator.modelResidency.free(name)
+            try? store.deleteLeftovers(variant: name)
+            try? store.delete(variant: name)
+            self?.refreshModelList()
+        }
     }
 }
