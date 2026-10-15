@@ -34,6 +34,7 @@ public final class ReadAloudNowPlaying: NowPlayingPublishing {
     }
 
     public func withdraw() {
+        guard !tokens.isEmpty else { return }
         let center = MPNowPlayingInfoCenter.default()
         center.nowPlayingInfo = nil
         center.playbackState = .stopped
@@ -56,15 +57,17 @@ public final class ReadAloudNowPlaying: NowPlayingPublishing {
         return info
     }
 
-    nonisolated static func handler(
+    // Built outside the @MainActor class: a closure formed there is inferred @MainActor and traps off main.
+    nonisolated static func target(
         for command: NowPlayingCommand,
         route: @escaping @MainActor @Sendable (NowPlayingCommand) -> MPRemoteCommandHandlerStatus
-    ) -> @Sendable () -> MPRemoteCommandHandlerStatus {
-        {
+    ) -> @Sendable (MPRemoteCommandEvent) -> MPRemoteCommandHandlerStatus {
+        { _ in
             if Thread.isMainThread {
                 return MainActor.assumeIsolated { route(command) }
             }
-            return DispatchQueue.main.sync { MainActor.assumeIsolated { route(command) } }
+            DispatchQueue.main.async { MainActor.assumeIsolated { _ = route(command) } }
+            return .success
         }
     }
 
@@ -87,9 +90,8 @@ public final class ReadAloudNowPlaying: NowPlayingPublishing {
         ]
         for command in others { command.isEnabled = false }
         for (name, command) in ours {
-            let handle = Self.handler(for: name, route: route)
             command.isEnabled = true
-            tokens.append((command, command.addTarget { _ in handle() }))
+            tokens.append((command, command.addTarget(handler: Self.target(for: name, route: route))))
         }
     }
 }

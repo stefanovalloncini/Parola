@@ -1,4 +1,5 @@
 import Foundation
+import ObjectiveC
 import MediaPlayer
 import Testing
 @testable import ParolaSpeech
@@ -19,27 +20,31 @@ struct ReadAloudNowPlayingTests {
         #expect(info[MPNowPlayingInfoPropertyElapsedPlaybackTime] == nil)
     }
 
-    @Test("a handler built for a command routes that command to the main actor and returns its status")
+    @Test("on the main thread the target returns the route's status for its command")
     @MainActor
-    func handlerOnMain() {
+    func targetOnMain() {
         let seen = Seen()
         for command in NowPlayingCommand.allCases {
-            let handler = ReadAloudNowPlaying.handler(for: command) { received in
+            let target = ReadAloudNowPlaying.target(for: command) { received in
                 seen.append(received)
                 return received == .pause ? .commandFailed : .success
             }
-            #expect(handler() == (command == .pause ? .commandFailed : .success))
+            #expect(target(Self.event()) == (command == .pause ? .commandFailed : .success))
         }
         #expect(seen.values == NowPlayingCommand.allCases)
     }
 
-    @Test("a handler called from another thread hops to the main actor")
-    func handlerOffMain() async {
-        let handler = ReadAloudNowPlaying.handler(for: .next) { command in
-            command == .next && Thread.isMainThread ? .success : .commandFailed
+    @Test("off the main thread the target returns at once and runs the route on the main actor")
+    func targetOffMain() async {
+        let ran = Awaitable<[Bool]>([])
+        let target = ReadAloudNowPlaying.target(for: .next) { command in
+            ran.update { $0.append(command == .next && Thread.isMainThread) }
+            return .commandFailed
         }
-        let status = await Task.detached { handler() }.value
+        let status = await Task.detached { target(Self.event()) }.value
         #expect(status == .success)
+        await ran.wait(until: { $0.count == 1 }, "the route ran")
+        #expect(ran.value == [true])
     }
 
     @Test("the recording fake records publications and withdrawals, and routes commands only while published")
@@ -61,6 +66,10 @@ struct ReadAloudNowPlayingTests {
         #expect(nowPlaying.fire(.next) == .noActionableNowPlayingItem)
         #expect(nowPlaying.withdrawCount == 1)
         #expect(received.values == [.toggle])
+    }
+
+    private nonisolated static func event() -> MPRemoteCommandEvent {
+        unsafeDowncast(class_createInstance(MPRemoteCommandEvent.self, 0)! as AnyObject, to: MPRemoteCommandEvent.self)
     }
 
     private final class Seen: Sendable {
