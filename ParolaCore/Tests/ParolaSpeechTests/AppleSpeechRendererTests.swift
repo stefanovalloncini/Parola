@@ -136,6 +136,37 @@ struct AppleSpeechRendererTests {
         #expect(reads.value == 2)
     }
 
+    @Test("a voice marked unusable leaves the apple:auto choice, and the next render uses the second voice")
+    @MainActor
+    func unusableLeavesAutoChoice() async throws {
+        let real = AppleSpeechRenderer.installedVoices()
+            .filter { !$0.isNovelty && !$0.isPersonal && $0.language.hasPrefix("en") }
+        try #require(real.count >= 2)
+        var top = real[0]
+        top.quality = .premium
+        var second = real[1]
+        second.quality = .default
+        let written = Awaitable<[String]>([])
+        let renderer = AppleSpeechRenderer(
+            backend: AppleSpeechRenderer.Backend(
+                write: { utterance, deliver in
+                    let identifier = utterance.voice?.identifier ?? ""
+                    written.update { $0.append(identifier) }
+                    deliver([], 0)
+                },
+                reset: {}
+            ),
+            installed: { [top, second] }
+        )
+        for unit in 0..<2 {
+            let stream = try await renderer.render(text: "A.", unitID: unit, voice: .appleAutomatic, language: "en")
+            _ = try? await { for try await _ in stream {} }()
+        }
+        #expect(renderer.unusableIdentifiers == [top.identifier])
+        for try await _ in try await renderer.render(text: "A.", unitID: 2, voice: .appleAutomatic, language: "en") {}
+        #expect(written.value == [top.identifier, top.identifier, second.identifier])
+    }
+
     @Test("a refresh changes what apple:auto picks")
     @MainActor
     func refreshRepicks() async throws {
