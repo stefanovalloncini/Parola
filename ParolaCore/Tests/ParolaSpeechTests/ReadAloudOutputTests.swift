@@ -188,22 +188,22 @@ struct ReadAloudOutputTests {
         output.schedule(PCMChunk(unitID: 0, samples: sine(seconds: 0.5, rate: 48_000, amplitude: 0.5), sampleRate: 48_000), epoch: 0, gainDB: 0)
         output.finishUnit(0, epoch: 0, pauseAfter: 0)
         try output.resume()
-        _ = try render(output, seconds: 0.6)
-        await events.wait(count: 1)
+        _ = try await play(output, events, until: 1, atMost: 2)
         let afterOneSentence = output.level.gainDB
         #expect(afterOneSentence < -0.5 && afterOneSentence > -2.5)
 
         output.schedule(PCMChunk(unitID: 1, samples: sine(seconds: 9, rate: 48_000, amplitude: 0.5), sampleRate: 48_000), epoch: 0, gainDB: 0)
         output.finishUnit(1, epoch: 0, pauseAfter: 0)
-        _ = try render(output, seconds: 9.2)
-        await events.wait(count: 2)
+        _ = try await play(output, events, until: 2, atMost: 20)
         #expect(output.level.gainDB < -9.5)
 
         let expected = 0.5 * Float(output.level.gain)
         output.schedule(PCMChunk(unitID: 2, samples: sine(seconds: 0.5, rate: 48_000, amplitude: 0.5), sampleRate: 48_000), epoch: 0, gainDB: 0)
         output.finishUnit(2, epoch: 0, pauseAfter: 0)
-        let levelled = try render(output, seconds: 0.5)
-        #expect(abs(peak(levelled[12_000..<24_000]) - expected) < 0.005)
+        let levelled = try await play(output, events, until: 3, atMost: 2)
+        let sound = try #require(soundSpan(in: levelled))
+        let window = (sound.lowerBound + 2_400)..<min(sound.lowerBound + 14_400, sound.upperBound)
+        #expect(abs(peak(levelled[window]) - expected) < 0.005)
 
         let pulledDown = output.level
         output.stop()
@@ -535,6 +535,17 @@ private func sine(seconds: Double, rate: Double, amplitude: Float = 0.1, frequen
 @MainActor
 private func render(_ output: ReadAloudOutput, seconds: Double) throws -> [Float] {
     samples(of: try output.renderOffline(frames: AVAudioFrameCount(seconds * ReadAloudOutput.sampleRate)))
+}
+
+@MainActor private func play(_ output: ReadAloudOutput, _ events: EventLog, until count: Int, atMost seconds: Double) async throws -> [Float] {
+    var rendered: [Float] = []
+    let limit = Int(seconds * ReadAloudOutput.sampleRate)
+    while events.received.count < count, rendered.count < limit {
+        rendered += try render(output, seconds: 0.25)
+        await Task.yield()
+    }
+    await events.wait(count: count)
+    return rendered
 }
 
 private func samples(of buffer: AVAudioPCMBuffer) -> [Float] {
