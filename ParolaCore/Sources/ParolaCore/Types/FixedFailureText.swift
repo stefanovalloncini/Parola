@@ -53,6 +53,9 @@ public enum FixedFailureText {
     public static let appleSpeechDownloadFailedPrefix = "Apple Speech couldn't download its model for "
     public static let appleSpeechDownloadFailedSuffix = ". Check your connection and try again."
 
+    public static let appleSpeechStoppedListening = "Apple Speech stopped listening."
+    public static let appleSpeechCouldNotStart = "Apple Speech couldn't start. Try again."
+
     public static func appleSpeechNoModel(_ locale: String) -> String {
         appleSpeechNoModelPrefix + locale + "."
     }

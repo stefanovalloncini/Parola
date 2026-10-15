@@ -3,10 +3,18 @@ import os
 
 /// One result from Apple's analyzer: volatile until the analyzer settles on it.
 struct CaptionRecognition: Sendable, Equatable {
+    /// A stretch of `text` with the audio time the analyzer gave it, when it gave one.
+    struct Run: Sendable, Equatable {
+        var text: String
+        var start: Double?
+        var end: Double?
+    }
+
     var text: String
     var start: Double
     var end: Double
     var isFinal: Bool
+    var runs: [Run] = []
 }
 
 /// A running analyzer, behind a seam so the session's rules can be tested without the system's speech model.
@@ -38,6 +46,8 @@ actor AppleSpeechCaptionSession: StreamingTranscriber {
     private let backend: AppleSpeechCaptionBackend
     private let captureFor: CaptureFor
     private let settleGate: SettleGate
+    private let settleLimit: Duration
+    private let clock: any Clock<Duration>
     private let intake = Intake()
 
     private var phase = Phase.idle
@@ -49,6 +59,10 @@ actor AppleSpeechCaptionSession: StreamingTranscriber {
     private var capture: CaptionCapture?
     private var startingCapture = false
     private var didStopCapture = false
+    private var creatingAnalyzer = false
+    private var holdingGateForCreation = false
+    private var settling: FirstResult<Bool>?
+    private var cancelledWhileEnding = false
     private var continuation: AsyncStream<StreamingEvent>.Continuation?
     private var confirmed: [TranscriptSegment] = []
     private var lastPartial = ""
@@ -60,8 +74,11 @@ actor AppleSpeechCaptionSession: StreamingTranscriber {
         backend: AppleSpeechCaptionBackend = .live,
         capture: CaptureFor? = nil,
         settleGate: SettleGate = .shared,
-        clock: any Clock<Duration> = ContinuousClock()
+        clock: any Clock<Duration> = ContinuousClock(),
+        settleLimit: Duration = .seconds(5)
     ) {
+        self.settleLimit = settleLimit
+        self.clock = clock
         self.source = source
         self.backend = backend
         self.captureFor = capture ?? { CaptionCapture.live($0, clock: clock) }
@@ -150,15 +167,20 @@ actor AppleSpeechCaptionSession: StreamingTranscriber {
         guard phase == .running else { return }
 
         let made: any CaptionAnalyzing
+        creatingAnalyzer = true
         do {
             made = try await backend.makeAnalyzer(locale)
         } catch {
+            creatingAnalyzer = false
+            endCreationHold()
             ParolaLog.error(.streaming, "apple speech analyzer failed to start", [.error: .error(error)])
-            await fail(error.localizedDescription)
+            await fail((error as? ParolaError)?.errorDescription ?? FixedFailureText.appleSpeechCouldNotStart)
             return
         }
+        creatingAnalyzer = false
         guard phase == .running else {
             await made.cancel()
+            endCreationHold()
             return
         }
         analyzer = made
@@ -166,6 +188,7 @@ actor AppleSpeechCaptionSession: StreamingTranscriber {
         collector = Task { [weak self] in
             do {
                 for try await recognition in made.recognitions { await self?.apply(recognition) }
+                Task { await self?.recognitionsEnded() }
             } catch {
                 // Failing awaits this very task, so it has to end first.
                 Task { await self?.recognitionFailed(error) }
@@ -190,20 +213,39 @@ actor AppleSpeechCaptionSession: StreamingTranscriber {
     }
 
     private func apply(_ recognition: CaptionRecognition) {
+        guard phase == .running || phase == .ending else { return }
         let text = recognition.text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty, phase == .running || phase == .ending else { return }
+        guard !text.isEmpty else {
+            clearPartial()
+            return
+        }
         guard recognition.isFinal else {
             guard text != lastPartial else { return }
             lastPartial = text
             continuation?.yield(.partial(text: text))
             return
         }
-        let segment = TranscriptSegment(
-            id: confirmed.count, start: recognition.start, end: recognition.end, text: text
-        )
-        confirmed.append(segment)
         lastPartial = ""
-        continuation?.yield(.confirmed(segment))
+        for piece in CaptionSentences.split(recognition) {
+            let segment = TranscriptSegment(
+                id: confirmed.count, start: piece.start, end: piece.end,
+                text: piece.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            )
+            confirmed.append(segment)
+            continuation?.yield(.confirmed(segment))
+        }
+    }
+
+    private func clearPartial() {
+        guard !lastPartial.isEmpty else { return }
+        lastPartial = ""
+        continuation?.yield(.partial(text: ""))
+    }
+
+    private func recognitionsEnded() async {
+        guard phase == .running else { return }
+        ParolaLog.error(.streaming, "apple speech results ended without a stop")
+        await fail(FixedFailureText.appleSpeechStoppedListening)
     }
 
     private func recognitionFailed(_ error: any Error) async {
@@ -216,16 +258,16 @@ actor AppleSpeechCaptionSession: StreamingTranscriber {
     private func captureEnded(_ text: String) async {
         guard phase == .running else { return }
         phase = .ending
-        stopCapture()
+        interruptCapture()
         await settle()
-        continuation?.yield(.failed(text))
+        if !cancelledWhileEnding { continuation?.yield(.failed(text)) }
         finishStream()
     }
 
     private func fail(_ text: String) async {
         guard phase == .running else { return }
         phase = .ending
-        stopCapture()
+        interruptCapture()
         await discard()
         continuation?.yield(.failed(text))
         finishStream()
@@ -238,13 +280,16 @@ actor AppleSpeechCaptionSession: StreamingTranscriber {
             preparing?.cancel()
         case .running:
             phase = .ending
+            holdGateWhileCreating()
             interruptCapture()
             if startingCapture { await runTask?.value }
             stopCapture()
             await settle()
-            continuation?.yield(.finished(await finishedTranscript()))
+            if !cancelledWhileEnding { continuation?.yield(.finished(await finishedTranscript())) }
             finishStream()
-        case .idle, .ending, .done:
+        case .ending:
+            break
+        case .idle, .done:
             break
         }
     }
@@ -256,13 +301,17 @@ actor AppleSpeechCaptionSession: StreamingTranscriber {
             preparing?.cancel()
         case .running:
             phase = .ending
+            holdGateWhileCreating()
             interruptCapture()
             runTask?.cancel()
             if startingCapture { await runTask?.value }
             stopCapture()
             await discard()
             finishStream()
-        case .idle, .ending, .done:
+        case .ending:
+            cancelledWhileEnding = true
+            settling?.resolve(false)
+        case .idle, .done:
             break
         }
     }
@@ -273,17 +322,51 @@ actor AppleSpeechCaptionSession: StreamingTranscriber {
 
     func currentModel() -> String? { AppleSpeechTranscriber.syntheticModelID }
 
-    /// Held words become final; an analyzer that fails to settle leaves the take with what it had confirmed.
+    /// Held words become final. A finalize that fails, hangs past the limit or is cancelled leaves the analyzer cancelled and the held words kept as a line.
     private func settle() async {
         guard let analyzer else { return }
         intake.close()
-        do {
-            try await analyzer.finalize()
-        } catch {
-            ParolaLog.error(.streaming, "apple speech failed to finalize", [.error: .error(error)])
-            await analyzer.cancel()
+        let race = FirstResult<Bool>()
+        settling = race
+        if cancelledWhileEnding { race.resolve(false) }
+        let limit = settleLimit
+        let clock = clock
+        Task {
+            let finalized = await AsyncTimeout.run(limit, clock: clock) { () async -> Bool in
+                do {
+                    try await analyzer.finalize()
+                    return true
+                } catch {
+                    ParolaLog.error(.streaming, "apple speech failed to finalize", [.error: .error(error)])
+                    return false
+                }
+            }
+            race.resolve(finalized ?? false)
         }
+        let settled = await race.wait()
+        settling = nil
+        if !settled { await analyzer.cancel() }
         await collector?.value
+        if !settled, !cancelledWhileEnding { keepHeldWords() }
+    }
+
+    private func keepHeldWords() {
+        guard !lastPartial.isEmpty else { return }
+        let at = confirmed.last?.end ?? 0
+        apply(CaptionRecognition(text: lastPartial, start: at, end: at, isFinal: true))
+    }
+
+    /// A late analyzer is cancelled after the stop returns, so the gate stays shut until then.
+    private func holdGateWhileCreating() {
+        guard creatingAnalyzer, !holdingGateForCreation else { return }
+        holdingGateForCreation = true
+        settleGate.beginStop()
+    }
+
+    private func endCreationHold() {
+        guard holdingGateForCreation else { return }
+        holdingGateForCreation = false
+        settleGate.endStop()
     }
 
     private func discard() async {

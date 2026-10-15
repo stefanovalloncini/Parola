@@ -6,18 +6,24 @@ import os
 
 private final class FakeAnalyzer: CaptionAnalyzing {
     let recognitions: AsyncThrowingStream<CaptionRecognition, any Error>
-    private let output: AsyncThrowingStream<CaptionRecognition, any Error>.Continuation
+    let output: AsyncThrowingStream<CaptionRecognition, any Error>.Continuation
     private let held: OSAllocatedUnfairLock<[CaptionRecognition]>
     let fed = Awaitable(0)
     let finalized = TestSignal()
     let cancelled = TestSignal()
     let failsToFinalize: Bool
+    let parksFinalize: Bool
+    let finalizeGate = UninterruptibleGate()
+    let finalizeStarted = TestSignal()
 
-    init(holding held: [CaptionRecognition] = [], failsToFinalize: Bool = false) {
+    init(holding held: [CaptionRecognition] = [], failsToFinalize: Bool = false, parksFinalize: Bool = false) {
         (recognitions, output) = AsyncThrowingStream<CaptionRecognition, any Error>.makeStream()
         self.held = OSAllocatedUnfairLock(initialState: held)
         self.failsToFinalize = failsToFinalize
+        self.parksFinalize = parksFinalize
     }
+
+    func endResults() { output.finish() }
 
     func say(_ text: String, _ start: Double = 0, _ end: Double = 1, final: Bool = false) {
         output.yield(CaptionRecognition(text: text, start: start, end: end, isFinal: final))
@@ -31,6 +37,8 @@ private final class FakeAnalyzer: CaptionAnalyzing {
 
     func finalize() async throws {
         finalized.fire()
+        finalizeStarted.fire()
+        if parksFinalize { await finalizeGate.wait() }
         if failsToFinalize { throw CaptionCaptureError(text: "no finalize") }
         for recognition in held.withLock({ $0 }) { output.yield(recognition) }
         output.finish()
@@ -55,8 +63,11 @@ private final class FakeBackend: Sendable {
     let analyzerRequested = TestSignal()
     private let analyzerToMake: FakeAnalyzer
 
-    init(analyzer: FakeAnalyzer = FakeAnalyzer()) {
+    let creationGate: UninterruptibleGate?
+
+    init(analyzer: FakeAnalyzer = FakeAnalyzer(), parksCreation: Bool = false) {
         analyzerToMake = analyzer
+        creationGate = parksCreation ? UninterruptibleGate() : nil
     }
 
     var prepared: [Locale] { state.withLock { $0.prepared } }
@@ -97,6 +108,7 @@ private final class FakeBackend: Sendable {
             },
             makeAnalyzer: { [self] _ in
                 analyzerRequested.fire()
+                if let creationGate { await creationGate.wait() }
                 state.withLock { $0.analyzers.append(analyzerToMake) }
                 return analyzerToMake
             }
@@ -114,17 +126,25 @@ private final class StandInCapture: Sendable {
     private let granted: Bool
     let started = TestSignal()
     let stopped = TestSignal()
+    let permissionGate: UninterruptibleGate?
+    let startGate: UninterruptibleGate?
 
-    init(granted: Bool = true) {
+    init(granted: Bool = true, parksPermission: Bool = false, parksStart: Bool = false) {
         self.granted = granted
+        permissionGate = parksPermission ? UninterruptibleGate() : nil
+        startGate = parksStart ? UninterruptibleGate() : nil
     }
 
     var capture: CaptionCapture {
         CaptionCapture(
-            requestPermission: { [granted] in granted },
+            requestPermission: { [self] in
+                if let permissionGate { await permissionGate.wait() }
+                return granted
+            },
             deniedText: FixedFailureText.systemAudioNotAllowed,
             start: { [self] onBuffer in
                 state.withLock { $0.onBuffer = onBuffer }
+                if let startGate { await startGate.wait() }
                 started.fire()
             },
             stop: { [self] in stopped.fire() },
@@ -144,10 +164,12 @@ private final class StandInCapture: Sendable {
 }
 
 private func session(
-    _ fake: FakeBackend, _ capture: StandInCapture = StandInCapture(), gate: SettleGate = SettleGate(duration: .milliseconds(1))
+    _ fake: FakeBackend, _ capture: StandInCapture = StandInCapture(), gate: SettleGate = SettleGate(duration: .milliseconds(1)),
+    settleLimit: Duration = .seconds(5)
 ) -> AppleSpeechCaptionSession {
     AppleSpeechCaptionSession(
-        source: .systemAudio, backend: fake.backend, capture: { _ in capture.capture }, settleGate: gate
+        source: .systemAudio, backend: fake.backend, capture: { _ in capture.capture }, settleGate: gate,
+        settleLimit: settleLimit
     )
 }
 
@@ -198,7 +220,7 @@ private final class Events: Sendable {
     }
 }
 
-@Suite("Apple Speech captions")
+@Suite("Apple Speech captions", .timeLimit(.minutes(1)))
 struct AppleSpeechCaptionTests {
     @Test("a volatile result is a partial and a final one a confirmed segment")
     func partialThenConfirm() async throws {
@@ -341,7 +363,7 @@ struct AppleSpeechCaptionTests {
         #expect(fake.analyzersMade == 0)
     }
 
-    @Test("a failed asset install fails at start and a retry on a fresh session prepares again")
+    @Test("a failed asset install fails at start with the download sentence")
     func installFailure() async {
         let fake = FakeBackend().failingInstall()
         let text = await startFailure(session(fake), options())
@@ -393,6 +415,230 @@ struct AppleSpeechCaptionTests {
         await #expect(throws: CancellationError.self) { _ = try await cancelled.value("the cancelled start") }
     }
 
+    @Test("a finalize that never returns ends at the limit and keeps the held words")
+    func finalizeNeverReturns() async throws {
+        let analyzer = FakeAnalyzer(parksFinalize: true)
+        let fake = FakeBackend(analyzer: analyzer)
+        let live = session(fake, settleLimit: .milliseconds(300))
+        let events = Events()
+        events.collect(try await live.start(options: options()))
+        analyzer.say("held words")
+        await events.wait("the partial") { !$0.isEmpty }
+
+        await live.stop()
+        await events.wait("the stream to end") { Events.ended($0) }
+        #expect(events.texts() == ["partial:held words", "confirmed:held words", "finished"])
+        #expect(analyzer.cancelled.fired)
+        analyzer.finalizeGate.open()
+    }
+
+    @Test("a cancel while stop waits on the finalize ends the stop and keeps nothing")
+    func cancelDuringEnding() async throws {
+        let analyzer = FakeAnalyzer(parksFinalize: true)
+        let live = session(FakeBackend(analyzer: analyzer), settleLimit: .seconds(3600))
+        let events = Events()
+        events.collect(try await live.start(options: options()))
+        analyzer.say("held words")
+        await events.wait("the partial") { !$0.isEmpty }
+        let stopping = GuardedTask { await live.stop() }
+        await analyzer.finalizeStarted.wait("the finalize to park")
+
+        await live.cancel()
+        _ = try await stopping.value("the stop to end")
+        await events.wait("the stream to end") { Events.ended($0) }
+        #expect(events.texts() == ["partial:held words"])
+        #expect(analyzer.cancelled.fired)
+        analyzer.finalizeGate.open()
+    }
+
+    @Test("a finalize that throws still confirms the held words and cancels the analyzer")
+    func failedFinalizeKeepsHeldWords() async throws {
+        let analyzer = FakeAnalyzer(failsToFinalize: true)
+        let live = session(FakeBackend(analyzer: analyzer))
+        let events = Events()
+        events.collect(try await live.start(options: options()))
+        analyzer.say("held words")
+        await events.wait("the partial") { !$0.isEmpty }
+
+        await live.stop()
+        await events.wait("the stream to end") { Events.ended($0) }
+        #expect(events.texts() == ["partial:held words", "confirmed:held words", "finished"])
+        #expect(analyzer.cancelled.fired)
+    }
+
+    @Test("a capture end whose finalize fails still confirms the held words before failing")
+    func captureEndWithFailedFinalize() async throws {
+        let analyzer = FakeAnalyzer(failsToFinalize: true)
+        let capture = StandInCapture()
+        let live = session(FakeBackend(analyzer: analyzer), capture)
+        let events = Events()
+        events.collect(try await live.start(options: options()))
+        await capture.started.wait("capture to start")
+        analyzer.say("held words")
+        await events.wait("the partial") { !$0.isEmpty }
+
+        capture.end(FixedFailureText.systemAudioStopped)
+        await events.wait("the stream to end") { Events.ended($0) }
+        #expect(events.texts() == [
+            "partial:held words", "confirmed:held words", "failed:\(FixedFailureText.systemAudioStopped)",
+        ])
+    }
+
+    @Test("a results stream that ends by itself fails the session")
+    func resultsEndFails() async throws {
+        let analyzer = FakeAnalyzer()
+        let capture = StandInCapture()
+        let live = session(FakeBackend(analyzer: analyzer), capture)
+        let events = Events()
+        events.collect(try await live.start(options: options()))
+        await capture.started.wait("capture to start")
+        analyzer.say("hello")
+        await events.wait("the partial") { !$0.isEmpty }
+
+        analyzer.endResults()
+        await events.wait("the stream to end") { Events.ended($0) }
+        #expect(events.texts() == ["partial:hello", "failed:\(FixedFailureText.appleSpeechStoppedListening)"])
+        #expect(capture.stopped.fired)
+    }
+
+    @Test("a stop during analyzer creation holds the settle gate until the late analyzer is cancelled")
+    func stopDuringCreation() async throws {
+        let analyzer = FakeAnalyzer()
+        let fake = FakeBackend(analyzer: analyzer, parksCreation: true)
+        let gate = SettleGate(duration: .milliseconds(50))
+        let live = session(fake, gate: gate)
+        let events = Events()
+        events.collect(try await live.start(options: options()))
+        await fake.creationGate?.arrivals.wait(atLeast: 1, "creation to park")
+
+        await live.stop()
+        await events.wait("the stream to end") { Events.ended($0) }
+        let waiting = GuardedTask { await gate.waitUntilSettled() }
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(!waiting.isFinished, "the gate settled while the analyzer was still being made")
+        #expect(!analyzer.cancelled.fired)
+
+        fake.creationGate?.open()
+        await analyzer.cancelled.wait("the late analyzer to be cancelled")
+        _ = try await waiting.value("the gate to settle after the late cancel")
+    }
+
+    @Test("a cancel during analyzer creation holds the settle gate too")
+    func cancelDuringCreation() async throws {
+        let analyzer = FakeAnalyzer()
+        let fake = FakeBackend(analyzer: analyzer, parksCreation: true)
+        let gate = SettleGate(duration: .milliseconds(50))
+        let live = session(fake, gate: gate)
+        let events = Events()
+        events.collect(try await live.start(options: options()))
+        await fake.creationGate?.arrivals.wait(atLeast: 1, "creation to park")
+
+        await live.cancel()
+        let waiting = GuardedTask { await gate.waitUntilSettled() }
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(!waiting.isFinished)
+        fake.creationGate?.open()
+        await analyzer.cancelled.wait("the late analyzer to be cancelled")
+        _ = try await waiting.value("the gate to settle")
+    }
+
+    @Test("a stop while the permission is pending builds no analyzer and starts no capture")
+    func stopDuringPermission() async throws {
+        let fake = FakeBackend()
+        let capture = StandInCapture(parksPermission: true)
+        let live = session(fake, capture)
+        let events = Events()
+        events.collect(try await live.start(options: options()))
+        await capture.permissionGate?.arrivals.wait(atLeast: 1, "the permission to park")
+
+        await live.stop()
+        capture.permissionGate?.open()
+        try await Task.sleep(for: .milliseconds(150))
+        #expect(fake.analyzersMade == 0)
+        #expect(!capture.started.fired)
+        #expect(events.texts() == ["finished"])
+    }
+
+    @Test("a stop waits for a capture that is still starting, then stops it")
+    func stopWaitsForStartingCapture() async throws {
+        let capture = StandInCapture(parksStart: true)
+        let live = session(FakeBackend(), capture)
+        let events = Events()
+        events.collect(try await live.start(options: options()))
+        await capture.startGate?.arrivals.wait(atLeast: 1, "the capture start to park")
+
+        let stopping = GuardedTask { await live.stop() }
+        try await Task.sleep(for: .milliseconds(150))
+        #expect(!stopping.isFinished)
+        #expect(!capture.stopped.fired)
+
+        capture.startGate?.open()
+        _ = try await stopping.value("the stop to end")
+        #expect(capture.stopped.fired)
+    }
+
+    @Test("a capture end after the stop adds nothing")
+    func captureEndAfterStop() async throws {
+        let capture = StandInCapture()
+        let live = session(FakeBackend(), capture)
+        let events = Events()
+        events.collect(try await live.start(options: options()))
+        await capture.started.wait("capture to start")
+        await live.stop()
+        await events.wait("the stream to end") { Events.ended($0) }
+
+        capture.end(FixedFailureText.systemAudioStopped)
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(events.texts() == ["finished"])
+    }
+
+    @Test("a second start on a running session is refused")
+    func secondStartRefused() async throws {
+        let live = session(FakeBackend())
+        _ = try await live.start(options: options())
+        do {
+            _ = try await live.start(options: options())
+            Issue.record("a second start went through")
+        } catch let ParolaError.transcriptionFailed(text) {
+            #expect(text == "session already started")
+        } catch {
+            Issue.record("unexpected \(error)")
+        }
+        await live.cancel()
+    }
+
+    @Test("the take is finished as Apple Speech: its sentences are not merged the way Whisper's are")
+    func engineStampKeepsLinesApart() async throws {
+        let analyzer = FakeAnalyzer()
+        let live = session(FakeBackend(analyzer: analyzer))
+        let events = Events()
+        events.collect(try await live.start(options: options()))
+        analyzer.say("no ending here", 0, 1, final: true)
+        analyzer.say("second part.", 1, 2, final: true)
+        await events.wait("both finals") { $0.count >= 2 }
+
+        await live.stop()
+        await events.wait("the stream to end") { Events.ended($0) }
+        guard case .finished(let take)? = events.all.value.first(where: { if case .finished = $0 { true } else { false } }) else {
+            Issue.record("no finished take")
+            return
+        }
+        #expect(take.segments.map(\.text) == ["no ending here", "second part."])
+    }
+
+    @Test("an empty result clears the partial the panel still shows")
+    func emptyResultClearsPartial() async throws {
+        let analyzer = FakeAnalyzer()
+        let live = session(FakeBackend(analyzer: analyzer))
+        let events = Events()
+        events.collect(try await live.start(options: options()))
+        analyzer.say("hello")
+        analyzer.say("  ")
+        await events.wait("the clear") { $0.count >= 2 }
+        #expect(events.texts() == ["partial:hello", "partial:"])
+        await live.cancel()
+    }
+
     @Test("download progress reaches the caller while assets install")
     func progressIsForwarded() async throws {
         let seen = Awaitable<[Double]>([])
@@ -403,7 +649,7 @@ struct AppleSpeechCaptionTests {
     }
 }
 
-@Suite("Apple Speech caption gating")
+@Suite("Apple Speech caption gating", .timeLimit(.minutes(1)))
 struct AppleSpeechCaptionGatingTests {
     private static let apple = AppleSpeechTranscriber.syntheticModelID
 
@@ -443,7 +689,7 @@ struct AppleSpeechCaptionGatingTests {
     }
 }
 
-@Suite("Analyzer buffer conversion")
+@Suite("Analyzer buffer conversion", .timeLimit(.minutes(1)))
 struct AnalyzerBufferConverterTests {
     private func ramp(_ count: Int) -> [Float] {
         (0..<count).map { Float($0) / Float(count) - 0.5 }
@@ -489,5 +735,87 @@ struct AnalyzerBufferConverterTests {
     func empty() throws {
         let converter = try #require(AnalyzerBufferConverter(target: AnalyzerBufferConverter.captureFormat))
         #expect(converter.buffer(from: []) == nil)
+    }
+}
+
+@Suite("Caption sentences", .timeLimit(.minutes(1)))
+struct CaptionSentencesTests {
+    private func final(_ text: String, _ start: Double, _ end: Double, runs: [CaptionRecognition.Run] = []) -> CaptionRecognition {
+        CaptionRecognition(text: text, start: start, end: end, isFinal: true, runs: runs)
+    }
+
+    @Test("a final with several sentences splits into one line each, timed from the runs")
+    func splitsWithRunTimes() {
+        let runs: [CaptionRecognition.Run] = [
+            .init(text: "Buongiorno a tutti. ", start: 0.5, end: 2.0),
+            .init(text: "Grazie per essere qui. ", start: 2.4, end: 4.0),
+            .init(text: "Iniziamo", start: 4.5, end: 5.2),
+        ]
+        let text = runs.map(\.text).joined()
+        let pieces = CaptionSentences.split(final(text, 0, 6, runs: runs))
+        #expect(pieces.map(\.text) == ["Buongiorno a tutti.", "Grazie per essere qui.", "Iniziamo"])
+        #expect(pieces.map(\.start) == [0.5, 2.4, 4.5])
+        #expect(pieces.map(\.end) == [2.0, 4.0, 5.2])
+        #expect(pieces.allSatisfy { $0.isFinal })
+    }
+
+    @Test("a sentence that spans two runs takes the first start and the last end")
+    func sentenceAcrossRuns() {
+        let runs: [CaptionRecognition.Run] = [
+            .init(text: "Hello ", start: 0, end: 0.5),
+            .init(text: "there. How ", start: 0.5, end: 1.5),
+            .init(text: "are you?", start: 1.6, end: 2.5),
+        ]
+        let pieces = CaptionSentences.split(final(runs.map(\.text).joined(), 0, 2.5, runs: runs))
+        #expect(pieces.map(\.text) == ["Hello there.", "How are you?"])
+        #expect(pieces[0].start == 0 && pieces[0].end == 1.5)
+        #expect(pieces[1].start == 0.5 && pieces[1].end == 2.5)
+    }
+
+    @Test("without runs the times are proportional to where each sentence sits")
+    func proportionalFallback() {
+        let pieces = CaptionSentences.split(final("Aaaa. Bbbb.", 10, 20))
+        #expect(pieces.map(\.text) == ["Aaaa.", "Bbbb."])
+        #expect(pieces[0].start == 10)
+        #expect(abs(pieces[0].end - 15) < 1.5)
+        #expect(abs(pieces[1].start - 15) < 1.5)
+        #expect(pieces[1].end == 20)
+    }
+
+    @Test("runs that don't add up to the text fall back to proportional times")
+    func mismatchedRuns() {
+        let runs: [CaptionRecognition.Run] = [.init(text: "Other text entirely", start: 99, end: 100)]
+        let pieces = CaptionSentences.split(final("One. Two.", 0, 4, runs: runs))
+        #expect(pieces.count == 2)
+        #expect(pieces.allSatisfy { $0.start < 4 && $0.end <= 4 })
+    }
+
+    @Test("one sentence stays one recognition, unchanged")
+    func singleSentence() {
+        let single = final("Just one sentence.", 1, 2)
+        #expect(CaptionSentences.split(single) == [single])
+    }
+}
+
+@Suite("Apple Speech caption lines", .timeLimit(.minutes(1)))
+struct AppleSpeechCaptionLinesTests {
+    @Test("a paragraph final reaches the panel as one confirmed line per sentence")
+    func paragraphFinalBecomesLines() async throws {
+        let analyzer = FakeAnalyzer()
+        let live = session(FakeBackend(analyzer: analyzer))
+        let events = Events()
+        events.collect(try await live.start(options: options()))
+        let runs: [CaptionRecognition.Run] = [
+            .init(text: "Prima frase. ", start: 0, end: 1),
+            .init(text: "Seconda frase.", start: 1.5, end: 2.5),
+        ]
+        analyzer.output.yield(CaptionRecognition(
+            text: runs.map(\.text).joined(), start: 0, end: 2.5, isFinal: true, runs: runs
+        ))
+        await events.wait("both lines") { $0.count >= 2 }
+        #expect(events.texts() == ["confirmed:Prima frase.", "confirmed:Seconda frase."])
+        guard case .confirmed(let second)? = events.all.value.last else { return }
+        #expect(second.id == 1 && second.start == 1.5 && second.end == 2.5)
+        await live.cancel()
     }
 }
