@@ -77,9 +77,9 @@ struct OwnPlayerPauseTests {
         let session = MediaSession(
             muter: nil, player: SilentToggler(), ownPlayback: OwnPlayerPause { [playing.handle] }
         )
-        await session.enterRecording(config: MediaSessionConfig(muteSystemAudio: false, pausePlayback: true))
+        await session.enterRecording(config: MediaSessionConfig(muteSystemAudio: false, pausePlayback: true), holder: .take)
         #expect(playing.isPlaying == false)
-        await session.exitRecording()
+        await session.exitRecording(holder: .take)
         #expect(playing.isPlaying == true)
     }
 

@@ -157,7 +157,7 @@ public actor DictationCoordinator {
         generation &+= 1
         await teardownMonitor()
         if case .listening = state {
-            await mediaSession?.exitRecording()
+            await mediaSession?.exitRecording(holder: .dictation)
             await recorder.stopAndDiscard()
         } else if startInFlight {
             await recorder.stopAndDiscard()
@@ -311,10 +311,10 @@ public actor DictationCoordinator {
         }
         if let session = mediaSession {
             let config = await mediaConfigProvider?() ?? .none
-            await session.enterRecording(config: config)
+            await session.enterRecording(config: config, holder: .dictation)
             if myGeneration != generation {
                 startInFlight = false
-                await session.exitRecording()
+                await session.exitRecording(holder: .dictation)
                 return
             }
         }
@@ -331,14 +331,14 @@ public actor DictationCoordinator {
             }
             startInFlight = false
             // The media session was entered before the start, so it is left even when a teardown superseded this start.
-            await mediaSession?.exitRecording()
+            await mediaSession?.exitRecording(holder: .dictation)
             guard myGeneration == generation else { return }
             await setState(.failed(error.localizedDescription))
             return
         }
         startInFlight = false
         guard myGeneration == generation else {
-            await mediaSession?.exitRecording()
+            await mediaSession?.exitRecording(holder: .dictation)
             await recorder.stopAndDiscard()
             return
         }
@@ -365,7 +365,7 @@ public actor DictationCoordinator {
         let finish = finishes
         hybridLocked = false
         await setState(.transcribing)
-        await mediaSession?.exitRecording()
+        await mediaSession?.exitRecording(holder: .dictation)
         let startedAt = ContinuousClock.now
         do {
             let raw = try await recorder.stopAndTranscribe()

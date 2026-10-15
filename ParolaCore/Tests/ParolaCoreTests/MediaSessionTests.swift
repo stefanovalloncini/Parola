@@ -55,10 +55,10 @@ struct MediaSessionTests {
         let own = SpyOwnPlayback(pausesSomething: true)
         let session = MediaSession(muter: SpyMuter(startMuted: false), player: SpyPlayer(), ownPlayback: own)
 
-        await session.enterRecording(config: MediaSessionConfig(muteSystemAudio: false, pausePlayback: true))
+        await session.enterRecording(config: MediaSessionConfig(muteSystemAudio: false, pausePlayback: true), holder: .take)
         #expect(await own.pauseCalls == 1)
         #expect(await own.resumeCalls == 0)
-        await session.exitRecording()
+        await session.exitRecording(holder: .take)
         #expect(await own.resumeCalls == 1)
     }
 
@@ -67,10 +67,10 @@ struct MediaSessionTests {
         let own = SpyOwnPlayback(pausesSomething: false)
         let session = MediaSession(muter: SpyMuter(startMuted: false), player: SpyPlayer(), ownPlayback: own)
 
-        await session.enterRecording(config: MediaSessionConfig(muteSystemAudio: true, pausePlayback: false))
-        await session.exitRecording()
-        await session.enterRecording(config: MediaSessionConfig(muteSystemAudio: false, pausePlayback: true))
-        await session.exitRecording()
+        await session.enterRecording(config: MediaSessionConfig(muteSystemAudio: true, pausePlayback: false), holder: .take)
+        await session.exitRecording(holder: .take)
+        await session.enterRecording(config: MediaSessionConfig(muteSystemAudio: false, pausePlayback: true), holder: .take)
+        await session.exitRecording(holder: .take)
         #expect(await own.pauseCalls == 1)
         #expect(await own.resumeCalls == 0)
     }
@@ -121,20 +121,62 @@ struct MediaSessionTests {
         let session = MediaSession(muter: muter, player: player, ownPlayback: own)
         let config = MediaSessionConfig(muteSystemAudio: true, pausePlayback: true)
 
-        await session.enterRecording(config: config)
-        await session.enterRecording(config: config)
+        await session.enterRecording(config: config, holder: .take)
+        await session.enterRecording(config: config, holder: .dictation)
         #expect(await muter.setMutedCalls == [true])
         #expect(await own.pauseCalls == 1)
 
-        await session.exitRecording()
+        await session.exitRecording(holder: .dictation)
         #expect(await muter.setMutedCalls == [true])
         #expect(await own.resumeCalls == 0)
         #expect(await player.playCalls == 0)
 
-        await session.exitRecording()
+        await session.exitRecording(holder: .take)
         #expect(await muter.setMutedCalls == [true, false])
         #expect(await own.resumeCalls == 1)
         #expect(await player.playCalls == 1)
+    }
+
+    @Test("extra exits by a take never drop a dictation's pause")
+    func extraExitsKeepOtherHolder() async {
+        let player = SpyPlayer()
+        let session = MediaSession(muter: SpyMuter(startMuted: false), player: player)
+        let config = MediaSessionConfig(muteSystemAudio: false, pausePlayback: true)
+
+        await session.enterRecording(config: config, holder: .take)
+        await session.enterRecording(config: config, holder: .dictation)
+        await session.exitRecording(holder: .take)
+        await session.exitRecording(holder: .take)
+        #expect(await player.playCalls == 0)
+        await session.exitRecording(holder: .dictation)
+        #expect(await player.playCalls == 1)
+    }
+
+    @Test("a holder that enters twice is still one holder: one exit resumes")
+    func doubleEnterIsOneHolder() async {
+        let player = SpyPlayer()
+        let session = MediaSession(muter: SpyMuter(startMuted: false), player: player)
+        let config = MediaSessionConfig(muteSystemAudio: false, pausePlayback: true)
+
+        await session.enterRecording(config: config, holder: .dictation)
+        await session.enterRecording(config: config, holder: .dictation)
+        #expect(await player.pauseCalls == 1)
+        await session.exitRecording(holder: .dictation)
+        #expect(await player.playCalls == 1)
+    }
+
+    @Test("an exit for a holder that never entered does nothing")
+    func exitWithoutEnter() async {
+        let muter = SpyMuter(startMuted: false)
+        let player = SpyPlayer()
+        let session = MediaSession(muter: muter, player: player)
+        let config = MediaSessionConfig(muteSystemAudio: true, pausePlayback: true)
+
+        await session.exitRecording(holder: .dictation)
+        await session.enterRecording(config: config, holder: .take)
+        await session.exitRecording(holder: .dictation)
+        #expect(await player.playCalls == 0)
+        #expect(await muter.setMutedCalls == [true])
     }
 
     @Test("an exit while a start is still pausing undoes what the start does afterwards")
@@ -145,9 +187,9 @@ struct MediaSessionTests {
         let session = MediaSession(muter: muter, player: player, ownPlayback: own)
         let config = MediaSessionConfig(muteSystemAudio: true, pausePlayback: true)
 
-        let entering = Task { await session.enterRecording(config: config) }
+        let entering = Task { await session.enterRecording(config: config, holder: .take) }
         await own.gate.waitForArrival()
-        await session.exitRecording()
+        await session.exitRecording(holder: .take)
         await own.gate.open()
         await entering.value
 
@@ -155,8 +197,8 @@ struct MediaSessionTests {
         #expect(await own.resumeCalls == 1)
         #expect(await player.pauseCalls == 0)
 
-        await session.enterRecording(config: config)
-        await session.exitRecording()
+        await session.enterRecording(config: config, holder: .take)
+        await session.exitRecording(holder: .take)
         #expect(await own.resumeCalls == 2)
     }
 
@@ -166,7 +208,7 @@ struct MediaSessionTests {
         let player = SpyPlayer()
         let session = MediaSession(muter: muter, player: player)
 
-        await session.enterRecording(config: MediaSessionConfig(muteSystemAudio: true, pausePlayback: true))
+        await session.enterRecording(config: MediaSessionConfig(muteSystemAudio: true, pausePlayback: true), holder: .take)
 
         let setCalls = await muter.setMutedCalls
         let pauseCalls = await player.pauseCalls
@@ -180,7 +222,7 @@ struct MediaSessionTests {
         let player = SpyPlayer()
         let session = MediaSession(muter: muter, player: player)
 
-        await session.enterRecording(config: MediaSessionConfig(muteSystemAudio: false, pausePlayback: true))
+        await session.enterRecording(config: MediaSessionConfig(muteSystemAudio: false, pausePlayback: true), holder: .take)
 
         let setCalls = await muter.setMutedCalls
         let queries = await muter.queryCalls
@@ -196,7 +238,7 @@ struct MediaSessionTests {
         let player = SpyPlayer()
         let session = MediaSession(muter: muter, player: player)
 
-        await session.enterRecording(config: MediaSessionConfig(muteSystemAudio: true, pausePlayback: false))
+        await session.enterRecording(config: MediaSessionConfig(muteSystemAudio: true, pausePlayback: false), holder: .take)
 
         let setCalls = await muter.setMutedCalls
         let pauseCalls = await player.pauseCalls
@@ -210,8 +252,8 @@ struct MediaSessionTests {
         let player = SpyPlayer()
         let session = MediaSession(muter: muter, player: player)
 
-        await session.enterRecording(config: MediaSessionConfig(muteSystemAudio: true, pausePlayback: true))
-        await session.exitRecording()
+        await session.enterRecording(config: MediaSessionConfig(muteSystemAudio: true, pausePlayback: true), holder: .take)
+        await session.exitRecording(holder: .take)
 
         let setCalls = await muter.setMutedCalls
         let playCalls = await player.playCalls
@@ -225,8 +267,8 @@ struct MediaSessionTests {
         let player = SpyPlayer()
         let session = MediaSession(muter: muter, player: player)
 
-        await session.enterRecording(config: MediaSessionConfig(muteSystemAudio: true, pausePlayback: false))
-        await session.exitRecording()
+        await session.enterRecording(config: MediaSessionConfig(muteSystemAudio: true, pausePlayback: false), holder: .take)
+        await session.exitRecording(holder: .take)
 
         let setCalls = await muter.setMutedCalls
         #expect(setCalls.isEmpty)
@@ -238,8 +280,8 @@ struct MediaSessionTests {
         let player = SpyPlayer()
         let session = MediaSession(muter: muter, player: player)
 
-        await session.enterRecording(config: MediaSessionConfig(muteSystemAudio: true, pausePlayback: true))
-        await session.enterRecording(config: MediaSessionConfig(muteSystemAudio: true, pausePlayback: true))
+        await session.enterRecording(config: MediaSessionConfig(muteSystemAudio: true, pausePlayback: true), holder: .take)
+        await session.enterRecording(config: MediaSessionConfig(muteSystemAudio: true, pausePlayback: true), holder: .take)
 
         let setCalls = await muter.setMutedCalls
         let pauseCalls = await player.pauseCalls
@@ -248,12 +290,12 @@ struct MediaSessionTests {
     }
 
     @Test("exit without enter is safe")
-    func exitWithoutEnter() async {
+    func exitOfAnotherHolderIsIgnored() async {
         let muter = SpyMuter(startMuted: false)
         let player = SpyPlayer()
         let session = MediaSession(muter: muter, player: player)
 
-        await session.exitRecording()
+        await session.exitRecording(holder: .take)
 
         let setCalls = await muter.setMutedCalls
         let playCalls = await player.playCalls

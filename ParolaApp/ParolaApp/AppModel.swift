@@ -2194,7 +2194,7 @@ final class AppModel {
             Task { await source.cancel() }
         }
         if let mic = detachMicTrack(of: nil) { Task { await dropMicTrack(mic) } }
-        if exitsMedia { Task { await mediaSession.exitRecording() } }
+        if exitsMedia { Task { await mediaSession.exitRecording(holder: .take) } }
         pendingRecordingCategory = nil
     }
 
@@ -4235,7 +4235,7 @@ final class AppModel {
                 startStreamingMic(take)
                 return
             }
-            await mediaSession.enterRecording(config: config)
+            await mediaSession.enterRecording(config: config, holder: .take)
             guard takeIsCurrent(take) else { return }
             var tapsApps = false
             do {
@@ -4271,7 +4271,7 @@ final class AppModel {
             } catch {
                 // A take that already ended in the pane has nobody left to tell.
                 guard takeIsCurrent(take) else { return }
-                await mediaSession.exitRecording()
+                await mediaSession.exitRecording(holder: .take)
                 guard takeIsCurrent(take) else { return }
                 stopRecordingWatch()
                 clearTakeReadouts(of: take.id)
@@ -4323,7 +4323,7 @@ final class AppModel {
         endSession(of: take.id)
         stopRecordingWatch()
         await source.cancel()
-        await mediaSession.exitRecording()
+        await mediaSession.exitRecording(holder: .take)
         guard takeIsCurrent(take) else { return false }
         activeTake = nil
         recordingStartInFlight = false
@@ -4616,10 +4616,10 @@ final class AppModel {
 
         streamingConsumer = Task { @MainActor in
             guard takeIsCurrent(take) else { return }
-            await mediaSession.enterRecording(config: config)
+            await mediaSession.enterRecording(config: config, holder: .take)
             await runStreamingTake(s, take: take, options: opts, downloadProgress: progress)
             // A take that started since owns the media session now.
-            if activeTake == nil || takeIsCurrent(take) { await mediaSession.exitRecording() }
+            if activeTake == nil || takeIsCurrent(take) { await mediaSession.exitRecording(holder: .take) }
         }
     }
 
@@ -4976,7 +4976,7 @@ final class AppModel {
         let given = annotations(of: take?.id)
         startTakeTask { [weak self] in
             guard let self else { return }
-            await mediaSession.exitRecording()
+            await mediaSession.exitRecording(holder: .take)
             await recordMicStoppedAtStop(mic, recovery: recovery)
             let title = given.title(for: category)
             do {
@@ -5803,7 +5803,7 @@ final class AppModel {
         if let recovery { recoveryHeldByTake.insert(recovery) }
         let given = annotations(of: take?.id)
         let title = given.title(for: category)
-        await mediaSession.exitRecording()
+        await mediaSession.exitRecording(holder: .take)
         await recordMicStoppedAtStop(mic, recovery: recovery)
         var cutShort = false
         let prepared: URL?
@@ -5871,7 +5871,7 @@ final class AppModel {
         await dropMicTrack(mic)
         // After the consumer's own exit, so this one is the exit that restores muted or paused media before the reply.
         await consumer?.value
-        await mediaSession.exitRecording()
+        await mediaSession.exitRecording(holder: .take)
         // Whatever the capture left of its file goes too, so the launch sweep can't bring a discarded take back.
         if let audio { releaseTakeFile(audio) }
         resolveRecordingOutcome(.failure(IntentActionError.cancelled), take: discarded)

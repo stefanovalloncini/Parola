@@ -31,6 +31,12 @@ public extension MediaPlaybackToggler {
     func isPlaying() async -> Bool { true }
 }
 
+/// Who asked for the pause. Each holder counts once, however often it enters or exits.
+public enum MediaSessionHolder: Hashable, Sendable {
+    case take
+    case dictation
+}
+
 /// The app's own players, which the system-wide pause doesn't reach.
 public protocol OwnPlaybackControl: Sendable {
     func pausePlaying() async -> Bool
@@ -43,7 +49,7 @@ public actor MediaSession {
     private let ownPlayback: (any OwnPlaybackControl)?
     private var ownPlaybackPaused = false
 
-    private var holders = 0
+    private var holders: Set<MediaSessionHolder> = []
     private var generation = 0
     private var wasMutedBeforeEnter: Bool?
     private var pauseIssued: Bool = false
@@ -58,10 +64,9 @@ public actor MediaSession {
         self.ownPlayback = ownPlayback
     }
 
-    /// The first holder applies the mute and pauses; later holders (a dictation during a take) only count.
-    public func enterRecording(config: MediaSessionConfig) async {
-        holders += 1
-        guard holders == 1 else { return }
+    /// The first holder applies the mute and pauses; later holders (a dictation during a take) only join.
+    public func enterRecording(config: MediaSessionConfig, holder: MediaSessionHolder) async {
+        guard holders.insert(holder).inserted, holders.count == 1 else { return }
         let ticket = generation
 
         if config.muteSystemAudio {
@@ -100,10 +105,8 @@ public actor MediaSession {
         }
     }
 
-    public func exitRecording() async {
-        guard holders > 0 else { return }
-        holders -= 1
-        guard holders == 0 else { return }
+    public func exitRecording(holder: MediaSessionHolder) async {
+        guard holders.remove(holder) != nil, holders.isEmpty else { return }
         generation += 1
 
         if let was = wasMutedBeforeEnter, was == false {
