@@ -176,7 +176,7 @@ struct AnyDestinationCodableTests {
         #expect(DestinationKind.allCases.map(\.rawValue) == [
             "obsidianFolder", "obsidianREST", "webhook", "notion",
         ])
-        #expect(DestinationKind.allCases.filter(\.isImplemented) == [.obsidianFolder])
+        #expect(DestinationKind.allCases.filter(\.isImplemented) == DestinationKind.allCases)
     }
 
     @Test("a title format resolves the title it names")
