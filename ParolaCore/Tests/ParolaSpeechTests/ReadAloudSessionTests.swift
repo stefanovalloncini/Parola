@@ -428,6 +428,37 @@ struct ReadAloudSessionTests {
         await h.session.stop()
     }
 
+    @Test("stopping a reading the sink already left keeps the reading that took the sink over")
+    func supersededStopKeepsNewReading() async throws {
+        let clock = TestClock()
+        let sink = FakeOutputSink()
+        let (renderer, _) = mockRenderer(clock: clock)
+        let first = ReadAloudSession(
+            units: units([sentence(100), sentence(100), sentence(100)]), renderer: renderer, voice: voice,
+            language: "en", sink: sink, clock: clock
+        )
+        let firstLog = SessionLog(first.events)
+        await first.play()
+        await first.settle()
+        sink.simulateOutputChange()
+        try #require(await firstLog.wait(for: .interrupted))
+
+        let second = ReadAloudSession(
+            units: units([sentence(100), sentence(100), sentence(100)]), renderer: renderer, voice: voice,
+            language: "en", sink: sink, clock: clock
+        )
+        await second.play()
+        await second.settle()
+        let pending = sink.pending.count
+        let stops = sink.calls.filter { $0 == .stop }.count
+        await first.stop()
+
+        #expect(pending == 3)
+        #expect(sink.pending.count == pending)
+        #expect(sink.calls.filter { $0 == .stop }.count == stops)
+        await second.stop()
+    }
+
     @Test("an output change while paused also waits for resume")
     func outputChangeWhilePaused() async throws {
         let h = harness(Array(repeating: sentence(100), count: 3))

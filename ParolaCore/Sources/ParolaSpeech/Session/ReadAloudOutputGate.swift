@@ -1,8 +1,6 @@
 import Foundation
 
-/// The session's side of the shared sink, on the main actor. It drops audio from an epoch the session has
-/// left and anything sent after the sink ended the session's stream, and it is where the session learns,
-/// in order with its own calls, that the stream was ended.
+/// The session's side of the shared sink: drops stale-epoch audio and what follows an ended stream.
 @MainActor
 final class ReadAloudOutputGate {
     enum Item: Sendable {
@@ -31,7 +29,6 @@ final class ReadAloudOutputGate {
         self.sink = sink
     }
 
-    /// Returns the sink's speed.
     func subscribe(id: Int, epoch: Int, session: ReadAloudSession) -> Double {
         self.epoch = epoch
         subscription = id
@@ -87,9 +84,10 @@ final class ReadAloudOutputGate {
     }
 
     func shutDown() {
+        let ownsSink = isLive
         isLive = false
         forwarder?.cancel()
         forwarder = nil
-        sink.stop()
+        if ownsSink { sink.stop() }
     }
 }
