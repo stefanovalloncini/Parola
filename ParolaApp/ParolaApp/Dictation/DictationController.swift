@@ -89,6 +89,7 @@ final class DictationController {
         var pasteDelayMs: Int = 0
         var mediaSession: MediaSession? = nil
         var mediaConfigProvider: (@Sendable () async -> MediaSessionConfig)? = nil
+        var willListen: (@Sendable () async -> Void)? = nil
     }
 
     private var coordinator: DictationCoordinator?
@@ -181,7 +182,8 @@ final class DictationController {
             postProcessor: configuration.postProcessor,
             mode: configuration.mode,
             mediaSession: configuration.mediaSession,
-            mediaConfigProvider: configuration.mediaConfigProvider
+            mediaConfigProvider: configuration.mediaConfigProvider,
+            willListen: configuration.willListen
         ) { [weak self] state in
             await MainActor.run { self?.handleStateChange(state, generation: generation) }
         }

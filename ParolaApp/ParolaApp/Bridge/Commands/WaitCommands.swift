@@ -276,7 +276,7 @@ extension ParolaAutomationServer {
 }
 
 @MainActor
-private func waitForCondition(
+func waitForCondition(
     ctx: AutomationContext,
     timeoutMs: Int,
     observed: @MainActor () -> [String: AutomationValue],

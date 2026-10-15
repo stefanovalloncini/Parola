@@ -225,6 +225,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         ParolaLog.info(.appLifecycle, "app terminating in phase \(model?.phase)")
         model?.meetingNotifier?.withdraw()
+        model?.readAloud.terminate()
         let diagnostics = DiagnosticsInstaller.current
         diagnostics?.stopPeriodicFlush()
         model?.flushWatchedArrivals()

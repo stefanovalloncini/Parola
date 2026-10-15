@@ -638,6 +638,7 @@ extension AppModel {
         aiJobs.cancelAll(for: id)
         do {
             try await library.delete(id)
+            readAloud.entryRemoved(id)
             if selectedEntryID == id { clearLoadedEntry() }
             if destinationsEnabled { await deliveryEngine.cancel(entryID: id) }
         } catch {
@@ -651,6 +652,7 @@ extension AppModel {
             aiJobs.cancelAll(for: id)
             do {
                 try await library.purge(id)
+                readAloud.entryRemoved(id)
                 if selectedEntryID == id { clearLoadedEntry() }
                 if destinationsEnabled { await deliveryEngine.cancel(entryID: id) }
             } catch {

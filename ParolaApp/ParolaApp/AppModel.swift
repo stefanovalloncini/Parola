@@ -449,6 +449,12 @@ final class AppModel {
     var fileTranscribeStage: TranscribeStage?
     var useStreaming: Bool = true { didSet { defaults.set(useStreaming, forKey: "useStreaming"); if !isReloadingSettings { restartDictation() } } }
     var wordTimestamps: Bool = false { didSet { defaults.set(wordTimestamps, forKey: "wordTimestamps") } }
+    var readAloudRate: Double = 1 {
+        didSet {
+            defaults.set(readAloudRate, forKey: "readAloudRate")
+            readAloud.setSpeed(readAloudRate)
+        }
+    }
     var karaokeHighlight: Bool = true { didSet { defaults.set(karaokeHighlight, forKey: "karaokeHighlight") } }
     var initialPrompt: String = "" { didSet { defaults.set(initialPrompt, forKey: "initialPrompt"); if !isReloadingSettings { scheduleDictationRestart() } } }
     var diarize: Bool = false { didSet { defaults.set(diarize, forKey: "diarize") } }
@@ -943,7 +949,9 @@ final class AppModel {
     var player: AVPlayer?
     var hasVideo: Bool = false
     var currentTimeSeconds: Double = 0
-    var isPlaying: Bool = false
+    var isPlaying: Bool = false {
+        didSet { if isPlaying, !oldValue { readAloud.mediaStartedPlaying() } }
+    }
     @ObservationIgnored var playerTimeObserver: Any?
     @ObservationIgnored var timeControlObserver: NSKeyValueObservation?
     @ObservationIgnored var playerInstallToken: Int = 0
@@ -1183,6 +1191,7 @@ final class AppModel {
             }
             return
         }
+        if !liveCaptions.isActive { readAloud.yieldNow(to: .captions) }
         Task { await liveCaptions.toggle(options: makeOptions(task: .transcribe, model: selectedModel, language: selectedLanguage), source: liveCaptionsSource) }
     }
 
@@ -1262,6 +1271,7 @@ final class AppModel {
     @ObservationIgnored private(set) var activeSideEffects: Set<BootstrapSideEffect> = []
     @ObservationIgnored let features: FeatureSet
     @ObservationIgnored let introduction: IntroductionController
+    @ObservationIgnored let readAloud: ReadAloudController
 
     /// The palette's keys only: Light and Dark are NSApp.appearance's, and need no repaint.
     private func themeKeySnapshot() -> [String] {
@@ -1285,6 +1295,7 @@ final class AppModel {
         self.useStreaming = readBool("useStreaming", default: true)
         self.wordTimestamps = defaults.bool(forKey: "wordTimestamps")
         self.karaokeHighlight = readBool("karaokeHighlight", default: true)
+        self.readAloudRate = readDouble("readAloudRate", default: 1)
         self.initialPrompt = defaults.string(forKey: "initialPrompt") ?? ""
         self.diarize = defaults.bool(forKey: "diarize")
         self.expectedSpeakersRaw = defaults.integer(forKey: "expectedSpeakersRaw")
@@ -2455,6 +2466,7 @@ final class AppModel {
             hasEngineChoice: !engineChoices.isEmpty,
             engineChoices: engineChoices.map(\.id)
         )
+        self.readAloud = ReadAloudController(environment: ReadAloudEnvironment.make(for: bootstrap))
         self.filePicker = bootstrap.filePicker
         self.linkFetcher = bootstrap.linkFetcher ?? YtDlpLinkFetcher(features: features)
         self.mode = bootstrap.mode
@@ -2512,6 +2524,7 @@ final class AppModel {
         loadPendingRecovery()
         sweepInflightRecordings()
         if bootstrap.mode != .test { startTakeFileHeartbeat() }
+        wireReadAloud()
         modelResidency.attach(fileSession: session) { [weak self] in self?.dictationController.fallbackSession }
         if features.isEnabled(.dictation) {
             wireDictationController()
@@ -3859,6 +3872,7 @@ final class AppModel {
             return
         }
         meetingDetectedApp = nil
+        readAloud.yieldNow(to: .take)
         let diskCheck = startDiskSpaceCheck()
         let countIn = max(0, recordingCountInSeconds)
         // The count-in shows only in a main window Parola has in front; anywhere else it would delay the take unseen.
@@ -5564,6 +5578,7 @@ final class AppModel {
         var resumed = false
         updateSession(of: take.id) { resumed = $0.resume(at: Date()) }
         guard resumed else { return false }
+        readAloud.yieldNow(to: .take)
         setCapturePaused(false)
         startSilenceWatch()
         runRecordingAutoStop()

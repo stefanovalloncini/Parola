@@ -259,7 +259,7 @@ enum UnscopedSettingsKeys {
         "liveCaptions.fontSize", "liveCaptions.opacity", "presenter.fontSize",
         "introductionComplete",
         "summaryOptions", "autostartSummary",
-        "libraryGroupsByDate", "lastRecordSource",
+        "libraryGroupsByDate", "lastRecordSource", "readAloudRate",
     ]
 
     /// Where the recording pill and the dictation HUD were dragged: a full reset clears them, a backup leaves them out.

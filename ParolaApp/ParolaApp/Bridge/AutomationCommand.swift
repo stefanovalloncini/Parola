@@ -5,7 +5,7 @@ struct AutomationCommand: Sendable {
 
     enum Area: String, Sendable {
         case core, model, transcript, library, batch, recording,
-             dictation, prompt, settings, window, test, lifecycle
+             dictation, prompt, settings, window, test, lifecycle, readAloud
     }
 
     struct Argument: Sendable {

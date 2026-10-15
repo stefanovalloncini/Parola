@@ -245,6 +245,7 @@ final class EntryWindowSession {
             Task { @MainActor in
                 guard let self, self.isPlaying != playing else { return }
                 self.isPlaying = playing
+                if playing { self.model.readAloud.mediaStartedPlaying() }
             }
         }
     }

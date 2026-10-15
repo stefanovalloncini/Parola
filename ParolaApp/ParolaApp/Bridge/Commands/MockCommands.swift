@@ -204,7 +204,7 @@ extension ParolaAutomationServer {
                 summary: "Clears installed mocks. Test-mode only.",
                 kind: .mutating,
                 args: [
-                    .init(name: "scope", kind: .string(enum: ["transcriber", "llm", "audio", "media", "translator", "all"]), required: false, summary: "Scope to clear", defaultValue: .string("all")),
+                    .init(name: "scope", kind: .string(enum: ["transcriber", "llm", "audio", "media", "translator", "speech", "all"]), required: false, summary: "Scope to clear", defaultValue: .string("all")),
                 ],
                 handler: { args, ctx in
                     try requireTestMode(ctx)
@@ -228,6 +228,9 @@ extension ParolaAutomationServer {
                     }
                     if scope == "translator" || scope == "all" {
                         MockTranslatorRegistry.shared.clear()
+                    }
+                    if scope == "speech" || scope == "all" {
+                        ctx.model.readAloud.mockVoice?.clear()
                     }
                     return .object([
                         "cleared": .bool(true),
@@ -256,6 +259,13 @@ extension ParolaAutomationServer {
                         "capturedInsertions": .int(CapturedInsertionStore.shared.all().count),
                         "mediaFetcher": .bool(ctx.model.linkFetcher is FixtureLinkFetcher),
                         "translator": MockTranslatorRegistry.shared.resolve().map { .string($0.mode.rawValue) } ?? .null,
+                        "speech": ctx.model.readAloud.mockVoice.map { voice in
+                            .object([
+                                "installed": .bool(voice.isInstalled),
+                                "msPerUnit": .int(voice.msPerUnit),
+                                "failAtUnit": voice.failAtUnit.map { .int($0) } ?? .null,
+                            ])
+                        } ?? .null,
                     ])
                 }
             ),

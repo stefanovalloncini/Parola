@@ -276,6 +276,9 @@ extension AppModel {
             mediaSession: mediaSession,
             mediaConfigProvider: { [weak self] in
                 await MainActor.run { self?.mediaSessionConfig(allowMute: true) ?? .none }
+            },
+            willListen: { [weak self] in
+                await self?.readAloud.yield(to: .dictation)
             }
         )
         dictationController.indicatorStyle = dictationIndicatorStyle

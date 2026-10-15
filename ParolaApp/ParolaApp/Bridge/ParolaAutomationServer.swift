@@ -78,6 +78,7 @@ final class ParolaAutomationServer {
             server.diagnosticsCommands(),
             server.simulationCommands(),
             server.mockCommands(),
+            server.readAloudCommands(),
             server.accessibilityCommands(),
         ]
         var out: [String: AutomationCommand] = [:]
@@ -379,7 +380,7 @@ final class ParolaAutomationServer {
         "translationSideBySide", "remoteAIAcknowledged", "showMostUsedPeople",
         "openEntriesInNewWindow", "playSoundWhenFinished", "appVisibilityMode",
         "duplicateImportPolicy", "libraryGroupsByDate",
-        "showRecordingStatusItem", "showRecordingPill", "meetingRecordsMicrophone",
+        "showRecordingStatusItem", "showRecordingPill", "meetingRecordsMicrophone", "readAloudRate",
     ]
 
     func runScreenshot(requestedFileName: String?) async throws -> AutomationValue {
@@ -539,6 +540,7 @@ final class ParolaAutomationServer {
             "appVisibilityMode": .string(model.appVisibilityMode.rawValue),
             "playSoundWhenFinished": .bool(model.playSoundWhenFinished),
             "models": .object(["resident": .array(residentModels.map { .string($0) })]),
+            "readAloud": Self.readAloudState(model),
         ])
     }
 

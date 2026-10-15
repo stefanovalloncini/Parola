@@ -91,6 +91,13 @@ struct SettingsPaneScopeTests {
         #expect(SettingsPaneScope.exportFormats.resetKeys(features: .all) == ["subtitleCaptionLength", "markdownTimestamps", "txtExportTimestamps", "htmlExportTheme"])
     }
 
+    @Test("the reading speed belongs to no pane yet, and still backs up and resets with the whole app")
+    func readAloudRateIsUnscoped() {
+        let scoped = Set(SettingsPaneScope.allCases.flatMap(\.defaultsKeys))
+        #expect(scoped.contains("readAloudRate") == false)
+        #expect(UnscopedSettingsKeys.all.contains("readAloudRate"))
+    }
+
     @Test("the models storage path stays out of every scope")
     func modelsPathStaysExcluded() {
         let scoped = Set(SettingsPaneScope.allCases.flatMap(\.defaultsKeys))
