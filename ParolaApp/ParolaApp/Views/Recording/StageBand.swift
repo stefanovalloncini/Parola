@@ -530,7 +530,9 @@ private struct StageLaneNames: View {
                     .frame(height: lanes[0].height)
                     .offset(x: x, y: lanes[0].minY)
                 mac
-                    .fixedSize()
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .frame(width: max(0, proxy.size.width - x - StageBand.laneNameInset), alignment: .leading)
                     .frame(height: lanes[1].height)
                     .offset(x: x, y: lanes[1].minY)
             }
