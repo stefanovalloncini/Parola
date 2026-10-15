@@ -14917,17 +14917,6 @@
         }
       }
     },
-    "Saved in Keychain. Type to replace.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Salvato nel Portachiavi. Scrivi per sostituirlo."
-          }
-        }
-      }
-    },
     "Send Test": {
       "extractionState": "manual",
       "localizations": {

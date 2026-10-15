@@ -64,7 +64,7 @@ struct SecretFieldRow: View {
 
     var body: some View {
         SettingRow(title, description: description) {
-            SecureField("", text: $input, prompt: Text(verbatim: isSaved ? String(localized: "Saved in Keychain. Type to replace.") : prompt))
+            SecureField("", text: $input, prompt: Text(verbatim: isSaved ? String(localized: "Saved in Keychain") : prompt))
                 .labelsHidden()
                 .textFieldStyle(.roundedBorder)
                 .frame(width: 240)

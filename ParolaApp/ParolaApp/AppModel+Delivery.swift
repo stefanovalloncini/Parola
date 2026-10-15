@@ -22,6 +22,17 @@ struct DeliveryNotice: Equatable {
     let state: State
 }
 
+/// Which Send To editor to open: a blank one for a kind, or the one for a destination in the list.
+struct DestinationEditorRequest: Equatable {
+    enum Target: Equatable {
+        case new(DestinationKind)
+        case existing(UUID)
+    }
+
+    let target: Target
+    let token = UUID()
+}
+
 extension AppModel {
 
     var destinationsEnabled: Bool { features.isEnabled(.destinations) }

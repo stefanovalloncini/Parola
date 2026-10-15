@@ -1074,6 +1074,8 @@ final class AppModel {
     /// Written only through `setDestinations(_:)`.
     var destinations: [AnyDestination] = []
     var deliveryNotice: DeliveryNotice?
+    /// Set by the test bridge to open a Send To editor without a click.
+    var destinationEditorRequest: DestinationEditorRequest?
     var exportNotice: ExportNotice? {
         didSet {
             guard exportNotice == nil, let covered = coveredNotice else { return }

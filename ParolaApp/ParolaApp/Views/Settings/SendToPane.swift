@@ -67,25 +67,19 @@ struct SendToPane: View {
                     addMenu: {
                         addButton(
                             "Obsidian Vault Folder", line: "Writes a note into a vault folder on this Mac.",
-                            leaf: "SendTo.Button.AddObsidian",
-                            draft: .folder(ObsidianVaultFolderDestination(
-                                name: String(localized: "Obsidian"), vaultBookmark: Data(), vaultPath: ""
-                            ))
+                            leaf: "SendTo.Button.AddObsidian", kind: .obsidianFolder
                         )
                         addButton(
                             "Obsidian Local REST", line: "Sends a note to an open vault through the plugin.",
-                            leaf: "SendTo.Button.AddObsidianREST",
-                            draft: .rest(ObsidianLocalRESTDestination(name: String(localized: "Obsidian REST")))
+                            leaf: "SendTo.Button.AddObsidianREST", kind: .obsidianREST
                         )
                         addButton(
                             "Webhook", line: "Posts JSON to Zapier, Make, n8n or your own server.",
-                            leaf: "SendTo.Button.AddWebhook",
-                            draft: .webhook(WebhookDestination(name: String(localized: "Webhook")))
+                            leaf: "SendTo.Button.AddWebhook", kind: .webhook
                         )
                         addButton(
                             "Notion", line: "Adds a page under a Notion page you choose.",
-                            leaf: "SendTo.Button.AddNotion",
-                            draft: .notion(NotionDestination(name: String(localized: "Notion")))
+                            leaf: "SendTo.Button.AddNotion", kind: .notion
                         )
                     },
                     onRemove: removeSelected
@@ -95,6 +89,11 @@ struct SendToPane: View {
             SettingHelper(text: "A destination receives the transcript when you send it: a Markdown note, a page or a JSON post. Turn on Send automatically to send as soon as a transcription finishes. A batch run is not sent automatically.")
 
             ResetPaneButton(scope: .sendTo)
+        }
+        .onChange(of: model.destinationEditorRequest, initial: true) { _, request in
+            guard let request else { return }
+            model.destinationEditorRequest = nil
+            open(request.target)
         }
         .sheet(item: $editing) { draft in
             editor(for: draft)
@@ -128,16 +127,37 @@ struct SendToPane: View {
         }
     }
 
-    private func addButton(_ title: LocalizedStringKey, line: LocalizedStringKey, leaf: String, draft: DestinationDraft) -> some View {
+    private func addButton(_ title: LocalizedStringKey, line: LocalizedStringKey, leaf: String, kind: DestinationKind) -> some View {
         Button {
-            isNew = true
-            editing = draft
+            open(.new(kind))
         } label: {
             Text(title)
             Text(line)
         }
         .help(line)
         .axLeaf(leaf)
+    }
+
+    private func open(_ target: DestinationEditorRequest.Target) {
+        switch target {
+        case .new(let kind):
+            isNew = true
+            editing = Self.blank(kind)
+        case .existing(let id):
+            guard let stored = model.destination(id: id), let draft = DestinationDraft(stored) else { return }
+            isNew = false
+            editing = draft
+        }
+    }
+
+    private static func blank(_ kind: DestinationKind) -> DestinationDraft {
+        switch kind {
+        case .obsidianFolder:
+            return .folder(ObsidianVaultFolderDestination(name: String(localized: "Obsidian"), vaultBookmark: Data(), vaultPath: ""))
+        case .obsidianREST: return .rest(ObsidianLocalRESTDestination(name: String(localized: "Obsidian REST")))
+        case .webhook: return .webhook(WebhookDestination(name: String(localized: "Webhook")))
+        case .notion: return .notion(NotionDestination(name: String(localized: "Notion")))
+        }
     }
 
     private func commit(_ saved: AnyDestination) {

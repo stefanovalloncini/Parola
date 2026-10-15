@@ -222,6 +222,26 @@ struct DeliveryCommandsTests {
         withExtendedLifetime(server) {}
     }
 
+    @Test("openDestinationEditor files a request for a kind or a destination, in test mode only")
+    func openEditorRequest() async throws {
+        let (model, server, context, commands) = try makeRig()
+        _ = try await run(commands, "openDestinationEditor", ["kind": .string("notion")], context)
+        #expect(model.destinationEditorRequest?.target == .new(.notion))
+
+        let id = UUID()
+        _ = try await run(commands, "openDestinationEditor", ["destinationID": .string(id.uuidString)], context)
+        #expect(model.destinationEditorRequest?.target == .existing(id))
+
+        await #expect(throws: AutomationError.self) {
+            _ = try await run(commands, "openDestinationEditor", ["kind": .string("carrierPigeon")], context)
+        }
+        let (_, otherServer, otherContext, otherCommands) = try makeRig(mode: .normal)
+        await #expect(throws: AutomationError.self) {
+            _ = try await run(otherCommands, "openDestinationEditor", ["kind": .string("webhook")], otherContext)
+        }
+        withExtendedLifetime((server, otherServer)) {}
+    }
+
     @Test("setDestinationSecret is test-mode only")
     func secretCommandNeedsTestMode() async throws {
         let (_, server, context, commands) = try makeRig(mode: .normal)
@@ -274,7 +294,7 @@ struct DeliveryCommandsTests {
     func commandsAreRegistered() throws {
         let (_, server, _, _) = try makeRig()
         let names = Set(server.commandNames())
-        for name in ["sendEntry", "listDeliveries", "setDestinations", "installMockDestination", "readMockDeliveries"] {
+        for name in ["sendEntry", "listDeliveries", "setDestinations", "installMockDestination", "setDestinationSecret", "openDestinationEditor", "readMockDeliveries"] {
             #expect(names.contains(name), "\(name) is missing from the catalog")
         }
     }

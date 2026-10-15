@@ -117,6 +117,34 @@ extension ParolaAutomationServer {
             ),
 
             AutomationCommand(
+                name: "openDestinationEditor",
+                area: .test,
+                summary: "Opens a Send To editor in the Send To pane, which has to be on screen. Test-mode only.",
+                kind: .mutating,
+                args: [
+                    .init(name: "kind", kind: .string(), required: false, summary: "obsidianFolder / obsidianREST / webhook / notion: a blank editor for the kind"),
+                    .init(name: "destinationID", kind: .string(), required: false, summary: "Edit this destination instead"),
+                ],
+                handler: { args, ctx in
+                    guard ctx.model.mode == .test else {
+                        throw AutomationError.precondition("only available in --test-mode")
+                    }
+                    if let raw = try args.optionalString("destinationID") {
+                        guard let id = UUID(uuidString: raw) else {
+                            throw AutomationError.invalidArgs(field: "destinationID", reason: "must be a UUID")
+                        }
+                        ctx.model.destinationEditorRequest = DestinationEditorRequest(target: .existing(id))
+                    } else {
+                        guard let kind = DestinationKind(rawValue: try args.optionalString("kind") ?? "") else {
+                            throw AutomationError.invalidArgs(field: "kind", reason: "must be one of the destination kinds")
+                        }
+                        ctx.model.destinationEditorRequest = DestinationEditorRequest(target: .new(kind))
+                    }
+                    return .object(["requested": .bool(true)])
+                }
+            ),
+
+            AutomationCommand(
                 name: "readMockDeliveries",
                 area: .test,
                 summary: "What the mock destinations were handed, and the receipts they gave back. Test-mode only.",
