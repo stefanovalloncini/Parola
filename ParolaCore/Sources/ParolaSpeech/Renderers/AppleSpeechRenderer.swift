@@ -3,8 +3,9 @@ import Foundation
 import ParolaCore
 
 /// Renders with the Apple voices installed on this Mac through `AVSpeechSynthesizer.write`, which makes
-/// buffers without playing them. It must stay main-actor: `write` is called on the main actor and its
-/// callbacks arrive there.
+/// buffers without playing them.
+// Must stay @MainActor: write()'s ObjC callbacks reach main only on a CFRunLoop host, and a closure
+// capturing an actor's self gets a Swift 6 executor check that traps on the first buffer.
 @MainActor
 public final class AppleSpeechRenderer: SpeechRenderer {
     public enum Failure: Error, Hashable {
@@ -17,7 +18,7 @@ public final class AppleSpeechRenderer: SpeechRenderer {
 
     struct Backend {
         var write: @MainActor (AVSpeechUtterance, @escaping Delivery) -> Void
-        var stop: @MainActor () -> Void
+        var reset: @MainActor () -> Void
     }
 
     private struct ActiveRender {
@@ -39,25 +40,41 @@ public final class AppleSpeechRenderer: SpeechRenderer {
     public private(set) var unusableIdentifiers: Set<String> = []
 
     private let backend: Backend
-    private let installed: @MainActor () -> [VoiceDescriptor]
+    private let readInstalled: @MainActor () -> [VoiceDescriptor]
+    private var inventory: [VoiceDescriptor]
+    private var autoChoices: [String: String] = [:]
     private var active: ActiveRender?
     private var lastID = 0
     private var emptyRenders: [String: Int] = [:]
 
-    public init() {
-        let synthesizer = AVSpeechSynthesizer()
-        self.backend = Backend(
-            write: { utterance, deliver in
-                synthesizer.write(utterance, toBufferCallback: Self.bufferCallback(deliver), toMarkerCallback: { _ in })
-            },
-            stop: { synthesizer.stopSpeaking(at: .immediate) }
+    public convenience init() {
+        let holder = SynthesizerHolder()
+        self.init(
+            backend: Backend(
+                write: { utterance, deliver in
+                    holder.synthesizer.write(
+                        utterance, toBufferCallback: Self.bufferCallback(deliver), toMarkerCallback: { _ in }
+                    )
+                },
+                reset: { holder.synthesizer = AVSpeechSynthesizer() }
+            ),
+            installed: { Self.installedVoices() }
         )
-        self.installed = { Self.installedVoices() }
     }
 
     init(backend: Backend, installed: @escaping @MainActor () -> [VoiceDescriptor]) {
         self.backend = backend
-        self.installed = installed
+        self.readInstalled = installed
+        self.inventory = installed()
+    }
+
+    public func refreshVoices() {
+        inventory = readInstalled()
+        autoChoices.removeAll()
+    }
+
+    @MainActor private final class SynthesizerHolder {
+        var synthesizer = AVSpeechSynthesizer()
     }
 
     // MARK: - Voices
@@ -86,8 +103,7 @@ public final class AppleSpeechRenderer: SpeechRenderer {
         }
     }
 
-    /// Eloquence voices are `com.apple.eloquence.<language>.<name>`; the classic MacinTalk voices live
-    /// under `com.apple.speech.synthesis.voice.`; the neural voices are `com.apple.voice.<quality>.…`.
+    // Eloquence is com.apple.eloquence.*, MacinTalk is com.apple.speech.synthesis.voice.*, the rest is standard.
     nonisolated static func family(forIdentifier identifier: String) -> VoiceDescriptor.Family {
         let lowered = identifier.lowercased()
         if lowered.hasPrefix("com.apple.eloquence.") { return .eloquence }
@@ -118,10 +134,24 @@ public final class AppleSpeechRenderer: SpeechRenderer {
 
     private func utterance(text: String, voice: VoiceID, language: String) throws -> (AVSpeechUtterance, String) {
         let regions = Locale.preferredLanguages.compactMap { Locale.Language(identifier: $0).region?.identifier }
-        let identifier = try Self.resolveIdentifier(
-            for: voice, language: language, installed: installed(), unusable: unusableIdentifiers,
-            preferredRegions: regions
-        )
+        let identifier: String
+        if case .appleAutomatic = voice.kind {
+            let key = "\(voice.rawValue)|\(language)"
+            if let chosen = autoChoices[key] {
+                identifier = chosen
+            } else {
+                identifier = try Self.resolveIdentifier(
+                    for: voice, language: language, installed: inventory, unusable: unusableIdentifiers,
+                    preferredRegions: regions
+                )
+                autoChoices[key] = identifier
+            }
+        } else {
+            identifier = try Self.resolveIdentifier(
+                for: voice, language: language, installed: [], unusable: unusableIdentifiers,
+                preferredRegions: regions
+            )
+        }
         guard let resolved = AVSpeechSynthesisVoice(identifier: identifier) else {
             throw Failure.noVoice(language: language)
         }
@@ -145,8 +175,8 @@ public final class AppleSpeechRenderer: SpeechRenderer {
     public func cancel() async {
         guard let active else { return }
         self.active = nil
-        backend.stop()
-        active.continuation.finish()
+        backend.reset()
+        active.continuation.finish(throwing: CancellationError())
     }
 
     public func prewarm(voice: VoiceID, language: String) async throws {
@@ -165,6 +195,9 @@ public final class AppleSpeechRenderer: SpeechRenderer {
         lastID += 1
         let id = lastID
         let (stream, continuation) = AsyncThrowingStream.makeStream(of: PCMChunk.self, throwing: (any Error).self)
+        if let previous = active {
+            previous.continuation.finish(throwing: CancellationError())
+        }
         active = ActiveRender(id: id, voiceIdentifier: identifier, counts: counts, continuation: continuation)
         continuation.onTermination = { [weak self] termination in
             guard case .cancelled = termination else { return }
@@ -212,6 +245,7 @@ public final class AppleSpeechRenderer: SpeechRenderer {
             return
         }
         unusableIdentifiers.insert(render.voiceIdentifier)
+        autoChoices.removeAll()
         ParolaLog.error(
             .readAloud, "an Apple voice produced no audio twice and is skipped",
             [.engine: .safe(SpeechEngineKind.apple)]
@@ -227,12 +261,19 @@ public final class AppleSpeechRenderer: SpeechRenderer {
                 deliver([], 0)
                 return
             }
-            let samples = monoSamples(of: pcm)
+            guard let samples = monoSamples(of: pcm) else {
+                ParolaLog.error(
+                    .readAloud, "an Apple voice delivered a buffer in a format Parola can't read",
+                    [.engine: .safe(SpeechEngineKind.apple)]
+                )
+                deliver([], 0)
+                return
+            }
             deliver(samples, pcm.format.sampleRate)
         }
     }
 
-    nonisolated static func monoSamples(of buffer: AVAudioPCMBuffer) -> [Float] {
+    nonisolated static func monoSamples(of buffer: AVAudioPCMBuffer) -> [Float]? {
         let count = Int(buffer.frameLength)
         if let channels = buffer.floatChannelData {
             return Array(UnsafeBufferPointer(start: channels[0], count: count))
@@ -243,6 +284,6 @@ public final class AppleSpeechRenderer: SpeechRenderer {
         if let channels = buffer.int32ChannelData {
             return UnsafeBufferPointer(start: channels[0], count: count).map { Float($0) / 2147483648 }
         }
-        return []
+        return nil
     }
 }

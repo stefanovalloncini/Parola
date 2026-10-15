@@ -21,9 +21,16 @@ struct AppleSpeechRendererTests {
 
     @Test("the system voice renders from another actor without trapping, and nothing plays")
     func isolationGuard() async throws {
+        let installed = await MainActor.run { AppleSpeechRenderer.installedVoices() }
+        let pinned = installed.first { $0.identifier == "com.apple.voice.compact.en-US.Samantha" }
+            ?? installed.first { !$0.isNovelty && !$0.isPersonal && $0.family == .standard }
+        guard let pinned, let voice = VoiceID.apple(identifier: pinned.identifier) else {
+            Issue.record("no Apple voice is installed on this Mac")
+            return
+        }
         let renderer = await MainActor.run { AppleSpeechRenderer() }
         let stream = try await renderer.render(
-            text: "Hello there.", unitID: 3, voice: .appleAutomatic, language: "en"
+            text: "Hello there.", unitID: 3, voice: voice, language: pinned.language
         )
         var chunks: [PCMChunk] = []
         for try await chunk in stream { chunks.append(chunk) }
@@ -80,18 +87,80 @@ struct AppleSpeechRendererTests {
         #expect(renderer.unusableIdentifiers.isEmpty)
     }
 
-    @Test("cancel stops the synthesizer and ends the stream")
+    @Test("cancel replaces the synthesizer, drops late buffers, and the next render writes on the fresh one")
     @MainActor
-    func cancelStops() async throws {
-        let stops = Counter()
-        let renderer = AppleSpeechRenderer(
-            backend: AppleSpeechRenderer.Backend(write: { _, _ in }, stop: { _ = stops.next() }),
-            installed: { [Self.samantha] }
-        )
-        let stream = try await renderer.render(text: "Wait.", unitID: 0, voice: .appleAutomatic, language: "en")
+    func cancelReplacesSynthesizer() async throws {
+        let synthesizers = FakeSynthesizers()
+        let renderer = AppleSpeechRenderer(backend: synthesizers.backend, installed: { [Self.samantha] })
+        let first = try await renderer.render(text: "Long.", unitID: 0, voice: .appleAutomatic, language: "en")
         await renderer.cancel()
-        for try await _ in stream {}
-        #expect(stops.value == 1)
+        #expect(synthesizers.generation == 1)
+        await #expect(throws: CancellationError.self) { for try await _ in first {} }
+
+        let second = try await renderer.render(text: "Next.", unitID: 1, voice: .appleAutomatic, language: "en")
+        #expect(synthesizers.writes.map(\.generation) == [0, 1])
+        synthesizers.writes[0].deliver([0.9], 22050)
+        synthesizers.writes[1].deliver([0.1, 0.2], 22050)
+        synthesizers.writes[1].deliver([], 0)
+        var received: [Float] = []
+        for try await chunk in second { received += chunk.samples }
+        #expect(received == [0.1, 0.2])
+    }
+
+    @Test("a second render started over a running one ends the first stream")
+    @MainActor
+    func secondStartFinishesFirst() async throws {
+        let synthesizers = FakeSynthesizers()
+        let renderer = AppleSpeechRenderer(backend: synthesizers.backend, installed: { [Self.samantha] })
+        let first = try await renderer.render(text: "One.", unitID: 0, voice: .appleAutomatic, language: "en")
+        _ = try await renderer.render(text: "Two.", unitID: 1, voice: .appleAutomatic, language: "en")
+        await #expect(throws: CancellationError.self) { for try await _ in first {} }
+    }
+
+    @Test("the voice list is read once, auto is resolved once, and an explicit voice never reads it")
+    @MainActor
+    func inventoryCached() async throws {
+        let reads = Counter()
+        let renderer = AppleSpeechRenderer(
+            backend: Self.backend { deliver in deliver([0.5], 22050); deliver([], 0) },
+            installed: { _ = reads.next(); return [Self.samantha] }
+        )
+        #expect(reads.value == 1)
+        let explicit = try #require(VoiceID.apple(identifier: Self.samantha.identifier))
+        for index in 0..<3 {
+            for try await _ in try await renderer.render(text: "A.", unitID: index, voice: explicit, language: "en") {}
+            for try await _ in try await renderer.render(text: "A.", unitID: index, voice: .appleAutomatic, language: "en") {}
+        }
+        #expect(reads.value == 1)
+        renderer.refreshVoices()
+        #expect(reads.value == 2)
+    }
+
+    @Test("a refresh changes what apple:auto picks")
+    @MainActor
+    func refreshRepicks() async throws {
+        let installed = Awaitable<[VoiceDescriptor]>([])
+        let renderer = AppleSpeechRenderer(
+            backend: Self.backend { deliver in deliver([], 0) },
+            installed: { installed.value }
+        )
+        await #expect(throws: AppleSpeechRenderer.Failure.noVoice(language: "en")) {
+            _ = try await renderer.render(text: "A.", unitID: 0, voice: .appleAutomatic, language: "en")
+        }
+        installed.update { $0 = [Self.samantha] }
+        await #expect(throws: AppleSpeechRenderer.Failure.noVoice(language: "en")) {
+            _ = try await renderer.render(text: "A.", unitID: 0, voice: .appleAutomatic, language: "en")
+        }
+        renderer.refreshVoices()
+        _ = try await renderer.render(text: "A.", unitID: 0, voice: .appleAutomatic, language: "en")
+    }
+
+    @Test("a buffer in an unknown format is not a sample run")
+    func unknownFormat() throws {
+        let format = try #require(AVAudioFormat(commonFormat: .pcmFormatFloat64, sampleRate: 22050, channels: 1, interleaved: false))
+        let buffer = try #require(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 2))
+        buffer.frameLength = 2
+        #expect(AppleSpeechRenderer.monoSamples(of: buffer) == nil)
     }
 
     @Test("apple:auto with no installed voice for the language throws noVoice")
@@ -181,9 +250,27 @@ struct AppleSpeechRendererTests {
     }
 
     @MainActor
+    private final class FakeSynthesizers {
+        struct Write {
+            let generation: Int
+            let deliver: AppleSpeechRenderer.Delivery
+        }
+
+        private(set) var generation = 0
+        private(set) var writes: [Write] = []
+
+        var backend: AppleSpeechRenderer.Backend {
+            AppleSpeechRenderer.Backend(
+                write: { [self] _, deliver in writes.append(Write(generation: generation, deliver: deliver)) },
+                reset: { [self] in generation += 1 }
+            )
+        }
+    }
+
+    @MainActor
     private static func backend(
         _ script: @escaping @Sendable (AppleSpeechRenderer.Delivery) -> Void
     ) -> AppleSpeechRenderer.Backend {
-        AppleSpeechRenderer.Backend(write: { _, deliver in script(deliver) }, stop: {})
+        AppleSpeechRenderer.Backend(write: { _, deliver in script(deliver) }, reset: {})
     }
 }
