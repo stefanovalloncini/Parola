@@ -331,28 +331,23 @@ private final class ExternalRun: Sendable {
     }
 
     private func settleThenEnd(_ tap: any TargetsGoneReporting, bundleID: String, environment env: CaptionCaptureEnvironment) {
-        let token = state.withLock { state -> Int in
-            state.settleCount += 1
-            return state.settleCount
-        }
         let probe = TapEnd.Probe(objects: { env.processObjects(bundleID) }, isRunningOutput: env.isRunningOutput)
-        let waiting = Task { [weak self] in
-            let again = self?.tapEndReporter(tap, bundleID: bundleID, environment: env)
-            let end = await TapEnd.resolve(tap, after: env.endSettle, on: env.clock, probe: probe) { [weak self] in
-                self?.settleOver(token)
-                again?()
-            }
-            self?.settleOver(token)
-            guard let end else { return }
-            self?.captureEnded(end == .quit ? FixedFailureText.appQuit(bundleID) : FixedFailureText.appStoppedSending(bundleID))
-        }
-        let accepted = state.withLock { state -> Bool in
-            guard !state.stopped, state.settling == nil else { return false }
-            state.settling = waiting
+        state.withLock { state in
+            guard !state.stopped, state.settling == nil else { return }
+            state.settleCount += 1
+            let token = state.settleCount
             state.settleToken = token
-            return true
+            state.settling = Task { [weak self] in
+                let again = self?.tapEndReporter(tap, bundleID: bundleID, environment: env)
+                let end = await TapEnd.resolve(tap, after: env.endSettle, on: env.clock, probe: probe) { [weak self] in
+                    self?.settleOver(token)
+                    again?()
+                }
+                self?.settleOver(token)
+                guard let end else { return }
+                self?.captureEnded(end == .quit ? FixedFailureText.appQuit(bundleID) : FixedFailureText.appStoppedSending(bundleID))
+            }
         }
-        if !accepted { waiting.cancel() }
     }
 
     private func settleOver(_ token: Int) {
