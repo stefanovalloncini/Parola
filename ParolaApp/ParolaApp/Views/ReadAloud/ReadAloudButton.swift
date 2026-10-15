@@ -88,7 +88,7 @@ struct ReadAloudButton: View {
     private func status(for kind: ReadAloudRequest.Kind) -> ReadAloudButtonStatus {
         ReadAloudButtonStatus.resolve(
             state: model.readAloud.state,
-            readsThis: model.readAloud.reads(entryID: entryID, source: Self.readingSource(kind)),
+            readsThis: model.readAloud.reads(entryID: entryID, inPane: kind),
             blocked: model.readingBlockedReason,
             hasContent: hasContent(kind)
         )
@@ -98,14 +98,6 @@ struct ReadAloudButton: View {
         switch kind {
         case .transcript, .translation: model.hasTranscript && !model.transcriptIsEmpty
         case .summary: model.transcript?.summary != nil
-        }
-    }
-
-    static func readingSource(_ kind: ReadAloudRequest.Kind) -> ReadingSource {
-        switch kind {
-        case .transcript: .transcript(fromSegment: nil)
-        case .summary: .summary
-        case .translation: .translation(language: "")
         }
     }
 
@@ -124,7 +116,7 @@ struct ReadAloudButton: View {
         let blocked = model.readingBlockedReason != nil
         if kind == .transcript {
             if let target = model.transcript?.translation?.targetLanguage {
-                Button("Read Translation (\(LanguageDisplay.name(for: target) ?? target))") {
+                Button("Read Translation (\(LanguageDisplay.midSentenceName(for: target) ?? target))") {
                     Task { await model.readAloud(ReadAloudRequest(kind: .translation)) }
                 }
                 .disabled(blocked)

@@ -181,6 +181,14 @@ final class ReadAloudController {
         }
     }
 
+    func reads(entryID: String, inPane kind: ReadAloudRequest.Kind) -> Bool {
+        guard let item, item.entryID == entryID else { return false }
+        switch (item.source, kind) {
+        case (.transcript, .transcript), (.translation, .transcript), (.summary, .summary): return true
+        default: return false
+        }
+    }
+
     // MARK: - Reading
 
     func start(_ plan: Plan, startAt: Int = 0) async {

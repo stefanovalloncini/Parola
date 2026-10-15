@@ -82,6 +82,14 @@ struct ReadAloudButtonStatusTests {
         }
     }
 
+    @Test("a language name inside a sentence is lowercase in Italian and capitalised elsewhere")
+    func midSentenceLanguageName() {
+        #expect(LanguageDisplay.midSentenceName(for: "it", locale: Locale(identifier: "it_IT")) == "italiano")
+        #expect(LanguageDisplay.midSentenceName(for: "fr", locale: Locale(identifier: "it_IT")) == "francese")
+        #expect(LanguageDisplay.midSentenceName(for: "unknown", locale: Locale(identifier: "it_IT")) == nil)
+        #expect(LanguageDisplay.midSentenceName(for: "it", locale: Locale(identifier: "en_US")) == "Italian")
+    }
+
     @Test("the blocked messages are the controller's own strings")
     func blockedMessages() {
         #expect(ReadAloudController.BlockedReason.take.message == "Reading waits until the recording ends.")

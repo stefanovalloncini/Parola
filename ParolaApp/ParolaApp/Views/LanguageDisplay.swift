@@ -13,6 +13,13 @@ enum LanguageDisplay {
         return normalized.uppercased()
     }
 
+    /// The name inside a sentence: Italian doesn't capitalise language names, so "(italiano)" there.
+    static func midSentenceName(for code: String?, locale: Locale = .current) -> String? {
+        guard let normalized = realCode(code) else { return nil }
+        guard let localized = locale.localizedString(forLanguageCode: normalized) else { return normalized.uppercased() }
+        return locale.language.languageCode?.identifier == "it" ? localized.lowercased(with: locale) : localized.capitalized(with: locale)
+    }
+
     /// Uppercased code for a compact language badge ("IT", "EN"), or nil for the same
     /// no-real-language cases as ``name(for:)`` — so a transcript stamped with the "unknown"
     /// sentinel shows no badge instead of a literal "UNKNOWN".

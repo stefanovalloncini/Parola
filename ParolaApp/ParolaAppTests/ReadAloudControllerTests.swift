@@ -228,6 +228,34 @@ struct ReadAloudControllerTests {
         #expect(!rig.controller.reads(entryID: "a", source: .translation(language: "it")))
     }
 
+    @Test("in Transcript mode the button follows the transcript, a segment start and the translation of its entry")
+    func buttonFollowsTheEntryReading() async {
+        func status(_ rig: ReadAloudRig, entry: String, pane: ReadAloudRequest.Kind) -> ReadAloudButtonStatus {
+            ReadAloudButtonStatus.resolve(
+                state: rig.controller.state,
+                readsThis: rig.controller.reads(entryID: entry, inPane: pane),
+                blocked: nil,
+                hasContent: true
+            )
+        }
+        let rig = ReadAloudRig()
+        await rig.start(ReadAloudRig.plan(entryID: "a", source: .translation(language: "it")))
+
+        #expect(status(rig, entry: "a", pane: .transcript).action == .pause)
+        #expect(status(rig, entry: "a", pane: .summary).action == .start)
+        #expect(status(rig, entry: "b", pane: .transcript).action == .start)
+
+        await rig.controller.pause()
+        #expect(status(rig, entry: "a", pane: .transcript).action == .resume)
+
+        await rig.start(ReadAloudRig.plan(entryID: "a", source: .transcript(fromSegment: 1)))
+        #expect(status(rig, entry: "a", pane: .transcript).action == .pause)
+
+        await rig.start(ReadAloudRig.plan(entryID: "a", source: .summary))
+        #expect(status(rig, entry: "a", pane: .summary).action == .pause)
+        #expect(status(rig, entry: "a", pane: .transcript).action == .start)
+    }
+
     @Test("deleting the entry being read stops it; another entry leaves it alone")
     func entryRemoval() async {
         let rig = ReadAloudRig()
