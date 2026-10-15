@@ -94,6 +94,11 @@ struct ReadAloudSessionTests {
         await harness.session.settle()
     }
 
+    private func expectStarts(_ h: Harness, _ expected: [Int], sourceLocation: SourceLocation = #_sourceLocation) async {
+        await h.log.waitForStarts(expected.count, sourceLocation: sourceLocation)
+        #expect(h.log.started == expected, sourceLocation: sourceLocation)
+    }
+
     private func drive(_ clock: TestClock, sleeps: Int, of step: Duration) async {
         for _ in 0..<sleeps {
             await clock.waitForSleeper()
@@ -116,7 +121,7 @@ struct ReadAloudSessionTests {
         await h.session.play()
         await h.session.settle()
 
-        #expect(h.log.started == [0])
+        await expectStarts(h, [0])
         #expect(h.sink.calls.first == .subscribe)
         #expect(h.sink.calls.contains(.resume))
         #expect(h.sink.schedulesBeforeSubscribing == 0)
@@ -131,12 +136,12 @@ struct ReadAloudSessionTests {
         let h = harness([sentence(100), sentence(100), sentence(100)])
         await h.session.play()
         await h.session.settle()
-        #expect(h.log.started == [0])
+        await expectStarts(h, [0])
 
         try await complete(h, startsTotal: 2)
-        #expect(h.log.started == [0, 1])
+        await expectStarts(h, [0, 1])
         try await complete(h, startsTotal: 3)
-        #expect(h.log.started == [0, 1, 2])
+        await expectStarts(h, [0, 1, 2])
 
         try #require(h.sink.completeNextUnit() != nil)
         try #require(await h.log.waitForEnd())
@@ -198,7 +203,7 @@ struct ReadAloudSessionTests {
 
         try await complete(h, startsTotal: 2)
         try await complete(h, startsTotal: 3)
-        #expect(h.log.started == [0, 1, 2])
+        await expectStarts(h, [0, 1, 2])
         let violations = await h.renderer.violations
         #expect(violations.isEmpty)
         await h.session.stop()
@@ -241,7 +246,7 @@ struct ReadAloudSessionTests {
         #expect(firstFinish != nil)
         #expect(resume != nil)
         #expect((firstFinish ?? .max) < (resume ?? .min))
-        #expect(h.log.started == [0, 1])
+        await expectStarts(h, [0, 1])
         await h.session.stop()
     }
 
@@ -259,7 +264,7 @@ struct ReadAloudSessionTests {
         #expect(after.first == .stop)
         #expect(after.contains(.finishUnit(1, epoch: 1, pauseAfter: 0.25)))
         #expect(!after.contains(.resume))
-        #expect(h.log.started == [0, 1])
+        await expectStarts(h, [0, 1])
         await h.session.stop()
     }
 
@@ -284,11 +289,11 @@ struct ReadAloudSessionTests {
 
         h.clock.advance(by: .seconds(2))
         await h.session.previous()
-        #expect(h.log.started == [0, 1, 1])
+        await expectStarts(h, [0, 1, 1])
 
         h.clock.advance(by: .seconds(1))
         await h.session.previous()
-        #expect(h.log.started == [0, 1, 1, 0])
+        await expectStarts(h, [0, 1, 1, 0])
 
         try await complete(h, startsTotal: 5)
         h.clock.advance(by: .seconds(1))
@@ -297,7 +302,7 @@ struct ReadAloudSessionTests {
         await h.session.resume()
         h.clock.advance(by: .milliseconds(400))
         await h.session.previous()
-        #expect(h.log.started == [0, 1, 1, 0, 1, 0])
+        await expectStarts(h, [0, 1, 1, 0, 1, 0])
 
         try await complete(h, startsTotal: 7)
         h.clock.advance(by: .seconds(1))
@@ -305,7 +310,7 @@ struct ReadAloudSessionTests {
         await h.session.resume()
         h.clock.advance(by: .milliseconds(600))
         await h.session.previous()
-        #expect(h.log.started == [0, 1, 1, 0, 1, 0, 1, 1])
+        await expectStarts(h, [0, 1, 1, 0, 1, 0, 1, 1])
 
         await h.session.settle()
         #expect(await h.renderer.rendered.map(\.unitID) == [0, 1, 2, 3])
@@ -321,7 +326,7 @@ struct ReadAloudSessionTests {
         try await complete(h, startsTotal: 2)
         h.clock.advance(by: .milliseconds(400))
         await h.session.previous()
-        #expect(h.log.started == [0, 1, 0])
+        await expectStarts(h, [0, 1, 0])
         await h.session.stop()
     }
 
@@ -342,7 +347,7 @@ struct ReadAloudSessionTests {
 
         await h.session.previous()
         await h.session.settle()
-        #expect(h.log.started == [0, 1, 2, 3, 4, 3, 2, 1])
+        await expectStarts(h, [0, 1, 2, 3, 4, 3, 2, 1])
         #expect(await h.renderer.rendered.filter { $0.unitID == 1 }.count == 2)
         await h.session.stop()
     }
@@ -362,7 +367,7 @@ struct ReadAloudSessionTests {
         try #require(await h.log.wait(for: .interrupted))
 
         #expect(delivered)
-        #expect(h.log.started == [0, 1])
+        await expectStarts(h, [0, 1])
         await h.session.stop()
     }
 
@@ -441,10 +446,10 @@ struct ReadAloudSessionTests {
         #expect(after.contains(.finishUnit(1, epoch: 1, pauseAfter: 0.25)))
         #expect(after.last == .resume)
         #expect(h.sink.schedulesBeforeSubscribing == 0)
-        #expect(h.log.started == [0, 1, 1])
+        await expectStarts(h, [0, 1, 1])
 
         try await complete(h, startsTotal: 4)
-        #expect(h.log.started == [0, 1, 1, 2])
+        await expectStarts(h, [0, 1, 1, 2])
         await h.session.stop()
     }
 
@@ -492,13 +497,13 @@ struct ReadAloudSessionTests {
         await h.session.next()
         await h.session.settle()
         #expect(h.sink.calls.count == mark)
-        #expect(h.log.started == [0, 1])
+        await expectStarts(h, [0, 1])
 
         await h.session.resume()
         let after = Array(h.sink.calls[mark...])
         #expect(after.first == .subscribe)
         #expect(after.last == .resume)
-        #expect(h.log.started == [0, 1, 1])
+        await expectStarts(h, [0, 1, 1])
         await h.session.stop()
     }
 
@@ -632,7 +637,7 @@ struct ReadAloudSessionTests {
 
         try #require(h.sink.completeNextUnit() != nil)
         await h.session.settle()
-        #expect(h.log.started == [0, 1])
+        await expectStarts(h, [0, 1])
         #expect(await h.renderer.rendered.map(\.unitID) == [0, 1])
 
         await h.session.continueReading()
@@ -722,7 +727,7 @@ struct ReadAloudSessionTests {
         #expect(after.contains(.resume))
         #expect(!chunks.isEmpty)
         #expect(chunks.allSatisfy { $0.sampleRate == 16_000 })
-        #expect(h.log.started == [0, 1])
+        await expectStarts(h, [0, 1])
         #expect(otherLog.events.value.contains(.ended(unitID: 2)))
         await expectSingleFlight(h.renderer)
         await expectSingleFlight(other)
@@ -743,7 +748,7 @@ struct ReadAloudSessionTests {
         await h.session.settle()
         #expect(Array(h.sink.calls[mark...]) == [.stop])
         #expect(await other.rendered.isEmpty)
-        #expect(h.log.started == [0, 0])
+        await expectStarts(h, [0, 0])
 
         await h.session.resume()
         await h.session.settle()
@@ -803,12 +808,12 @@ struct ReadAloudSessionTests {
         await h.session.play()
         await h.session.settle()
         #expect(await h.renderer.rendered.map(\.unitID) == [0, 1, 2])
-        #expect(h.log.started == [0])
+        await expectStarts(h, [0])
 
         try await complete(h, startsTotal: 2)
         try #require(h.sink.completeNextUnit() != nil)
         try #require(await h.log.waitForEnd())
-        #expect(h.log.started == [0, 1])
+        await expectStarts(h, [0, 1])
         #expect(h.log.events.value.last == .failed(String(describing: MockSpeechRenderer.Failure(unitID: 2))))
         #expect(h.sink.calls.last == .stop)
     }

@@ -1,9 +1,7 @@
 import Foundation
 import ParolaCore
 
-/// What a renderer is given for one reading unit: the text spelled out for a renderer that can't expand
-/// numbers, trimmed, and cut into pieces no longer than `maxUnitChars`. No pieces means the unit has
-/// nothing to say.
+/// A unit's text as a renderer gets it: spelled out if needed, trimmed, cut to `maxUnitChars`; none means silence.
 enum RenderText {
     private static let clauseMarks: Set<Character> = [",", ";", ":"]
     private static let fullWidthMarks: Set<Character> = ["、", "，", "；", "：", "。"]
