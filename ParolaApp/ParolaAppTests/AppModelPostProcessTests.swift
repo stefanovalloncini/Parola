@@ -115,7 +115,7 @@ struct AppModelPostProcessTests {
         #expect(reloaded.findReplaceRules.last?.regex == true)
     }
 
-    @Test("reloading clears in-memory ignore rules once the defaults key is gone")
+    @Test("reloading restores the suggested ignore rules once the defaults key is gone")
     func ignoredRulesResetWhenKeyAbsent() {
         let defaults = temporaryDefaults()
         let model = makeModel(defaults)
@@ -124,7 +124,7 @@ struct AppModelPostProcessTests {
         defaults.removeObject(forKey: "ignoredSegmentRules")
         model.loadIgnoredSegmentRules()
 
-        #expect(model.ignoredSegmentRules.isEmpty)
+        #expect(model.ignoredSegmentRules.map(\.pattern) == SuggestedIgnoredPhrases.defaults)
     }
 
     @Test("reloading clears in-memory find/replace rules once the defaults key is gone")

@@ -5,7 +5,14 @@ import ParolaCore
 extension AppModel {
 
     func loadIgnoredSegmentRules() {
-        ignoredSegmentRules = readJSON([IgnoredSegmentRule].self, forKey: "ignoredSegmentRules") ?? []
+        ignoredSegmentRules = readJSON([IgnoredSegmentRule].self, forKey: "ignoredSegmentRules") ?? SuggestedIgnoredPhrases.rules()
+    }
+
+    @discardableResult
+    func addSuggestedIgnoredPhrases() -> Int {
+        let missing = SuggestedIgnoredPhrases.missing(from: ignoredSegmentRules)
+        ignoredSegmentRules.append(contentsOf: missing)
+        return missing.count
     }
 
     func saveIgnoredSegmentRules() {

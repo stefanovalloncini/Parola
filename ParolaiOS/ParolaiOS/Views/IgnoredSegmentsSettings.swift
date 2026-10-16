@@ -5,6 +5,7 @@ struct IgnoredSegmentsSettings: View {
     @Environment(AppModel.self) private var model
     @State private var query = ""
     @State private var filter: RuleFilter = .all
+    @State private var addedCount: Int?
 
     var body: some View {
         @Bindable var model = model
@@ -48,13 +49,25 @@ struct IgnoredSegmentsSettings: View {
                 } label: {
                     Label("Add pattern", systemImage: "plus.circle")
                 }
+                Button {
+                    addedCount = model.addSuggestedIgnoredPhrases()
+                } label: {
+                    Label("Add suggested phrases", systemImage: "text.badge.plus")
+                }
+                .disabled(SuggestedIgnoredPhrases.missing(from: model.ignoredSegmentRules).isEmpty)
             } header: {
                 Text("Patterns")
             } footer: {
-                Text("Segments whose text exactly matches a pattern (case-insensitive, trimmed) are removed from the transcript before it's saved.")
+                Text(footer)
             }
         }
         .searchable(text: $query, prompt: "Search patterns")
+    }
+
+    private var footer: String {
+        let base = "Segments whose text exactly matches a pattern, ignoring case and punctuation around it, are removed from the transcript before it's saved. Suggested phrases are ones speech models sometimes invent over silence or music."
+        guard let addedCount else { return base }
+        return base + (addedCount == 0 ? " No new phrases." : " Phrases added: \(addedCount).")
     }
 
     private var filteredRuleIDs: Set<IgnoredSegmentRule.ID> {

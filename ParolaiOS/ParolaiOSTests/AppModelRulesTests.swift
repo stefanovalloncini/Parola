@@ -97,12 +97,29 @@ struct AppModelRulesTests {
         #expect(reader.findReplaceRules == rules)
     }
 
-    @Test("a fresh model with no stored rules starts empty")
+    @Test("a fresh model with no stored rules starts with the suggested ignore phrases")
     func defaultsAreEmpty() throws {
         let model = try makeModel(defaults: freshDefaults())
         #expect(model.autoExportRules.isEmpty)
-        #expect(model.ignoredSegmentRules.isEmpty)
+        #expect(model.ignoredSegmentRules.map(\.pattern) == SuggestedIgnoredPhrases.defaults)
         #expect(model.findReplaceRules.isEmpty)
+    }
+
+    @Test("an empty saved ignore list stays empty on iOS")
+    func emptyIgnoreListStaysEmpty() throws {
+        let defaults = freshDefaults()
+        defaults.set(try JSONEncoder().encode([IgnoredSegmentRule]()), forKey: "ignoredSegmentRules")
+        let model = try makeModel(defaults: defaults)
+        #expect(model.ignoredSegmentRules.isEmpty)
+    }
+
+    @Test("add-suggested on iOS skips phrases already there")
+    func addSuggestedSkipsDuplicates() throws {
+        let model = try makeModel(defaults: freshDefaults())
+        model.ignoredSegmentRules = [IgnoredSegmentRule(pattern: "Thanks for watching.")]
+        let added = model.addSuggestedIgnoredPhrases()
+        #expect(added == SuggestedIgnoredPhrases.defaults.count - 1)
+        #expect(model.addSuggestedIgnoredPhrases() == 0)
     }
 
     @Test("a landed transcript gets the user's rules, then the Italian orthography")

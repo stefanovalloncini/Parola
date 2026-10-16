@@ -5,6 +5,7 @@ struct IgnoredSegmentsPane: View {
     @Environment(AppModel.self) private var model
     @State private var query = RuleListQuery()
     @State private var selection: IgnoredSegmentRule.ID?
+    @State private var addedCount: Int?
 
     var body: some View {
         let displayed = displayedRules
@@ -35,9 +36,29 @@ struct IgnoredSegmentsPane: View {
                 }
             }
 
-            SettingHelper(text: "A segment is removed when its entire text equals a pattern (case-insensitive, trimmed). Catches filler-only segments like “uh” — not words inside sentences. Applies to new transcriptions; saved transcripts don't change.")
+            Section {
+                HStack {
+                    Button("Add Suggested Phrases") {
+                        addedCount = model.addSuggestedIgnoredPhrases()
+                    }
+                    .disabled(!hasMissingSuggestions)
+                    .help(hasMissingSuggestions ? "" : String(localized: "Every suggested phrase is already in the list."))
+                    .axLeaf("IgnoredSegments.Button.AddSuggested")
+                    if let addedCount {
+                        Text(addedCount == 0 ? String(localized: "No new phrases.") : String(localized: "Phrases added: \(addedCount)"))
+                            .foregroundStyle(.secondary)
+                            .axLeaf("IgnoredSegments.Text.AddedCount")
+                    }
+                }
+            }
+
+            SettingHelper(text: "A segment is removed when its entire text equals a pattern, ignoring case and punctuation around it. Speech models sometimes invent phrases like “Thanks for watching!” or “[Music]” over silence or music; the suggested phrases catch those. Applies to new transcriptions; saved transcripts don't change.")
             ResetPaneButton(scope: .ignoredSegments)
         }
+    }
+
+    private var hasMissingSuggestions: Bool {
+        !SuggestedIgnoredPhrases.missing(from: model.ignoredSegmentRules).isEmpty
     }
 
     private func add() {

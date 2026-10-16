@@ -17,8 +17,18 @@ extension AppModel {
 
     func loadIgnoredSegmentRules() {
         guard let data = defaults.data(forKey: "ignoredSegmentRules"),
-              let rules = try? JSONDecoder().decode([IgnoredSegmentRule].self, from: data) else { return }
+              let rules = try? JSONDecoder().decode([IgnoredSegmentRule].self, from: data) else {
+            ignoredSegmentRules = SuggestedIgnoredPhrases.rules()
+            return
+        }
         ignoredSegmentRules = rules
+    }
+
+    @discardableResult
+    func addSuggestedIgnoredPhrases() -> Int {
+        let missing = SuggestedIgnoredPhrases.missing(from: ignoredSegmentRules)
+        ignoredSegmentRules.append(contentsOf: missing)
+        return missing.count
     }
 
     func saveIgnoredSegmentRules() {

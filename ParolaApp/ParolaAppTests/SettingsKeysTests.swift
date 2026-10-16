@@ -201,7 +201,8 @@ struct SettingsResetServiceTests {
 
                 for key in scope.defaultsKeys(features: .all) {
                     let kept = defaults.object(forKey: key) != nil
-                    #expect(kept == lists.contains(key), "\(scope.rawValue) reset \(kept ? "kept" : "cleared") \(key)")
+                    let expected = lists.contains(key) && scope != .ignoredSegments
+                    #expect(kept == expected, "\(scope.rawValue) reset \(kept ? "kept" : "cleared") \(key)")
                 }
             }
         }

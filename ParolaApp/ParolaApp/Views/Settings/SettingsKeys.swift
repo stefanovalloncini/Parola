@@ -141,9 +141,10 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
         "exportPresets", "destinations", "aiServices", "autoExportRules", "autoExportFolder", "dictationPerAppOverridesJSON",
     ]
 
-    /// What the pane's Reset to Defaults clears: its settings and where its panel was dragged, never its lists.
+    /// What the pane's Reset to Defaults clears: its settings and where its panel was dragged, never its lists. Ignored Segments is the exception: clearing its list restores the suggested phrases.
     func resetKeys(features: FeatureSet) -> [String] {
-        defaultsKeys(features: features).filter { !Self.userListKeys.contains($0) } + dragSpotKeys
+        if self == .ignoredSegments { return defaultsKeys(features: features) }
+        return defaultsKeys(features: features).filter { !Self.userListKeys.contains($0) } + dragSpotKeys
     }
 
     /// A backup leaves these out, since they name this Mac's screens.

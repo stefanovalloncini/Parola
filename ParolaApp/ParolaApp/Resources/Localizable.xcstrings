@@ -1582,17 +1582,6 @@
         }
       }
     },
-    "A segment is removed when its entire text equals a pattern (case-insensitive, trimmed). Catches filler-only segments like “uh” — not words inside sentences. Applies to new transcriptions; saved transcripts don't change.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Un segmento viene rimosso quando tutto il suo testo è uguale a un pattern (senza distinguere maiuscole e minuscole, spazi esclusi). Toglie i segmenti fatti solo di riempitivi come “uh”, non le parole dentro le frasi. Vale per le nuove trascrizioni; quelle salvate non cambiano."
-          }
-        }
-      }
-    },
     "A short list of names or jargon helps Whisper get unusual words right.": {
       "localizations": {
         "it": {
@@ -22532,6 +22521,61 @@
           "stringUnit": {
             "state": "translated",
             "value": "Scarica una voce per %@ in Impostazioni di Sistema, poi torna qui."
+          }
+        }
+      }
+    },
+    "Add Suggested Phrases": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aggiungi frasi suggerite"
+          }
+        }
+      }
+    },
+    "Every suggested phrase is already in the list.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tutte le frasi suggerite sono già nell'elenco."
+          }
+        }
+      }
+    },
+    "No new phrases.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nessuna frase nuova."
+          }
+        }
+      }
+    },
+    "Phrases added: %lld": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Frasi aggiunte: %lld"
+          }
+        }
+      }
+    },
+    "A segment is removed when its entire text equals a pattern, ignoring case and punctuation around it. Speech models sometimes invent phrases like “Thanks for watching!” or “[Music]” over silence or music; the suggested phrases catch those. Applies to new transcriptions; saved transcripts don't change.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Un segmento viene rimosso quando tutto il suo testo è uguale a un pattern, senza contare maiuscole e punteggiatura intorno. I modelli vocali a volte inventano frasi come “Thanks for watching!” o “[Music]” sul silenzio o sulla musica: le frasi suggerite le tolgono. Vale per le nuove trascrizioni; quelle salvate non cambiano."
           }
         }
       }
