@@ -105,6 +105,10 @@ struct FailureTextTests {
         #expect(FailureText.message(for: DeliveryError.invalidSetup("Zap", .address(.empty)), bundle: it)
             == "Zap non è configurato correttamente. Inserisci l'indirizzo del webhook.")
         #expect(FailureText.message(for: .rejected("Zap", .httpStatus("Zap", 401, "")), bundle: it) == "Zap ha risposto HTTP 401.")
+        #expect(FailureText.message(for: DeliveryError.redirected("Zap", status: 307), bundle: it)
+            == "Zap si è spostato a un altro indirizzo (HTTP 307). Aggiorna l'indirizzo nelle impostazioni di Invia a.")
+        #expect(FailureText.message(for: DeliveryError.pageNotReturned("Notion"), bundle: it)
+            == "Notion non ha restituito la nuova pagina, quindi Parola si è fermata per non crearne una seconda.")
         #expect(FailureText.message(for: DeliveryError.missingSecret("Notion"), bundle: it)
             == "Notion non ha una chiave salvata. Inseriscila di nuovo nelle impostazioni di Invia a.")
         #expect(FailureText.message(for: DeliveryError.partialDelivery("Notion", sent: 100, total: 250, underlying: .httpStatus("Notion", 500, ""), resume: "r"), bundle: it)
@@ -162,6 +166,8 @@ struct FailureTextTests {
             DeliveryError.networkFailed("example.com", .offline),
             DeliveryError.networkFailed("example.com", .tlsFailed),
             DeliveryError.missingSecret("Notion"),
+            DeliveryError.redirected("Zap", status: 307),
+            DeliveryError.pageNotReturned("Notion"),
             DeliveryError.invalidSetup("Zap", .address(.empty)),
             DeliveryError.invalidSetup("Zap", .address(.insecurePublicHost)),
             DeliveryError.invalidSetup("Notion", .notionPage),

@@ -156,6 +156,10 @@ enum FailureText {
             return String(localized: "\(name) has no saved key. Enter it again in Send To settings.", bundle: bundle)
         case .invalidSetup(let name, let problem):
             return String(localized: "\(name) isn't set up correctly. \(setupProblem(problem, bundle: bundle))", bundle: bundle)
+        case .redirected(let name, let status):
+            return String(localized: "\(name) has moved to another address (HTTP \(status)). Update its address in Send To settings.", bundle: bundle)
+        case .pageNotReturned(let name):
+            return String(localized: "\(name) didn't send back the new page, so Parola stopped rather than make a second one.", bundle: bundle)
         case .partialDelivery(let name, let sent, let total, let underlying, _):
             return String(localized: "\(name) got \(sent) of \(total) blocks before it failed, and the page stays there. \(delivery(underlying, bundle: bundle))", bundle: bundle)
         }

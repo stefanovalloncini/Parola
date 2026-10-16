@@ -85,10 +85,12 @@ public struct NotionDestination: DeliveryDestinationSettings, Codable, Sendable,
         }
         let blocks = NotionBlocks.blocks(for: payload, headings: environment.notionHeadings)
         let title = titleFormat.title(for: payload)
-        let fingerprint = Self.fingerprint(title: title, blocks: blocks)
+        let fingerprint = Self.fingerprint(parent: parent, title: title, blocks: blocks)
         var progress: PageProgress
+        var resumedFrom: Int?
         if let saved = PageProgress(token: resume), saved.fingerprint == fingerprint, saved.sent <= blocks.count {
             progress = saved
+            resumedFrom = saved.sent
         } else {
             progress = try await createPage(parent: parent, title: title, blocks: blocks, fingerprint: fingerprint)
         }
@@ -104,16 +106,28 @@ public struct NotionDestination: DeliveryDestinationSettings, Codable, Sendable,
                 } else {
                     cause = error as? DeliveryError ?? .networkFailed(Self.host, .other)
                 }
+                if resumedFrom == progress.sent, Self.isPageGone(cause) {
+                    resumedFrom = nil
+                    progress = try await createPage(parent: parent, title: title, blocks: blocks, fingerprint: fingerprint)
+                    continue
+                }
                 throw DeliveryError.partialDelivery(
                     name, sent: progress.sent, total: blocks.count, underlying: cause, resume: progress.token
                 )
             }
+            resumedFrom = nil
             progress.sent += batch.count
         }
         return DeliveryReceipt(
             destinationID: id, destinationName: name, deliveredAt: Date(),
             location: progress.url.flatMap(URL.init(string:))
         )
+    }
+
+    /// The page a resume points at was trashed or deleted: Notion answers 404, or 400 for an archived block.
+    static func isPageGone(_ error: DeliveryError) -> Bool {
+        guard case .httpStatus(_, let status, let detail) = error else { return false }
+        return status == 404 || (status == 400 && detail.lowercased().contains("archived"))
     }
 
     private func createPage(parent: String, title: String, blocks: [DestinationConfig], fingerprint: String) async throws -> PageProgress {
@@ -127,7 +141,7 @@ public struct NotionDestination: DeliveryDestinationSettings, Codable, Sendable,
         ]))
         try ensureSuccess(created)
         guard let page = try? JSONDecoder().decode(CreatedPage.self, from: created.body) else {
-            throw DeliveryError.httpStatus(name, created.status, "Notion's answer had no page in it.")
+            throw DeliveryError.pageNotReturned(name)
         }
         return PageProgress(pageID: page.id, url: page.url, sent: first.count, fingerprint: fingerprint)
     }
@@ -135,12 +149,12 @@ public struct NotionDestination: DeliveryDestinationSettings, Codable, Sendable,
     static let host = "api.notion.com"
 
     /// Stable across launches, so a retry after a restart can tell the transcript has not changed.
-    static func fingerprint(title: String, blocks: [DestinationConfig]) -> String {
+    static func fingerprint(parent: String, title: String, blocks: [DestinationConfig]) -> String {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
         let data = (try? encoder.encode(blocks)) ?? Data()
         var hash: UInt64 = 14_695_981_039_346_656_037
-        for byte in Data(title.utf8) + data {
+        for byte in Data(parent.utf8) + Data(title.utf8) + data {
             hash ^= UInt64(byte)
             hash &*= 1_099_511_628_211
         }
@@ -215,7 +229,7 @@ public struct NotionDestination: DeliveryDestinationSettings, Codable, Sendable,
     static func retryDelay(_ result: HTTPResult, now: Date = Date()) -> Double {
         let seconds: Double
         if let header = result.headers["retry-after"]?.trimmingCharacters(in: .whitespaces) {
-            if let number = Double(header) {
+            if let number = Double(header), number.isFinite {
                 seconds = number
             } else if let date = Self.httpDate(header) {
                 seconds = date.timeIntervalSince(now)
@@ -239,7 +253,7 @@ public struct NotionDestination: DeliveryDestinationSettings, Codable, Sendable,
     private func ensureSuccess(_ result: HTTPResult) throws {
         guard !result.isSuccess else { return }
         let message = (try? JSONDecoder().decode(ErrorBody.self, from: result.body))?.message ?? ""
-        throw DeliveryError.httpStatus(name, result.status, String(message.prefix(200)))
+        throw DeliveryError.http(name, result.status, detail: String(message.prefix(200)))
     }
 
     private struct CreatedPage: Decodable {

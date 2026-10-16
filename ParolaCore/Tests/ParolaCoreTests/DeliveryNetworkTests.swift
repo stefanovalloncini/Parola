@@ -105,6 +105,7 @@ struct DeliveryNetworkTests {
         ("http://nas.lan/hook", true),
         ("http://box.home.arpa/hook", true),
         ("http://123/hook", false),
+        ("http://99999999999/hook", false),
         ("ftp://example.com/hook", false),
         ("example.com/hook", false),
         ("", false),
@@ -286,9 +287,11 @@ struct DeliveryNetworkTests {
     @Test("one character longer than the limit is split by scalar without an empty run")
     func giantGrapheme() {
         let giant = "e" + String(repeating: "\u{301}", count: 2100)
-        let chunks = NotionBlocks.chunks("start " + giant)
-        #expect(chunks.allSatisfy { $0.utf16.count <= 2000 && !$0.isEmpty })
-        #expect(chunks.joined() == "start " + giant)
+        for text in ["start " + giant, giant, giant + " end"] {
+            let chunks = NotionBlocks.chunks(text)
+            #expect(chunks.allSatisfy { $0.utf16.count <= 2000 && !$0.isEmpty })
+            #expect(chunks.joined() == text)
+        }
     }
 
     @Test("a long summary paragraph splits into runs of at most 2000 characters")
@@ -374,7 +377,8 @@ struct DeliveryNetworkTests {
     }
 
     @Test("the Retry-After wait", arguments: [
-        ("7", 7.0), ("0", 1.0), ("600", 60.0), ("2.5", 2.5), ("soon", 1.0), ("-3", 1.0),
+        ("7", 7.0), ("0", 1.0), ("600", 60.0), ("2.5", 2.5), ("soon", 1.0), ("-3", 1.0), ("-1", 1.0),
+        ("nan", 1.0), ("NaN", 1.0), ("inf", 1.0), ("-inf", 1.0), ("1e400", 1.0),
     ])
     func retryAfterSeconds(header: String, expected: Double) {
         let result = HTTPResult(status: 429, headers: ["retry-after": header])
@@ -703,18 +707,40 @@ struct DeliveryNetworkTests {
 
     // MARK: - Trust, redirects and secrets
 
-    @Test("the certificate decision follows the challenge kind and the host", arguments: [
-        (NSURLAuthenticationMethodServerTrust, "127.0.0.1", false, LoopbackTrust.Decision.acceptCertificate),
-        (NSURLAuthenticationMethodServerTrust, "localhost", false, .acceptCertificate),
-        (NSURLAuthenticationMethodServerTrust, "::1", false, .acceptCertificate),
-        (NSURLAuthenticationMethodServerTrust, "192.168.1.5", false, .defaultHandling),
-        (NSURLAuthenticationMethodServerTrust, "example.com", false, .defaultHandling),
-        (NSURLAuthenticationMethodServerTrust, "example.com", true, .defaultHandling),
-        (NSURLAuthenticationMethodClientCertificate, "127.0.0.1", false, .defaultHandling),
-        (NSURLAuthenticationMethodHTTPBasic, "127.0.0.1", true, .defaultHandling),
+    @Test("the certificate decision follows the session, the challenge kind and the host", arguments: [
+        (TransportTrust.loopbackSelfSigned, NSURLAuthenticationMethodServerTrust, "127.0.0.1", false, LoopbackTrust.Decision.acceptCertificate),
+        (.loopbackSelfSigned, NSURLAuthenticationMethodServerTrust, "localhost", false, .acceptCertificate),
+        (.loopbackSelfSigned, NSURLAuthenticationMethodServerTrust, "::1", false, .acceptCertificate),
+        (.loopbackSelfSigned, NSURLAuthenticationMethodServerTrust, "192.168.1.5", false, .defaultHandling),
+        (.loopbackSelfSigned, NSURLAuthenticationMethodServerTrust, "example.com", false, .defaultHandling),
+        (.loopbackSelfSigned, NSURLAuthenticationMethodServerTrust, "example.com", true, .defaultHandling),
+        (.loopbackSelfSigned, NSURLAuthenticationMethodClientCertificate, "127.0.0.1", false, .defaultHandling),
+        (.loopbackSelfSigned, NSURLAuthenticationMethodHTTPBasic, "127.0.0.1", true, .defaultHandling),
+        (.system, NSURLAuthenticationMethodServerTrust, "127.0.0.1", false, .defaultHandling),
+        (.system, NSURLAuthenticationMethodServerTrust, "localhost", false, .defaultHandling),
     ])
-    func trustDecision(method: String, host: String, systemTrust: Bool, expected: LoopbackTrust.Decision) {
-        #expect(LoopbackTrust.decision(authenticationMethod: method, host: host, systemTrustPassed: systemTrust) == expected)
+    func trustDecision(trust: TransportTrust, method: String, host: String, systemTrust: Bool, expected: LoopbackTrust.Decision) {
+        #expect(LoopbackTrust.decision(trust: trust, authenticationMethod: method, host: host, systemTrustPassed: systemTrust) == expected)
+    }
+
+    @Test("the session delegate refuses a cross-origin redirect and follows a same-origin one", arguments: [
+        (TransportTrust.system, "https://hooks.example.com/a", "https://other.example.com/a", false),
+        (.loopbackSelfSigned, "https://127.0.0.1:9/a", "https://localhost:9/a", false),
+        (.system, "https://hooks.example.com/a", "https://hooks.example.com/b", true),
+        (.system, "https://hooks.example.com/a", "https://hooks.example.com:443/b", true),
+    ])
+    func delegateRedirects(trust: TransportTrust, from: String, to: String, followed: Bool) async throws {
+        let delegate = DeliverySessionDelegate(trust: trust)
+        let fromURL = try #require(URL(string: from))
+        let toURL = try #require(URL(string: to))
+        let task = URLSession.shared.dataTask(with: fromURL)
+        let response = try #require(HTTPURLResponse(url: fromURL, statusCode: 307, httpVersion: nil, headerFields: nil))
+        let target = URLRequest(url: toURL)
+
+        let result = await delegate.urlSession(URLSession.shared, task: task, willPerformHTTPRedirection: response, newRequest: target)
+
+        #expect((result != nil) == followed)
+        task.cancel()
     }
 
     @Test("a redirect is followed only to the same scheme, host and port", arguments: [
@@ -724,6 +750,11 @@ struct DeliveryNetworkTests {
         ("https://hooks.example.com/a", "http://hooks.example.com/a", false),
         ("https://hooks.example.com/a", "https://hooks.example.com:8443/a", false),
         ("http://127.0.0.1:9/a", "http://localhost:9/a", false),
+        ("https://hooks.example.com/", "https://hooks.example.com:443/x", true),
+        ("http://hooks.example.com/", "http://hooks.example.com:80/x", true),
+        ("https://hooks.example.com:443/", "https://hooks.example.com/x", true),
+        ("https://hooks.example.com/", "https://hooks.example.com:8443/x", false),
+        ("http://hooks.example.com/", "https://hooks.example.com:80/x", false),
     ])
     func redirects(from: String, to: String, allowed: Bool) {
         #expect(RedirectPolicy.allows(from: URL(string: from), to: URL(string: to)) == allowed)
@@ -791,7 +822,7 @@ struct DeliveryNetworkTests {
     @Test("which failures are permanent", arguments: [
         (DeliveryError.httpStatus("Z", 400, ""), true), (.httpStatus("Z", 401, ""), true), (.httpStatus("Z", 403, ""), true),
         (.httpStatus("Z", 404, ""), true), (.httpStatus("Z", 410, ""), true), (.httpStatus("Z", 422, ""), true),
-        (.httpStatus("Z", 307, ""), true),
+        (.httpStatus("Z", 307, ""), true), (.redirected("Z", status: 307), true), (.pageNotReturned("Notes"), true),
         (.httpStatus("Z", 408, ""), false), (.httpStatus("Z", 429, ""), false), (.httpStatus("Z", 500, ""), false),
         (.httpStatus("Z", 503, ""), false),
         (.networkFailed("h", .timedOut), false), (.writeFailed("p", "r"), false),
@@ -917,6 +948,165 @@ struct DeliveryNetworkTests {
         let requests = await transport.requests
         #expect(requests.first?.httpMethod == "POST")
         #expect(requests.first?.url?.path == "/v1/pages")
+    }
+
+    private func partialToken(
+        _ destination: NotionDestination, payload: DeliveryPayload
+    ) async throws -> String {
+        do {
+            _ = try await destination.deliver(payload)
+        } catch let error as DeliveryError {
+            if case .partialDelivery(_, _, _, _, let resume) = error { return resume }
+        }
+        throw DeliveryError.pageNotReturned("no partial delivery happened")
+    }
+
+    @Test("a resume aimed at a trashed page starts a new one in the same attempt", arguments: [
+        (404, ""), (400, "Can't edit block that is archived. You must unarchive the block before editing."),
+    ])
+    func resumeOntoTrashedPage(status: Int, message: String) async throws {
+        let transport = StubTransport(script: [
+            .success(NetworkTestRig.json(["id": "page-1"])),
+            .success(HTTPResult(status: 500)),
+            .success(NetworkTestRig.json(["message": message], status: status)),
+            .success(NetworkTestRig.json(["id": "page-2", "url": "https://www.notion.so/page-2"])),
+        ])
+        let (destination, _) = notion(environment: NetworkTestRig.environment(transport: transport))
+        let payload = NetworkTestRig.manySegmentsPayload(paragraphs: 150)
+        let token = try await partialToken(destination, payload: payload)
+
+        let receipt = try await destination.deliver(payload, resume: token)
+
+        let requests = await transport.requests
+        #expect(requests.map(\.httpMethod) == ["POST", "PATCH", "PATCH", "POST", "PATCH"])
+        #expect(requests.map { $0.url?.path } == [
+            "/v1/pages", "/v1/blocks/page-1/children", "/v1/blocks/page-1/children",
+            "/v1/pages", "/v1/blocks/page-2/children",
+        ])
+        #expect(receipt.location?.absoluteString == "https://www.notion.so/page-2")
+    }
+
+    @Test("when the new page fails too, the failure follows the permanence table")
+    func resumeOntoTrashedPageThenRefused() async throws {
+        let transport = StubTransport(script: [
+            .success(NetworkTestRig.json(["id": "page-1"])),
+            .success(HTTPResult(status: 500)),
+            .success(HTTPResult(status: 404)),
+            .success(HTTPResult(status: 404)),
+        ])
+        let (destination, _) = notion(environment: NetworkTestRig.environment(transport: transport))
+        let payload = NetworkTestRig.manySegmentsPayload(paragraphs: 150)
+        let token = try await partialToken(destination, payload: payload)
+
+        do {
+            _ = try await destination.deliver(payload, resume: token)
+            Issue.record("expected a failure")
+        } catch let error as DeliveryError {
+            #expect(error == .httpStatus("Notes", 404, ""))
+            #expect(error.isPermanent)
+        }
+        #expect(await transport.requests.count == 4, "one new page was tried, once")
+    }
+
+    @Test("other refusals of a resumed append are not read as a trashed page")
+    func resumeOtherFailureStaysPartial() async throws {
+        let transport = StubTransport(script: [
+            .success(NetworkTestRig.json(["id": "page-1"])),
+            .success(HTTPResult(status: 500)),
+            .success(NetworkTestRig.json(["message": "Body failed validation"], status: 400)),
+        ])
+        let (destination, _) = notion(environment: NetworkTestRig.environment(transport: transport))
+        let payload = NetworkTestRig.manySegmentsPayload(paragraphs: 150)
+        let token = try await partialToken(destination, payload: payload)
+
+        do {
+            _ = try await destination.deliver(payload, resume: token)
+            Issue.record("expected a failure")
+        } catch let error as DeliveryError {
+            guard case .partialDelivery = error else {
+                Issue.record("wrong error \(error)")
+                return
+            }
+        }
+        #expect(await transport.requests.count == 3)
+    }
+
+    @Test("moving the destination to another parent page starts a new page")
+    func resumeFingerprintCoversParent() async throws {
+        let transport = StubTransport(script: [
+            .success(NetworkTestRig.json(["id": "page-1"])),
+            .success(HTTPResult(status: 500)),
+        ], fallback: NetworkTestRig.json(["id": "page-2"]))
+        let (destination, _) = notion(environment: NetworkTestRig.environment(transport: transport))
+        let payload = NetworkTestRig.manySegmentsPayload(paragraphs: 150)
+        let token = try await partialToken(destination, payload: payload)
+        var moved = destination
+        moved.parentPageID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+
+        _ = try await moved.deliver(payload, resume: token)
+
+        let all = await transport.requests
+        let third = try #require(all.dropFirst(2).first)
+        #expect(third.httpMethod == "POST")
+        #expect(NetworkTestRig.object(third)["parent"] as? [String: String] == ["page_id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"])
+    }
+
+    @Test("an answer with no page in it stops the delivery instead of risking a second page")
+    func pageNotReturned() async throws {
+        let transport = StubTransport(script: [.success(NetworkTestRig.json(["object": "page"]))])
+        let (destination, _) = notion(environment: NetworkTestRig.environment(transport: transport))
+
+        await #expect(throws: DeliveryError.pageNotReturned("Notes")) {
+            try await destination.deliver(NetworkTestRig.manySegmentsPayload(paragraphs: 3))
+        }
+    }
+
+    @Test("a redirect the policy refused is reported as a moved address and not retried", .logFacade)
+    func refusedRedirect() async throws {
+        let transport = StubTransport(script: [.success(HTTPResult(status: 307, headers: ["location": "https://elsewhere.example/hook"]))])
+        let destination = AnyDestination.webhook(webhook(environment: NetworkTestRig.environment(transport: transport)))
+        let directory = tempDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let engine = engine(for: destination, directory: directory)
+
+        let outcome = await engine.send(entryID: "entry-1", to: destination.id)
+
+        #expect(outcome == .skipped(reason: .rejected("Zap", .redirected("Zap", status: 307))))
+        #expect(DeliverySkipReason.rejected("Zap", .redirected("Zap", status: 307)).message
+            == "Zap has moved to another address (HTTP 307). Update its address in Send To settings.")
+        #expect(await engine.pending().isEmpty)
+    }
+
+    @Test("a failure that is not a partial one keeps the page the queue already holds", .logFacade)
+    func laterFailureKeepsResume() async throws {
+        let variant = PayloadVariant()
+        let transport = StubTransport(script: [
+            .success(NetworkTestRig.json(["id": "page-1"])),
+            .success(HTTPResult(status: 500)),
+            .success(HTTPResult(status: 500)),
+        ])
+        let (destination, _) = notion(environment: NetworkTestRig.environment(transport: transport))
+        let stored = AnyDestination.notion(destination)
+        let directory = tempDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let engine = DeliveryEngine(
+            destinations: { [stored] },
+            payload: { id in
+                var payload = NetworkTestRig.manySegmentsPayload(paragraphs: await variant.paragraphs)
+                payload.entryID = id
+                return payload
+            },
+            store: DeliveryQueueStore(directory: directory),
+            clock: TestClock()
+        )
+
+        _ = await engine.send(entryID: "entry-1", to: stored.id)
+        let pending = await engine.pending()
+        let held = try #require(pending.first?.resume)
+        await variant.set(120)
+        _ = await engine.send(entryID: "entry-1", to: stored.id)
+
+        #expect(await engine.pending().first?.resume == held, "the second attempt failed creating a page, so the first page is still the one to finish")
     }
 
     @Test("a send cancelled partway keeps its progress for the retry", .logFacade)

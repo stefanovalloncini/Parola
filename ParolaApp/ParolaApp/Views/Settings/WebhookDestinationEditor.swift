@@ -7,7 +7,7 @@ struct WebhookDestinationEditor: View {
     @State private var headerValues: [UUID: String] = [:]
     @State private var saveError: String?
     @State private var saving = false
-    @State private var savedRefs: Set<String> = []
+    @State private var savedRefs: Set<String>?
     let isNew: Bool
     let onSave: (WebhookDestination) -> Void
     let onCancel: () -> Void
@@ -175,11 +175,11 @@ struct WebhookDestinationEditor: View {
     }
 
     private var headersProblem: String? {
-        if namedHeaders.count != draft.headers.count { return String(localized: "Every header needs a name.") }
-        let missingValue = namedHeaders.contains { header in
-            (headerValues[header.id] ?? "").isEmpty && !savedRefs.contains(header.secretRef)
+        switch WebhookHeaderValidation.problem(headers: draft.headers, typed: headerValues, saved: savedRefs) {
+        case .blankName: return String(localized: "Every header needs a name.")
+        case .missingValue: return String(localized: "Add a value for each header.")
+        case nil: return nil
         }
-        return missingValue ? String(localized: "Add a value for each header.") : nil
     }
 
     private var unsavedSecrets: [String: String] {
@@ -232,5 +232,22 @@ private struct HeaderValueField: View {
             .textFieldStyle(.roundedBorder)
             .axLeaf("SendTo.SecureField.HeaderValue.\(header.id.uuidString)")
             .task(id: header.secretRef) { isSaved = await model.hasSavedSecret(header.secretRef) }
+    }
+}
+
+/// What stops a webhook's headers from being saved. `saved` is nil until the Keychain lookup has answered,
+/// and a missing value is not reported before then.
+enum WebhookHeaderValidation {
+    enum Problem: Equatable {
+        case blankName
+        case missingValue
+    }
+
+    static func problem(headers: [WebhookHeader], typed: [UUID: String], saved: Set<String>?) -> Problem? {
+        let named = headers.filter { !$0.name.trimmingCharacters(in: .whitespaces).isEmpty }
+        if named.count != headers.count { return .blankName }
+        guard let saved else { return nil }
+        let missing = named.contains { (typed[$0.id] ?? "").isEmpty && !saved.contains($0.secretRef) }
+        return missing ? .missingValue : nil
     }
 }

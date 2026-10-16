@@ -122,6 +122,17 @@
         }
       }
     },
+    "%@ didn't send back the new page, so Parola stopped rather than make a second one.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ non ha restituito la nuova pagina, quindi Parola si è fermata per non crearne una seconda."
+          }
+        }
+      }
+    },
     "%@ got %lld of %lld blocks before it failed, and the page stays there. %@": {
       "extractionState": "manual",
       "localizations": {
@@ -129,6 +140,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@ ha ricevuto %lld blocchi su %lld prima di fallire, e la pagina resta lì. %@"
+          }
+        }
+      }
+    },
+    "%@ has moved to another address (HTTP %lld). Update its address in Send To settings.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ si è spostato a un altro indirizzo (HTTP %lld). Aggiorna l'indirizzo nelle impostazioni di Invia a."
           }
         }
       }

@@ -169,14 +169,23 @@ public enum DeliveryError: Error, LocalizedError, Equatable {
     case networkFailed(String, NetworkFailure)
     case missingSecret(String)
     case invalidSetup(String, SetupProblem)
+    /// The server pointed somewhere else, and Parola does not follow a redirect to another origin.
+    case redirected(String, status: Int)
+    /// Notion took the page but its answer did not say which one, so a retry could make a second.
+    case pageNotReturned(String)
     /// Some of a page went out and the rest did not. `resume` lets the next attempt carry on from there.
     indirect case partialDelivery(String, sent: Int, total: Int, underlying: DeliveryError, resume: String)
+
+    /// The error for a response that is not a success: a refused redirect or a status.
+    static func http(_ name: String, _ status: Int, detail: String = "") -> DeliveryError {
+        (300..<400).contains(status) ? .redirected(name, status: status) : .httpStatus(name, status, detail)
+    }
 
     /// A failure that sending again cannot fix: the server refused the request, or the settings are wrong.
     public var isPermanent: Bool {
         switch self {
         case .httpStatus(_, let status, _): return [400, 401, 403, 404, 410, 422].contains(status) || (300..<400).contains(status)
-        case .invalidSetup, .missingSecret: return true
+        case .invalidSetup, .missingSecret, .redirected, .pageNotReturned: return true
         case .partialDelivery(_, _, _, let underlying, _): return underlying.isPermanent
         case .vaultUnavailable, .writeFailed, .networkFailed: return false
         }
@@ -203,6 +212,10 @@ public enum DeliveryError: Error, LocalizedError, Equatable {
             return "\(name) has no saved key. Enter it again in Send To settings."
         case .invalidSetup(let name, let problem):
             return "\(name) isn't set up correctly. \(problem.message)"
+        case .redirected(let name, let status):
+            return "\(name) has moved to another address (HTTP \(status)). Update its address in Send To settings."
+        case .pageNotReturned(let name):
+            return "\(name) didn't send back the new page, so Parola stopped rather than make a second one."
         case .partialDelivery(let name, let sent, let total, let underlying, _):
             return "\(name) got \(sent) of \(total) blocks before it failed, and the page stays there. \(underlying.localizedDescription)"
         }

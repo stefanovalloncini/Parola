@@ -134,7 +134,7 @@ public struct WebhookDestination: DeliveryDestinationSettings, Codable, Sendable
     public func deliver(_ payload: DeliveryPayload) async throws -> DeliveryReceipt {
         let result = try await post(payload)
         guard result.isSuccess else {
-            throw DeliveryError.httpStatus(name, result.status, "")
+            throw DeliveryError.http(name, result.status)
         }
         return DeliveryReceipt(destinationID: id, destinationName: name, deliveredAt: Date(), location: nil)
     }

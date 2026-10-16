@@ -107,3 +107,8 @@ extension DeliveryOutcome {
         return nextAt
     }
 }
+
+actor PayloadVariant {
+    private(set) var paragraphs = 150
+    func set(_ value: Int) { paragraphs = value }
+}

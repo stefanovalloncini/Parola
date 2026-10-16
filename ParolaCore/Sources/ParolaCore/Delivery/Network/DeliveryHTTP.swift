@@ -81,8 +81,10 @@ public enum LoopbackTrust {
 
     /// What a session set to `.loopbackSelfSigned` does with an authentication challenge. A certificate
     /// without a trusted chain is accepted only for a server trust challenge from a loopback host.
-    public static func decision(authenticationMethod: String, host: String, systemTrustPassed: @autoclosure () -> Bool) -> Decision {
-        guard authenticationMethod == NSURLAuthenticationMethodServerTrust, isLoopback(host: host) else {
+    public static func decision(
+        trust: TransportTrust, authenticationMethod: String, host: String, systemTrustPassed: @autoclosure () -> Bool
+    ) -> Decision {
+        guard trust == .loopbackSelfSigned, authenticationMethod == NSURLAuthenticationMethodServerTrust, isLoopback(host: host) else {
             return .defaultHandling
         }
         return accepts(host: host, systemTrustPassed: systemTrustPassed()) ? .acceptCertificate : .defaultHandling
@@ -96,7 +98,11 @@ public enum RedirectPolicy {
         guard let original, let target else { return false }
         return original.scheme?.lowercased() == target.scheme?.lowercased()
             && original.host?.lowercased() == target.host?.lowercased()
-            && original.port == target.port
+            && effectivePort(original) == effectivePort(target)
+    }
+
+    private static func effectivePort(_ url: URL) -> Int? {
+        url.port ?? (url.scheme?.lowercased() == "https" ? 443 : url.scheme?.lowercased() == "http" ? 80 : nil)
     }
 }
 
@@ -112,8 +118,9 @@ final class DeliverySessionDelegate: NSObject, URLSessionTaskDelegate, Sendable 
         didReceive challenge: URLAuthenticationChallenge
     ) async -> (URLSession.AuthChallengeDisposition, URLCredential?) {
         let space = challenge.protectionSpace
-        guard trust == .loopbackSelfSigned, let serverTrust = space.serverTrust else { return (.performDefaultHandling, nil) }
+        guard let serverTrust = space.serverTrust else { return (.performDefaultHandling, nil) }
         let decision = LoopbackTrust.decision(
+            trust: trust,
             authenticationMethod: space.authenticationMethod,
             host: space.host,
             systemTrustPassed: SecTrustEvaluateWithError(serverTrust, nil)

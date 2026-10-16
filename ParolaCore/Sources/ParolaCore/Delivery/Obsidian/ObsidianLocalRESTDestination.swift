@@ -153,7 +153,7 @@ public struct ObsidianLocalRESTDestination: DeliveryDestinationSettings, Codable
         request.setValue("text/markdown", forHTTPHeaderField: "Content-Type")
         request.httpBody = Data(note.utf8)
         let result = try await environment.perform(request, trust: trust(for: base), destination: name)
-        guard result.isSuccess else { throw DeliveryError.httpStatus(name, result.status, "") }
+        guard result.isSuccess else { throw DeliveryError.http(name, result.status) }
         return DeliveryReceipt(destinationID: id, destinationName: name, deliveredAt: Date(), location: nil)
     }
 
@@ -163,7 +163,7 @@ public struct ObsidianLocalRESTDestination: DeliveryDestinationSettings, Codable
         let request = try makeRequest("GET", path: "/", base: base, key: key)
         let result = try await environment.perform(request, trust: trust(for: base), destination: name)
         if result.status == 401 || result.status == 403 { return .unauthorised }
-        guard result.isSuccess else { throw DeliveryError.httpStatus(name, result.status, "") }
+        guard result.isSuccess else { throw DeliveryError.http(name, result.status) }
         let status = try? JSONDecoder().decode(ServerStatus.self, from: result.body)
         return status?.authenticated == false ? .unauthorised : .connected(nil)
     }
@@ -193,7 +193,7 @@ public struct ObsidianLocalRESTDestination: DeliveryDestinationSettings, Codable
             let probe = try makeRequest("GET", path: Self.vaultPath(folder: folder, filename: candidate), base: base, key: key)
             let result = try await environment.perform(probe, trust: trust(for: base), destination: name)
             if result.status == 404 { return candidate }
-            guard result.isSuccess else { throw DeliveryError.httpStatus(name, result.status, "") }
+            guard result.isSuccess else { throw DeliveryError.http(name, result.status) }
         }
         return "\(stem) \(UUID().uuidString).md"
     }
