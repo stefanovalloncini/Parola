@@ -7,11 +7,21 @@ struct WatchedFolder: Codable, Identifiable, Hashable {
     let id: UUID
     let bookmark: Data
     let displayPath: String
+    var options: WatchedFolderOptions
 
-    init(id: UUID = UUID(), bookmark: Data, displayPath: String) {
+    init(id: UUID = UUID(), bookmark: Data, displayPath: String, options: WatchedFolderOptions = .default) {
         self.id = id
         self.bookmark = bookmark
         self.displayPath = displayPath
+        self.options = options
+    }
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        bookmark = try container.decode(Data.self, forKey: .bookmark)
+        displayPath = try container.decode(String.self, forKey: .displayPath)
+        options = try container.decodeIfPresent(WatchedFolderOptions.self, forKey: .options) ?? .default
     }
 
     var displayName: String { (displayPath as NSString).lastPathComponent }
@@ -22,6 +32,7 @@ struct WatchedFolder: Codable, Identifiable, Hashable {
 final class WatchedFoldersStore {
     private(set) var folders: [WatchedFolder] = []
     private(set) var lastError: String?
+    var optionsSheetFolderID: UUID?
     /// Missing, trashed, unmounted or unreadable; tried again when a volume mounts and when the Mac wakes.
     private(set) var unavailableFolderIDs: Set<UUID> = []
     @ObservationIgnored private var watchers: [UUID: FolderWatcher] = [:]
@@ -39,6 +50,7 @@ final class WatchedFoldersStore {
     @ObservationIgnored private let baselineWriteDelay: Duration
     @ObservationIgnored private let baselineMaxWait: Duration
     @ObservationIgnored private let onNewMediaFile: @MainActor (URL) -> Void
+    @ObservationIgnored private let picker: any FilePicker
     /// Called each time a folder's watch starts, so files waiting on an unreachable folder can go.
     @ObservationIgnored var onFolderWatching: (@MainActor () -> Void)?
 
@@ -49,8 +61,10 @@ final class WatchedFoldersStore {
         watcherOptions: FolderWatcher.Options = FolderWatcher.Options(),
         baselineWriteDelay: Duration = .seconds(2),
         baselineMaxWait: Duration = .seconds(10),
+        picker: any FilePicker = SystemFilePicker(),
         onNewMediaFile: @escaping @MainActor (URL) -> Void
     ) {
+        self.picker = picker
         self.defaults = defaults
         self.baselines = WatchedFolderBaselines(directory: baselineDirectory)
         self.watcherOptions = watcherOptions
@@ -71,12 +85,12 @@ final class WatchedFoldersStore {
     }
 
     func presentAddFolderPanel() {
-        let panel = NSOpenPanel()
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = false
-        panel.allowsMultipleSelection = false
-        panel.message = String(localized: "Choose a folder to watch for new audio and video files.")
-        guard panel.runModal() == .OK, let url = panel.url else { return }
+        Task { await addFolderFromPanel() }
+    }
+
+    func addFolderFromPanel() async {
+        let message = String(localized: "Choose a folder to watch for new audio and video files.")
+        guard let url = await picker.chooseFolder(message: message) else { return }
         // The panel can still hand back a file via the go-to-folder field despite canChooseFiles=false.
         guard url.hasDirectoryPath else {
             lastError = "\(url.lastPathComponent) isn't a folder."
@@ -111,14 +125,14 @@ final class WatchedFoldersStore {
     }
 
     func reattach(_ id: UUID) {
+        Task { await reattachFromPanel(id) }
+    }
+
+    func reattachFromPanel(_ id: UUID) async {
         guard let folder = folders.first(where: { $0.id == id }) else { return }
-        let panel = NSOpenPanel()
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = false
-        panel.allowsMultipleSelection = false
-        panel.directoryURL = URL(fileURLWithPath: folder.displayPath)
-        panel.message = String(localized: "Pick \(folder.displayName) again to refresh permissions.")
-        guard panel.runModal() == .OK, let url = panel.url else { return }
+        let message = String(localized: "Pick \(folder.displayName) again to refresh permissions.")
+        let start = URL(fileURLWithPath: folder.displayPath)
+        guard let url = await picker.chooseFolder(message: message, startingAt: start) else { return }
         adopt(url, for: id)
     }
 
@@ -131,7 +145,7 @@ final class WatchedFoldersStore {
                 includingResourceValuesForKeys: nil,
                 relativeTo: nil
             )
-            let refreshed = WatchedFolder(id: folder.id, bookmark: bookmark, displayPath: url.path)
+            let refreshed = WatchedFolder(id: folder.id, bookmark: bookmark, displayPath: url.path, options: folder.options)
             if let idx = folders.firstIndex(where: { $0.id == folder.id }) {
                 folders[idx] = refreshed
             }
@@ -152,6 +166,42 @@ final class WatchedFoldersStore {
         } catch {
             lastError = String(localized: "Couldn't refresh \(url.path): \(error.localizedDescription)")
         }
+    }
+
+    func options(for id: UUID) -> WatchedFolderOptions {
+        folders.first { $0.id == id }?.options ?? .default
+    }
+
+    /// A change of depth restarts that folder's watcher alone; a file already in a subfolder it now reaches counts as seen.
+    func setOptions(_ options: WatchedFolderOptions, for id: UUID) {
+        guard let index = folders.firstIndex(where: { $0.id == id }) else { return }
+        let normalized = options.normalized
+        let previous = folders[index].options
+        guard normalized != previous else { return }
+        folders[index].options = normalized
+        save()
+        guard normalized.includesSubfolders != previous.includesSubfolders else { return }
+        restartWatcher(for: folders[index], widening: normalized.includesSubfolders)
+    }
+
+    /// A deleted preset leaves every folder's list.
+    func removeExportPreset(_ presetID: UUID) {
+        for index in folders.indices where folders[index].options.exportPresetIDs.contains(presetID) {
+            var options = folders[index].options
+            options.exportPresetIDs.removeAll { $0 == presetID }
+            folders[index].options = options.normalized
+        }
+        save()
+    }
+
+    private func restartWatcher(for folder: WatchedFolder, widening: Bool) {
+        cancelBaselineWrite(folder.id)
+        startWatcher(
+            for: folder,
+            replacing: watchers.removeValue(forKey: folder.id),
+            releasing: scopedURLs.removeValue(forKey: folder.id),
+            widening: widening
+        )
     }
 
     func isUnavailable(_ id: UUID) -> Bool {
@@ -200,19 +250,28 @@ final class WatchedFoldersStore {
             forget(id)
         }
         baselines.removeAll(except: kept)
-        for folder in folders where previous[folder.id] != folder {
+        for folder in folders where Self.needsRestart(from: previous[folder.id], to: folder) {
             let samePath = previous[folder.id]?.displayPath == folder.displayPath
             cancelBaselineWrite(folder.id)
             if !samePath {
                 baselines.remove(folder.id)
             }
+            let widening = samePath && folder.options.includesSubfolders && previous[folder.id]?.options.includesSubfolders == false
             startWatcher(
                 for: folder,
                 replacing: watchers.removeValue(forKey: folder.id),
                 releasing: scopedURLs.removeValue(forKey: folder.id),
-                carriesBaseline: samePath
+                carriesBaseline: samePath,
+                widening: widening
             )
         }
+    }
+
+    /// Every option but the depth is read when a file arrives, so only a depth change restarts a watcher.
+    private static func needsRestart(from old: WatchedFolder?, to new: WatchedFolder) -> Bool {
+        guard let old else { return true }
+        return old.bookmark != new.bookmark || old.displayPath != new.displayPath
+            || old.options.includesSubfolders != new.options.includesSubfolders
     }
 
     private func forget(_ id: UUID) {
@@ -263,7 +322,8 @@ final class WatchedFoldersStore {
         replacing previous: FolderWatcher? = nil,
         releasing previousScope: URL? = nil,
         carriesBaseline: Bool = true,
-        mounting: Bool = true
+        mounting: Bool = true,
+        widening: Bool = false
     ) {
         let id = folder.id
         let start = UUID()
@@ -308,9 +368,11 @@ final class WatchedFoldersStore {
             self.follow(current, to: resolved)
 
             let handler = self.onNewMediaFile
+            var watching = self.watcherOptions
+            watching.recursive = current.options.includesSubfolders
             let watcher = FolderWatcher(
                 folderURL: resolved.url,
-                options: self.watcherOptions,
+                options: watching,
                 onBaselineChange: { [weak self] in
                     Task { @MainActor in self?.scheduleBaselineWrite(for: id) }
                 },
@@ -323,7 +385,7 @@ final class WatchedFoldersStore {
             )
             self.watchers[id] = watcher
             self.scopedURLs[id] = resolved.url
-            await watcher.start(baseline: baseline)
+            await watcher.start(baseline: baseline, countsSubfolderFilesAsSeen: widening)
             guard self.watchers[id] === watcher else { return }
             if await watcher.state == .unavailable {
                 self.watchers[id] = nil
@@ -343,7 +405,8 @@ final class WatchedFoldersStore {
         let refreshed = WatchedFolder(
             id: folder.id,
             bookmark: resolved.freshBookmark ?? folder.bookmark,
-            displayPath: resolved.movedTo ?? folder.displayPath
+            displayPath: resolved.movedTo ?? folder.displayPath,
+            options: folder.options
         )
         guard let index = folders.firstIndex(where: { $0.id == folder.id }) else { return }
         folders[index] = refreshed

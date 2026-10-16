@@ -132,6 +132,7 @@ extension AppModel {
             rules[index].presetIDs.removeAll { $0 == id }
         }
         if rules != autoExportRules { autoExportRules = rules }
+        watchedFoldersIfWatching?.removeExportPreset(id)
         setExportPresets(exportPresets.filter { $0.id != id })
     }
 

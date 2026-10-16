@@ -383,6 +383,29 @@ final class ParolaAutomationServer {
         "showRecordingStatusItem", "showRecordingPill", "meetingRecordsMicrophone", "readAloudRate", "readAloudVoices",
     ]
 
+    static func watchedFoldersValue(_ model: AppModel) -> AutomationValue {
+        guard let store = model.watchedFoldersIfWatching else { return .array([]) }
+        return .array(store.folders.map { folder in
+            .object([
+                "id": .string(folder.id.uuidString),
+                "path": .string(folder.displayPath),
+                "unavailable": .bool(store.isUnavailable(folder.id)),
+                "options": watchedFolderOptionsValue(folder.options),
+                "summary": folder.options.summary(presets: model.exportPresets).map { .string($0) } ?? .null,
+            ])
+        })
+    }
+
+    static func watchedFolderOptionsValue(_ options: WatchedFolderOptions) -> AutomationValue {
+        .object([
+            "autoTranscribe": .bool(options.autoTranscribes),
+            "includeSubfolders": .bool(options.includesSubfolders),
+            "saveToLibrary": .bool(options.savesToLibrary),
+            "exportPresetIDs": .array(options.exportPresetIDs.map { .string($0.uuidString) }),
+            "exportTo": .string(options.exportsToAutoExportFolder ? "autoExportFolder" : "nextToFile"),
+        ])
+    }
+
     func runScreenshot(requestedFileName: String?) async throws -> AutomationValue {
         let target = try resolveScreenshotPath(requestedFileName)
         return try await captureMainWindow(path: target.path)

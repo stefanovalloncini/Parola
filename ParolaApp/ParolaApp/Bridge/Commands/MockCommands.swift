@@ -330,6 +330,24 @@ extension ParolaAutomationServer {
             ),
 
             AutomationCommand(
+                name: "queueFolderChoice",
+                area: .test,
+                summary: "Queues a folder-panel response for the next Add Folder, Re-Add or Auto-Export folder choice. Test-mode only.",
+                kind: .mutating,
+                args: [
+                    .init(name: "path", kind: .string(), required: true, summary: "Absolute path of the folder the panel returns"),
+                ],
+                handler: { args, ctx in
+                    try requireTestMode(ctx)
+                    guard let picker = ctx.model.filePicker as? TestFilePicker else {
+                        throw AutomationError.precondition("file picker is not a TestFilePicker")
+                    }
+                    await picker.queueFolderResponse(URL(fileURLWithPath: try args.string("path"), isDirectory: true))
+                    return .object(["queued": .bool(true)])
+                }
+            ),
+
+            AutomationCommand(
                 name: "queueSaveDestination",
                 area: .test,
                 summary: "Queues a save-panel response for the next export. Test-mode only.",

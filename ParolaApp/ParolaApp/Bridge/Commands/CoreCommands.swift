@@ -51,6 +51,7 @@ extension ParolaAutomationServer {
                     for key in ParolaAutomationServer.writableSettingKeys.sorted() {
                         out[key] = AutomationValue(d.object(forKey: key))
                     }
+                    out["watchedFolders"] = ParolaAutomationServer.watchedFoldersValue(ctx.model)
                     return .object(out)
                 }
             ),

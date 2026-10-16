@@ -5,9 +5,14 @@ import UniformTypeIdentifiers
 protocol FilePicker: Sendable {
     func chooseInputFiles(allowedTypes: [UTType], allowsMultiple: Bool, message: String?) async -> [URL]
     func chooseSaveDestination(suggestedName: String, allowedTypes: [UTType], message: String?) async -> URL?
+    func chooseFolder(message: String?, startingAt: URL?, canCreateDirectories: Bool, prompt: String?) async -> URL?
 }
 
 extension FilePicker {
+    func chooseFolder(message: String? = nil, startingAt: URL? = nil, canCreateDirectories: Bool = false) async -> URL? {
+        await chooseFolder(message: message, startingAt: startingAt, canCreateDirectories: canCreateDirectories, prompt: nil)
+    }
+
     func chooseInputFiles(allowedTypes: [UTType], allowsMultiple: Bool) async -> [URL] {
         await chooseInputFiles(allowedTypes: allowedTypes, allowsMultiple: allowsMultiple, message: nil)
     }
@@ -38,6 +43,19 @@ final class SystemFilePicker: FilePicker {
         guard panel.runModal() == .OK else { return nil }
         return panel.url
     }
+
+    func chooseFolder(message: String?, startingAt: URL?, canCreateDirectories: Bool, prompt: String?) async -> URL? {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.canCreateDirectories = canCreateDirectories
+        if let message { panel.message = message }
+        if let prompt { panel.prompt = prompt }
+        if let startingAt { panel.directoryURL = startingAt }
+        guard panel.runModal() == .OK else { return nil }
+        return panel.url
+    }
 }
 
 final actor TestFilePicker: FilePicker {
@@ -49,9 +67,11 @@ final actor TestFilePicker: FilePicker {
         let suggestedName: String
         let allowedTypes: [UTType]
     }
+    private var folderResponses: [URL?] = []
 
     func queueInputResponse(_ urls: [URL]) { inputResponses.append(urls) }
     func queueSaveResponse(_ url: URL?) { saveResponses.append(url) }
+    func queueFolderResponse(_ url: URL?) { folderResponses.append(url) }
 
     func chooseInputFiles(allowedTypes: [UTType], allowsMultiple: Bool, message: String?) async -> [URL] {
         guard !inputResponses.isEmpty else { return [] }
@@ -62,5 +82,10 @@ final actor TestFilePicker: FilePicker {
         saveRequests.append(SaveRequest(suggestedName: suggestedName, allowedTypes: allowedTypes))
         guard !saveResponses.isEmpty else { return nil }
         return saveResponses.removeFirst()
+    }
+
+    func chooseFolder(message: String?, startingAt: URL?, canCreateDirectories: Bool, prompt: String?) async -> URL? {
+        guard !folderResponses.isEmpty else { return nil }
+        return folderResponses.removeFirst()
     }
 }

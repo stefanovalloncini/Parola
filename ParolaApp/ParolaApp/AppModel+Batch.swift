@@ -91,7 +91,7 @@ extension AppModel {
             batchPhaseFile = nil
             refreshLibraryOnceBatchAddsLand()
             // The pending wave ends in another .finished, and the batch lets go of the foreground there.
-            let pending = batchJobs.filter { $0.status == .pending }
+            let pending = batchJobs.filter { $0.status == .pending && !heldBatchJobIDs.contains($0.id) }
             if pending.isEmpty {
                 batchTask = nil
                 // One sound for the run that just ended, whatever mix of done and failed it ended with.
@@ -179,7 +179,7 @@ extension AppModel {
     }
 
     private func resumeWaitingBatchJobs() {
-        let remaining = batchJobs.filter { $0.status == .pending }
+        let remaining = batchJobs.filter { $0.status == .pending && !heldBatchJobIDs.contains($0.id) }
         if !remaining.isEmpty { resumeBatch(pendingJobs: remaining) }
     }
 
@@ -337,6 +337,7 @@ extension AppModel {
 
     func resumePendingBatchJobs() {
         guard canResumeBatch else { return }
+        heldBatchJobIDs = []
         runBatchTask(jobs: batchJobs.filter { $0.status == .pending })
     }
 

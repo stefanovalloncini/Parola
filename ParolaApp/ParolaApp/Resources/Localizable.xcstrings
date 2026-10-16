@@ -1573,6 +1573,28 @@
         }
       }
     },
+    "Added %@ to Batch": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ aggiunto a Batch"
+          }
+        }
+      }
+    },
+    "Added %lld files to Batch": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld file aggiunti a Batch"
+          }
+        }
+      }
+    },
     "Address": {
       "extractionState": "manual",
       "localizations": {
@@ -2982,6 +3004,17 @@
         }
       }
     },
+    "Auto-Export Folder": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cartella di esportazione automatica"
+          }
+        }
+      }
+    },
     "Auto-export skipped this transcript: recordings and links save to an auto-export folder, and none is chosen yet. Choose one in Settings › Auto-Export.": {
       "extractionState": "manual",
       "localizations": {
@@ -3011,6 +3044,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Stop automatico dopo"
+          }
+        }
+      }
+    },
+    "Auto-Transcribe": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trascrizione automatica"
           }
         }
       }
@@ -3558,6 +3602,28 @@
         }
       }
     },
+    "Choose an Auto-Export folder in Auto-Export settings.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scegli una cartella di esportazione automatica nelle impostazioni di Esportazione automatica."
+          }
+        }
+      }
+    },
+    "Choose an export format first.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scegli prima un formato di esportazione."
+          }
+        }
+      }
+    },
     "Connected to the Local REST API plugin.": {
       "extractionState": "manual",
       "localizations": {
@@ -3646,6 +3712,61 @@
         }
       }
     },
+    "Export Formats": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Formati di esportazione"
+          }
+        }
+      }
+    },
+    "Export To": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esporta in"
+          }
+        }
+      }
+    },
+    "Exports %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esporta %@"
+          }
+        }
+      }
+    },
+    "Exports %@ to the Auto-Export folder": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esporta %@ nella cartella di esportazione automatica"
+          }
+        }
+      }
+    },
+    "Folder Depth": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Profondità della cartella"
+          }
+        }
+      }
+    },
     "Header values are kept in the Keychain.": {
       "extractionState": "manual",
       "localizations": {
@@ -3679,6 +3800,17 @@
         }
       }
     },
+    "Include Subfolders": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Includi sottocartelle"
+          }
+        }
+      }
+    },
     "Inside the vault. Leave empty to write into the vault root.": {
       "extractionState": "manual",
       "localizations": {
@@ -3697,6 +3829,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Segreto dell'integrazione"
+          }
+        }
+      }
+    },
+    "New Files": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nuovi file"
+          }
+        }
+      }
+    },
+    "Next to the File": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Accanto al file"
           }
         }
       }
@@ -3734,6 +3888,17 @@
         }
       }
     },
+    "Not saved to Library": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non salvato nella libreria"
+          }
+        }
+      }
+    },
     "Notion can't see that page. Open it in Notion, choose the ••• menu, then Connections, and add your integration.": {
       "extractionState": "manual",
       "localizations": {
@@ -3763,6 +3928,61 @@
           "stringUnit": {
             "state": "translated",
             "value": "Obsidian REST"
+          }
+        }
+      }
+    },
+    "Off: new files wait in Batch until you start them.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Disattivata: i nuovi file restano in Batch finché non li avvii."
+          }
+        }
+      }
+    },
+    "Off: the transcript is only exported.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Disattivato: la trascrizione viene solo esportata."
+          }
+        }
+      }
+    },
+    "Only this folder": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Solo questa cartella"
+          }
+        }
+      }
+    },
+    "Options for %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opzioni di %@"
+          }
+        }
+      }
+    },
+    "Options…": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opzioni…"
           }
         }
       }
@@ -17736,6 +17956,28 @@
         }
       }
     },
+    "This Folder Only": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Solo questa cartella"
+          }
+        }
+      }
+    },
+    "Transcribed %@ and exported it": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ trascritto ed esportato"
+          }
+        }
+      }
+    },
     "TSV": {
       "extractionState": "manual",
       "localizations": {
@@ -20473,6 +20715,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "In attesa della voce…"
+          }
+        }
+      }
+    },
+    "Waits in Batch": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Resta in Batch"
           }
         }
       }

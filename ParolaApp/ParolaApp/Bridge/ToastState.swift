@@ -4,7 +4,7 @@ import Foundation
 /// The toasts under the page as `getState` reports them; a button's id names its toast, so a press never reaches a newer one.
 extension ParolaAutomationServer {
     enum ToastButton: String {
-        case summarize, copy, open, stop, retry, reveal, dismiss
+        case summarize, copy, open, openBatch, stop, retry, reveal, dismiss
     }
 
     static func toastActionID(_ toastID: UUID, _ button: ToastButton) -> String {
@@ -19,6 +19,8 @@ extension ParolaAutomationServer {
     static func arrivalButtons(_ notice: ArrivalNotice) -> [ToastButton] {
         switch notice.state {
         case .saved: [.open, .dismiss]
+        case .queued: [.openBatch, .dismiss]
+        case .exported: [.dismiss]
         case .running: [.stop, .dismiss]
         case .paused, .unsaved: [.retry, .dismiss]
         case .failed: [.retry, .reveal, .dismiss]
@@ -65,7 +67,7 @@ extension ParolaAutomationServer {
                 return (true, pasteboard.string(forType: .string))
             case .dismiss:
                 model.dismissTakeSaved()
-            case .open, .stop, .retry, .reveal:
+            case .open, .openBatch, .stop, .retry, .reveal:
                 return (false, nil)
             }
             return (true, nil)
@@ -76,6 +78,7 @@ extension ParolaAutomationServer {
         }
         switch button {
         case .open: model.openArrivalNotice()
+        case .openBatch: model.openBatchFromNotice()
         case .stop: model.stopBackgroundArrival()
         case .retry: model.retryArrivalNotice()
         case .reveal: model.revealFailedArrival()
@@ -94,6 +97,7 @@ extension ParolaAutomationServer {
         case .summarize: String(localized: "Summarize")
         case .copy: String(localized: "Copy")
         case .open: String(localized: "Open")
+        case .openBatch: String(localized: "Open Batch")
         case .stop: String(localized: "Stop")
         case .retry: String(localized: "Retry")
         case .reveal: String(localized: "Reveal")
@@ -108,6 +112,8 @@ extension ParolaAutomationServer {
         case .failed: "failed"
         case .paused: "paused"
         case .unsaved: "unsaved"
+        case .queued: "queued"
+        case .exported: "exported"
         }
     }
 

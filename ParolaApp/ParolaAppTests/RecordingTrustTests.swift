@@ -91,6 +91,7 @@ private actor NameRecordingPicker: FilePicker {
         suggestedNames.append(suggestedName)
         return nil
     }
+    func chooseFolder(message: String?, startingAt: URL?, canCreateDirectories: Bool, prompt: String?) async -> URL? { nil }
 }
 
 /// Every label a Dock badge showed, in order.

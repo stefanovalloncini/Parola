@@ -117,6 +117,10 @@ struct ArrivalNotice: Equatable, Identifiable {
         case paused(String)
         /// Transcribed but not saved: the lane stops with it waiting, like `paused`.
         case unsaved(String)
+        /// Waiting in Batch for the user to start it; the count is the files this one toast stands for.
+        case queued(Int)
+        /// Transcribed and exported by its folder's options, with no library entry to open.
+        case exported
     }
 
     enum Origin: Equatable {
@@ -149,14 +153,14 @@ struct ArrivalNotice: Equatable, Identifiable {
     var reason: String? {
         switch state {
         case .failed(let reason), .paused(let reason), .unsaved(let reason): reason
-        case .running, .saved: nil
+        case .running, .saved, .queued, .exported: nil
         }
     }
 
     /// Only a landing goes after a few seconds: a running file, a stopped lane and a failure stay until something changes.
     var dismissesItself: Bool {
         switch state {
-        case .saved: true
+        case .saved, .queued, .exported: true
         case .running, .paused, .unsaved, .failed: false
         }
     }
@@ -187,7 +191,22 @@ struct ArrivalNotice: Equatable, Identifiable {
         case .saved: savedTitle(bundle: bundle)
         case .failed, .paused: String(localized: "Couldn't transcribe \(name)", bundle: bundle)
         case .unsaved: String(localized: "Couldn't save \(name) to your library", bundle: bundle)
+        case .queued(let count):
+            count == 1
+                ? String(localized: "Added \(name) to Batch", bundle: bundle)
+                : String(localized: "Added \(count) files to Batch", bundle: bundle)
+        case .exported: String(localized: "Transcribed \(name) and exported it", bundle: bundle)
         }
+    }
+
+    init(queued url: URL, count: Int = 1) {
+        name = url.deletingPathExtension().lastPathComponent
+        state = .queued(count)
+    }
+
+    init(exported url: URL) {
+        name = url.deletingPathExtension().lastPathComponent
+        state = .exported
     }
 
     init(failed url: URL, reason: String, folderID: UUID? = nil, folderPath: String? = nil) {
@@ -218,7 +237,9 @@ extension AppModel {
 
     /// Saved to the line before anything reads the file, so a quit during the duplicate check loses nothing.
     func handleWatchedArrival(_ url: URL) {
-        let folder = watchedFoldersIfWatching?.folder(containing: url)
+        let store = watchedFoldersIfWatching
+        let folder = store?.folder(containing: url)
+        if let store, let folder, !store.options(for: folder.id).autoTranscribes, holdWatchedFileInBatch(url) { return }
         enqueueWatchedArrival(WatchedArrival(url: url, folderID: folder?.id, folderPath: folder?.root.path))
     }
 
@@ -233,6 +254,30 @@ extension AppModel {
             watchedArrivals.append(arrival)
         }
         pumpWatchedLane()
+    }
+
+    func watchedOptions(for arrival: WatchedArrival) -> WatchedFolderOptions {
+        guard let id = arrival.folderID, let store = watchedFoldersIfWatching else { return .default }
+        return store.options(for: id)
+    }
+
+    /// A folder that doesn't transcribe by itself hands its new files to Batch as pending jobs; false when Batch is off.
+    private func holdWatchedFileInBatch(_ url: URL) -> Bool {
+        guard features.isEnabled(.batch) else { return false }
+        if batchJobs.contains(where: { $0.url == url && $0.status == .pending }) { return true }
+        let job = BatchJob(url: url)
+        heldBatchJobIDs.insert(job.id)
+        batchJobs.append(job)
+        if selectedBatchJobID == nil { selectedBatchJobID = job.id }
+        var count = 1
+        if case .queued(let earlier) = arrivalNotice?.state { count = earlier + 1 }
+        arrivalNotice = ArrivalNotice(queued: url, count: count)
+        return true
+    }
+
+    func openBatchFromNotice() {
+        arrivalNotice = nil
+        openQueue()
     }
 
     /// Starts the next watched file when the foreground is free: in the window when Parola is idle, out of sight otherwise.
@@ -306,7 +351,7 @@ extension AppModel {
             saveAgain(next, unsaved)
             return
         }
-        if !next.inBackground, arrivalMayTakeWindow {
+        if !next.inBackground, arrivalMayTakeWindow, watchedOptions(for: next).keepsTranscriptInLibrary {
             beginFileTranscription(
                 fileURL: next.url, translateOverride: nil, sourceDigest: next.sourceDigest, arrival: next
             )
@@ -441,7 +486,7 @@ extension AppModel {
     func visibleArrivalLanded(_ arrival: WatchedArrival, landing: RunLanding, saving: Task<LibraryEntry, any Error>) {
         guard visibleArrivalID == arrival.id else { return }
         visibleArrivalID = nil
-        holdUntilSaved(arrival, landing, saving, ringsWhenDry: false, install: derivedArtifactsGeneration)
+        holdUntilSaved(arrival, landing, Task { _ = try await saving.value }, ringsWhenDry: false, install: derivedArtifactsGeneration)
     }
 
     /// The window's run of an arrival finished after the user moved on: it lands like one out of sight.
@@ -450,9 +495,9 @@ extension AppModel {
         visibleArrivalID = nil
         let landing = RunLanding(
             kind: .backgroundArrival, transcript: transcript, audioSource: arrival.url,
-            sourceDigest: arrival.sourceDigest
+            sourceDigest: arrival.sourceDigest, watchedOptions: watchedOptions(for: arrival)
         )
-        holdUntilSaved(arrival, landing, land(landing), ringsWhenDry: true)
+        holdUntilSaved(arrival, landing, landWatched(landing), ringsWhenDry: true)
     }
 
     private func landBackgroundArrival(_ arrival: WatchedArrival, _ transcript: Transcript) {
@@ -461,9 +506,9 @@ extension AppModel {
         runningArrivalNotice = nil
         let landing = RunLanding(
             kind: .backgroundArrival, transcript: transcript, audioSource: arrival.url,
-            sourceDigest: arrival.sourceDigest
+            sourceDigest: arrival.sourceDigest, watchedOptions: watchedOptions(for: arrival)
         )
-        holdUntilSaved(arrival, landing, land(landing), ringsWhenDry: true)
+        holdUntilSaved(arrival, landing, landWatched(landing), ringsWhenDry: true)
         pumpWatchedLane()
     }
 
@@ -471,6 +516,7 @@ extension AppModel {
     /// edits included; anything else lands out of sight.
     private func saveAgain(_ arrival: WatchedArrival, _ unsaved: UnsavedLanding) {
         var landing = unsaved.landing
+        let options = landing.watchedOptions.flatMap { $0.keepsTranscriptInLibrary ? $0 : nil }
         var install: Int?
         if let shown = unsaved.install, shown == derivedArtifactsGeneration, selectedEntryID == nil, let transcript {
             landing = RunLanding(
@@ -483,13 +529,38 @@ extension AppModel {
                 sourceDigest: landing.sourceDigest
             )
         }
-        holdUntilSaved(arrival, landing, land(landing), ringsWhenDry: install == nil, install: install)
+        landing.watchedOptions = options
+        holdUntilSaved(arrival, landing, landWatched(landing), ringsWhenDry: install == nil, install: install)
         pumpWatchedLane()
+    }
+
+    /// A folder that keeps nothing in the library exports the transcript instead, and saves it anyway when no export lands.
+    private func landWatched(_ landing: RunLanding) -> Task<Void, any Error> {
+        guard let options = landing.watchedOptions, !options.keepsTranscriptInLibrary else {
+            let saving = land(landing)
+            return Task { _ = try await saving.value }
+        }
+        return Task { [weak self] in try await self?.exportWithoutLibrary(landing, options) }
+    }
+
+    private func exportWithoutLibrary(_ landing: RunLanding, _ options: WatchedFolderOptions) async throws {
+        let results = await exportTranscript(
+            landing.transcript, audioSource: landing.audioSource, source: landing.source, entry: nil,
+            title: landing.title, folderOptions: options
+        )?.value ?? []
+        if let url = landing.audioSource, results.contains(where: { $0.written != nil }) {
+            arrivalNotice = ArrivalNotice(exported: url)
+            return
+        }
+        if let error = results.lazy.compactMap(\.error).first { exportNotice = .autoExportFailed(error) }
+        var kept = landing
+        kept.watchedOptions = nil
+        _ = try await land(kept).value
     }
 
     /// The file stays in the line until its entry is saved: a quit during the copy runs it again, a failed save hands it back.
     private func holdUntilSaved(
-        _ arrival: WatchedArrival, _ landing: RunLanding, _ saving: Task<LibraryEntry, any Error>,
+        _ arrival: WatchedArrival, _ landing: RunLanding, _ saving: Task<Void, any Error>,
         ringsWhenDry: Bool, install: Int? = nil
     ) {
         guard let index = watchedArrivals.firstIndex(where: { $0.id == arrival.id }) else { return }
@@ -674,7 +745,7 @@ extension AppModel {
             arrivalNotice = nil
             guard let file = notice.file else { return }
             enqueueWatchedArrival(WatchedArrival(url: file, folderID: notice.folderID, folderPath: notice.folderPath))
-        case .running, .saved:
+        case .running, .saved, .queued, .exported:
             break
         }
     }

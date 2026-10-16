@@ -23,15 +23,16 @@ extension AppModel {
     }
 
     func chooseAutoExportFolder() {
-        let panel = NSOpenPanel()
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = false
-        panel.canCreateDirectories = true
-        panel.allowsMultipleSelection = false
-        panel.prompt = String(localized: "Choose")
-        if let folder = autoExportFolder { panel.directoryURL = URL(fileURLWithPath: folder.path, isDirectory: true) }
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        setAutoExportFolder(url)
+        Task { await chooseAutoExportFolderFromPanel() }
+    }
+
+    func chooseAutoExportFolderFromPanel() async {
+        let start = autoExportFolder.map { URL(fileURLWithPath: $0.path, isDirectory: true) }
+        let chosen = await filePicker.chooseFolder(
+            message: nil, startingAt: start, canCreateDirectories: true, prompt: String(localized: "Choose")
+        )
+        guard let chosen else { return }
+        setAutoExportFolder(chosen)
     }
 
     /// A process that can't mint a security-scoped bookmark still gets a plain one that resolves.
@@ -69,47 +70,77 @@ extension AppModel {
     /// A file's exports go beside it; a take's or a link's go to the chosen folder, under the entry's title.
     @discardableResult
     func runAutoExports(
-        transcript: Transcript, audioSource: URL?, source: EntrySource, entry: LibraryEntry?, title: String? = nil
+        transcript: Transcript, audioSource: URL?, source: EntrySource, entry: LibraryEntry?, title: String? = nil,
+        folderOptions: WatchedFolderOptions? = nil
     ) -> Task<Void, Never>? {
+        guard let exports = exportTranscript(
+            transcript, audioSource: audioSource, source: source, entry: entry, title: title, folderOptions: folderOptions
+        ) else { return nil }
+        return Task { _ = await exports.value }
+    }
+
+    /// The auto-export rules plus, for a watched file, its folder's formats, planned together so no file is written twice.
+    func exportTranscript(
+        _ transcript: Transcript, audioSource: URL?, source: EntrySource, entry: LibraryEntry?, title: String?,
+        folderOptions: WatchedFolderOptions?
+    ) -> Task<[ExportJobResult], Never>? {
+        let own = folderOptions?.presets(in: exportPresets) ?? []
+        let toExportFolder = folderOptions?.exportsToAutoExportFolder == true
+        let name = entry.map(LibraryEntryDisplay.title(for:))
+            ?? title
+            ?? audioSource?.deletingPathExtension().lastPathComponent
+            ?? ""
+        let owner = entry?.id ?? audioSource?.path ?? UUID().uuidString
         switch sidecarRoute(audioSource: audioSource, source: source) {
         case .besideSource(let url):
-            let written = writeSidecars(transcript, presets: [], source: SidecarSource(besideFile: url))
-            return written.map { task in Task { _ = await task.value } }
-        case .autoExportFolder:
-            let fileExtension = audioSource?.pathExtension ?? "vtt"
-            let planned = AutoExportEngine.plannedPresets(
-                rules: autoExportRules, sourceExtension: fileExtension, presets: exportPresets
-            )
-            guard !planned.isEmpty else { return nil }
-            guard let folder = autoExportFolder else {
-                noteAutoExport(.autoExportFolderMissing)
-                return nil
-            }
-            let name = entry.map(LibraryEntryDisplay.title(for:))
-                ?? title
-                ?? audioSource?.deletingPathExtension().lastPathComponent
-                ?? ""
-            let owner = entry?.id ?? UUID().uuidString
-            return Task { [weak self] in
-                guard case .resolved(let url, let refreshed) = await Self.resolve(folder) else {
-                    self?.noteAutoExport(.autoExportFolderUnavailable)
-                    return
-                }
-                guard let self else { return }
-                if let refreshed, autoExportFolder == folder { autoExportFolder = refreshed }
-                let jobs = SidecarExportPlanner.plan(
-                    presets: [], rules: autoExportRules, library: exportPresets,
-                    source: SidecarSource(fileExtension: fileExtension, folder: url, baseName: name, owner: owner)
+            let beside = writeSidecars(transcript, presets: toExportFolder ? [] : own, source: SidecarSource(besideFile: url))
+            let elsewhere = toExportFolder
+                ? writeToAutoExportFolder(
+                    transcript, fileExtension: url.pathExtension, name: name, owner: owner, presets: own, appliesRules: false
                 )
-                let scoped = url.startAccessingSecurityScopedResource()
-                let results = await ExportRunner.run(jobs, transcript: transcript)
-                if scoped { url.stopAccessingSecurityScopedResource() }
-                if let error = results.lazy.compactMap(\.error).first {
-                    noteAutoExport(.autoExportFailed(error))
-                }
-            }
+                : nil
+            guard beside != nil || elsewhere != nil else { return nil }
+            return Task { await (beside?.value ?? []) + (elsewhere?.value ?? []) }
+        case .autoExportFolder:
+            return writeToAutoExportFolder(
+                transcript, fileExtension: audioSource?.pathExtension ?? "vtt", name: name, owner: owner,
+                presets: own, appliesRules: true
+            )
         case .none:
             return nil
+        }
+    }
+
+    private func writeToAutoExportFolder(
+        _ transcript: Transcript, fileExtension: String, name: String, owner: String,
+        presets: [ExportPreset], appliesRules: Bool
+    ) -> Task<[ExportJobResult], Never>? {
+        let ruled = appliesRules
+            ? AutoExportEngine.plannedPresets(rules: autoExportRules, sourceExtension: fileExtension, presets: exportPresets)
+            : []
+        guard !(ruled.isEmpty && presets.isEmpty) else { return nil }
+        guard let folder = autoExportFolder else {
+            noteAutoExport(.autoExportFolderMissing)
+            return nil
+        }
+        return Task { [weak self] in
+            guard case .resolved(let url, let refreshed) = await Self.resolve(folder) else {
+                self?.noteAutoExport(.autoExportFolderUnavailable)
+                return []
+            }
+            guard let self else { return [] }
+            if let refreshed, autoExportFolder == folder { autoExportFolder = refreshed }
+            let jobs = SidecarExportPlanner.plan(
+                presets: presets, rules: appliesRules ? autoExportRules : [], library: exportPresets,
+                source: SidecarSource(fileExtension: fileExtension, folder: url, baseName: name, owner: owner)
+            )
+            let scoped = url.startAccessingSecurityScopedResource()
+            let results = await ExportRunner.run(jobs, transcript: transcript)
+            if scoped { url.stopAccessingSecurityScopedResource() }
+            if let error = results.lazy.compactMap(\.error).first {
+                noteAutoExport(.autoExportFailed(error))
+            }
+            return results
         }
     }
 
@@ -148,7 +179,7 @@ extension AppModel {
     }
 
     /// Once per launch, and again after a new folder is chosen: every take would otherwise say the same thing.
-    private func noteAutoExport(_ notice: ExportNotice) {
+    func noteAutoExport(_ notice: ExportNotice) {
         guard !autoExportNoticeShown else { return }
         autoExportNoticeShown = true
         exportNotice = notice

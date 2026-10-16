@@ -1112,16 +1112,21 @@ final class AppModel {
     // MARK: - Watched folders
 
     @ObservationIgnored lazy var watchedFolders: WatchedFoldersStore = {
-        let store = WatchedFoldersStore(defaults: defaults, baselineDirectory: watchedFoldersDirectory) { [weak self] url in
+        watchedFoldersBuilt = true
+        let store = WatchedFoldersStore(
+            defaults: defaults, baselineDirectory: watchedFoldersDirectory, picker: filePicker
+        ) { [weak self] url in
             self?.handleWatchedArrival(url)
         }
         store.onFolderWatching = { [weak self] in self?.retryUnreachableArrivals() }
         return store
     }()
 
-    /// Nil when this launch doesn't watch folders, so a view never builds the store and starts its watchers.
+    @ObservationIgnored private var watchedFoldersBuilt = false
+
+    /// Nil when this launch doesn't watch folders and nothing built the store, so a view never builds it just to ask.
     var watchedFoldersIfWatching: WatchedFoldersStore? {
-        activeSideEffects.contains(.watchedFolders) ? watchedFolders : nil
+        activeSideEffects.contains(.watchedFolders) || watchedFoldersBuilt ? watchedFolders : nil
     }
 
     /// Nil when this launch doesn't watch folders, so quitting never builds the store just to flush it.
@@ -1146,6 +1151,8 @@ final class AppModel {
     @ObservationIgnored var unsavedLandings: [WatchedArrival.ID: UnsavedLanding] = [:]
     /// Test seam: when set, replaces telling the watchers that a file they handed over couldn't be used.
     @ObservationIgnored var offerWatchedFileAgain: (@MainActor (URL) -> Void)?
+    /// Batch jobs a watched folder added without starting them: only Resume, or the job's own Start, runs them.
+    @ObservationIgnored var heldBatchJobIDs: Set<BatchJob.ID> = []
     @ObservationIgnored var watchedLaneTask: Task<Void, Never>?
     @ObservationIgnored var backgroundArrivalID: WatchedArrival.ID?
     @ObservationIgnored var laneOwesRing = false
@@ -3151,7 +3158,8 @@ final class AppModel {
                     title: fetchedLink.map { _ in linkMetadataTitle ?? LibraryEntryDisplay.webVideoTitle(createdAt: Date()) },
                     titleSource: linkMetadataTitle == nil ? nil : .source,
                     sourceDigest: sourceDigest,
-                    consumesAudio: ownedDownload != nil
+                    consumesAudio: ownedDownload != nil,
+                    watchedOptions: arrival.map { watchedOptions(for: $0) }
                 )
                 let entry = land(finished)
                 fileRunLanding = FileRunLanding(runToken: runToken, text: processed.text, entry: entry)

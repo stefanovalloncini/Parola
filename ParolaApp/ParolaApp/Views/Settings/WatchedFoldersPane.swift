@@ -10,6 +10,7 @@ struct WatchedFoldersPane: View {
 }
 
 private struct WatchedFoldersPaneBody: View {
+    @Environment(AppModel.self) private var model
     let store: WatchedFoldersStore
     @State private var selection: WatchedFolder.ID?
 
@@ -52,6 +53,17 @@ private struct WatchedFoldersPaneBody: View {
             SettingHelper(text: "New files dropped into a watched folder are transcribed automatically, including ones added while Parola was closed. Files already there when you add the folder are ignored.")
             ResetPaneButton(scope: .watchedFolders)
         }
+        .sheet(item: optionsFolder) { folder in
+            WatchedFolderOptionsSheet(store: store, folder: folder) { store.optionsSheetFolderID = nil }
+                .environment(model)
+        }
+    }
+
+    private var optionsFolder: Binding<WatchedFolder?> {
+        Binding(
+            get: { store.optionsSheetFolderID.flatMap { id in store.folders.first { $0.id == id } } },
+            set: { store.optionsSheetFolderID = $0?.id }
+        )
     }
 
     private func removeSelected() {
@@ -66,15 +78,15 @@ private struct WatchedFoldersPaneBody: View {
 }
 
 private struct WatchedFolderRow: View {
+    @Environment(AppModel.self) private var model
     let store: WatchedFoldersStore
     let folder: WatchedFolder
 
     var body: some View {
         let unavailable = store.isUnavailable(folder.id)
-        SettingRow(titleVerbatim: folder.displayName,
-                   descriptionVerbatim: folder.displayPath) {
-            if unavailable {
-                HStack(spacing: 6) {
+        SettingRow(titleVerbatim: folder.displayName, descriptionVerbatim: description) {
+            HStack(spacing: 6) {
+                if unavailable {
                     Label("Unavailable", systemImage: "exclamationmark.triangle.fill")
                         .font(DS.Font.secondary)
                         .foregroundStyle(DS.Color.warningText)
@@ -84,7 +96,17 @@ private struct WatchedFolderRow: View {
                     .controlSize(.small)
                     .axLeaf("WatchedFolders.Button.Readd")
                 }
+                Button("Options…") {
+                    store.optionsSheetFolderID = folder.id
+                }
+                .controlSize(.small)
+                .axLeaf("WatchedFolders.Button.Options")
             }
         }
+    }
+
+    private var description: String {
+        guard let summary = folder.options.summary(presets: model.exportPresets) else { return folder.displayPath }
+        return folder.displayPath + "\n" + summary
     }
 }

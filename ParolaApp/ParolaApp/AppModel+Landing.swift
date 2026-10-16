@@ -44,6 +44,8 @@ struct RunLanding {
     /// The entry a `.rerun` replaces, and the notes it held on the old segments.
     var rerunEntryID: LibraryEntry.ID?
     var clearingNotes: [String: String] = [:]
+    /// The options of the watched folder a `.arrival` or `.backgroundArrival` file came from.
+    var watchedOptions: WatchedFolderOptions?
 
     var policy: LandingPolicy { kind.policy }
 
@@ -183,7 +185,7 @@ extension AppModel {
             if policy.export == .rules {
                 exports = runAutoExports(
                     transcript: landing.transcript, audioSource: landing.audioSource,
-                    source: landing.source, entry: entry, title: landing.title
+                    source: landing.source, entry: entry, title: landing.title, folderOptions: landing.watchedOptions
                 )
             }
             if let entry { await finishLanding(entry, landing, navigation: navigation) }

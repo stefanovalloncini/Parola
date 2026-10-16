@@ -46,6 +46,14 @@ struct ArrivalToast: View {
                 }
                 .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
                 .axLeaf("Arrival.Button.Open")
+            case .queued:
+                Button("Open Batch") {
+                    model.openBatchFromNotice()
+                }
+                .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
+                .axLeaf("Arrival.Button.OpenBatch")
+            case .exported:
+                EmptyView()
             case .running:
                 Button("Stop") {
                     model.stopBackgroundArrival()
@@ -114,7 +122,8 @@ struct ArrivalToast: View {
     private var symbol: String {
         switch notice.state {
         case .running: return "waveform"
-        case .saved: return "checkmark.circle.fill"
+        case .saved, .exported: return "checkmark.circle.fill"
+        case .queued: return "tray.and.arrow.down.fill"
         case .failed, .paused, .unsaved: return "exclamationmark.triangle.fill"
         }
     }
@@ -122,7 +131,8 @@ struct ArrivalToast: View {
     private var tint: Color {
         switch notice.state {
         case .running: return DS.Color.accent
-        case .saved: return DS.Palette.success
+        case .saved, .exported: return DS.Palette.success
+        case .queued: return DS.Color.accent
         case .failed: return DS.Color.danger
         case .paused, .unsaved: return DS.Palette.warning
         }

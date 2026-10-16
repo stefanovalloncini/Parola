@@ -75,6 +75,73 @@ extension ParolaAutomationServer {
                     return .object(["exportPresets": ParolaAutomationServer.encode(ctx.model.exportPresets)])
                 }
             ),
+
+            AutomationCommand(
+                name: "openWatchedFolderOptions",
+                area: .test,
+                summary: "Test mode: opens one watched folder's Options sheet in the Watched Folders pane, which has to be on screen; no id closes it. Replies {open}.",
+                kind: .mutating,
+                args: [
+                    .init(name: "id", kind: .string(), required: false, summary: "The folder's id, from getSettings watchedFolders"),
+                ],
+                handler: { args, ctx in
+                    try requireTestMode(ctx)
+                    guard let store = ctx.model.watchedFoldersIfWatching else {
+                        throw AutomationError.precondition("no watched folders in this launch")
+                    }
+                    guard let raw = try args.optionalString("id") else {
+                        store.optionsSheetFolderID = nil
+                        return .object(["open": .null])
+                    }
+                    guard let id = UUID(uuidString: raw), store.folders.contains(where: { $0.id == id }) else {
+                        throw AutomationError.invalidArgs(field: "id", reason: "no watched folder has this id")
+                    }
+                    store.optionsSheetFolderID = id
+                    return .object(["open": .string(id.uuidString)])
+                }
+            ),
+
+            AutomationCommand(
+                name: "setWatchedFolderOptions",
+                area: .test,
+                summary: "Test mode: sets fields of one watched folder's options, as the Options sheet does. Replies {id, options}.",
+                kind: .mutating,
+                args: [
+                    .init(name: "id", kind: .string(), required: true, summary: "The folder's id, from getSettings watchedFolders"),
+                    .init(name: "autoTranscribe", kind: .boolean, required: false, summary: "False sends new files to Batch as pending jobs"),
+                    .init(name: "includeSubfolders", kind: .boolean, required: false, summary: "False watches the folder itself only"),
+                    .init(name: "saveToLibrary", kind: .boolean, required: false, summary: "False exports the transcript and keeps nothing in the library"),
+                    .init(name: "exportPresetIDs", kind: .stringArray, required: false, summary: "Export preset ids, in order; replaces the list"),
+                    .init(name: "exportTo", kind: .string(), required: false, summary: "nextToFile or autoExportFolder"),
+                ],
+                handler: { args, ctx in
+                    try requireTestMode(ctx)
+                    guard let id = UUID(uuidString: try args.string("id")),
+                          let store = ctx.model.watchedFoldersIfWatching,
+                          store.folders.contains(where: { $0.id == id }) else {
+                        throw AutomationError.invalidArgs(field: "id", reason: "no watched folder has this id")
+                    }
+                    var options = store.options(for: id)
+                    if let value = try args.optionalBool("autoTranscribe") { options.autoTranscribes = value }
+                    if let value = try args.optionalBool("includeSubfolders") { options.includesSubfolders = value }
+                    if let value = try args.optionalBool("saveToLibrary") { options.savesToLibrary = value }
+                    if let ids = try args.optionalStringArray("exportPresetIDs") {
+                        options.exportPresetIDs = ids.compactMap(UUID.init(uuidString:))
+                    }
+                    if let destination = try args.optionalString("exportTo") {
+                        switch destination {
+                        case "nextToFile": options.exportsToAutoExportFolder = false
+                        case "autoExportFolder": options.exportsToAutoExportFolder = true
+                        default: throw AutomationError.invalidArgs(field: "exportTo", reason: "must be nextToFile or autoExportFolder")
+                        }
+                    }
+                    store.setOptions(options, for: id)
+                    return .object([
+                        "id": .string(id.uuidString),
+                        "options": ParolaAutomationServer.watchedFolderOptionsValue(store.options(for: id)),
+                    ])
+                }
+            ),
         ]
     }
 }

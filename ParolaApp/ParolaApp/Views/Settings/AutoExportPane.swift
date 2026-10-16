@@ -7,6 +7,7 @@ struct AutoExportPane: View {
     @State private var selection: AutoExportRule.ID?
 
     var body: some View {
+        @Bindable var model = model
         let displayed = displayedRules
         return SettingsForm {
             Section {
