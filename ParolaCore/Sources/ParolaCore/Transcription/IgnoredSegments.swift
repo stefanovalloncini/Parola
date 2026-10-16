@@ -12,11 +12,15 @@ public struct IgnoredSegmentRule: Codable, Sendable, Identifiable, Hashable {
     }
 }
 
-/// Drops segments whose entire text matches one of the rule patterns after trimming and
-/// lowercasing. Patterns are matched against the full segment text, not as substrings —
-/// a pattern of `"uh"` only filters a segment whose text is exactly "uh" (modulo case
-/// and surrounding whitespace).
+/// Drops segments whose entire text matches one of the rule patterns, ignoring case, surrounding
+/// whitespace and surrounding punctuation. Patterns are matched against the full segment text, not
+/// as substrings — a pattern of `"uh"` filters "Uh." but not "uh huh". A pattern made only of
+/// punctuation, like "♪", matches any segment that is only punctuation.
 public enum IgnoredSegments {
+    public static func normalized(_ text: String) -> String {
+        text.lowercased().trimmingCharacters(in: trimmed)
+    }
+
     public static func apply(
         rules: [IgnoredSegmentRule],
         to segments: [TranscriptSegment]
@@ -24,14 +28,11 @@ public enum IgnoredSegments {
         let patterns: Set<String> = Set(
             rules
                 .filter(\.enabled)
-                .map { $0.pattern.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
-                .filter { !$0.isEmpty }
+                .filter { !$0.pattern.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+                .map { normalized($0.pattern) }
         )
         guard !patterns.isEmpty else { return segments }
-        return segments.filter { seg in
-            let normalized = seg.text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-            return !patterns.contains(normalized)
-        }
+        return segments.filter { !patterns.contains(normalized($0.text)) }
     }
 
     /// Drops the built-in ``HallucinationPhrases`` list. Kept apart from ``apply(rules:to:)``
@@ -39,6 +40,9 @@ public enum IgnoredSegments {
     public static func applyBuiltInDefaults(
         to segments: [TranscriptSegment]
     ) -> [TranscriptSegment] {
-        segments.filter { !HallucinationPhrases.matchSet.contains(HallucinationPhrases.normalized($0.text)) }
+        segments.filter { !HallucinationPhrases.matchSet.contains(normalized($0.text)) }
     }
+
+    private static let trimmed = CharacterSet(charactersIn: ".!?…。！？,、♪-—¡¿")
+        .union(.whitespacesAndNewlines)
 }

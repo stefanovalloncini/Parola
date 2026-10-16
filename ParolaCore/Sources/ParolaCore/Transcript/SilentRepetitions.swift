@@ -77,7 +77,7 @@ enum SilentRepetitions {
     }
 
     static func normalized(_ text: String) -> String {
-        HallucinationPhrases.normalized(text.split(whereSeparator: \.isWhitespace).joined(separator: " "))
+        IgnoredSegments.normalized(text.split(whereSeparator: \.isWhitespace).joined(separator: " "))
     }
 
     private static func median(of values: [Double]) -> Double {

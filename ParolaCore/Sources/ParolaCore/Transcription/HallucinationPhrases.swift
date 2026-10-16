@@ -21,12 +21,5 @@ public enum HallucinationPhrases {
         "字幕由Amara.org社区提供"
     ]
 
-    static let matchSet: Set<String> = Set(defaults.map(normalized))
-
-    static func normalized(_ text: String) -> String {
-        text.lowercased().trimmingCharacters(in: trimmed)
-    }
-
-    private static let trimmed = CharacterSet(charactersIn: ".!?…。！？,、♪-—")
-        .union(.whitespacesAndNewlines)
+    static let matchSet: Set<String> = Set(defaults.map(IgnoredSegments.normalized))
 }
