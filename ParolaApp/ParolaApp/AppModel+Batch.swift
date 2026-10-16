@@ -328,6 +328,7 @@ extension AppModel {
         else { return }
         lastSavedBatchQueueURLs = urls
         batchJobs = urls.map { BatchJob(url: $0) }
+        heldBatchJobIDs = Set(batchJobs.map(\.id))
         selectedBatchJobID = batchJobs.first?.id
     }
 

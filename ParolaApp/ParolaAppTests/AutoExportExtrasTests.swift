@@ -44,6 +44,10 @@ struct AutoExportExtrasTests {
         Transcript(segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "hello there")], language: "en", modelName: "stub")
     }
 
+    private func storedSummary(_ rig: Rig, _ id: LibraryEntry.ID) async -> String? {
+        try? await rig.model.library.load(id).document.transcript.summary?.text
+    }
+
     private func land(_ rig: Rig, source: EntrySource, title: String = "Weekly sync") async -> LibraryEntry? {
         let landing = RunLanding(
             kind: source == .file ? .file : .recording, transcript: transcript(), audioSource: rig.audio,
@@ -169,18 +173,120 @@ struct AutoExportExtrasTests {
         #expect(try String(contentsOf: numbered, encoding: .utf8) == "Ours\n")
     }
 
-    @Test("with the switch off no summary is written")
+    @Test("with the switch off no summary is written, though the summary lands")
     func summaryOff() async throws {
         let rig = try makeRig("summary-off")
         defer { try? FileManager.default.removeItem(at: rig.root) }
         let entry = try #require(await land(rig, source: .microphone))
 
         rig.model.summariseOperation = { _, _ in Summary(text: "Quiet") }
-        let run = try #require(rig.model.summarise(entry: entry.id, transcript: transcript()))
-        _ = try await run.value
+        rig.model.summarise(entry: entry.id, transcript: transcript())
+        await waitUntil(timeoutMs: 10_000) { await storedSummary(rig, entry.id) == "Quiet" }
         await rig.model.awaitSummaryExports()
 
         #expect(names(rig.exports).isEmpty)
+    }
+
+    @Test("a chat's digest becomes the entry's summary and gets its file too")
+    func chatDigestIsExported() async throws {
+        let rig = try makeRig("digest", summary: true)
+        defer { try? FileManager.default.removeItem(at: rig.root) }
+        let entry = try #require(await land(rig, source: .microphone))
+        rig.model.summariseOperation = { _, _ in Summary(text: "The digest") }
+
+        _ = try await rig.model.chatDigest(for: entry.id, transcript: transcript())()
+        let target = rig.exports.appendingPathComponent("Weekly sync – Summary.md")
+        await waitUntil(timeoutMs: 10_000) { FileManager.default.fileExists(atPath: target.path) }
+        await rig.model.awaitSummaryExports()
+
+        #expect(try String(contentsOf: target, encoding: .utf8) == "The digest\n")
+    }
+
+    @Test("summaries land in the order they were queued, so the newest text is the file")
+    func summariesAreWrittenInOrder() async throws {
+        let rig = try makeRig("order", summary: true)
+        defer { try? FileManager.default.removeItem(at: rig.root) }
+        let entry = try #require(await land(rig, source: .microphone))
+
+        for round in 1...6 { rig.model.queueSummaryExport(Summary(text: "Version \(round)"), of: entry.id) }
+        await rig.model.awaitSummaryExports()
+
+        #expect(names(rig.exports) == ["Weekly sync – Summary.md"])
+        #expect(try String(contentsOf: rig.exports.appendingPathComponent("Weekly sync – Summary.md"), encoding: .utf8) == "Version 6\n")
+    }
+
+    @Test("a renamed entry's regenerated summary replaces the old file instead of leaving two")
+    func renamedEntryKeepsOneSummaryFile() async throws {
+        let rig = try makeRig("renamed", summary: true)
+        defer { try? FileManager.default.removeItem(at: rig.root) }
+        let entry = try #require(await land(rig, source: .microphone))
+        rig.model.queueSummaryExport(Summary(text: "First"), of: entry.id)
+        await rig.model.awaitSummaryExports()
+        #expect(names(rig.exports) == ["Weekly sync – Summary.md"])
+
+        try await rig.model.library.renameEntry(entry.id, to: "Board call")
+        rig.model.queueSummaryExport(Summary(text: "Second"), of: entry.id)
+        await rig.model.awaitSummaryExports()
+
+        #expect(names(rig.exports) == ["Board call – Summary.md"])
+    }
+
+    @Test("a summary file the user edited is kept, and the next summary goes into a numbered copy")
+    func editedSummaryIsTheUsers() async throws {
+        let rig = try makeRig("edited", summary: true)
+        defer { try? FileManager.default.removeItem(at: rig.root) }
+        let entry = try #require(await land(rig, source: .microphone))
+        rig.model.queueSummaryExport(Summary(text: "First"), of: entry.id)
+        await rig.model.awaitSummaryExports()
+        let file = rig.exports.appendingPathComponent("Weekly sync – Summary.md")
+        try Data("My own notes on top\n".utf8).write(to: file)
+
+        rig.model.queueSummaryExport(Summary(text: "Second"), of: entry.id)
+        await rig.model.awaitSummaryExports()
+
+        #expect(try String(contentsOf: file, encoding: .utf8) == "My own notes on top\n")
+        #expect(try String(contentsOf: rig.exports.appendingPathComponent("Weekly sync (2) – Summary.md"), encoding: .utf8) == "Second\n")
+    }
+
+    @Test("a copy that fails leaves no hidden partial file behind")
+    func failedCopyLeavesNothing() async throws {
+        let rig = try makeRig("failed-copy")
+        defer { try? FileManager.default.removeItem(at: rig.root) }
+        let missing = rig.root.appendingPathComponent("gone.wav")
+
+        await #expect(throws: (any Error).self) {
+            try await AppModel.copyOwned(missing, into: rig.exports, named: "Weekly sync", tail: "", owner: "x")
+        }
+
+        let hidden = (try? FileManager.default.contentsOfDirectory(atPath: rig.exports.path)) ?? []
+        #expect(hidden.isEmpty)
+    }
+
+    @Test("deleting a preset takes it out of the watched folders that name it")
+    func deletedPresetLeavesTheFolders() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-extras-prune-\(UUID().uuidString)", isDirectory: true)
+        let inbox = root.appendingPathComponent("Inbox", isDirectory: true)
+        try FileManager.default.createDirectory(at: inbox, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let defaults = temporaryDefaults()
+        let model = AppModel(skipBootstrap: true, defaults: defaults, libraryURL: makeTempLibraryURL("extras-prune"))
+        let custom = model.addExportPreset(name: "Short SRT", spec: ExportPreset.builtIn(for: .srt)!.spec)
+        var options = WatchedFolderOptions()
+        options.exportPresetIDs = [custom.id]
+        options.savesToLibrary = false
+        let bookmark = try inbox.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil)
+        let folder = WatchedFolder(bookmark: bookmark, displayPath: inbox.path, options: options)
+        defaults.set(try JSONEncoder().encode([folder]), forKey: "watchedFolders")
+        let store = model.watchedFolders
+        #expect(model.exportPresetUse(id: custom.id).folderCount == 1)
+        #expect(model.exportPresetUse(id: custom.id).soleFormatFolderCount == 1)
+
+        model.deleteExportPreset(id: custom.id)
+
+        #expect(store.options(for: folder.id).exportPresetIDs.isEmpty)
+        #expect(store.options(for: folder.id).savesToLibrary)
+        await store.stopWatching()
     }
 
     @Test("Choose… in Auto-Export takes the folder the picker returns")

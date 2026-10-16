@@ -1122,10 +1122,11 @@ final class AppModel {
             self?.handleWatchedArrival(url)
         }
         store.onFolderWatching = { [weak self] in self?.retryUnreachableArrivals() }
+        store.pruneExportPresets(keeping: Set(exportPresets.map(\.id)))
         return store
     }()
 
-    @ObservationIgnored private var watchedFoldersBuilt = false
+    @ObservationIgnored private(set) var watchedFoldersBuilt = false
 
     /// Nil when this launch doesn't watch folders and nothing built the store, so a view never builds it just to ask.
     var watchedFoldersIfWatching: WatchedFoldersStore? {
@@ -1134,8 +1135,7 @@ final class AppModel {
 
     /// Nil when this launch doesn't watch folders, so quitting never builds the store just to flush it.
     func watchedFolderBaselineFlush() -> (@Sendable () async -> Void)? {
-        guard activeSideEffects.contains(.watchedFolders) else { return nil }
-        return watchedFolders.pendingBaselineFlush()
+        return watchedFoldersIfWatching?.pendingBaselineFlush()
     }
 
     /// Watched-folder files waiting their turn, the one running included; each leaves when it lands or fails.
@@ -1154,7 +1154,7 @@ final class AppModel {
     @ObservationIgnored var unsavedLandings: [WatchedArrival.ID: UnsavedLanding] = [:]
     /// Test seam: when set, replaces telling the watchers that a file they handed over couldn't be used.
     @ObservationIgnored var offerWatchedFileAgain: (@MainActor (URL) -> Void)?
-    /// Batch jobs a watched folder added without starting them: only Resume, or the job's own Start, runs them.
+    /// Batch jobs a watched folder added without starting them, and jobs restored after a quit: only Resume runs them.
     @ObservationIgnored var heldBatchJobIDs: Set<BatchJob.ID> = []
     @ObservationIgnored var watchedLaneTask: Task<Void, Never>?
     @ObservationIgnored var backgroundArrivalID: WatchedArrival.ID?
@@ -1464,8 +1464,9 @@ final class AppModel {
         case .stop: stopAutomationBridge()
         case .keep: break
         }
-        if activeSideEffects.contains(.watchedFolders) {
-            watchedFolders.reloadFromDefaults()
+        if let store = watchedFoldersIfWatching {
+            store.reloadFromDefaults()
+            store.pruneExportPresets(keeping: Set(exportPresets.map(\.id)))
         }
     }
     var appAccentRaw: String = AppAccent.defaultAccent.rawValue { didSet { defaults.set(appAccentRaw, forKey: AppAccent.storageKey) } }

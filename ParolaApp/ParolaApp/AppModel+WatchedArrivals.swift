@@ -119,8 +119,8 @@ struct ArrivalNotice: Equatable, Identifiable {
         case unsaved(String)
         /// Waiting in Batch for the user to start it; the count is the files this one toast stands for.
         case queued(Int)
-        /// Transcribed and exported by its folder's options, with no library entry to open.
-        case exported
+        /// Transcribed and exported by its folder's options, with no library entry to open; the first file written.
+        case exported(URL?)
     }
 
     enum Origin: Equatable {
@@ -204,9 +204,9 @@ struct ArrivalNotice: Equatable, Identifiable {
         state = .queued(count)
     }
 
-    init(exported url: URL) {
+    init(exported url: URL, writing file: URL?) {
         name = url.deletingPathExtension().lastPathComponent
-        state = .exported
+        state = .exported(file)
     }
 
     init(failed url: URL, reason: String, folderID: UUID? = nil, folderPath: String? = nil) {
@@ -258,7 +258,11 @@ extension AppModel {
 
     func watchedOptions(for arrival: WatchedArrival) -> WatchedFolderOptions {
         guard let id = arrival.folderID, let store = watchedFoldersIfWatching else { return .default }
-        return store.options(for: id)
+        var options = store.options(for: id)
+        let known = Set(exportPresets.map(\.id))
+        options.exportPresetIDs.removeAll { !known.contains($0) }
+        if !features.isEnabled(.batch) { options.autoTranscribes = true }
+        return options.normalized
     }
 
     /// A folder that doesn't transcribe by itself hands its new files to Batch as pending jobs; false when Batch is off.
@@ -269,9 +273,14 @@ extension AppModel {
         heldBatchJobIDs.insert(job.id)
         batchJobs.append(job)
         if selectedBatchJobID == nil { selectedBatchJobID = job.id }
-        var count = 1
-        if case .queued(let earlier) = arrivalNotice?.state { count = earlier + 1 }
-        arrivalNotice = ArrivalNotice(queued: url, count: count)
+        switch arrivalNotice?.state {
+        case nil, .saved, .exported:
+            arrivalNotice = ArrivalNotice(queued: url)
+        case .queued(let earlier):
+            arrivalNotice = ArrivalNotice(queued: url, count: earlier + 1)
+        case .running, .failed, .paused, .unsaved:
+            break
+        }
         return true
     }
 
@@ -285,7 +294,8 @@ extension AppModel {
         guard watchedLaneTask == nil, visibleArrivalID == nil, watchedLanePausedAt == nil, !foregroundIsHeld,
               let next = nextWatchedArrival else { return }
         let deadline = fileReadDeadline
-        let checksLibrary = duplicateImportPolicy.batchSkipsDuplicates || next.landingInterrupted
+        let checksLibrary = (duplicateImportPolicy.batchSkipsDuplicates || next.landingInterrupted)
+            && watchedOptions(for: next).keepsTranscriptInLibrary
         let folderIsUnavailable = next.folderID.map { watchedFoldersIfWatching?.isUnavailable($0) ?? false } ?? false
         let folderVouches = watchedFolderVouches(for: next)
         let returnsAtCheck = watchedFolderReturns
@@ -468,8 +478,8 @@ extension AppModel {
     private func handBack(_ url: URL) {
         if let offerWatchedFileAgain {
             offerWatchedFileAgain(url)
-        } else if activeSideEffects.contains(.watchedFolders) {
-            watchedFolders.offerAgainOnChange(url)
+        } else if let store = watchedFoldersIfWatching {
+            store.offerAgainOnChange(url)
         }
     }
 
@@ -544,15 +554,21 @@ extension AppModel {
     }
 
     private func exportWithoutLibrary(_ landing: RunLanding, _ options: WatchedFolderOptions) async throws {
-        let results = await exportTranscript(
+        let batch = await exportTranscript(
             landing.transcript, audioSource: landing.audioSource, source: landing.source, entry: nil,
             title: landing.title, folderOptions: options
-        )?.value ?? []
-        if let url = landing.audioSource, results.contains(where: { $0.written != nil }) {
-            arrivalNotice = ArrivalNotice(exported: url)
+        )?.value ?? ExportBatch()
+        let own = batch.own
+        let landed = batch.problem == nil && !own.isEmpty && own.allSatisfy { $0.written != nil }
+        if landed, let url = landing.audioSource {
+            arrivalNotice = ArrivalNotice(exported: url, writing: own.first?.written)
             return
         }
-        if let error = results.lazy.compactMap(\.error).first { exportNotice = .autoExportFailed(error) }
+        if let problem = batch.problem {
+            exportNotice = problem.notice
+        } else if let error = own.lazy.compactMap(\.error).first {
+            exportNotice = .autoExportFailed(error)
+        }
         var kept = landing
         kept.watchedOptions = nil
         _ = try await land(kept).value
@@ -748,6 +764,11 @@ extension AppModel {
         case .running, .saved, .queued, .exported:
             break
         }
+    }
+
+    func revealExportedArrival() {
+        guard case .exported(let file?)? = arrivalNotice?.state else { return }
+        NSWorkspace.shared.activateFileViewerSelecting([file])
     }
 
     enum ArrivalReveal: Equatable {

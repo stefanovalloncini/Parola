@@ -20,7 +20,7 @@ extension ParolaAutomationServer {
         switch notice.state {
         case .saved: [.open, .dismiss]
         case .queued: [.openBatch, .dismiss]
-        case .exported: [.dismiss]
+        case .exported(let file): file == nil ? [.dismiss] : [.reveal, .dismiss]
         case .running: [.stop, .dismiss]
         case .paused, .unsaved: [.retry, .dismiss]
         case .failed: [.retry, .reveal, .dismiss]
@@ -81,7 +81,8 @@ extension ParolaAutomationServer {
         case .openBatch: model.openBatchFromNotice()
         case .stop: model.stopBackgroundArrival()
         case .retry: model.retryArrivalNotice()
-        case .reveal: model.revealFailedArrival()
+        case .reveal:
+            if case .exported = shown.state { model.revealExportedArrival() } else { model.revealFailedArrival() }
         case .dismiss: if shown.state == .running { model.hideRunningArrival() } else { model.dismissArrivalNotice() }
         case .summarize, .copy: return (false, nil)
         }

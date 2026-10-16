@@ -1008,6 +1008,47 @@
         }
       }
     },
+    "%lld watched folders use it.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld watched folder uses it."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld watched folders use it."
+                }
+              }
+            }
+          }
+        },
+        "it": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld cartella monitorata lo usa."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld cartelle monitorate lo usano."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld words": {
       "extractionState": "manual",
       "localizations": {
@@ -1465,6 +1506,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Una trascrizione finita viene tradotta con Apple Translation, sul tuo Mac, in qualsiasi lingua disponibile."
+          }
+        }
+      }
+    },
+    "A folder left with no format saves to the Library again.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Una cartella rimasta senza formati salva di nuovo nella libreria."
           }
         }
       }
@@ -3037,6 +3089,17 @@
         }
       }
     },
+    "Auto-Export folder": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cartella di esportazione automatica"
+          }
+        }
+      }
+    },
     "Auto-export skipped this transcript: recordings and links save to an auto-export folder, and none is chosen yet. Choose one in Settings › Auto-Export.": {
       "extractionState": "manual",
       "localizations": {
@@ -3624,6 +3687,17 @@
         }
       }
     },
+    "Choose an Auto-Export folder first.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scegli prima una cartella di esportazione automatica."
+          }
+        }
+      }
+    },
     "Choose an Auto-Export folder in Auto-Export settings.": {
       "extractionState": "manual",
       "localizations": {
@@ -3873,6 +3947,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Nuovi file"
+          }
+        }
+      }
+    },
+    "New files added to a watched folder are transcribed automatically unless you turn that off in Options. That includes files added while Parola was closed. Files already there when you add the folder are ignored.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I nuovi file aggiunti a una cartella monitorata vengono trascritti automaticamente, a meno che tu non lo disattivi in Opzioni. Vale anche per i file aggiunti mentre Parola era chiuso. I file già presenti quando aggiungi la cartella vengono ignorati."
           }
         }
       }

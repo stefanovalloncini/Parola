@@ -122,7 +122,7 @@ struct WatchedFolderOptionsTests {
         let file = URL(fileURLWithPath: "/tmp/Standup.wav")
         #expect(ArrivalNotice(queued: file).title(bundle: bundle) == "Standup aggiunto a Batch")
         #expect(ArrivalNotice(queued: file, count: 3).title(bundle: bundle) == "3 file aggiunti a Batch")
-        #expect(ArrivalNotice(exported: file).title(bundle: bundle) == "Standup trascritto ed esportato")
+        #expect(ArrivalNotice(exported: file, writing: nil).title(bundle: bundle) == "Standup trascritto ed esportato")
     }
 
     @Test("every sheet and pane string has an Italian line")

@@ -79,11 +79,31 @@ extension AppModel {
         return Task { _ = await exports.value }
     }
 
-    /// The auto-export rules plus, for a watched file, its folder's formats, planned together so no file is written twice.
+    /// What a run of exports wrote. `own` is the folder's formats only: the global rules' files don't say whether those landed.
+    struct ExportBatch: Sendable {
+        var results: [ExportJobResult] = []
+        var ownCount = 0
+        var problem: Problem?
+
+        enum Problem: Sendable {
+            case folderMissing
+            case folderUnavailable
+
+            var notice: ExportNotice {
+                switch self {
+                case .folderMissing: .autoExportFolderMissing
+                case .folderUnavailable: .autoExportFolderUnavailable
+                }
+            }
+        }
+
+        var own: [ExportJobResult] { Array(results.prefix(ownCount)) }
+    }
+
     func exportTranscript(
         _ transcript: Transcript, audioSource: URL?, source: EntrySource, entry: LibraryEntry?, title: String?,
         folderOptions: WatchedFolderOptions?
-    ) -> Task<[ExportJobResult], Never>? {
+    ) -> Task<ExportBatch, Never>? {
         let own = folderOptions?.presets(in: exportPresets) ?? []
         let toExportFolder = folderOptions?.exportsToAutoExportFolder == true
         let name = entry.map(LibraryEntryDisplay.title(for:))
@@ -93,14 +113,25 @@ extension AppModel {
         let owner = entry?.id ?? audioSource?.path ?? UUID().uuidString
         switch sidecarRoute(audioSource: audioSource, source: source) {
         case .besideSource(let url):
-            let beside = writeSidecars(transcript, presets: toExportFolder ? [] : own, source: SidecarSource(besideFile: url))
+            let sidecar = SidecarSource(besideFile: url)
+            let beside = writeSidecars(transcript, presets: toExportFolder ? [] : own, source: sidecar)
+            let besideOwn = toExportFolder
+                ? 0 : SidecarExportPlanner.plan(presets: own, library: exportPresets, source: sidecar).count
             let elsewhere = toExportFolder
                 ? writeToAutoExportFolder(
                     transcript, fileExtension: url.pathExtension, name: name, owner: owner, presets: own, appliesRules: false
                 )
                 : nil
             guard beside != nil || elsewhere != nil else { return nil }
-            return Task { await (beside?.value ?? []) + (elsewhere?.value ?? []) }
+            return Task {
+                let first = await beside?.value ?? []
+                let second = await elsewhere?.value ?? ExportBatch()
+                return ExportBatch(
+                    results: toExportFolder ? second.results + first : first,
+                    ownCount: toExportFolder ? second.results.count : besideOwn,
+                    problem: second.problem
+                )
+            }
         case .autoExportFolder:
             return writeToAutoExportFolder(
                 transcript, fileExtension: audioSource?.pathExtension ?? "vtt", name: name, owner: owner,
@@ -114,33 +145,34 @@ extension AppModel {
     private func writeToAutoExportFolder(
         _ transcript: Transcript, fileExtension: String, name: String, owner: String,
         presets: [ExportPreset], appliesRules: Bool
-    ) -> Task<[ExportJobResult], Never>? {
+    ) -> Task<ExportBatch, Never>? {
         let ruled = appliesRules
             ? AutoExportEngine.plannedPresets(rules: autoExportRules, sourceExtension: fileExtension, presets: exportPresets)
             : []
         guard !(ruled.isEmpty && presets.isEmpty) else { return nil }
         guard let folder = autoExportFolder else {
             noteAutoExport(.autoExportFolderMissing)
-            return nil
+            return presets.isEmpty ? nil : Task { ExportBatch(problem: .folderMissing) }
         }
         return Task { [weak self] in
             guard case .resolved(let url, let refreshed) = await Self.resolve(folder) else {
                 self?.noteAutoExport(.autoExportFolderUnavailable)
-                return []
+                return ExportBatch(problem: .folderUnavailable)
             }
-            guard let self else { return [] }
+            guard let self else { return ExportBatch() }
             if let refreshed, autoExportFolder == folder { autoExportFolder = refreshed }
+            let sidecar = SidecarSource(fileExtension: fileExtension, folder: url, baseName: name, owner: owner)
             let jobs = SidecarExportPlanner.plan(
-                presets: presets, rules: appliesRules ? autoExportRules : [], library: exportPresets,
-                source: SidecarSource(fileExtension: fileExtension, folder: url, baseName: name, owner: owner)
+                presets: presets, rules: appliesRules ? autoExportRules : [], library: exportPresets, source: sidecar
             )
+            let ownCount = SidecarExportPlanner.plan(presets: presets, library: exportPresets, source: sidecar).count
             let scoped = url.startAccessingSecurityScopedResource()
             let results = await ExportRunner.run(jobs, transcript: transcript)
             if scoped { url.stopAccessingSecurityScopedResource() }
             if let error = results.lazy.compactMap(\.error).first {
                 noteAutoExport(.autoExportFailed(error))
             }
-            return results
+            return ExportBatch(results: results, ownCount: ownCount)
         }
     }
 

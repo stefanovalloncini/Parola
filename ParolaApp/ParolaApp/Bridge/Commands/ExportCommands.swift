@@ -87,7 +87,7 @@ extension ParolaAutomationServer {
                 handler: { args, ctx in
                     try requireTestMode(ctx)
                     guard let store = ctx.model.watchedFoldersIfWatching else {
-                        throw AutomationError.precondition("no watched folders in this launch")
+                        throw AutomationError.precondition("Watched Folders isn't running; open its Settings pane first")
                     }
                     guard let raw = try args.optionalString("id") else {
                         store.optionsSheetFolderID = nil
@@ -116,8 +116,10 @@ extension ParolaAutomationServer {
                 ],
                 handler: { args, ctx in
                     try requireTestMode(ctx)
+                    guard let store = ctx.model.watchedFoldersIfWatching else {
+                        throw AutomationError.precondition("Watched Folders isn't running; open its Settings pane first")
+                    }
                     guard let id = UUID(uuidString: try args.string("id")),
-                          let store = ctx.model.watchedFoldersIfWatching,
                           store.folders.contains(where: { $0.id == id }) else {
                         throw AutomationError.invalidArgs(field: "id", reason: "no watched folder has this id")
                     }
@@ -126,12 +128,21 @@ extension ParolaAutomationServer {
                     if let value = try args.optionalBool("includeSubfolders") { options.includesSubfolders = value }
                     if let value = try args.optionalBool("saveToLibrary") { options.savesToLibrary = value }
                     if let ids = try args.optionalStringArray("exportPresetIDs") {
-                        options.exportPresetIDs = ids.compactMap(UUID.init(uuidString:))
+                        let known = Set(ctx.model.exportPresets.map(\.id))
+                        let parsed = ids.map { UUID(uuidString: $0) }
+                        guard parsed.allSatisfy({ $0.map(known.contains) == true }) else {
+                            throw AutomationError.invalidArgs(field: "exportPresetIDs", reason: "every id must name an export preset")
+                        }
+                        options.exportPresetIDs = parsed.compactMap { $0 }
                     }
                     if let destination = try args.optionalString("exportTo") {
                         switch destination {
                         case "nextToFile": options.exportsToAutoExportFolder = false
-                        case "autoExportFolder": options.exportsToAutoExportFolder = true
+                        case "autoExportFolder":
+                            guard ctx.model.autoExportFolder != nil else {
+                                throw AutomationError.invalidArgs(field: "exportTo", reason: "choose an Auto-Export folder first")
+                            }
+                            options.exportsToAutoExportFolder = true
                         default: throw AutomationError.invalidArgs(field: "exportTo", reason: "must be nextToFile or autoExportFolder")
                         }
                     }

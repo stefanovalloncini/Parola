@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import ParolaCore
 
@@ -28,11 +29,10 @@ extension AppModel {
     }
 
     func queueSummaryExport(_ summary: Summary, of entryID: LibraryEntry.ID) {
-        guard let export = exportSummary(summary, of: entryID) else { return }
         let earlier = summaryExports
-        summaryExports = Task {
+        summaryExports = Task { [weak self] in
             await earlier?.value
-            await export.value
+            await self?.exportSummary(summary, of: entryID)?.value
         }
     }
 
@@ -40,8 +40,7 @@ extension AppModel {
         await summaryExports?.value
     }
 
-    /// Runs whenever a summary lands, so one that finishes after the transcript's export still gets its file,
-    /// and a regenerated one replaces the file this wrote.
+    /// Runs whenever a summary lands, so a late one gets its file and a regenerated one replaces it.
     func exportSummary(_ summary: Summary, of entryID: LibraryEntry.ID) -> Task<Void, Never>? {
         guard autoExportSummary, let folder = autoExportFolder else { return nil }
         let text = summary.text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -55,9 +54,8 @@ extension AppModel {
             let scoped = url.startAccessingSecurityScopedResource()
             defer { if scoped { url.stopAccessingSecurityScopedResource() } }
             do {
-                try await Self.writeOwned(
-                    Data((text + "\n").utf8), into: url, named: LibraryEntryDisplay.title(for: loaded.entry),
-                    tail: " – Summary", fileExtension: "md", owner: "\(entryID).summary"
+                try await Self.writeSummaryFile(
+                    Data((text + "\n").utf8), into: url, named: LibraryEntryDisplay.title(for: loaded.entry), entryID: entryID
                 )
             } catch {
                 ParolaLog.error(.export, "the summary could not be exported", [.error: .error(error)])
@@ -89,20 +87,43 @@ extension AppModel {
         )
         let manager = FileManager.default
         let staging = folder.appendingPathComponent(".\(UUID().uuidString).partial")
-        try manager.copyItem(at: source, to: staging)
-        if manager.fileExists(atPath: target.path) { try manager.removeItem(at: target) }
-        try manager.moveItem(at: staging, to: target)
-        OutputMarker.mark(target, owner: owner)
+        do {
+            try manager.copyItem(at: source, to: staging)
+            OutputMarker.mark(staging, owner: owner)
+            if manager.fileExists(atPath: target.path) { try manager.removeItem(at: target) }
+            try manager.moveItem(at: staging, to: target)
+        } catch {
+            try? manager.removeItem(at: staging)
+            throw error
+        }
     }
 
+    nonisolated static func summaryOwnerPrefix(_ entryID: String) -> String { "\(entryID).summary:" }
+
+    /// The mark carries the hash of what was written, so a file the user edited since is theirs and stays.
     @concurrent
-    nonisolated static func writeOwned(
-        _ data: Data, into folder: URL, named title: String, tail: String, fileExtension: String, owner: String
-    ) async throws {
-        let target = ownedTarget(
-            in: folder, base: exportFileBaseName(title), tail: tail, fileExtension: fileExtension, owner: owner
-        )
+    nonisolated static func writeSummaryFile(_ data: Data, into folder: URL, named title: String, entryID: String) async throws {
+        let manager = FileManager.default
+        let prefix = summaryOwnerPrefix(entryID)
+        for name in (try? manager.contentsOfDirectory(atPath: folder.path)) ?? [] {
+            let url = folder.appendingPathComponent(name)
+            guard let owner = OutputMarker.owner(of: url), owner.hasPrefix(prefix),
+                  let current = try? Data(contentsOf: url), contentHash(current) == String(owner.dropFirst(prefix.count))
+            else { continue }
+            try manager.removeItem(at: url)
+        }
+        let base = exportFileBaseName(title)
+        var target = folder.appendingPathComponent(base + " – Summary").appendingPathExtension("md")
+        var number = 2
+        while manager.fileExists(atPath: target.path) {
+            target = folder.appendingPathComponent("\(base) (\(number)) – Summary").appendingPathExtension("md")
+            number += 1
+        }
         try data.write(to: target, options: .atomic)
-        OutputMarker.mark(target, owner: owner)
+        OutputMarker.mark(target, owner: prefix + contentHash(data))
+    }
+
+    nonisolated static func contentHash(_ data: Data) -> String {
+        SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
     }
 }

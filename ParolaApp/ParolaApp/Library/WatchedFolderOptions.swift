@@ -30,7 +30,6 @@ struct WatchedFolderOptions: Codable, Hashable, Sendable {
 
     var libraryToggleIsEnabled: Bool { exportsFiles }
 
-    /// Writing to the Auto-Export folder needs formats to write and a folder chosen.
     func offersAutoExportFolder(chosen: Bool) -> Bool { exportsFiles && chosen }
 
     /// What the options mean once they are consistent: no formats means nothing to save to the library instead of.
@@ -48,9 +47,9 @@ struct WatchedFolderOptions: Codable, Hashable, Sendable {
     }
 
     /// One line under the folder's name for anything that isn't a default; nil when everything is.
-    func summary(presets library: [ExportPreset], bundle: Bundle = .main) -> String? {
+    func summary(presets library: [ExportPreset], batchIsEnabled: Bool = true, bundle: Bundle = .main) -> String? {
         var parts: [String] = []
-        if !autoTranscribes { parts.append(String(localized: "Waits in Batch", bundle: bundle)) }
+        if !autoTranscribes, batchIsEnabled { parts.append(String(localized: "Waits in Batch", bundle: bundle)) }
         if !includesSubfolders { parts.append(String(localized: "Only this folder", bundle: bundle)) }
         let formats = presets(in: library).map { $0.spec.format.fileExtension.uppercased() }
         if !formats.isEmpty {

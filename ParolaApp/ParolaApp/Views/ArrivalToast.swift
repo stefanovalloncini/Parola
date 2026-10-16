@@ -52,8 +52,15 @@ struct ArrivalToast: View {
                 }
                 .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
                 .axLeaf("Arrival.Button.OpenBatch")
-            case .exported:
-                EmptyView()
+            case .exported(let file):
+                if file != nil {
+                    Button("Reveal") {
+                        model.revealExportedArrival()
+                    }
+                    .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
+                    .help("Reveal in Finder")
+                    .axLeaf("Arrival.Button.Reveal")
+                }
             case .running:
                 Button("Stop") {
                     model.stopBackgroundArrival()

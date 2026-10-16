@@ -8,6 +8,7 @@ struct AutoExportPane: View {
 
     var body: some View {
         @Bindable var model = model
+        let hasFolder = model.autoExportFolder != nil
         let displayed = displayedRules
         return SettingsForm {
             Section {
@@ -43,7 +44,7 @@ struct AutoExportPane: View {
 
             SettingsSection {
                 SettingRow(
-                    "Auto-export folder",
+                    "Auto-Export folder",
                     descriptionVerbatim: model.autoExportFolder.map { ($0.path as NSString).abbreviatingWithTildeInPath }
                         ?? String(localized: "Not chosen: recordings and links skip auto-export.")
                 ) {
@@ -54,19 +55,29 @@ struct AutoExportPane: View {
                     "Also Export the Recording",
                     description: "Copies a recording or meeting's audio to the Auto-Export folder, as it was saved."
                 ) {
-                    Toggle("", isOn: $model.autoExportRecording).labelsHidden()
-                        .axLeaf("AutoExport.Toggle.Recording")
+                    extraToggle($model.autoExportRecording, leaf: "AutoExport.Toggle.Recording", hasFolder: hasFolder)
                 }
-                SettingRow(
-                    "Also Export the AI Summary",
-                    description: "Writes each summary to the Auto-Export folder as a Markdown file, when it is ready."
-                ) {
-                    Toggle("", isOn: $model.autoExportSummary).labelsHidden()
-                        .axLeaf("AutoExport.Toggle.Summary")
+                if model.features.isEnabled(.ai) {
+                    SettingRow(
+                        "Also Export the AI Summary",
+                        description: "Writes each summary to the Auto-Export folder as a Markdown file, when it is ready."
+                    ) {
+                        extraToggle($model.autoExportSummary, leaf: "AutoExport.Toggle.Summary", hasFolder: hasFolder)
+                    }
                 }
             }
 
             ResetPaneButton(scope: .autoExport)
+        }
+    }
+
+    @ViewBuilder
+    private func extraToggle(_ isOn: Binding<Bool>, leaf: String, hasFolder: Bool) -> some View {
+        let toggle = Toggle("", isOn: isOn).labelsHidden()
+        if hasFolder {
+            toggle.axLeaf(leaf)
+        } else {
+            toggle.disabled(true).help("Choose an Auto-Export folder first.").axLeaf(leaf)
         }
     }
 

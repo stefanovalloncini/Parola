@@ -392,7 +392,7 @@ final class ParolaAutomationServer {
                 "path": .string(folder.displayPath),
                 "unavailable": .bool(store.isUnavailable(folder.id)),
                 "options": watchedFolderOptionsValue(folder.options),
-                "summary": folder.options.summary(presets: model.exportPresets).map { .string($0) } ?? .null,
+                "summary": folder.options.summary(presets: model.exportPresets, batchIsEnabled: model.features.isEnabled(.batch)).map { .string($0) } ?? .null,
             ])
         })
     }

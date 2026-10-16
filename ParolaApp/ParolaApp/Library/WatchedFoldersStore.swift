@@ -172,7 +172,7 @@ final class WatchedFoldersStore {
         folders.first { $0.id == id }?.options ?? .default
     }
 
-    /// A change of depth restarts that folder's watcher alone; a file already in a subfolder it now reaches counts as seen.
+    /// A change of depth restarts that folder's watcher alone.
     func setOptions(_ options: WatchedFolderOptions, for id: UUID) {
         guard let index = folders.firstIndex(where: { $0.id == id }) else { return }
         let normalized = options.normalized
@@ -181,26 +181,30 @@ final class WatchedFoldersStore {
         folders[index].options = normalized
         save()
         guard normalized.includesSubfolders != previous.includesSubfolders else { return }
-        restartWatcher(for: folders[index], widening: normalized.includesSubfolders)
+        restartWatcher(for: folders[index])
     }
 
-    /// A deleted preset leaves every folder's list.
-    func removeExportPreset(_ presetID: UUID) {
-        for index in folders.indices where folders[index].options.exportPresetIDs.contains(presetID) {
+    /// A preset that is gone leaves every folder's list; a folder left with no format saves to the library again.
+    func pruneExportPresets(keeping ids: Set<UUID>) {
+        var changed = false
+        for index in folders.indices {
             var options = folders[index].options
-            options.exportPresetIDs.removeAll { $0 == presetID }
-            folders[index].options = options.normalized
+            options.exportPresetIDs.removeAll { !ids.contains($0) }
+            options = options.normalized
+            if options != folders[index].options {
+                folders[index].options = options
+                changed = true
+            }
         }
-        save()
+        if changed { save() }
     }
 
-    private func restartWatcher(for folder: WatchedFolder, widening: Bool) {
+    private func restartWatcher(for folder: WatchedFolder) {
         cancelBaselineWrite(folder.id)
         startWatcher(
             for: folder,
             replacing: watchers.removeValue(forKey: folder.id),
-            releasing: scopedURLs.removeValue(forKey: folder.id),
-            widening: widening
+            releasing: scopedURLs.removeValue(forKey: folder.id)
         )
     }
 
@@ -256,13 +260,11 @@ final class WatchedFoldersStore {
             if !samePath {
                 baselines.remove(folder.id)
             }
-            let widening = samePath && folder.options.includesSubfolders && previous[folder.id]?.options.includesSubfolders == false
             startWatcher(
                 for: folder,
                 replacing: watchers.removeValue(forKey: folder.id),
                 releasing: scopedURLs.removeValue(forKey: folder.id),
-                carriesBaseline: samePath,
-                widening: widening
+                carriesBaseline: samePath
             )
         }
     }
@@ -322,8 +324,7 @@ final class WatchedFoldersStore {
         replacing previous: FolderWatcher? = nil,
         releasing previousScope: URL? = nil,
         carriesBaseline: Bool = true,
-        mounting: Bool = true,
-        widening: Bool = false
+        mounting: Bool = true
     ) {
         let id = folder.id
         let start = UUID()
@@ -385,7 +386,7 @@ final class WatchedFoldersStore {
             )
             self.watchers[id] = watcher
             self.scopedURLs[id] = resolved.url
-            await watcher.start(baseline: baseline, countsSubfolderFilesAsSeen: widening)
+            await watcher.start(baseline: baseline)
             guard self.watchers[id] === watcher else { return }
             if await watcher.state == .unavailable {
                 self.watchers[id] = nil

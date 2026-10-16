@@ -145,6 +145,58 @@ struct WatchedFoldersStoreOptionsTests {
         #expect(arrivals.names == ["top.wav", "later.wav"])
     }
 
+    @Test("a settings reload that widens the depth counts what is already in the subfolders as seen")
+    func reloadWidens() async throws {
+        let rig = try makeRig("reload-widen", options: [depthOptions(depth: false)])
+        defer { try? FileManager.default.removeItem(at: rig.root) }
+        try writeSettled(rig.folders[0].appendingPathComponent("Archive/old.m4a"))
+        let arrivals = Arrivals()
+        var starts = 0
+        let store = makeStore(rig, arrivals: arrivals)
+        store.onFolderWatching = { starts += 1 }
+        await waitUntil { starts == 1 }
+
+        var widened = store.folders[0]
+        widened.options.includesSubfolders = true
+        rig.defaults.set(try JSONEncoder().encode([widened]), forKey: "watchedFolders")
+        store.reloadFromDefaults()
+        await waitUntil { starts == 2 }
+        try writeSettled(rig.folders[0].appendingPathComponent("Archive/new.m4a"))
+        await waitUntil { arrivals.names == ["new.m4a"] }
+        await store.stopWatching()
+
+        #expect(arrivals.names == ["new.m4a"])
+    }
+
+    @Test("a relaunch after a depth change that never reached the saved baseline still skips the subfolder backlog")
+    func relaunchAfterWidening() async throws {
+        let rig = try makeRig("relaunch-widen", options: [depthOptions(depth: false)])
+        defer { try? FileManager.default.removeItem(at: rig.root) }
+        let arrivals = Arrivals()
+        var starts = 0
+        let first = makeStore(rig, arrivals: arrivals)
+        first.onFolderWatching = { starts += 1 }
+        await waitUntil { starts == 1 }
+        let baselineURL = rig.baselineDirectory.appendingPathComponent("\(rig.ids[0].uuidString).json")
+        await waitUntil { FileManager.default.fileExists(atPath: baselineURL.path) }
+        await first.stopWatching()
+
+        var widened = first.folders[0]
+        widened.options.includesSubfolders = true
+        rig.defaults.set(try JSONEncoder().encode([widened]), forKey: "watchedFolders")
+        try writeSettled(rig.folders[0].appendingPathComponent("Archive/old.m4a"))
+
+        starts = 0
+        let second = makeStore(rig, arrivals: arrivals)
+        second.onFolderWatching = { starts += 1 }
+        await waitUntil { starts == 1 }
+        try writeSettled(rig.folders[0].appendingPathComponent("Archive/new.m4a"))
+        await waitUntil { arrivals.names == ["new.m4a"] }
+        await second.stopWatching()
+
+        #expect(arrivals.names == ["new.m4a"])
+    }
+
     @Test("options without formats come back normalized, and the same options change nothing")
     func setOptionsNormalizes() async throws {
         let rig = try makeRig("normal")
@@ -176,7 +228,7 @@ struct WatchedFoldersStoreOptionsTests {
         defer { try? FileManager.default.removeItem(at: rig.root) }
         let store = makeStore(rig, arrivals: Arrivals())
 
-        store.removeExportPreset(gone)
+        store.pruneExportPresets(keeping: [kept])
 
         #expect(store.options(for: rig.ids[0]).exportPresetIDs == [kept])
         await store.stopWatching()

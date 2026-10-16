@@ -31,9 +31,11 @@ struct WatchedFolderOptionsSheet: View {
 
     private var transcriptionSection: some View {
         SettingsSection("New Files") {
-            SettingRow("Auto-Transcribe", description: "Off: new files wait in Batch until you start them.") {
-                Toggle("", isOn: binding(\.autoTranscribes)).labelsHidden()
-                    .axLeaf("WatchedFolders.Options.Toggle.AutoTranscribe")
+            if model.features.isEnabled(.batch) {
+                SettingRow("Auto-Transcribe", description: "Off: new files wait in Batch until you start them.") {
+                    Toggle("", isOn: binding(\.autoTranscribes)).labelsHidden()
+                        .axLeaf("WatchedFolders.Options.Toggle.AutoTranscribe")
+                }
             }
             SettingRow("Folder Depth") {
                 Picker("", selection: binding(\.includesSubfolders)) {
@@ -51,11 +53,18 @@ struct WatchedFolderOptionsSheet: View {
                     ? "Off: the transcript is only exported."
                     : "Choose an export format first."
             ) {
-                Toggle("", isOn: binding(\.savesToLibrary)).labelsHidden()
-                    .disabled(!options.libraryToggleIsEnabled)
-                    .help(options.libraryToggleIsEnabled ? "" : String(localized: "Choose an export format first."))
-                    .axLeaf("WatchedFolders.Options.Toggle.SaveToLibrary")
+                libraryToggle
             }
+        }
+    }
+
+    @ViewBuilder private var libraryToggle: some View {
+        let toggle = Toggle("", isOn: binding(\.savesToLibrary)).labelsHidden()
+        if options.libraryToggleIsEnabled {
+            toggle.axLeaf("WatchedFolders.Options.Toggle.SaveToLibrary")
+        } else {
+            toggle.disabled(true).help("Choose an export format first.")
+                .axLeaf("WatchedFolders.Options.Toggle.SaveToLibrary")
         }
     }
 

@@ -50,7 +50,7 @@ private struct WatchedFoldersPaneBody: View {
                 }
             }
 
-            SettingHelper(text: "New files dropped into a watched folder are transcribed automatically, including ones added while Parola was closed. Files already there when you add the folder are ignored.")
+            SettingHelper(text: "New files added to a watched folder are transcribed automatically unless you turn that off in Options. That includes files added while Parola was closed. Files already there when you add the folder are ignored.")
             ResetPaneButton(scope: .watchedFolders)
         }
         .sheet(item: optionsFolder) { folder in
@@ -106,7 +106,10 @@ private struct WatchedFolderRow: View {
     }
 
     private var description: String {
-        guard let summary = folder.options.summary(presets: model.exportPresets) else { return folder.displayPath }
-        return folder.displayPath + "\n" + summary
+        let path = (folder.displayPath as NSString).abbreviatingWithTildeInPath
+        guard let summary = folder.options.summary(
+            presets: model.exportPresets, batchIsEnabled: model.features.isEnabled(.batch)
+        ) else { return path }
+        return path + "\n" + summary
     }
 }

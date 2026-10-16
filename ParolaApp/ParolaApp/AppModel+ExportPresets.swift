@@ -6,14 +6,18 @@ import ParolaCore
 struct ExportPresetUse: Equatable {
     let ruleCount: Int
     let inBatch: Bool
+    var folderCount = 0
+    var soleFormatFolderCount = 0
 
-    var isUsed: Bool { ruleCount > 0 || inBatch }
+    var isUsed: Bool { ruleCount > 0 || inBatch || folderCount > 0 }
 
     var deleteMessage: String {
         let batch = ruleCount > 0 ? String(localized: "Batch runs use it too.") : String(localized: "Batch runs use it.")
         let parts = [
             ruleCount > 0 ? String(localized: "\(ruleCount) auto-export rules use it.") : nil,
             inBatch ? batch : nil,
+            folderCount > 0 ? String(localized: "\(folderCount) watched folders use it.") : nil,
+            soleFormatFolderCount > 0 ? String(localized: "A folder left with no format saves to the Library again.") : nil,
         ]
         return parts.compactMap { $0 }.joined(separator: " ")
     }
@@ -38,6 +42,7 @@ extension AppModel {
     /// The one way the preset library changes: every add, rename, delete and move lands here.
     func setExportPresets(_ presets: [ExportPreset]) {
         exportPresets = AppModel.normalizedExportPresets(presets, referencedIDs: referencedExportPresetIDs)
+        if watchedFoldersBuilt { watchedFolders.pruneExportPresets(keeping: Set(exportPresets.map(\.id))) }
     }
 
     /// Ids a rule or the batch selection still points at, so normalization can put those presets back.
@@ -115,10 +120,16 @@ extension AppModel {
         return name
     }
 
+    private var watchedFolderOptions: [WatchedFolderOptions] {
+        watchedFoldersIfWatching?.folders.map(\.options) ?? []
+    }
+
     func exportPresetUse(id: UUID) -> ExportPresetUse {
         ExportPresetUse(
             ruleCount: autoExportRules.count { $0.presetIDs.contains(id) },
-            inBatch: batchExportPresetIDs.contains(id)
+            inBatch: batchExportPresetIDs.contains(id),
+            folderCount: watchedFolderOptions.count { $0.exportPresetIDs.contains(id) },
+            soleFormatFolderCount: watchedFolderOptions.count { $0.exportPresetIDs == [id] }
         )
     }
 
@@ -132,7 +143,6 @@ extension AppModel {
             rules[index].presetIDs.removeAll { $0 == id }
         }
         if rules != autoExportRules { autoExportRules = rules }
-        watchedFoldersIfWatching?.removeExportPreset(id)
         setExportPresets(exportPresets.filter { $0.id != id })
     }
 

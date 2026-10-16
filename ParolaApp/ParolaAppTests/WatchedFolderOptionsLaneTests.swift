@@ -25,9 +25,10 @@ extension TranscriberMockSuites {
 
         private func withRig(
             _ label: String, options: WatchedFolderOptions, files: [String] = ["Standup"], rules: [AutoExportRule] = [],
-            chooseExportFolder: Bool = false, _ body: (Rig) async throws -> Void
+            chooseExportFolder: Bool = false, features: Set<ParolaFeature> = Set(ParolaFeature.allCases),
+            _ body: (Rig) async throws -> Void
         ) async throws {
-            let rig = try await makeRig(label, options: options, files: files, rules: rules, chooseExportFolder: chooseExportFolder)
+            let rig = try await makeRig(label, options: options, files: files, rules: rules, chooseExportFolder: chooseExportFolder, features: features)
             do {
                 try await body(rig)
             } catch {
@@ -39,7 +40,7 @@ extension TranscriberMockSuites {
 
         private func makeRig(
             _ label: String, options: WatchedFolderOptions, files: [String] = ["Standup"], rules: [AutoExportRule] = [],
-            chooseExportFolder: Bool = false
+            chooseExportFolder: Bool = false, features: Set<ParolaFeature> = Set(ParolaFeature.allCases)
         ) async throws -> Rig {
             let root = FileManager.default.temporaryDirectory
                 .appendingPathComponent("parola-lane-options-\(label)-\(UUID().uuidString)", isDirectory: true)
@@ -55,7 +56,7 @@ extension TranscriberMockSuites {
             defaults.set(try JSONEncoder().encode([watched]), forKey: "watchedFolders")
             let model = AppModel(
                 skipBootstrap: true, defaults: defaults,
-                libraryURL: makeTempLibraryURL("lane-options-\(label)"), features: Set(ParolaFeature.allCases)
+                libraryURL: makeTempLibraryURL("lane-options-\(label)"), features: features
             )
             model.selectedModel = Self.appleSpeech
             model.cardMetadataOperation = { _ in CardMetadata(title: "Titled", summary: "Summed up.") }
@@ -200,7 +201,9 @@ extension TranscriberMockSuites {
                     #expect(await model.library.list().isEmpty)
                     #expect(names(in: rig.folder) == ["Standup.srt", "Standup.wav"])
                     #expect(OutputMarker.isMarked(rig.folder.appendingPathComponent("Standup.srt")))
-                    #expect(model.arrivalNotice?.state == .exported)
+                    #expect(model.arrivalNotice?.state == .exported(rig.folder.appendingPathComponent("Standup.srt")))
+                    let notice = try #require(model.arrivalNotice)
+                    #expect(ParolaAutomationServer.arrivalButtons(notice) == [.reveal, .dismiss])
                     #expect(model.arrivalNotice?.title() == "Transcribed Standup and exported it")
                     #expect(model.exportNotice == nil)
                 }
@@ -281,6 +284,215 @@ extension TranscriberMockSuites {
 
                     #expect(names(in: rig.folder) == ["Standup.wav"])
                     #expect(await model.library.list().count == 1)
+                }
+            }
+        }
+
+        @Test("a folder's own format that fails saves the transcript even though a global rule wrote its file")
+        func ownFailureWithAGlobalRuleWriting() async throws {
+            try await withMocksCleared(.transcriber) {
+                await install()
+                var options = WatchedFolderOptions()
+                options.savesToLibrary = false
+                options.exportPresetIDs = [srt.id]
+                options.exportsToAutoExportFolder = true
+                let rules = [AutoExportRule(sourceExtensions: ["wav"], presetIDs: [txt.id])]
+                try await withRig("own-fails", options: options, rules: rules, chooseExportFolder: true) { rig in
+                    let model = rig.model
+                    try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: rig.exportFolder.path)
+                    defer { try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: rig.exportFolder.path) }
+
+                    model.handleWatchedArrival(try #require(rig.files["Standup"]))
+                    await landed(model)
+
+                    #expect(names(in: rig.folder) == ["Standup.txt", "Standup.wav"])
+                    let entries = await model.library.list()
+                    #expect(entries.count == 1)
+                    #expect(model.exportNotice != nil)
+                    #expect(model.arrivalNotice?.state == .saved(try #require(entries.first).id))
+                }
+            }
+        }
+
+        @Test("one of two formats failing saves the transcript and says why")
+        func partialFailure() async throws {
+            try await withMocksCleared(.transcriber) {
+                await install()
+                var options = WatchedFolderOptions()
+                options.savesToLibrary = false
+                options.exportPresetIDs = [srt.id, txt.id]
+                try await withRig("partial", options: options) { rig in
+                    let model = rig.model
+                    let blocker = rig.folder.appendingPathComponent("Standup.srt")
+                    try FileManager.default.createDirectory(at: blocker, withIntermediateDirectories: true)
+                    OutputMarker.mark(blocker, owner: "Standup.wav")
+
+                    model.handleWatchedArrival(try #require(rig.files["Standup"]))
+                    await landed(model)
+
+                    #expect(OutputMarker.isMarked(rig.folder.appendingPathComponent("Standup.txt")))
+                    #expect(await model.library.list().count == 1)
+                    #expect(model.exportNotice != nil)
+                }
+            }
+        }
+
+        @Test("with no Auto-Export folder chosen the transcript is saved, and every file in the launch says why")
+        func missingFolderSaysSoEachTime() async throws {
+            try await withMocksCleared(.transcriber) {
+                await install()
+                var options = WatchedFolderOptions()
+                options.savesToLibrary = false
+                options.exportPresetIDs = [srt.id]
+                options.exportsToAutoExportFolder = true
+                try await withRig("missing-folder", options: options, files: ["One", "Two"]) { rig in
+                    let model = rig.model
+
+                    model.handleWatchedArrival(try #require(rig.files["One"]))
+                    await landed(model)
+                    #expect(model.exportNotice?.message == ExportNotice.autoExportFolderMissing.message)
+                    model.dismissExportNotice()
+
+                    model.handleWatchedArrival(try #require(rig.files["Two"]))
+                    await landed(model)
+                    #expect(model.exportNotice?.message == ExportNotice.autoExportFolderMissing.message)
+                    #expect(await model.library.list().count == 2)
+                }
+            }
+        }
+
+        @Test("an Auto-Export folder that is gone saves the transcript and says so")
+        func unavailableFolder() async throws {
+            try await withMocksCleared(.transcriber) {
+                await install()
+                var options = WatchedFolderOptions()
+                options.savesToLibrary = false
+                options.exportPresetIDs = [srt.id]
+                options.exportsToAutoExportFolder = true
+                try await withRig("gone-folder", options: options, chooseExportFolder: true) { rig in
+                    let model = rig.model
+                    try FileManager.default.removeItem(at: rig.exportFolder)
+
+                    model.handleWatchedArrival(try #require(rig.files["Standup"]))
+                    await landed(model)
+
+                    #expect(model.exportNotice?.message == ExportNotice.autoExportFolderUnavailable.message)
+                    #expect(await model.library.list().count == 1)
+                }
+            }
+        }
+
+        @Test("with Batch off the Auto-Transcribe option is ignored and the file runs")
+        func batchGatedOff() async throws {
+            try await withMocksCleared(.transcriber) {
+                await install()
+                var options = WatchedFolderOptions()
+                options.autoTranscribes = false
+                let features = Set(ParolaFeature.allCases).subtracting([.batch])
+                try await withRig("no-batch", options: options, features: features) { rig in
+                    let model = rig.model
+
+                    model.handleWatchedArrival(try #require(rig.files["Standup"]))
+                    await landed(model)
+
+                    #expect(model.batchJobs.isEmpty)
+                    #expect(await model.library.list().count == 1)
+                    #expect(options.summary(presets: ExportPreset.builtIns, batchIsEnabled: false) == nil)
+                }
+            }
+        }
+
+        @Test("a file the library already holds is still exported by a folder that keeps nothing in it")
+        func exportOnlySkipsTheDuplicateCheck() async throws {
+            try await withMocksCleared(.transcriber) {
+                await install()
+                var options = WatchedFolderOptions()
+                options.savesToLibrary = false
+                options.exportPresetIDs = [srt.id]
+                try await withRig("duplicate", options: options) { rig in
+                    let model = rig.model
+                    let audio = try #require(rig.files["Standup"])
+                    _ = try await model.library.add(
+                        transcript: Transcript(
+                            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "already here")],
+                            language: "en", modelName: "stub"
+                        ),
+                        audioSource: audio
+                    )
+
+                    model.handleWatchedArrival(audio)
+                    await landed(model)
+
+                    #expect(names(in: rig.folder) == ["Standup.srt", "Standup.wav"])
+                    #expect(await model.library.list().count == 1)
+                }
+            }
+        }
+
+        @Test("the queued toast never replaces one that carries a Retry")
+        func queuedToastKeepsARetry() async throws {
+            try await withMocksCleared(.transcriber) {
+                await install()
+                var options = WatchedFolderOptions()
+                options.autoTranscribes = false
+                try await withRig("retry-kept", options: options) { rig in
+                    let model = rig.model
+                    let failed = ArrivalNotice(unsaved: URL(fileURLWithPath: "/tmp/Other.wav"), reason: "disk full")
+                    model.arrivalNotice = failed
+
+                    model.handleWatchedArrival(try #require(rig.files["Standup"]))
+
+                    #expect(model.arrivalNotice == failed)
+                    #expect(model.batchJobs.count == 1)
+                }
+            }
+        }
+
+        @Test("jobs restored after a relaunch stay held until the user resumes")
+        func restoredJobsStayHeld() async throws {
+            try await withMocksCleared(.transcriber) {
+                await install()
+                var options = WatchedFolderOptions()
+                options.autoTranscribes = false
+                try await withRig("restored", options: options) { rig in
+                    let model = rig.model
+                    model.handleWatchedArrival(try #require(rig.files["Standup"]))
+                    model.saveBatchQueueSnapshot()
+
+                    let relaunched = AppModel(
+                        skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: model.library.libraryURL,
+                        features: Set(ParolaFeature.allCases)
+                    )
+                    relaunched.restoreBatchQueue()
+
+                    #expect(relaunched.batchJobs.count == 1)
+                    #expect(relaunched.heldBatchJobIDs == Set(relaunched.batchJobs.map(\.id)))
+                }
+            }
+        }
+
+        @Test("cancelling a running batch job does not start a job a folder is holding")
+        func cancelDoesNotReleaseHeldJobs() async throws {
+            try await withMocksCleared(.transcriber) {
+                let gate = MockTranscriberGate()
+                await MockTranscriberRegistry.shared.install(engineID: .appleSpeech, response: MockTranscriberResponse(
+                    segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "held back")], failure: nil, gate: gate
+                ))
+                var options = WatchedFolderOptions()
+                options.autoTranscribes = false
+                try await withRig("cancel-held", options: options, files: ["Held", "Running"]) { rig in
+                    let model = rig.model
+                    model.handleWatchedArrival(try #require(rig.files["Held"]))
+                    model.addBatchFiles([try #require(rig.files["Running"])])
+                    await waitUntil(timeoutMs: 10_000) { model.batchJobs.contains { $0.status == .transcribing } }
+                    let runningJob = model.batchJobs.first { $0.status == .transcribing }
+                    let running = try #require(runningJob)
+
+                    model.cancelBatchJob(running.id)
+
+                    let held = model.batchJobs.first { $0.displayName == "Held" }
+                    #expect(held?.status == .pending)
+                    await gate.open()
                 }
             }
         }
