@@ -13,7 +13,7 @@ struct AdvancedPane: View {
                            description: "Save your settings to a `.parola-settings` file, or restore one. Downloaded models and the prompt library are not included.") {
                     HStack(spacing: 8) {
                         Button("Export…") {
-                            transferFailure = SettingsExportService.presentExportPanel()
+                            Task { transferFailure = await SettingsExportService.exportSettings(using: model.filePicker) }
                         }
                         .accessibilityLabel("Export Settings…")
                         .axLeaf("Advanced.Button.ExportSettings")

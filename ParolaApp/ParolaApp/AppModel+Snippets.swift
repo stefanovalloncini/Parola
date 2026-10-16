@@ -16,23 +16,18 @@ extension AppModel {
         writeJSON(snippets, forKey: AppModel.snippetsDefaultsKey)
     }
 
-    func exportSnippetsToFile() {
-        let panel = NSSavePanel()
-        panel.allowedContentTypes = [.json]
-        panel.nameFieldStringValue = "parola-snippets.json"
-        guard panel.runModal() == .OK, let url = panel.url else { return }
+    func exportSnippetsToFile() async {
+        guard let url = await filePicker.chooseSaveDestination(suggestedName: "parola-snippets.json", allowedTypes: [.json]) else { return }
         let items = snippets
-        Task { [weak self] in
-            do {
-                try await AppModel.offMainIO {
-                    let encoder = JSONEncoder()
-                    encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-                    try encoder.encode(items).write(to: url, options: .atomic)
-                }
-            } catch {
-                ParolaLog.error(.export, "snippets export failed", [.error: .error(error)])
-                self?.exportNotice = .failed(error)
+        do {
+            try await AppModel.offMainIO {
+                let encoder = JSONEncoder()
+                encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+                try encoder.encode(items).write(to: url, options: .atomic)
             }
+        } catch {
+            ParolaLog.error(.export, "snippets export failed", [.error: .error(error)])
+            exportNotice = .failed(error)
         }
     }
 

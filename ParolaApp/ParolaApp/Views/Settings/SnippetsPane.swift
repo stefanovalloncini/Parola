@@ -32,7 +32,7 @@ struct SnippetsPane: View {
                 ) {
                     Button("Import…") { model.importSnippetsFromFile() }
                         .axLeaf("Snippets.MenuItem.Import")
-                    Button("Export…") { model.exportSnippetsToFile() }
+                    Button("Export…") { Task { await model.exportSnippetsToFile() } }
                         .disabled(model.snippets.isEmpty)
                         .axLeaf("Snippets.MenuItem.Export")
                 }

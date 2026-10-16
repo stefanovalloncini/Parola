@@ -25,12 +25,10 @@ enum SettingsExportService {
     }()
 
     @MainActor
-    static func presentExportPanel() -> SettingsTransferFailure? {
-        let panel = NSSavePanel()
-        panel.nameFieldStringValue = "parola.parola-settings"
-        panel.allowedContentTypes = []
-        panel.message = String(localized: "Save Parola settings")
-        guard panel.runModal() == .OK, let url = panel.url else { return nil }
+    static func exportSettings(using picker: any FilePicker) async -> SettingsTransferFailure? {
+        guard let url = await picker.chooseSaveDestination(
+            suggestedName: "parola.parola-settings", allowedTypes: [], message: String(localized: "Save Parola settings")
+        ) else { return nil }
         let payload = exportPayload()
         do {
             let data = try JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted, .sortedKeys])

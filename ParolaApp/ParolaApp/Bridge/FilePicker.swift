@@ -43,6 +43,12 @@ final class SystemFilePicker: FilePicker {
 final actor TestFilePicker: FilePicker {
     private var inputResponses: [[URL]] = []
     private var saveResponses: [URL?] = []
+    private(set) var saveRequests: [SaveRequest] = []
+
+    struct SaveRequest: Equatable, Sendable {
+        let suggestedName: String
+        let allowedTypes: [UTType]
+    }
 
     func queueInputResponse(_ urls: [URL]) { inputResponses.append(urls) }
     func queueSaveResponse(_ url: URL?) { saveResponses.append(url) }
@@ -53,6 +59,7 @@ final actor TestFilePicker: FilePicker {
     }
 
     func chooseSaveDestination(suggestedName: String, allowedTypes: [UTType], message: String?) async -> URL? {
+        saveRequests.append(SaveRequest(suggestedName: suggestedName, allowedTypes: allowedTypes))
         guard !saveResponses.isEmpty else { return nil }
         return saveResponses.removeFirst()
     }

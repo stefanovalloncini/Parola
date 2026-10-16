@@ -225,13 +225,10 @@ final class LiveCaptionsController {
         }
     }
 
-    func saveCaptionsHistory() {
+    func saveCaptionsHistory(using picker: any FilePicker) async {
         guard hasHistory else { return }
-        let panel = NSSavePanel()
-        panel.allowedContentTypes = [.plainText]
         let stamp = Self.timestampFormatter.string(from: Date()).replacingOccurrences(of: ":", with: "-")
-        panel.nameFieldStringValue = "captions-\(stamp).txt"
-        guard panel.runModal() == .OK, let url = panel.url else { return }
+        guard let url = await picker.chooseSaveDestination(suggestedName: "captions-\(stamp).txt", allowedTypes: [.plainText]) else { return }
         try? state.historyText.data(using: .utf8)?.write(to: url, options: .atomic)
     }
 
