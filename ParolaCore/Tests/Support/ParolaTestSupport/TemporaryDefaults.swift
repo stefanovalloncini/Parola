@@ -22,16 +22,17 @@ public enum TemporarySuites {
         registered.withLock { $0.append(name) }
     }
 
-    /// Deletes `paths` from a process that outlives this one, retrying until they stay gone: cfprefsd
-    /// writes every suite it knows about back to disk as this process goes away, so a plist removed
-    /// from here reappears. On success the list file is deleted; a list file left in `listDirectory`
-    /// means the sweeper gave up with files still on disk.
+    /// Deletes `paths` from a process that outlives this one, until `quietPasses` passes in a row find
+    /// nothing: cfprefsd writes every suite it knows about back to disk up to about ten seconds after
+    /// this process goes away, so a plist removed from here reappears. On success the list file is
+    /// deleted; a list file left in `listDirectory` means the sweeper gave up with files still on disk.
     @discardableResult
     public static func sweep(
         plists paths: [String],
         listDirectory: URL = FileManager.default.temporaryDirectory,
         interval: Double = 2,
-        passes: Int = 30
+        quietPasses: Int = 15,
+        passes: Int = 90
     ) -> URL? {
         guard !paths.isEmpty else { return nil }
         let list = listDirectory.appending(path: "parola-temporary-suites-\(UUID().uuidString)")
@@ -44,6 +45,7 @@ public enum TemporarySuites {
 
         let script = """
         i=0
+        quiet=0
         while [ "$i" -lt \(passes) ]; do
           i=$((i + 1))
           sleep \(interval)
@@ -55,6 +57,11 @@ public enum TemporarySuites {
             fi
           done < "$0"
           if [ "$found" -eq 0 ]; then
+            quiet=$((quiet + 1))
+          else
+            quiet=0
+          fi
+          if [ "$quiet" -ge \(quietPasses) ]; then
             rm -f "$0"
             exit 0
           fi

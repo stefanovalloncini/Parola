@@ -19,7 +19,7 @@ struct TemporaryDefaultsTests {
 
         let list = try #require(
             TemporarySuites.sweep(
-                plists: doomed.map(\.path), listDirectory: root, interval: 0.1, passes: 50
+                plists: doomed.map(\.path), listDirectory: root, interval: 0.1, quietPasses: 3, passes: 50
             )
         )
 
@@ -29,6 +29,32 @@ struct TemporaryDefaultsTests {
 
         let finished = await poll { !files.fileExists(atPath: list.path) }
         #expect(finished, "the sweeper kept its list file, so it gave up with files still on disk")
+    }
+
+    @Test("the sweeper catches plists written back after it first found nothing")
+    func catchesLateWriteBack() async throws {
+        let files = FileManager.default
+        let root = files.temporaryDirectory.appending(path: "parola late write-back \(UUID().uuidString)")
+        try files.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? files.removeItem(at: root) }
+
+        let doomed = (0..<3).map { root.appending(path: "late-\($0)-\(UUID().uuidString).plist") }
+        for url in doomed { try Data("x".utf8).write(to: url) }
+
+        let list = try #require(
+            TemporarySuites.sweep(
+                plists: doomed.map(\.path), listDirectory: root, interval: 0.1, quietPasses: 20, passes: 200
+            )
+        )
+        let writeBack = Process()
+        writeBack.executableURL = URL(filePath: "/bin/sh")
+        writeBack.arguments = ["-c", "sleep 0.8; for f in \"$@\"; do echo x > \"$f\"; done", "sh"] + doomed.map(\.path)
+        try writeBack.run()
+        writeBack.waitUntilExit()
+
+        let finished = await poll { !files.fileExists(atPath: list.path) }
+        #expect(finished, "the sweeper gave up")
+        #expect(doomed.allSatisfy { !files.fileExists(atPath: $0.path) }, "a write-back survived the sweeper")
     }
 
     private func poll(
