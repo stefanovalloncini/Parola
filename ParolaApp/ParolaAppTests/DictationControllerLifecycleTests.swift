@@ -269,7 +269,7 @@ struct DictationControllerLifecycleTests {
 
         controller.cancelDictation()
 
-        #expect(controller.state == .idle)
+        await waitUntil { controller.state == .idle }
         await waitUntil { await recorder.discarded }
         await settle()
         #expect(store.all().isEmpty)

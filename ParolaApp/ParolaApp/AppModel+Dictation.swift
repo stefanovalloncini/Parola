@@ -197,10 +197,6 @@ extension AppModel {
     func wireDictationController() {
         dictationController.appModel = self
         dictationController.indicatorStyle = dictationIndicatorStyle
-        dictationPermissions.onAccessibilityGranted = { [weak self] in
-            guard let self, self.dictationEnabled, self.dictationController.isRunning else { return }
-            self.restartDictation()
-        }
     }
 
     func restartDictation() {
@@ -209,21 +205,22 @@ extension AppModel {
         startDictation()
     }
 
-    /// Debounced restart for the two settings bound to a live control — the custom-vocabulary
-    /// field and the paste-delay slider. Restarting the hotkey coordinator per keystroke/tick
-    /// would thrash it and spawn a prewarm task each time; coalesce to one restart once editing settles.
-    func scheduleDictationRestart() {
-        pendingDictationRestart?.cancel()
-        guard dictationEnabled, dictationController.isRunning else {
-            pendingDictationRestart = nil
+    func applyDictationModelChange() {
+        guard dictationEnabled, dictationController.isRunning else { return }
+        prewarmDictationModel()
+    }
+
+    func reapplyDictationAfterReload() {
+        let running = dictationController.configuration
+        guard dictationController.isRunning,
+              running?.hotkeyKeyCode == dictationKeyCode,
+              running?.hotkeyModifiers == dictationModifierFlags
+        else {
+            stopDictation()
+            startDictation()
             return
         }
-        let clock = clock
-        pendingDictationRestart = Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .milliseconds(400), clock: clock)
-            guard !Task.isCancelled else { return }
-            self?.restartDictation()
-        }
+        applyDictationModelChange()
     }
 
     func applyDictationEnabledChange() {
@@ -244,8 +241,6 @@ extension AppModel {
 
     /// Unlike a restart's stop, this drops a final still on its way: nothing is pasted once dictation is off.
     func turnOffDictation() {
-        pendingDictationRestart?.cancel()
-        pendingDictationRestart = nil
         let mayBeTranscribing = dictationController.state != .idle
         let configuredModel = dictationController.configuration?.modelName ?? selectedModel
         dictationController.discardAndStop()
@@ -260,6 +255,7 @@ extension AppModel {
     func startDictation() {
         guard features.isEnabled(.dictation) else { return }
         guard !dictationController.isRunning else { return }
+        let initial = dictationPipelineConfiguration()
         let configuration = DictationController.Configuration(
             modelName: selectedModel,
             language: selectedLanguage,
@@ -271,11 +267,14 @@ extension AppModel {
             listensForHotkey: activeSideEffects.contains(.dictationHotkey),
             mode: dictationMode,
             workflows: dictationWorkflows(),
-            postProcessor: currentDictationProcessor(),
-            pasteDelayMs: max(0, min(2000, dictationPasteDelayMs)),
+            postProcessor: initial.postProcessor,
+            pasteDelayMs: initial.pasteDelayMs,
             mediaSession: mediaSession,
             mediaConfigProvider: { [weak self] in
                 await MainActor.run { self?.mediaSessionConfig(allowMute: true) ?? .none }
+            },
+            pipelineProvider: { [weak self] in
+                await MainActor.run { self?.dictationPipelineConfiguration() ?? initial }
             },
             willListen: { [weak self] in
                 await self?.readAloud.yield(to: .dictation)
@@ -416,24 +415,17 @@ extension AppModel {
         return chain.count == 1 ? prompt : CompositePostProcessor(chain)
     }
 
-    func applyDictationCleanupPromptChange() {
-        guard dictationController.isRunning else { return }
-        dictationController.setPostProcessor(currentDictationProcessor())
-    }
-
-    /// The Snippets and Corrections panes write on every keystroke; the chain is rebuilt once the typing settles.
-    func scheduleDictationProcessorRebuild() {
-        pendingDictationProcessorRebuild?.cancel()
-        guard dictationController.isRunning else {
-            pendingDictationProcessorRebuild = nil
-            return
-        }
-        let clock = clock
-        pendingDictationProcessorRebuild = Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .milliseconds(400), clock: clock)
-            guard !Task.isCancelled else { return }
-            self?.applyDictationCleanupPromptChange()
-        }
+    func dictationPipelineConfiguration() -> DictationPipelineConfiguration {
+        DictationPipelineConfiguration(
+            modelName: selectedModel,
+            language: selectedLanguage,
+            initialPrompt: initialPrompt.isEmpty ? nil : initialPrompt,
+            deviceUID: preferredInputDeviceUID,
+            streamingEnabled: useStreaming,
+            workflows: dictationWorkflows(),
+            postProcessor: currentDictationProcessor(),
+            pasteDelayMs: max(0, min(2000, dictationPasteDelayMs))
+        )
     }
 
     func refreshDictationTriggerPrompts() async {
@@ -441,7 +433,6 @@ extension AppModel {
         let prompts = (Prompt.builtIns + user).filter { !$0.triggerWords.isEmpty }
         await MainActor.run {
             self.cachedDictationTriggerPrompts = prompts
-            self.applyDictationCleanupPromptChange()
         }
     }
 
@@ -465,8 +456,6 @@ extension AppModel {
     }
 
     func stopDictation() {
-        pendingDictationRestart?.cancel()
-        pendingDictationRestart = nil
         dictationController.stop()
     }
 

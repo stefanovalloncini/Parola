@@ -277,89 +277,142 @@ struct AppModelDictationTests {
         #expect(workflow.urlPattern == nil)
     }
 
-    @Test("editing correction rules refreshes a running dictation processor")
-    func correctionRulesRefreshRunningProcessor() async {
+    @Test("each press builds its configuration from the current settings")
+    func pipelineConfigurationReadsCurrentSettings() async {
         let model = makeModel()
-        model.startDictation()
-        #expect(model.dictationController.isRunning)
-
-        model.correctionRules = [CorrectionRule(from: "q three", to: "Q")]
         model.correctionRules = [CorrectionRule(from: "q three", to: "Q3")]
-        // The rebuild waits for the pane's typing to settle; flush it.
-        await model.pendingDictationProcessorRebuild?.value
-
-        let processor = model.dictationController.configuration?.postProcessor
-        let out = await processor?.process("q three results")
-        #expect(out == "Q3 results")
-
-        model.stopDictation()
-    }
-
-    @Test("editing snippets refreshes a running dictation processor once the typing settles")
-    func snippetEditsRefreshRunningProcessor() async {
-        let model = makeModel()
-        model.startDictation()
-        #expect(model.dictationController.isRunning)
-
-        model.snippets = [Snippet(trigger: "o", replacement: "?")]
-        let pending = model.pendingDictationProcessorRebuild
         model.snippets = [Snippet(trigger: "omw", replacement: "on my way")]
-        #expect(pending?.isCancelled == true)
-        await model.pendingDictationProcessorRebuild?.value
-
-        let out = await model.dictationController.configuration?.postProcessor.process("omw home")
-        #expect(out == "on my way home")
-
-        model.stopDictation()
-    }
-
-    @Test("rule edits with dictation off schedule nothing")
-    func ruleEditsWithDictationOffScheduleNothing() {
-        let model = makeModel()
-        model.correctionRules = [CorrectionRule(from: "teh", to: "the")]
-        #expect(model.pendingDictationProcessorRebuild == nil)
-    }
-
-    @Test("toggling self-correction strip refreshes a running dictation processor")
-    func selfCorrectionStripRefreshesRunningProcessor() async {
-        let model = makeModel()
-        model.startDictation()
-        #expect(model.dictationController.isRunning)
-
         model.dictationStripSelfCorrections = true
+        model.dictationContextSelection = true
+        model.dictationPasteDelayMs = 250
+        model.initialPrompt = "Parola"
+        model.inputDeviceUID = "usb"
 
-        let processor = model.dictationController.configuration?.postProcessor
-        let out = await processor?.process("scratch that, hello world")
-        #expect(out == "hello world", "the strip proves the refresh; Voice mode no longer rewrites case")
+        let configuration = model.dictationPipelineConfiguration()
 
-        model.stopDictation()
+        #expect(configuration.pasteDelayMs == 250)
+        #expect(configuration.initialPrompt == "Parola")
+        #expect(configuration.deviceUID == "usb")
+        let out = await configuration.postProcessor.process("scratch that, q three omw")
+        #expect(out == "Q3 on my way")
+        let processor = (configuration.postProcessor as? CompositePostProcessor)
+        #expect(processor != nil)
     }
 
-    @Test("toggling dictation context sources refreshes a running dictation processor")
-    func contextSourcesRefreshRunningProcessor() {
+    private final class PressLog: @unchecked Sendable {
+        private let lock = NSLock()
+        private var items: [DictationPipelineConfiguration] = []
+        private var monitors = 0
+        var configurations: [DictationPipelineConfiguration] { lock.withLock { items } }
+        var monitorCount: Int { lock.withLock { monitors } }
+        func note(_ configuration: DictationPipelineConfiguration) { lock.withLock { items.append(configuration) } }
+        func noteMonitor() { lock.withLock { monitors += 1 } }
+    }
+
+    private actor ConfigurationRecorder: DictationRecorder {
+        let log: PressLog
+        init(log: PressLog) { self.log = log }
+        func start() async throws {}
+        func start(configuration: DictationPipelineConfiguration) async throws { log.note(configuration) }
+        func stopAndTranscribe() async throws -> String { "text" }
+    }
+
+    private final class CountedHotkey: HotkeyMonitor, @unchecked Sendable {
+        func start(handler: @escaping @Sendable (HotkeyEvent) -> Void) async {}
+        func stop() async {}
+    }
+
+    private func pressTwice(_ model: AppModel, between change: () -> Void) async -> PressLog {
+        let log = PressLog()
+        model.dictationController.hotkeyFactory = { _, _ in
+            log.noteMonitor()
+            return CountedHotkey()
+        }
+        model.dictationController.recorderFactory = { _ in ConfigurationRecorder(log: log) }
+        model.dictationController.inserterFactory = { CapturingTextInserter(store: CapturedInsertionStore()) }
+        model.dictationEnabled = true
+        model.dictationController.simulatePress()
+        _ = await waitUntil { log.configurations.count == 1 }
+        model.dictationController.simulateRelease()
+        _ = await waitUntil { model.dictationController.state == .idle }
+        change()
+        model.dictationController.simulatePress()
+        _ = await waitUntil { log.configurations.count == 2 }
+        model.dictationController.simulateRelease()
+        _ = await waitUntil { model.dictationController.state == .idle }
+        return log
+    }
+
+    @Test("a setting changed between two presses reaches the second take without a restart", arguments: [
+        "language", "model", "streaming", "prompt", "device", "pasteDelay", "workflows", "rules", "snippets",
+        "selfCorrection", "cleanupPrompt",
+    ])
+    func settingsAreReadPerPress(_ setting: String) async {
         let model = makeModel()
-        model.startDictation()
-        #expect(model.dictationController.isRunning)
+        let log = await pressTwice(model) {
+            switch setting {
+            case "language": model.selectedLanguage = "it"
+            case "model": model.selectedModel = "openai_whisper-tiny"
+            case "streaming": model.useStreaming = false
+            case "prompt": model.initialPrompt = "Parola"
+            case "device": model.inputDeviceUID = "usb"
+            case "pasteDelay": model.dictationPasteDelayMs = 300
+            case "workflows": model.setDictationOverrideLanguage("it", for: "com.apple.mail")
+            case "rules": model.correctionRules = [CorrectionRule(from: "teh", to: "the")]
+            case "snippets": model.snippets = [Snippet(trigger: "omw", replacement: "on my way")]
+            case "selfCorrection": model.dictationStripSelfCorrections = true
+            default: model.dictationCleanupPromptID = DictationModePreset.builtIns.compactMap(\.promptID).first?.uuidString ?? ""
+            }
+        }
+        let first = log.configurations[0]
+        let second = log.configurations[1]
+        switch setting {
+        case "language": #expect(first.language == nil && second.language == "it")
+        case "model": #expect(second.modelName == "openai_whisper-tiny" && first.modelName != second.modelName)
+        case "streaming": #expect(first.streamingEnabled && !second.streamingEnabled)
+        case "prompt": #expect(first.initialPrompt == nil && second.initialPrompt == "Parola")
+        case "device": #expect(first.deviceUID == nil && second.deviceUID == "usb")
+        case "pasteDelay": #expect(first.pasteDelayMs == 0 && second.pasteDelayMs == 300)
+        case "workflows": #expect(first.workflows.isEmpty && second.workflows["com.apple.mail"]?.first?.language == "it")
+        case "rules":
+            #expect(await first.postProcessor.process("teh cat") == "teh cat")
+            #expect(await second.postProcessor.process("teh cat") == "the cat")
+        case "snippets":
+            #expect(await first.postProcessor.process("omw") == "omw")
+            #expect(await second.postProcessor.process("omw") == "on my way")
+        case "selfCorrection":
+            #expect(await first.postProcessor.process("scratch that, hi") != "hi")
+            #expect(await second.postProcessor.process("scratch that, hi") == "hi")
+        default: break
+        }
+        #expect(log.monitorCount == 1, "\(setting) must not restart the monitor")
+        model.abortDictation()
+    }
 
-        // Built with every context source off → no provider, all-disabled config.
-        let initial = model.dictationController.configuration?.postProcessor as? PromptDictationProcessor
-        #expect(initial?.contextConfig.isAllDisabled == true)
-        #expect(initial?.contextProvider == nil)
+    @Test("the hotkey key, its modifiers and the enabled switch restart the monitor", arguments: ["key", "modifiers", "enabled"])
+    func hotkeySettingsRestartTheMonitor(_ setting: String) async {
+        let model = makeModel()
+        let log = PressLog()
+        model.dictationController.hotkeyFactory = { _, _ in
+            log.noteMonitor()
+            return CountedHotkey()
+        }
+        model.dictationController.recorderFactory = { _ in ConfigurationRecorder(log: log) }
+        model.dictationController.inserterFactory = { CapturingTextInserter(store: CapturedInsertionStore()) }
+        model.dictationEnabled = true
+        #expect(log.monitorCount == 1)
 
-        model.dictationContextSelection = true
-        let afterSelection = model.dictationController.configuration?.postProcessor as? PromptDictationProcessor
-        #expect(afterSelection?.contextConfig.selectionEnabled == true)
-        #expect(afterSelection?.contextProvider != nil)
+        switch setting {
+        case "key": model.dictationKeyCode = 97
+        case "modifiers": model.dictationKeyModifiers = Int(NSEvent.ModifierFlags.command.rawValue)
+        default:
+            model.dictationEnabled = false
+            #expect(!model.dictationController.isRunning)
+            model.dictationEnabled = true
+        }
 
-        model.dictationContextClipboard = true
-        let afterClipboard = model.dictationController.configuration?.postProcessor as? PromptDictationProcessor
-        #expect(afterClipboard?.contextConfig.clipboardEnabled == true)
-
-        model.dictationContextScreen = true
-        let afterScreen = model.dictationController.configuration?.postProcessor as? PromptDictationProcessor
-        #expect(afterScreen?.contextConfig.screenEnabled == true)
-
-        model.stopDictation()
+        #expect(log.monitorCount == 2)
+        model.abortDictation()
     }
 
     @Test("changing the dictation keycode rebinds a running session to the new key")
@@ -387,23 +440,6 @@ struct AppModelDictationTests {
         model.dictationKeyModifiers = Int(NSEvent.ModifierFlags.command.rawValue)
 
         #expect(model.dictationController.configuration?.hotkeyModifiers == .command)
-
-        model.stopDictation()
-    }
-
-    @Test("changing the paste delay re-applies to a running session")
-    func pasteDelayChangeReappliesToRunningSession() async {
-        let model = makeModel()
-        model.dictationEnabled = true
-        #expect(model.dictationController.isRunning)
-        #expect(model.dictationController.configuration?.pasteDelayMs == 0)
-
-        model.dictationPasteDelayMs = 250
-        // The restart is debounced so per-keystroke edits don't thrash the coordinator; flush it.
-        await model.pendingDictationRestart?.value
-
-        #expect(model.dictationController.isRunning)
-        #expect(model.dictationController.configuration?.pasteDelayMs == 250)
 
         model.stopDictation()
     }
@@ -731,7 +767,7 @@ struct AppModelDictationTests {
     func restartKeepsThePendingFinal() async throws {
         let (model, recorders, pasted) = await modelHoldingAFinal()
 
-        model.restartDictation()
+        model.dictationKeyCode = 97
         #expect(model.dictationController.isRunning)
 
         for recorder in recorders.made { await recorder.release() }

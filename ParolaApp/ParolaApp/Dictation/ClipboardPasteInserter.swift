@@ -68,13 +68,18 @@ struct ClipboardPasteInserter: TextInserter {
 
     @MainActor
     fileprivate static func postCmdV() {
+        let (down, up) = cmdVEvents()
+        down?.post(tap: .cghidEventTap)
+        up?.post(tap: .cghidEventTap)
+    }
+
+    nonisolated static func cmdVEvents() -> (down: CGEvent?, up: CGEvent?) {
         let source = CGEventSource(stateID: .combinedSessionState)
         let vKey = CGKeyCode(kVK_ANSI_V)
         let down = CGEvent(keyboardEventSource: source, virtualKey: vKey, keyDown: true)
         down?.flags = .maskCommand
         let up = CGEvent(keyboardEventSource: source, virtualKey: vKey, keyDown: false)
         up?.flags = .maskCommand
-        down?.post(tap: .cghidEventTap)
-        up?.post(tap: .cghidEventTap)
+        return (down, up)
     }
 }

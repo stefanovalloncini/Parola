@@ -89,6 +89,7 @@ final class DictationController {
         var pasteDelayMs: Int = 0
         var mediaSession: MediaSession? = nil
         var mediaConfigProvider: (@Sendable () async -> MediaSessionConfig)? = nil
+        var pipelineProvider: (@Sendable () async -> DictationPipelineConfiguration)? = nil
         var willListen: (@Sendable () async -> Void)? = nil
     }
 
@@ -141,7 +142,6 @@ final class DictationController {
         self.configuration = configuration
         let hotkey = hotkeyFactory?(configuration.hotkeyKeyCode, configuration.hotkeyModifiers)
             ?? Self.hotkeyMonitor(for: configuration)
-        let workflows = configuration.workflows
         // Own session so a stop never queues behind a file job; it outlives restarts, and rearm() replaces it.
         let recorder = recorderFactory?(configuration) ?? MicDictationRecorder(
             model: configuration.modelName,
@@ -149,11 +149,12 @@ final class DictationController {
             initialPrompt: configuration.initialPrompt,
             deviceUID: configuration.deviceUID,
             streamingEnabled: configuration.streamingEnabled,
+            workflows: configuration.workflows,
             session: fallbackSession,
             onRunEnded: { [weak self] in
                 Task { @MainActor in self?.appModel?.modelResidency.retryPendingUnloads() }
             },
-            workflowResolver: { @Sendable in
+            workflowResolver: { @Sendable workflows in
                 await Self.resolveWorkflow(in: workflows)
             },
             downloadProgress: { [weak self] fraction in
@@ -167,8 +168,9 @@ final class DictationController {
             inserter = CapturingTextInserter()
         } else {
             inserter = PerAppTextInserter(
-                paste: ClipboardPasteInserter(preDelayMs: configuration.pasteDelayMs)
-            ) { @Sendable in
+                paste: ClipboardPasteInserter(preDelayMs: configuration.pasteDelayMs),
+                workflows: configuration.workflows
+            ) { @Sendable workflows in
                 let workflow = await Self.resolveWorkflow(in: workflows)
                 return workflow?.insertion ?? .paste
             }
@@ -183,6 +185,7 @@ final class DictationController {
             mode: configuration.mode,
             mediaSession: configuration.mediaSession,
             mediaConfigProvider: configuration.mediaConfigProvider,
+            configurationProvider: configuration.pipelineProvider,
             willListen: configuration.willListen
         ) { [weak self] state in
             await MainActor.run { self?.handleStateChange(state, generation: generation) }
@@ -253,12 +256,6 @@ final class DictationController {
         Task { await coord.setMode(mode) }
     }
 
-    func setPostProcessor(_ processor: any TextPostProcessor) {
-        guard let coord = coordinator else { return }
-        configuration?.postProcessor = processor
-        Task { await coord.setPostProcessor(processor) }
-    }
-
     func simulatePress() {
         guard let coord = coordinator else { return }
         Task { await coord.simulatePress() }
@@ -300,9 +297,8 @@ final class DictationController {
     func cancelDictation() {
         switch state {
         case .listening:
-            guard let configuration else { return }
-            abort()
-            start(configuration: configuration)
+            guard let coord = coordinator else { return }
+            Task { await coord.cancelListening() }
         case .transcribing:
             cancelTranscription()
         case .failed:
@@ -628,6 +624,10 @@ private final class PasteGate: Sendable {
 private struct GatedTextInserter: TextInserter {
     let base: any TextInserter
     let gate: PasteGate
+
+    func bound(to configuration: DictationPipelineConfiguration?) async -> any TextInserter {
+        GatedTextInserter(base: await base.bound(to: configuration), gate: gate)
+    }
 
     func insert(_ text: String) async throws {
         guard gate.isOpen else { return }

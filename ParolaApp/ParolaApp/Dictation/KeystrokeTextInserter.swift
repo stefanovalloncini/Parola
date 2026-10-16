@@ -52,6 +52,12 @@ struct KeystrokeTextInserter: TextInserter {
     @MainActor
     private func postKeystrokes(_ units: [UInt16]) {
         guard !units.isEmpty else { return }
+        let (down, up) = Self.events(for: units)
+        down?.post(tap: .cghidEventTap)
+        up?.post(tap: .cghidEventTap)
+    }
+
+    nonisolated static func events(for units: [UInt16]) -> (down: CGEvent?, up: CGEvent?) {
         let source = CGEventSource(stateID: .combinedSessionState)
         var buffer = units
         let down = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: true)
@@ -59,33 +65,45 @@ struct KeystrokeTextInserter: TextInserter {
         // Events inherit the live modifier state: a still-held hotkey modifier would turn
         // an inserted "w" into ⌘W in the target app.
         down?.flags = []
-        down?.post(tap: .cghidEventTap)
         let up = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: false)
         up?.keyboardSetUnicodeString(stringLength: buffer.count, unicodeString: &buffer)
         up?.flags = []
-        up?.post(tap: .cghidEventTap)
+        return (down, up)
     }
 }
 
 struct PerAppTextInserter: TextInserter {
     let paste: ClipboardPasteInserter
     let keystroke: KeystrokeTextInserter
-    let resolver: @Sendable () async -> DictationInsertionMode
+    let resolver: @Sendable ([String: [DictationWorkflow]]) async -> DictationInsertionMode
+    var workflows: [String: [DictationWorkflow]] = [:]
 
     init(
         paste: ClipboardPasteInserter = ClipboardPasteInserter(),
         keystroke: KeystrokeTextInserter = KeystrokeTextInserter(),
-        resolver: @escaping @Sendable () async -> DictationInsertionMode
+        workflows: [String: [DictationWorkflow]] = [:],
+        resolver: @escaping @Sendable ([String: [DictationWorkflow]]) async -> DictationInsertionMode
     ) {
+        self.workflows = workflows
         self.paste = paste
         self.keystroke = keystroke
         self.resolver = resolver
     }
 
     func insert(_ text: String) async throws {
-        switch await resolver() {
+        switch await resolver(workflows) {
         case .paste:     try await paste.insert(text)
         case .keystroke: try await keystroke.insert(text)
+        }
+    }
+
+    func bound(to configuration: DictationPipelineConfiguration?) async -> any TextInserter {
+        guard let configuration else { return self }
+        var pasteInserter = paste
+        pasteInserter.preDelayMs = max(0, min(2000, configuration.pasteDelayMs))
+        switch await resolver(configuration.workflows) {
+        case .paste:     return pasteInserter
+        case .keystroke: return keystroke
         }
     }
 }

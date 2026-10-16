@@ -77,6 +77,7 @@ struct DictationCoordinatorTests {
         await coord.startMonitoring()
         await coord.handle(.press)
         await coord.handle(.release)
+        await coord.drain()
         await #expect(coord.state == .failed("insert blocked"))
     }
 
@@ -102,6 +103,7 @@ struct DictationCoordinatorTests {
         await coord.startMonitoring()
         await coord.handle(.press)
         await coord.handle(.release)
+        await coord.drain()
         await #expect(coord.state == .idle)
         let inserted = await inserter.inserted
         #expect(inserted == ["hello world"])
@@ -128,6 +130,7 @@ struct DictationCoordinatorTests {
         let coord = DictationCoordinator(hotkey: hotkey, recorder: recorder, inserter: inserter)
         await coord.startMonitoring()
         await coord.handle(.release)
+        await coord.drain()
         let stops = await recorder.stopCalls
         #expect(stops == 0)
         let inserted = await inserter.inserted
@@ -172,6 +175,7 @@ struct DictationCoordinatorTests {
         #expect(pausesAfterPress == 1)
 
         await coord.handle(.release)
+        await coord.drain()
         let mutedAfterRelease = await muter.current
         let playsAfterRelease = await player.playCalls
         #expect(mutedAfterRelease == false)
@@ -216,6 +220,7 @@ struct DictationCoordinatorTests {
         await coord.startMonitoring()
         await coord.handle(.press)
         await coord.handle(.release)
+        await coord.drain()
         await #expect(coord.state == .failed("mic error"))
         let inserted = await inserter.inserted
         #expect(inserted.isEmpty)
@@ -234,6 +239,7 @@ struct DictationCoordinatorTests {
         await coord.startMonitoring()
         await coord.handle(.press)
         await coord.handle(.release)
+        await coord.drain()
         await #expect(coord.state == .failed("mic error"))
 
         await coord.handle(.press)
@@ -251,6 +257,7 @@ struct DictationCoordinatorTests {
         await coord.startMonitoring()
         await coord.handle(.press)
         await coord.handle(.release)
+        await coord.drain()
         let inserted = await inserter.inserted
         #expect(inserted.isEmpty)
     }
@@ -281,6 +288,7 @@ struct DictationCoordinatorTests {
         await coord.startMonitoring()
         await coord.handle(.press)
         await coord.handle(.release)
+        await coord.drain()
         let inserted = await inserter.inserted
         #expect(inserted.count == 1)
         #expect(inserted.first?.contains(SnippetMarker.cursor) == false)
@@ -302,6 +310,7 @@ struct DictationCoordinatorTests {
         await coord.startMonitoring()
         await coord.handle(.press)
         await coord.handle(.release)
+        await coord.drain()
         let inserted = await inserter.inserted
         #expect(inserted == ["HELLO WORLD"])
     }
@@ -321,8 +330,10 @@ struct DictationCoordinatorTests {
         await coord.handle(.press)
         await #expect(coord.state == .listening)
         await coord.handle(.release)
+        await coord.drain()
         await #expect(coord.state == .listening)
         await coord.handle(.press)
+        await coord.drain()
         await #expect(coord.state == .idle)
         let inserted = await inserter.inserted
         #expect(inserted == ["toggled"])
@@ -342,9 +353,11 @@ struct DictationCoordinatorTests {
         await coord.startMonitoring()
         await coord.handle(.press)
         await coord.handle(.release)
+        await coord.drain()
         await #expect(coord.state == .listening)
         await coord.handle(.press)
         await coord.handle(.release)
+        await coord.drain()
         await #expect(coord.state == .idle)
         let inserted = await inserter.inserted
         #expect(inserted == ["hybrid"])
@@ -364,11 +377,13 @@ struct DictationCoordinatorTests {
         await coord.startMonitoring()
         await coord.handle(.press)
         await coord.handle(.release)
+        await coord.drain()
         await #expect(coord.state == .listening)
         await coord.handle(.press)
         try await Task.sleep(for: .milliseconds(350))
         await #expect(coord.state == .listening)
         await coord.handle(.release)
+        await coord.drain()
         await #expect(coord.state == .idle)
         let inserted = await inserter.inserted
         #expect(inserted == ["held"])
@@ -392,6 +407,7 @@ struct DictationCoordinatorTests {
 
         await coord.handle(.press, capturedAt: keyDown.addingTimeInterval(0.4))
         await coord.handle(.release, capturedAt: keyDown.addingTimeInterval(0.5))
+        await coord.drain()
 
         await #expect(coord.state == .idle)
         let startCalls = await recorder.startCalls
@@ -414,8 +430,10 @@ struct DictationCoordinatorTests {
         await coord.startMonitoring()
         await coord.handle(.press)
         await coord.handle(.release)
+        await coord.drain()
         await coord.setMode(.pushToTalk)
         await coord.handle(.release)
+        await coord.drain()
         await #expect(coord.state == .idle)
     }
 
@@ -461,6 +479,7 @@ struct DictationCoordinatorTests {
         await coord.startMonitoring()
         await coord.handle(.press)
         await coord.handle(.release)
+        await coord.drain()
         let inserted = await inserter.inserted
         #expect(inserted.isEmpty)
     }
@@ -523,6 +542,7 @@ struct DictationCoordinatorTests {
         await coord.abortMonitoring()
         await recorder.openGate()
         await press.value
+        await coord.drain()
 
         await #expect(coord.state == .idle)
         let running = await recorder.running
@@ -546,6 +566,7 @@ struct DictationCoordinatorTests {
         #expect(await recorder.discardCalls == 1)
         await recorder.openGate()
         await press.value
+        await coord.drain()
         #expect(await recorder.discardCalls == 2, "the start that returned late discards again")
     }
 
@@ -591,6 +612,7 @@ struct DictationCoordinatorTests {
 
         await coord.abortMonitoring()
         await press.value
+        await coord.drain()
 
         #expect(await muter.current == false)
         #expect(await player.playCalls == 1)
@@ -619,12 +641,14 @@ struct DictationCoordinatorTests {
         // Release arrives while the recorder is still starting: `.listening` must not be reported
         // yet, and nothing is inserted until the recorder is actually up.
         await coord.simulateRelease()
+        await coord.drain()
         await #expect(coord.state != .listening)
         let insertedDuringStart = await inserter.inserted
         #expect(insertedDuringStart.isEmpty)
 
         await recorder.openGate()
         await press.value
+        await coord.drain()
 
         await #expect(coord.state == .idle)
         let inserted = await inserter.inserted
@@ -671,6 +695,7 @@ struct DictationCoordinatorTests {
         await coord.abortMonitoring()
         await recorder.openGate()
         await press.value
+        await coord.drain()
 
         let discards = await recorder.discardCalls
         let stops = await recorder.stopCalls
@@ -701,8 +726,10 @@ struct DictationCoordinatorTests {
         await coord.startMonitoring()
         await coord.handle(.press)
         await coord.handle(.release)
+        await coord.drain()
         await #expect(coord.state == .listening)
         await coord.stopListening()
+        await coord.drain()
         await #expect(coord.state == .idle)
         let inserted = await inserter.inserted
         #expect(inserted == ["toggled off"])
@@ -750,6 +777,7 @@ struct DictationCoordinatorTests {
 
         await recorder.release()
         await finishing.value
+        await coord.drain()
         await #expect(coord.state == .idle)
         let inserted = await inserter.inserted
         #expect(inserted.isEmpty)
@@ -802,6 +830,7 @@ struct DictationCoordinatorTests {
 
         await recorder.releaseNext()
         await first.value
+        await coord.drain()
         #expect(await inserter.inserted == ["one"])
 
         await coord.handle(.press)
@@ -813,6 +842,7 @@ struct DictationCoordinatorTests {
 
         await recorder.releaseNext()
         await second.value
+        await coord.drain()
         #expect(await inserter.inserted == ["one", "two"])
         await #expect(coord.state == .idle)
     }
@@ -844,12 +874,14 @@ struct DictationCoordinatorTests {
         await coord.startMonitoring()
         await coord.handle(.press)
         await coord.handle(.release)
+        await coord.drain()
         guard case .failed = await coord.state else {
             Issue.record("expected the failed state")
             return
         }
 
         await coord.stopListening()
+        await coord.drain()
 
         await #expect(coord.state == .idle)
     }
@@ -871,12 +903,14 @@ struct DictationCoordinatorTests {
         }
 
         await coord.stopListening()
+        await coord.drain()
         await #expect(coord.state != .listening)
         let insertedDuringStart = await inserter.inserted
         #expect(insertedDuringStart.isEmpty)
 
         await recorder.openGate()
         await press.value
+        await coord.drain()
 
         await #expect(coord.state == .idle)
         let inserted = await inserter.inserted

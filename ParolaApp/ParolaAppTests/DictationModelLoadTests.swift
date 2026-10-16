@@ -45,7 +45,7 @@ struct DictationModelLoadTests {
             model: "openai_whisper-large-v3_turbo",
             language: nil,
             streamingEnabled: true,
-            workflowResolver: {
+            workflowResolver: { _ in
                 resolving.withLock { $0 = true }
                 for await _ in released {}
                 return nil

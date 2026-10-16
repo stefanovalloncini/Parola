@@ -53,6 +53,8 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
     /// The loop a stop still waits on for the model, so a cancel can reach it.
     private var stoppingLoop: StreamingRealtimeLoop?
     private var stopWaiters: [CheckedContinuation<Void, Never>] = []
+    private var captureStoppedLoop: StreamingRealtimeLoop?
+    private var finalizingStop = false
     private var continuation: AsyncStream<StreamingEvent>.Continuation?
     private var segmentContinuation: AsyncStream<ConfirmedAudioBatch>.Continuation?
     private var consumerTask: Task<Void, Never>?
@@ -275,9 +277,13 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
     static func decoder(
         over lease: StreamingModelLease, options: TranscriptionOptions
     ) throws -> StreamingRealtimeLoop.Decoder {
-        switch lease.payload {
+        let decoder: StreamingRealtimeLoop.Decoder = switch lease.payload {
         case .whisper: try whisperDecoder(over: lease, options: options)
         case .parakeet: try ParakeetStreamingDecoder.over(lease: lease, options: options)
+        }
+        let transcribe = decoder.transcribe
+        return StreamingRealtimeLoop.Decoder(options: decoder.options) { samples, decodeOptions, progress in
+            try await StreamingDecodeSlot.shared.run { try await transcribe(samples, decodeOptions, progress) }
         }
     }
 
@@ -406,16 +412,28 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         loop?.setPaused(paused)
     }
 
-    /// Stops the mic stream, flushes a final transcript, and finishes the stream.
-    public func stop() async {
+    /// Stops the mic stream and returns; ``stop()`` then flushes the tail, so the next take can record meanwhile.
+    public func stopCapturing() async {
         guard let loop else {
             if isStarting, pendingEnd == nil { pendingEnd = .stop }
             return
         }
         self.loop = nil
         stoppingLoop = loop
-        defer { endStopping() }
+        captureStoppedLoop = loop
         await loop.stop()
+    }
+
+    /// Stops the mic stream, flushes a final transcript, and finishes the stream.
+    public func stop() async {
+        await stopCapturing()
+        guard captureStoppedLoop != nil else { return }
+        captureStoppedLoop = nil
+        finalizingStop = true
+        defer {
+            finalizingStop = false
+            endStopping()
+        }
         // The run task performs the final tail flush after its loop exits; cancelling
         // it here would kill that decode. Confirmed batches from the flush must drain
         // through the consumer before the stream finishes.
@@ -484,6 +502,13 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
 
     /// Ends the take without the final decode and deletes its audio; no `.finished` is sent.
     public func cancel() async {
+        let capturedLoop = loop == nil && !finalizingStop ? captureStoppedLoop : nil
+        if capturedLoop != nil {
+            captureStoppedLoop = nil
+            defer { endStopping() }
+            await cancelStoppedCapture(of: capturedLoop)
+            return
+        }
         guard let loop else {
             if let stopping = stoppingLoop {
                 await cancelWaitingStop(of: stopping)
@@ -495,6 +520,18 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         self.loop = nil
         await loop.cancel()
         // A decode already in flight would otherwise run to the end before the loop sees the cancel.
+        streamerTask?.cancel()
+        _ = await streamerTask?.value
+        segmentContinuation?.finish()
+        consumerTask?.cancel()
+        await consumerTask?.value
+        await persister?.discard()
+        continuation?.finish()
+        await teardown()
+    }
+
+    private func cancelStoppedCapture(of loop: StreamingRealtimeLoop?) async {
+        await loop?.cancel()
         streamerTask?.cancel()
         _ = await streamerTask?.value
         segmentContinuation?.finish()

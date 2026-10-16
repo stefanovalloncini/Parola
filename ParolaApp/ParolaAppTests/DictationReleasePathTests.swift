@@ -18,10 +18,10 @@ private final class InsertClock: TextInserter, @unchecked Sendable {
     private let lock = NSLock()
     private var items: [String] = []
     var texts: [String] { lock.withLock { items } }
-    let resolve: @Sendable () async -> DictationWorkflow?
-    init(resolve: @escaping @Sendable () async -> DictationWorkflow?) { self.resolve = resolve }
+    let resolve: @Sendable ([String: [DictationWorkflow]]) async -> DictationWorkflow?
+    init(resolve: @escaping @Sendable ([String: [DictationWorkflow]]) async -> DictationWorkflow?) { self.resolve = resolve }
     func insert(_ text: String) async throws {
-        _ = await resolve()
+        _ = await resolve([:])
         lock.withLock { items.append(text) }
     }
 }
@@ -50,7 +50,7 @@ struct DictationReleasePathTests {
     private func release(
         streaming: Bool, probe: ResolverProbe
     ) async throws -> (atRelease: Int, resolutions: Int, text: [String]) {
-        let resolver: @Sendable () async -> DictationWorkflow? = { await probe.resolve() }
+        let resolver: @Sendable ([String: [DictationWorkflow]]) async -> DictationWorkflow? = { _ in await probe.resolve() }
         let recorder = MicDictationRecorder(
             model: streaming ? "openai_whisper-large-v3_turbo" : nil,
             language: nil,
@@ -68,6 +68,7 @@ struct DictationReleasePathTests {
         await coordinator.simulatePress()
         let atRelease = probe.calls
         await coordinator.simulateRelease()
+        await coordinator.drain()
         return (atRelease, probe.calls, inserter.texts)
     }
 

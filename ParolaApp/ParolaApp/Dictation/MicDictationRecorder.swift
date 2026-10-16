@@ -3,30 +3,27 @@ import ParolaCore
 import ParolaDictation
 
 actor MicDictationRecorder: DictationRecorder {
-    private let model: String?
-    private let defaultLanguage: String?
-    private var effectiveLanguage: String?
-    private let initialPrompt: String?
-    private let deviceUID: String?
-    private let streamingEnabled: Bool
-    private let workflowResolver: (@Sendable () async -> DictationWorkflow?)?
+    struct Settings: Sendable {
+        var model: String?
+        var language: String?
+        var initialPrompt: String?
+        var deviceUID: String?
+        var streamingEnabled: Bool
+        var workflows: [String: [DictationWorkflow]]
+    }
+
+    private let defaults: Settings
+    private let workflowResolver: (@Sendable ([String: [DictationWorkflow]]) async -> DictationWorkflow?)?
     private let downloadProgress: (@Sendable (Double) -> Void)?
     private var partialContinuations: [UUID: AsyncStream<String>.Continuation] = [:]
 
-    private var fallbackSource: (any LiveAudioSource)?
     private let fallbackSession: TranscriptionSession
     private let clock: any Clock<Duration>
-    private let makeStreamingSession: @Sendable () -> any StreamingTranscriber
+    private let makeStreamingSession: (@Sendable (_ deviceUID: String?) -> any StreamingTranscriber)?
     private let warmFallbackModel: @Sendable (String) async -> Void
     private let onRunEnded: (@Sendable () -> Void)?
 
-    private var streamingSession: (any StreamingTranscriber)?
-    private var streamingConsumer: Task<Void, Never>?
-    private var streamingSegments: [TranscriptSegment] = []
-    private var streamingPartial: String = ""
-    private var streamingFailure: String?
-    private var isStarting = false
-    private var discardRequested = false
+    private var capturing: (id: UUID, take: MicTake)?
 
     init(
         model: String?,
@@ -34,20 +31,19 @@ actor MicDictationRecorder: DictationRecorder {
         initialPrompt: String? = nil,
         deviceUID: String? = nil,
         streamingEnabled: Bool = true,
+        workflows: [String: [DictationWorkflow]] = [:],
         session: TranscriptionSession? = nil,
         onRunEnded: (@Sendable () -> Void)? = nil,
-        workflowResolver: (@Sendable () async -> DictationWorkflow?)? = nil,
+        workflowResolver: (@Sendable ([String: [DictationWorkflow]]) async -> DictationWorkflow?)? = nil,
         downloadProgress: (@Sendable (Double) -> Void)? = nil,
         clock: any Clock<Duration> = ContinuousClock(),
         makeStreamingSession: (@Sendable () -> any StreamingTranscriber)? = nil,
         warmFallbackModel: (@Sendable (String) async -> Void)? = nil
     ) {
-        self.model = model
-        self.defaultLanguage = language
-        self.effectiveLanguage = language
-        self.initialPrompt = initialPrompt
-        self.deviceUID = deviceUID
-        self.streamingEnabled = streamingEnabled
+        defaults = Settings(
+            model: model, language: language, initialPrompt: initialPrompt, deviceUID: deviceUID,
+            streamingEnabled: streamingEnabled, workflows: workflows
+        )
         let fallbackSession = session ?? TranscriptionSession()
         self.fallbackSession = fallbackSession
         self.onRunEnded = onRunEnded
@@ -55,26 +51,46 @@ actor MicDictationRecorder: DictationRecorder {
         self.workflowResolver = workflowResolver
         self.downloadProgress = downloadProgress
         self.clock = clock
-        self.makeStreamingSession = makeStreamingSession ?? { [clock] in
-            StreamingTranscriberFactory.make(clock: clock, deviceUID: deviceUID)
-        }
-    }
-
-    private func resolveLanguageOverride() async {
-        guard let resolver = workflowResolver else {
-            effectiveLanguage = defaultLanguage
-            return
-        }
-        let workflow = await resolver()
-        if let override = workflow?.language, !override.isEmpty {
-            effectiveLanguage = override
+        if let makeStreamingSession {
+            self.makeStreamingSession = { @Sendable _ in makeStreamingSession() }
         } else {
-            effectiveLanguage = defaultLanguage
+            self.makeStreamingSession = nil
         }
     }
 
     func start() async throws {
-        do { try await begin() } catch { throw presented(error) }
+        try await start(settings: defaults)
+    }
+
+    func start(configuration: DictationPipelineConfiguration) async throws {
+        try await start(settings: Settings(
+            model: configuration.modelName, language: configuration.language,
+            initialPrompt: configuration.initialPrompt, deviceUID: configuration.deviceUID,
+            streamingEnabled: configuration.streamingEnabled, workflows: configuration.workflows
+        ))
+    }
+
+    private func start(settings: Settings) async throws {
+        guard capturing == nil else { return }
+        let id = UUID()
+        let take = MicTake(
+            settings: settings,
+            workflowResolver: workflowResolver,
+            downloadProgress: downloadProgress,
+            fallbackSession: fallbackSession,
+            clock: clock,
+            makeStreamingSession: makeStreamingSession,
+            warmFallbackModel: warmFallbackModel,
+            onRunEnded: onRunEnded,
+            onPartial: { [weak self] text in await self?.broadcastPartial(text, from: id) }
+        )
+        capturing = (id, take)
+        do {
+            try await take.begin()
+        } catch {
+            if capturing?.id == id { capturing = nil }
+            throw presented(error)
+        }
     }
 
     private func presented(_ error: any Error) -> any Error {
@@ -84,56 +100,32 @@ actor MicDictationRecorder: DictationRecorder {
         return FailureText.presented(error)
     }
 
-    private func begin() async throws {
-        isStarting = true
-        discardRequested = false
-        defer { isStarting = false }
-        await resolveLanguageOverride()
-        if discardRequested { throw CancellationError() }
-        if useStreaming {
-            try await startStreaming()
-        } else {
-            try await startFallback()
+    func stopCapture() async throws -> DictationTake {
+        guard let (_, take) = capturing else { return DictationTake(finalize: { "" }) }
+        capturing = nil
+        do {
+            let finalize = try await take.stopCapture()
+            return DictationTake(
+                finalize: { do { return try await finalize() } catch { throw await self.presented(error) } },
+                discard: { await take.discard() }
+            )
+        } catch {
+            throw presented(error)
         }
     }
 
     func stopAndTranscribe() async throws -> String {
-        do { return try await finish() } catch { throw presented(error) }
-    }
-
-    private func finish() async throws -> String {
-        if streamingSession != nil {
-            return try await stopStreaming()
-        }
-        return try await stopFallback()
+        try await stopCapture().finalize()
     }
 
     func stopAndDiscard() async {
-        // Before any session or file exists, the start under way sees this and never opens the mic.
-        if isStarting, streamingSession == nil, fallbackSource == nil { discardRequested = true }
-        if let session = streamingSession {
-            await session.cancel()
-            await streamingConsumer?.value
-            streamingConsumer = nil
-            streamingSession = nil
-            streamingSegments = []
-            streamingPartial = ""
-            streamingFailure = nil
-            return
-        }
-        guard let source = fallbackSource else { return }
-        fallbackSource = nil
-        // prepare() is the only way to stop capture; the finalized take is thrown away
-        // unread, so no model load or transcription happens on this path.
-        do {
-            Self.discardScratch(try await source.prepare())
-        } catch let cut as CaptureInterrupted {
-            Self.discardScratch(cut.url)
-        } catch {}
+        guard let (_, take) = capturing else { return }
+        capturing = nil
+        await take.discard()
     }
 
-    func levelMeter() -> LevelMeter? {
-        streamingSession?.levelMeter ?? fallbackSource?.levelMeter
+    func levelMeter() async -> LevelMeter? {
+        await capturing?.take.levelMeter()
     }
 
     func partials() -> AsyncStream<String> {
@@ -147,22 +139,170 @@ actor MicDictationRecorder: DictationRecorder {
         }
     }
 
-    private var useStreaming: Bool {
-        guard streamingEnabled, let model else { return false }
-        return ModelCatalog.canStream(id: model)
+    func transcriptionOptions() -> TranscriptionOptions {
+        MicTake.options(for: defaults, language: defaults.language)
     }
 
-    func transcriptionOptions() -> TranscriptionOptions {
+    /// Dictation audio is scratch: it goes once read or given up on. Only a file named for dictation, never a test fixture.
+    static func discardScratch(_ url: URL) {
+        guard url.lastPathComponent.hasPrefix(RecordingScratch.dictationPrefix + "-") else { return }
+        try? FileManager.default.removeItem(at: url)
+    }
+
+    private func removePartialContinuation(_ id: UUID) {
+        partialContinuations.removeValue(forKey: id)
+    }
+
+    private func broadcastPartial(_ text: String, from id: UUID) {
+        guard capturing?.id == id else { return }
+        for continuation in partialContinuations.values {
+            continuation.yield(text)
+        }
+    }
+}
+
+private actor MicTake {
+    private let settings: MicDictationRecorder.Settings
+    private let workflowResolver: (@Sendable ([String: [DictationWorkflow]]) async -> DictationWorkflow?)?
+    private let downloadProgress: (@Sendable (Double) -> Void)?
+    private let fallbackSession: TranscriptionSession
+    private let clock: any Clock<Duration>
+    private let makeStreamingSession: (@Sendable (String?) -> any StreamingTranscriber)?
+    private let warmFallbackModel: @Sendable (String) async -> Void
+    private let onRunEnded: (@Sendable () -> Void)?
+    private let onPartial: @Sendable (String) async -> Void
+
+    private var effectiveLanguage: String?
+    private var fallbackSource: (any LiveAudioSource)?
+    private var stoppedFallbackURL: URL?
+    private var streamingSession: (any StreamingTranscriber)?
+    private var streamingConsumer: Task<Void, Never>?
+    private var streamingSegments: [TranscriptSegment] = []
+    private var streamingPartial = ""
+    private var streamingFailure: String?
+    private var isStarting = false
+    private var discardRequested = false
+
+    init(
+        settings: MicDictationRecorder.Settings,
+        workflowResolver: (@Sendable ([String: [DictationWorkflow]]) async -> DictationWorkflow?)?,
+        downloadProgress: (@Sendable (Double) -> Void)?,
+        fallbackSession: TranscriptionSession,
+        clock: any Clock<Duration>,
+        makeStreamingSession: (@Sendable (String?) -> any StreamingTranscriber)?,
+        warmFallbackModel: @escaping @Sendable (String) async -> Void,
+        onRunEnded: (@Sendable () -> Void)?,
+        onPartial: @escaping @Sendable (String) async -> Void
+    ) {
+        self.settings = settings
+        self.effectiveLanguage = settings.language
+        self.workflowResolver = workflowResolver
+        self.downloadProgress = downloadProgress
+        self.fallbackSession = fallbackSession
+        self.clock = clock
+        self.makeStreamingSession = makeStreamingSession
+        self.warmFallbackModel = warmFallbackModel
+        self.onRunEnded = onRunEnded
+        self.onPartial = onPartial
+    }
+
+    static func options(for settings: MicDictationRecorder.Settings, language: String?) -> TranscriptionOptions {
         TranscriptionOptions(
-            model: model,
-            language: effectiveLanguage,
+            model: settings.model,
+            language: language,
             task: .transcribe,
-            initialPrompt: initialPrompt
+            initialPrompt: settings.initialPrompt
         )
     }
 
+    private var useStreaming: Bool {
+        guard settings.streamingEnabled, let model = settings.model else { return false }
+        return ModelCatalog.canStream(id: model)
+    }
+
+    private func options() -> TranscriptionOptions {
+        Self.options(for: settings, language: effectiveLanguage)
+    }
+
+    private func resolveLanguageOverride() async {
+        guard let resolver = workflowResolver else {
+            effectiveLanguage = settings.language
+            return
+        }
+        let workflow = await resolver(settings.workflows)
+        if let override = workflow?.language, !override.isEmpty {
+            effectiveLanguage = override
+        } else {
+            effectiveLanguage = settings.language
+        }
+    }
+
+    func begin() async throws {
+        isStarting = true
+        defer { isStarting = false }
+        await resolveLanguageOverride()
+        if discardRequested { throw CancellationError() }
+        if useStreaming {
+            try await startStreaming()
+        } else {
+            try await startFallback()
+        }
+    }
+
+    func levelMeter() -> LevelMeter? {
+        streamingSession?.levelMeter ?? fallbackSource?.levelMeter
+    }
+
+    func discard() async {
+        // Before any session or file exists, the start under way sees this and never opens the mic.
+        if isStarting, streamingSession == nil, fallbackSource == nil { discardRequested = true }
+        if let session = streamingSession {
+            await session.cancel()
+            await streamingConsumer?.value
+            streamingConsumer = nil
+            streamingSession = nil
+            streamingSegments = []
+            streamingPartial = ""
+            streamingFailure = nil
+            return
+        }
+        if let url = stoppedFallbackURL {
+            stoppedFallbackURL = nil
+            MicDictationRecorder.discardScratch(url)
+            return
+        }
+        guard let source = fallbackSource else { return }
+        fallbackSource = nil
+        // prepare() is the only way to stop capture; the finalized take is thrown away
+        // unread, so no model load or transcription happens on this path.
+        do {
+            MicDictationRecorder.discardScratch(try await source.prepare())
+        } catch let cut as CaptureInterrupted {
+            MicDictationRecorder.discardScratch(cut.url)
+        } catch {}
+    }
+
+    func stopCapture() async throws -> @Sendable () async throws -> String {
+        if let session = streamingSession {
+            await session.stopCapturing()
+            return { try await self.finishStreaming(session) }
+        }
+        guard let source = fallbackSource else { return { "" } }
+        fallbackSource = nil
+        let url: URL
+        do {
+            url = try await source.prepare()
+        } catch let cut as CaptureInterrupted {
+            MicDictationRecorder.discardScratch(cut.url)
+            throw cut
+        }
+        stoppedFallbackURL = url
+        return { try await self.transcribeFallback(url) }
+    }
+
     private func startStreaming() async throws {
-        let session = makeStreamingSession()
+        let session = makeStreamingSession?(settings.deviceUID)
+            ?? StreamingTranscriberFactory.make(clock: clock, deviceUID: settings.deviceUID)
         streamingSegments = []
         streamingPartial = ""
         streamingFailure = nil
@@ -171,7 +311,7 @@ actor MicDictationRecorder: DictationRecorder {
 
         let events: AsyncStream<StreamingEvent>
         do {
-            events = try await session.start(options: transcriptionOptions(), speakerLabeler: nil, downloadProgress: downloadProgress)
+            events = try await session.start(options: options(), speakerLabeler: nil, downloadProgress: downloadProgress)
         } catch {
             streamingSession = nil
             throw error
@@ -186,8 +326,8 @@ actor MicDictationRecorder: DictationRecorder {
         }
     }
 
-    private func stopStreaming() async throws -> String {
-        guard let session = streamingSession else { return "" }
+    private func finishStreaming(_ session: any StreamingTranscriber) async throws -> String {
+        guard streamingSession != nil else { return "" }
         await session.stop()
         await streamingConsumer?.value
         streamingConsumer = nil
@@ -206,11 +346,11 @@ actor MicDictationRecorder: DictationRecorder {
         switch event {
         case .partial(let text):
             streamingPartial = text
-            broadcastPartial(combinedText())
+            await onPartial(combinedText())
         case .confirmed(let segment):
             streamingSegments.append(segment)
             streamingPartial = ""
-            broadcastPartial(combinedText())
+            await onPartial(combinedText())
         case .failed(let message):
             streamingFailure = message
         case .voiceActivity, .warning, .finished:
@@ -227,12 +367,12 @@ actor MicDictationRecorder: DictationRecorder {
 
     private func startFallback() async throws {
         guard fallbackSource == nil else { return }
-        if let model {
+        if let model = settings.model {
             let warm = warmFallbackModel
             Task { await warm(model) }
         }
         let mic = await LiveAudioSourceFactory.makeMicrophone(
-            deviceUID: deviceUID, clock: clock, filePrefix: RecordingScratch.dictationPrefix
+            deviceUID: settings.deviceUID, clock: clock, filePrefix: RecordingScratch.dictationPrefix
         )
         if discardRequested { throw CancellationError() }
         try await mic.start()
@@ -243,41 +383,17 @@ actor MicDictationRecorder: DictationRecorder {
         fallbackSource = mic
     }
 
-    private func stopFallback() async throws -> String {
-        guard let source = fallbackSource else { return "" }
-        self.fallbackSource = nil
-        let url: URL
-        do {
-            url = try await source.prepare()
-        } catch let cut as CaptureInterrupted {
-            Self.discardScratch(cut.url)
-            throw cut
-        }
+    private func transcribeFallback(_ url: URL) async throws -> String {
+        stoppedFallbackURL = nil
         defer {
-            Self.discardScratch(url)
+            MicDictationRecorder.discardScratch(url)
             onRunEnded?()
         }
         let transcript = try await fallbackSession.transcribe(
             source: FileAudioSource(url: url),
-            options: transcriptionOptions(),
+            options: options(),
             downloadProgress: downloadProgress
         )
         return transcript.text
-    }
-
-    /// Dictation audio is scratch: it goes once read or given up on. Only a file named for dictation, never a test fixture.
-    static func discardScratch(_ url: URL) {
-        guard url.lastPathComponent.hasPrefix(RecordingScratch.dictationPrefix + "-") else { return }
-        try? FileManager.default.removeItem(at: url)
-    }
-
-    private func removePartialContinuation(_ id: UUID) {
-        partialContinuations.removeValue(forKey: id)
-    }
-
-    private func broadcastPartial(_ text: String) {
-        for continuation in partialContinuations.values {
-            continuation.yield(text)
-        }
     }
 }

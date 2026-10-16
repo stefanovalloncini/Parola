@@ -20,11 +20,35 @@ public protocol TextInserter: Sendable {
     /// cannot reach the target should leave the text on the general pasteboard,
     /// then throw an error whose description tells the user how to recover.
     func insert(_ text: String) async throws
+    /// The inserter a take uses for its own text, resolved when the take is released so a later focus change doesn't retarget it.
+    func bound(to configuration: DictationPipelineConfiguration?) async -> any TextInserter
+}
+
+public extension TextInserter {
+    func bound(to configuration: DictationPipelineConfiguration?) async -> any TextInserter { self }
+}
+
+/// A take whose capture has stopped. Finalizing it may run while the next take records.
+public struct DictationTake: Sendable {
+    public let finalize: @Sendable () async throws -> String
+    public let discard: @Sendable () async -> Void
+
+    public init(
+        finalize: @escaping @Sendable () async throws -> String,
+        discard: @escaping @Sendable () async -> Void = {}
+    ) {
+        self.finalize = finalize
+        self.discard = discard
+    }
 }
 
 public protocol DictationRecorder: Sendable {
     /// Starts recording from the mic. Subsequent `start` calls before `stop` are a no-op.
     func start() async throws
+    /// Starts a take with the settings read at the press.
+    func start(configuration: DictationPipelineConfiguration) async throws
+    /// Stops recording and releases the mic at once; the returned take transcribes what was captured.
+    func stopCapture() async throws -> DictationTake
     /// Stops recording and transcribes the captured audio. Returns the transcript text.
     func stopAndTranscribe() async throws -> String
     /// Stops recording and throws the captured audio away. Must not transcribe (or download
@@ -38,6 +62,12 @@ public protocol DictationRecorder: Sendable {
 }
 
 public extension DictationRecorder {
+    func start(configuration: DictationPipelineConfiguration) async throws {
+        try await start()
+    }
+    func stopCapture() async throws -> DictationTake {
+        DictationTake(finalize: { try await self.stopAndTranscribe() })
+    }
     func stopAndDiscard() async {
         _ = try? await stopAndTranscribe()
     }

@@ -449,6 +449,51 @@ struct StreamingTakeEndingTests {
         for await _ in events {}
     }
 
+    @Test("stopping the capture returns before the tail decode, and the stop that follows still finishes the take")
+    func stopCapturingReturnsBeforeTheTail() async throws {
+        let session = StreamingTranscriptionSession(persistAudio: true)
+        let persister = try #require(StreamingAudioPersister(sampleRate: 16_000))
+        defer { try? FileManager.default.removeItem(at: persister.url) }
+        let harness = TakeHarness()
+        let decodeGate = UninterruptibleGate()
+        defer { decodeGate.open() }
+        let events = await launchTake(on: session, persister: persister, harness: harness, decodeGate: decodeGate)
+        await harness.captureStarted.wait("capture to start")
+        harness.push([Float](repeating: 0.5, count: 8_000))
+
+        let capturing = GuardedTask { await session.stopCapturing() }
+        _ = try await capturing.value("the capture to stop while the tail decode is held")
+        await decodeGate.arrivals.wait(atLeast: 1, "the tail decode to start")
+        let stopping = GuardedTask { await session.stop() }
+        decodeGate.open()
+        _ = try await stopping.value("the stop to finish")
+
+        let transcript = await finishedTranscript(of: events)
+        #expect(transcript?.text.contains("last words") == true)
+    }
+
+    @Test("cancelling a take whose capture already stopped ends it without a transcript")
+    func cancelAfterStopCapturing() async throws {
+        let session = StreamingTranscriptionSession(persistAudio: true)
+        let persister = try #require(StreamingAudioPersister(sampleRate: 16_000))
+        let harness = TakeHarness()
+        let events = await launchTake(on: session, persister: persister, harness: harness)
+        await harness.captureStarted.wait("capture to start")
+        harness.push([Float](repeating: 0.5, count: 8_000))
+        let audio = persister.url
+
+        await session.stopCapturing()
+        let cancelling = GuardedTask { await session.cancel() }
+        _ = try await cancelling.value("the cancel to return")
+
+        var finished = false
+        for await event in events {
+            if case .finished = event { finished = true }
+        }
+        #expect(!finished)
+        #expect(!FileManager.default.fileExists(atPath: audio.path))
+    }
+
     @Test("cancelling a take skips its final decode, deletes its audio and sends no finished transcript")
     func cancelDiscardsTheTake() async throws {
         let session = StreamingTranscriptionSession(persistAudio: true)

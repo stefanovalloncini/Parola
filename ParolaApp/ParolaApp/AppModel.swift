@@ -447,7 +447,7 @@ final class AppModel {
     /// 0–1 fraction of the media transcribed so far, or nil while indeterminate (duration unknown, or the engine reports no progress).
     var fileTranscribeFraction: Double?
     var fileTranscribeStage: TranscribeStage?
-    var useStreaming: Bool = true { didSet { defaults.set(useStreaming, forKey: "useStreaming"); if !isReloadingSettings { restartDictation() } } }
+    var useStreaming: Bool = true { didSet { defaults.set(useStreaming, forKey: "useStreaming"); if !isReloadingSettings { applyDictationModelChange() } } }
     var wordTimestamps: Bool = false { didSet { defaults.set(wordTimestamps, forKey: "wordTimestamps") } }
     var readAloudRate: Double = 1 {
         didSet {
@@ -470,7 +470,7 @@ final class AppModel {
         }
     }
     var karaokeHighlight: Bool = true { didSet { defaults.set(karaokeHighlight, forKey: "karaokeHighlight") } }
-    var initialPrompt: String = "" { didSet { defaults.set(initialPrompt, forKey: "initialPrompt"); if !isReloadingSettings { scheduleDictationRestart() } } }
+    var initialPrompt: String = "" { didSet { defaults.set(initialPrompt, forKey: "initialPrompt") } }
     var diarize: Bool = false { didSet { defaults.set(diarize, forKey: "diarize") } }
     /// Diarizer speaker-count hint; 0 means auto-detect and threads nil into the options.
     var expectedSpeakersRaw: Int = 0 { didSet { defaults.set(expectedSpeakersRaw, forKey: "expectedSpeakersRaw") } }
@@ -546,31 +546,26 @@ final class AppModel {
     var dictationStripSelfCorrections: Bool = false {
         didSet {
             defaults.set(dictationStripSelfCorrections, forKey: "dictationStripSelfCorrections")
-            if !isReloadingSettings { applyDictationCleanupPromptChange() }
         }
     }
     var dictationPasteDelayMs: Int = 0 {
         didSet {
             defaults.set(dictationPasteDelayMs, forKey: "dictationPasteDelayMs")
-            if !isReloadingSettings { scheduleDictationRestart() }
         }
     }
     var dictationContextSelection: Bool = false {
         didSet {
             defaults.set(dictationContextSelection, forKey: "dictationContextSelection")
-            if !isReloadingSettings { applyDictationCleanupPromptChange() }
         }
     }
     var dictationContextClipboard: Bool = false {
         didSet {
             defaults.set(dictationContextClipboard, forKey: "dictationContextClipboard")
-            if !isReloadingSettings { applyDictationCleanupPromptChange() }
         }
     }
     var dictationContextScreen: Bool = false {
         didSet {
             defaults.set(dictationContextScreen, forKey: "dictationContextScreen")
-            if !isReloadingSettings { applyDictationCleanupPromptChange() }
         }
     }
     var recordingMaxMinutes: Int = 0 { didSet { defaults.set(recordingMaxMinutes, forKey: "recordingMaxMinutes") } }
@@ -732,8 +727,6 @@ final class AppModel {
     var failedTranslateOverride: Bool?
     var failedLink: DeferredLink?
     var failedLinkDownload: LinkDownloadFailure?
-    @ObservationIgnored var pendingDictationRestart: Task<Void, Never>?
-    @ObservationIgnored var pendingDictationProcessorRebuild: Task<Void, Never>?
 
     var recordingDiskSpaceLow: Bool = false
     @ObservationIgnored var freeDiskSpaceProvider: @Sendable () -> Int64? = { AppModel.systemFreeDiskSpace() }
@@ -836,7 +829,7 @@ final class AppModel {
     var currentMatchIndex: Int = 0
     @ObservationIgnored var matchesDebounce: Task<Void, Never>?
 
-    var inputDeviceUID: String = "" { didSet { defaults.set(inputDeviceUID, forKey: "inputDeviceUID"); if !isReloadingSettings { restartDictation() } } }
+    var inputDeviceUID: String = "" { didSet { defaults.set(inputDeviceUID, forKey: "inputDeviceUID") } }
 
     var preferredInputDeviceUID: String? {
         inputDeviceUID.isEmpty ? nil : inputDeviceUID
@@ -846,12 +839,12 @@ final class AppModel {
         didSet {
             defaults.set(selectedModel, forKey: "selectedModel")
             if !isReloadingSettings {
-                restartDictation()
+                applyDictationModelChange()
                 applyLiveCaptionsTranslateChange()
             }
         }
     }
-    private var selectedLanguageRaw: String = "" { didSet { defaults.set(selectedLanguageRaw, forKey: "selectedLanguageRaw"); if !isReloadingSettings { restartDictation() } } }
+    private var selectedLanguageRaw: String = "" { didSet { defaults.set(selectedLanguageRaw, forKey: "selectedLanguageRaw") } }
     var translate: Bool = false { didSet { defaults.set(translate, forKey: "translate") } }
 
     /// What Apple Speech says it can transcribe; nil until its language list is first opened.
@@ -997,14 +990,12 @@ final class AppModel {
     var snippets: [Snippet] = [] {
         didSet {
             saveSnippets()
-            if !isReloadingSettings { scheduleDictationProcessorRebuild() }
         }
     }
 
     var correctionRules: [CorrectionRule] = [] {
         didSet {
             saveCorrectionRules()
-            if !isReloadingSettings { scheduleDictationProcessorRebuild() }
         }
     }
 
@@ -1441,8 +1432,7 @@ final class AppModel {
         if !dictationEnabled {
             turnOffDictation()
         } else if activeSideEffects.contains(.dictationHotkey) {
-            stopDictation()
-            startDictation()
+            reapplyDictationAfterReload()
         }
         if activeSideEffects.contains(.sparkle) {
             applySparkleChannelChange()
@@ -1599,7 +1589,6 @@ final class AppModel {
     var dictationCleanupPromptID: String = "" {
         didSet {
             defaults.set(dictationCleanupPromptID, forKey: "dictationCleanupPromptID")
-            if !isReloadingSettings { applyDictationCleanupPromptChange() }
         }
     }
 
@@ -1607,10 +1596,6 @@ final class AppModel {
         didSet {
             defaults.set(dictationPerAppOverridesJSON, forKey: "dictationPerAppOverridesJSON")
             cachedDictationWorkflows = nil
-            if !isReloadingSettings {
-                applyDictationCleanupPromptChange()
-                restartDictation()
-            }
         }
     }
 
