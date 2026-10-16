@@ -197,6 +197,10 @@ extension AppModel {
     func wireDictationController() {
         dictationController.appModel = self
         dictationController.indicatorStyle = dictationIndicatorStyle
+        dictationPermissions.onAccessibilityGranted = { [weak self] in
+            guard let self, self.dictationEnabled, self.dictationController.isRunning else { return }
+            self.restartDictation()
+        }
     }
 
     func restartDictation() {
@@ -214,12 +218,15 @@ extension AppModel {
         let running = dictationController.configuration
         guard dictationController.isRunning,
               running?.hotkeyKeyCode == dictationKeyCode,
-              running?.hotkeyModifiers == dictationModifierFlags
+              running?.hotkeyModifiers == dictationModifierFlags,
+              running?.mode == dictationMode
         else {
             stopDictation()
             startDictation()
             return
         }
+        applyIndicatorStyleChange()
+        modelResidency.dictationArmed()
         applyDictationModelChange()
     }
 
@@ -242,7 +249,7 @@ extension AppModel {
     /// Unlike a restart's stop, this drops a final still on its way: nothing is pasted once dictation is off.
     func turnOffDictation() {
         let mayBeTranscribing = dictationController.state != .idle
-        let configuredModel = dictationController.configuration?.modelName ?? selectedModel
+        let configuredModel = lastDictationModel ?? dictationController.configuration?.pipeline.modelName ?? selectedModel
         dictationController.discardAndStop()
         let residency = modelResidency
         let epoch = residency.warmEpoch
@@ -255,26 +262,18 @@ extension AppModel {
     func startDictation() {
         guard features.isEnabled(.dictation) else { return }
         guard !dictationController.isRunning else { return }
-        let initial = dictationPipelineConfiguration()
         let configuration = DictationController.Configuration(
-            modelName: selectedModel,
-            language: selectedLanguage,
-            initialPrompt: initialPrompt.isEmpty ? nil : initialPrompt,
-            deviceUID: preferredInputDeviceUID,
-            streamingEnabled: useStreaming,
+            pipeline: dictationPipelineConfiguration(),
+            pipelineProvider: { [weak self] in
+                await MainActor.run { self?.pressedPipelineConfiguration() ?? DictationPipelineConfiguration(postProcessor: DictationNoProcessing()) }
+            },
             hotkeyKeyCode: dictationKeyCode,
             hotkeyModifiers: dictationModifierFlags,
             listensForHotkey: activeSideEffects.contains(.dictationHotkey),
             mode: dictationMode,
-            workflows: dictationWorkflows(),
-            postProcessor: initial.postProcessor,
-            pasteDelayMs: initial.pasteDelayMs,
             mediaSession: mediaSession,
             mediaConfigProvider: { [weak self] in
                 await MainActor.run { self?.mediaSessionConfig(allowMute: true) ?? .none }
-            },
-            pipelineProvider: { [weak self] in
-                await MainActor.run { self?.dictationPipelineConfiguration() ?? initial }
             },
             willListen: { [weak self] in
                 await self?.readAloud.yield(to: .dictation)
@@ -353,10 +352,6 @@ extension AppModel {
         return model
     }
 
-    func applyDictationModeChange() {
-        dictationController.setMode(dictationMode)
-    }
-
 
     private func currentDictationCleanupPrompt() -> Prompt? {
         guard let uuid = UUID(uuidString: dictationCleanupPromptID) else { return nil }
@@ -379,7 +374,13 @@ extension AppModel {
         return out
     }
 
-    private func currentDictationProcessor() -> any TextPostProcessor {
+    nonisolated static func dictationProcessor(for target: DictationTarget?, pieces: DictationProcessorPieces) -> any TextPostProcessor {
+        let prompt = pieces.prompt.targeting(target)
+        let chain = pieces.before + [prompt] + pieces.after
+        return chain.count == 1 ? prompt : CompositePostProcessor(chain)
+    }
+
+    private func dictationProcessorPieces() -> DictationProcessorPieces {
         let contextConfig = DictationContextConfig(
             selectionEnabled: dictationContextSelection,
             clipboardEnabled: dictationContextClipboard,
@@ -397,35 +398,54 @@ extension AppModel {
             language: selectedLanguage,
             cleanupRunner: dictationCleanupRunner()
         )
-        var chain: [any TextPostProcessor] = []
+        var before: [any TextPostProcessor] = []
         if dictationStripSelfCorrections {
-            chain.append(SelfCorrectionCleaner())
+            before.append(SelfCorrectionCleaner())
         }
         if correctionRules.contains(where: { $0.enabled && !$0.from.isEmpty }) {
-            chain.append(CorrectionRuleSet(rules: correctionRules))
+            before.append(CorrectionRuleSet(rules: correctionRules))
         }
         if snippets.contains(where: { $0.enabled }) {
-            chain.append(makeSnippetExpander())
+            before.append(makeSnippetExpander())
         }
-        chain.append(prompt)
+        var after: [any TextPostProcessor] = []
         // Deferred snippets expand after cleanup so {{CLIPBOARD}}/{{TIME}} read insert-time state.
         if snippets.contains(where: { $0.enabled && $0.expandAtInsert }) {
-            chain.append(makeSnippetExpander().deferredOnly())
+            after.append(makeSnippetExpander().deferredOnly())
         }
-        return chain.count == 1 ? prompt : CompositePostProcessor(chain)
+        return DictationProcessorPieces(prompt: prompt, before: before, after: after)
     }
 
     func dictationPipelineConfiguration() -> DictationPipelineConfiguration {
-        DictationPipelineConfiguration(
+        let pieces = dictationProcessorPieces()
+        let workflows = dictationWorkflows()
+        let pasteDelay = max(0, min(2000, dictationPasteDelayMs))
+        return DictationPipelineConfiguration(
             modelName: selectedModel,
             language: selectedLanguage,
             initialPrompt: initialPrompt.isEmpty ? nil : initialPrompt,
             deviceUID: preferredInputDeviceUID,
             streamingEnabled: useStreaming,
-            workflows: dictationWorkflows(),
-            postProcessor: currentDictationProcessor(),
-            pasteDelayMs: max(0, min(2000, dictationPasteDelayMs))
+            workflows: workflows,
+            postProcessor: Self.dictationProcessor(for: nil, pieces: pieces),
+            pasteDelayMs: pasteDelay,
+            bind: { target in
+                let workflow = target?.bundleID.flatMap { DictationWorkflowMap.select(in: workflows, for: $0, url: target?.url) }
+                let base: any TextInserter = (workflow?.insertion ?? .paste) == .keystroke
+                    ? KeystrokeTextInserter()
+                    : ClipboardPasteInserter(preDelayMs: pasteDelay)
+                return DictationTakeBinding(
+                    postProcessor: Self.dictationProcessor(for: target, pieces: pieces),
+                    inserter: TargetedTextInserter(base: base, target: target)
+                )
+            }
         )
+    }
+
+    func pressedPipelineConfiguration() -> DictationPipelineConfiguration {
+        let configuration = dictationPipelineConfiguration()
+        lastDictationModel = configuration.modelName
+        return configuration
     }
 
     func refreshDictationTriggerPrompts() async {
@@ -466,4 +486,14 @@ extension AppModel {
     func applyIndicatorStyleChange() {
         dictationController.indicatorStyle = dictationIndicatorStyle
     }
+}
+
+struct DictationProcessorPieces: Sendable {
+    let prompt: PromptDictationProcessor
+    let before: [any TextPostProcessor]
+    let after: [any TextPostProcessor]
+}
+
+struct DictationNoProcessing: TextPostProcessor {
+    func process(_ text: String) async -> String { text }
 }

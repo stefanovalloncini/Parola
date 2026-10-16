@@ -20,12 +20,6 @@ public protocol TextInserter: Sendable {
     /// cannot reach the target should leave the text on the general pasteboard,
     /// then throw an error whose description tells the user how to recover.
     func insert(_ text: String) async throws
-    /// The inserter a take uses for its own text, resolved when the take is released so a later focus change doesn't retarget it.
-    func bound(to configuration: DictationPipelineConfiguration?) async -> any TextInserter
-}
-
-public extension TextInserter {
-    func bound(to configuration: DictationPipelineConfiguration?) async -> any TextInserter { self }
 }
 
 /// A take whose capture has stopped. Finalizing it may run while the next take records.
@@ -66,7 +60,8 @@ public extension DictationRecorder {
         try await start()
     }
     func stopCapture() async throws -> DictationTake {
-        DictationTake(finalize: { try await self.stopAndTranscribe() })
+        let text = try await stopAndTranscribe()
+        return DictationTake(finalize: { text })
     }
     func stopAndDiscard() async {
         _ = try? await stopAndTranscribe()

@@ -48,14 +48,11 @@ private struct IdentityPostProcessor: TextPostProcessor {
 struct DictationControllerStateGuardTests {
     private func makeConfiguration() -> DictationController.Configuration {
         DictationController.Configuration(
-            modelName: "openai_whisper-tiny",
-            language: nil,
-            deviceUID: nil,
-            streamingEnabled: false,
+            pipeline: DictationPipelineConfiguration(
+                modelName: "openai_whisper-tiny", streamingEnabled: false, postProcessor: IdentityPostProcessor()
+            ),
             hotkeyKeyCode: 96,
-            mode: .toggle,
-            workflows: [:],
-            postProcessor: IdentityPostProcessor()
+            mode: .toggle
         )
     }
 

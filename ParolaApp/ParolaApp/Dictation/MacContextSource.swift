@@ -20,7 +20,7 @@ struct MacContextSource: DictationContextSource {
 
     func clipboardContents() async -> String? {
         await MainActor.run {
-            NSPasteboard.general.string(forType: .string)
+            PendingPasteRestores.userText()
         }
     }
 

@@ -1,8 +1,8 @@
 import Foundation
 
-/// Lets one streaming decode run at a time, so a take finishing its tail never overlaps the next take's live decodes.
+/// Lets one streaming decode run at a time, so a dictation take finishing its tail never overlaps the next take's live decodes.
 actor StreamingDecodeSlot {
-    static let shared = StreamingDecodeSlot()
+    static let dictation = StreamingDecodeSlot()
 
     private var busy = false
     private var waiters: [(id: UInt64, continuation: CheckedContinuation<Void, any Error>)] = []

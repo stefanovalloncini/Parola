@@ -3,23 +3,36 @@ import ApplicationServices
 import Carbon.HIToolbox
 import Foundation
 import ParolaCore
+import os
 import ParolaDictation
 
 /// The prior clipboard of a paste whose restore has not run yet, so the next paste can take it over instead of snapshotting our own text.
-@MainActor
-private enum PendingPasteRestores {
-    struct Pending {
+enum PendingPasteRestores {
+    struct Pending: Sendable {
         let prior: PasteboardSnapshot
         let changeCount: Int
         let task: Task<Void, Never>
     }
 
-    static var byPasteboard: [NSPasteboard.Name: Pending] = [:]
+    private static let state = OSAllocatedUnfairLock<[NSPasteboard.Name: Pending]>(initialState: [:])
+
+    static func set(_ pending: Pending?, on name: NSPasteboard.Name) {
+        state.withLock { $0[name] = pending }
+    }
 
     static func takeReusablePrior(on name: NSPasteboard.Name) -> PasteboardSnapshot? {
-        guard let pending = byPasteboard.removeValue(forKey: name) else { return nil }
+        guard let pending = state.withLock({ $0.removeValue(forKey: name) }) else { return nil }
         pending.task.cancel()
         return NSPasteboard(name: name).changeCount == pending.changeCount ? pending.prior : nil
+    }
+
+    /// What the user has copied: while a restore is pending and nothing else has written since the paste, that is the prior clipboard, not our pasted text.
+    static func userText(on name: NSPasteboard.Name = .general) -> String? {
+        let pasteboard = NSPasteboard(name: name)
+        if let pending = state.withLock({ $0[name] }), pasteboard.changeCount == pending.changeCount {
+            return pending.prior.plainText
+        }
+        return pasteboard.string(forType: .string)
     }
 }
 
@@ -58,11 +71,11 @@ struct ClipboardPasteInserter: TextInserter {
             let restore = Task { @MainActor in
                 try? await Task.sleep(for: delay)
                 guard !Task.isCancelled else { return }
-                PendingPasteRestores.byPasteboard[name] = nil
+                PendingPasteRestores.set(nil, on: name)
                 guard pasteboard.changeCount == changeCountAfterWrite else { return }
                 prior.restore(to: pasteboard)
             }
-            PendingPasteRestores.byPasteboard[name] = .init(prior: prior, changeCount: changeCountAfterWrite, task: restore)
+            PendingPasteRestores.set(.init(prior: prior, changeCount: changeCountAfterWrite, task: restore), on: name)
         }
     }
 

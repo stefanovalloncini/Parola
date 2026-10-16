@@ -15,6 +15,10 @@ struct PasteboardSnapshot: Sendable {
 
     var isEmpty: Bool { items.allSatisfy(\.isEmpty) }
 
+    var plainText: String? {
+        items.lazy.compactMap { $0[NSPasteboard.PasteboardType.string.rawValue] }.first.flatMap { String(data: $0, encoding: .utf8) }
+    }
+
     /// Lazy providers (Office, browsers) can take long to render; this keeps that wait off the main actor.
     @concurrent
     static func capture(named name: NSPasteboard.Name, byteBudget: Int = defaultByteBudget) async -> PasteboardSnapshot {

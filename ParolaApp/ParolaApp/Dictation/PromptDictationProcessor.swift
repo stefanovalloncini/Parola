@@ -18,6 +18,13 @@ struct PromptDictationProcessor: TextPostProcessor {
     let urlResolver: (@Sendable @MainActor (String) async -> URL?)?
     let cleanupTimeout: Duration
     let cleanupRunner: @Sendable (Prompt, String) async -> String?
+    var target: DictationTarget?
+
+    func targeting(_ target: DictationTarget?) -> PromptDictationProcessor {
+        var copy = self
+        copy.target = target
+        return copy
+    }
 
     init(
         defaultPrompt: Prompt?,
@@ -53,7 +60,12 @@ struct PromptDictationProcessor: TextPostProcessor {
     }
 
     func process(_ text: String) async -> String {
-        let frontmost = await frontmostAppContext()
+        let frontmost: (bundleID: String?, name: String?)
+        if let target {
+            frontmost = (target.bundleID, target.appName)
+        } else {
+            frontmost = await frontmostAppContext()
+        }
         let basePrompt: Prompt? = await selectOverridePrompt(bundleID: frontmost.bundleID) ?? defaultPrompt
 
         let detector = TriggerWordDetector()
@@ -85,7 +97,7 @@ struct PromptDictationProcessor: TextPostProcessor {
     func selectOverridePrompt(bundleID: String?) async -> Prompt? {
         guard let bundleID, let entries = overrides[bundleID], !entries.isEmpty else { return nil }
         let hasURLRule = entries.contains { !($0.urlPattern ?? "").isEmpty }
-        let url: URL? = hasURLRule ? await resolveURL(bundleID: bundleID) : nil
+        let url: URL? = hasURLRule ? (target != nil ? target?.url : await resolveURL(bundleID: bundleID)) : nil
         if let url, let match = entries.first(where: { entry in
             guard let pattern = entry.urlPattern, !pattern.isEmpty else { return false }
             return matches(pattern: pattern, url: url)

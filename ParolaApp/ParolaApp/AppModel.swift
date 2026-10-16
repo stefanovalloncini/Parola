@@ -1236,7 +1236,7 @@ final class AppModel {
     var dictationModeRaw: String = DictationMode.pushToTalk.rawValue {
         didSet {
             defaults.set(dictationModeRaw, forKey: "dictationModeRaw")
-            if !isReloadingSettings { applyDictationModeChange() }
+            if !isReloadingSettings { restartDictation() }
         }
     }
 
@@ -1610,6 +1610,7 @@ final class AppModel {
     ]
 
     @ObservationIgnored let dictationController = DictationController()
+    @ObservationIgnored var lastDictationModel: String?
     @ObservationIgnored let dictationPermissions = DictationPermissions(readsAtLaunch: false)
     @ObservationIgnored let capturePermissions: SystemCapturePermissions
 

@@ -24,6 +24,7 @@ actor MicDictationRecorder: DictationRecorder {
     private let onRunEnded: (@Sendable () -> Void)?
 
     private var capturing: (id: UUID, take: MicTake)?
+    private var newestReleased: UUID?
 
     init(
         model: String?,
@@ -71,7 +72,10 @@ actor MicDictationRecorder: DictationRecorder {
     }
 
     private func start(settings: Settings) async throws {
-        guard capturing == nil else { return }
+        guard capturing == nil else {
+            ParolaLog.fault(.dictation, "dictation recorder asked to start while a take is capturing")
+            throw ParolaError.transcriptionFailed("A take is already recording.")
+        }
         let id = UUID()
         let take = MicTake(
             settings: settings,
@@ -101,8 +105,9 @@ actor MicDictationRecorder: DictationRecorder {
     }
 
     func stopCapture() async throws -> DictationTake {
-        guard let (_, take) = capturing else { return DictationTake(finalize: { "" }) }
+        guard let (id, take) = capturing else { return DictationTake(finalize: { "" }) }
         capturing = nil
+        newestReleased = id
         do {
             let finalize = try await take.stopCapture()
             return DictationTake(
@@ -154,7 +159,7 @@ actor MicDictationRecorder: DictationRecorder {
     }
 
     private func broadcastPartial(_ text: String, from id: UUID) {
-        guard capturing?.id == id else { return }
+        guard capturing?.id == id || (capturing == nil && newestReleased == id) else { return }
         for continuation in partialContinuations.values {
             continuation.yield(text)
         }
@@ -302,7 +307,7 @@ private actor MicTake {
 
     private func startStreaming() async throws {
         let session = makeStreamingSession?(settings.deviceUID)
-            ?? StreamingTranscriberFactory.make(clock: clock, deviceUID: settings.deviceUID)
+            ?? StreamingTranscriberFactory.make(clock: clock, deviceUID: settings.deviceUID, serializesDecodes: true)
         streamingSegments = []
         streamingPartial = ""
         streamingFailure = nil

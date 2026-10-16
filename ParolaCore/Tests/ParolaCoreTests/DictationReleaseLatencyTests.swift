@@ -5,6 +5,7 @@ import Testing
 
 @Suite("Dictation release to next capture")
 struct DictationReleaseLatencyTests {
+    // @unchecked: `handler` is touched only under `lock`.
     private final class Hotkey: HotkeyMonitor, @unchecked Sendable {
         private let lock = NSLock()
         private var handler: (@Sendable (HotkeyEvent) -> Void)?

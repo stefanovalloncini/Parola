@@ -71,39 +71,3 @@ struct KeystrokeTextInserter: TextInserter {
         return (down, up)
     }
 }
-
-struct PerAppTextInserter: TextInserter {
-    let paste: ClipboardPasteInserter
-    let keystroke: KeystrokeTextInserter
-    let resolver: @Sendable ([String: [DictationWorkflow]]) async -> DictationInsertionMode
-    var workflows: [String: [DictationWorkflow]] = [:]
-
-    init(
-        paste: ClipboardPasteInserter = ClipboardPasteInserter(),
-        keystroke: KeystrokeTextInserter = KeystrokeTextInserter(),
-        workflows: [String: [DictationWorkflow]] = [:],
-        resolver: @escaping @Sendable ([String: [DictationWorkflow]]) async -> DictationInsertionMode
-    ) {
-        self.workflows = workflows
-        self.paste = paste
-        self.keystroke = keystroke
-        self.resolver = resolver
-    }
-
-    func insert(_ text: String) async throws {
-        switch await resolver(workflows) {
-        case .paste:     try await paste.insert(text)
-        case .keystroke: try await keystroke.insert(text)
-        }
-    }
-
-    func bound(to configuration: DictationPipelineConfiguration?) async -> any TextInserter {
-        guard let configuration else { return self }
-        var pasteInserter = paste
-        pasteInserter.preDelayMs = max(0, min(2000, configuration.pasteDelayMs))
-        switch await resolver(configuration.workflows) {
-        case .paste:     return pasteInserter
-        case .keystroke: return keystroke
-        }
-    }
-}

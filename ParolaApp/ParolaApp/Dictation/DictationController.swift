@@ -66,6 +66,9 @@ final class DictationController {
     @ObservationIgnored var hotkeyFactory: ((Int, NSEvent.ModifierFlags) -> any HotkeyMonitor)?
     @ObservationIgnored var recorderFactory: ((Configuration) -> any DictationRecorder)?
     @ObservationIgnored var inserterFactory: (() -> any TextInserter)?
+    @ObservationIgnored var targetReader: @Sendable ([String: [DictationWorkflow]]) async -> DictationTarget? = { workflows in
+        await DictationController.readTarget(workflows: workflows)
+    }
     @ObservationIgnored private var pasteGate = PasteGate()
     @ObservationIgnored private(set) var fallbackSession = TranscriptionSession()
     private(set) var currentAnchor: FieldAnchor?
@@ -74,22 +77,15 @@ final class DictationController {
     weak var appModel: AppModel?
 
     struct Configuration {
-        var modelName: String
-        var language: String?
-        var initialPrompt: String? = nil
-        var deviceUID: String?
-        var streamingEnabled: Bool
+        var pipeline: DictationPipelineConfiguration
+        var pipelineProvider: (@Sendable () async -> DictationPipelineConfiguration)? = nil
         var hotkeyKeyCode: Int
         var hotkeyModifiers: NSEvent.ModifierFlags = []
         /// Off unless the launch owns the dictation hotkey: a test sandbox must not hear keys pressed in other apps.
         var listensForHotkey = false
         var mode: DictationMode
-        var workflows: [String: [DictationWorkflow]]
-        var postProcessor: any TextPostProcessor
-        var pasteDelayMs: Int = 0
         var mediaSession: MediaSession? = nil
         var mediaConfigProvider: (@Sendable () async -> MediaSessionConfig)? = nil
-        var pipelineProvider: (@Sendable () async -> DictationPipelineConfiguration)? = nil
         var willListen: (@Sendable () async -> Void)? = nil
     }
 
@@ -140,16 +136,17 @@ final class DictationController {
     func start(configuration: Configuration) {
         guard coordinator == nil else { return }
         self.configuration = configuration
+        let pipeline = configuration.pipeline
         let hotkey = hotkeyFactory?(configuration.hotkeyKeyCode, configuration.hotkeyModifiers)
             ?? Self.hotkeyMonitor(for: configuration)
         // Own session so a stop never queues behind a file job; it outlives restarts, and rearm() replaces it.
         let recorder = recorderFactory?(configuration) ?? MicDictationRecorder(
-            model: configuration.modelName,
-            language: configuration.language,
-            initialPrompt: configuration.initialPrompt,
-            deviceUID: configuration.deviceUID,
-            streamingEnabled: configuration.streamingEnabled,
-            workflows: configuration.workflows,
+            model: pipeline.modelName,
+            language: pipeline.language,
+            initialPrompt: pipeline.initialPrompt,
+            deviceUID: pipeline.deviceUID,
+            streamingEnabled: pipeline.streamingEnabled,
+            workflows: pipeline.workflows,
             session: fallbackSession,
             onRunEnded: { [weak self] in
                 Task { @MainActor in self?.appModel?.modelResidency.retryPendingUnloads() }
@@ -161,31 +158,45 @@ final class DictationController {
                 Task { @MainActor in self?.noteModelDownloadProgress(fraction) }
             }
         )
-        let inserter: any TextInserter
+        let override: (any TextInserter)?
         if let inserterFactory {
-            inserter = inserterFactory()
+            override = inserterFactory()
         } else if appModel?.mode == .test {
-            inserter = CapturingTextInserter()
+            override = CapturingTextInserter()
         } else {
-            inserter = PerAppTextInserter(
-                paste: ClipboardPasteInserter(preDelayMs: configuration.pasteDelayMs),
-                workflows: configuration.workflows
-            ) { @Sendable workflows in
-                let workflow = await Self.resolveWorkflow(in: workflows)
-                return workflow?.insertion ?? .paste
-            }
+            override = nil
         }
+        let gate = pasteGate
+        let baseInserter = override ?? ClipboardPasteInserter(preDelayMs: pipeline.pasteDelayMs)
+        let provider: (@Sendable () async -> DictationPipelineConfiguration)?
+        if let source = configuration.pipelineProvider {
+            provider = {
+                var next = await source()
+                if let bind = next.bind {
+                    next.bind = { target in
+                        var binding = bind(target)
+                        binding.inserter = GatedTextInserter(base: override ?? binding.inserter, gate: gate)
+                        return binding
+                    }
+                }
+                return next
+            }
+        } else {
+            provider = nil
+        }
+        let reader = targetReader
         coordinatorGeneration += 1
         let generation = coordinatorGeneration
         let coord = DictationCoordinator(
             hotkey: hotkey,
             recorder: recorder,
-            inserter: GatedTextInserter(base: inserter, gate: pasteGate),
-            postProcessor: configuration.postProcessor,
+            inserter: GatedTextInserter(base: baseInserter, gate: gate),
+            postProcessor: pipeline.postProcessor,
             mode: configuration.mode,
             mediaSession: configuration.mediaSession,
             mediaConfigProvider: configuration.mediaConfigProvider,
-            configurationProvider: configuration.pipelineProvider,
+            configurationProvider: provider,
+            targetProvider: { await reader($0.workflows) },
             willListen: configuration.willListen
         ) { [weak self] state in
             await MainActor.run { self?.handleStateChange(state, generation: generation) }
@@ -248,12 +259,6 @@ final class DictationController {
         hideHUD()
         state = .idle
         appModel?.dictationState = .idle
-    }
-
-    func setMode(_ mode: DictationMode) {
-        guard let coord = coordinator else { return }
-        configuration?.mode = mode
-        Task { await coord.setMode(mode) }
     }
 
     func simulatePress() {
@@ -599,6 +604,18 @@ final class DictationController {
         hud?.orderOut(nil)
     }
 
+    static func readTarget(workflows: [String: [DictationWorkflow]]) async -> DictationTarget? {
+        let app = await MainActor.run {
+            NSWorkspace.shared.frontmostApplication.map { ($0.processIdentifier, $0.bundleIdentifier, $0.localizedName) }
+        }
+        guard let app else { return nil }
+        var url: URL?
+        if let bundleID = app.1, DictationWorkflowMap.hasURLRules(in: workflows, for: bundleID) {
+            url = await BrowserURLResolver.shared.currentURL(for: bundleID)
+        }
+        return DictationTarget(processID: app.0, bundleID: app.1, appName: app.2, url: url)
+    }
+
     static func resolveWorkflow(in workflows: [String: [DictationWorkflow]]) async -> DictationWorkflow? {
         let bundleID = await MainActor.run { NSWorkspace.shared.frontmostApplication?.bundleIdentifier }
         guard let bundleID else { return nil }
@@ -624,10 +641,6 @@ private final class PasteGate: Sendable {
 private struct GatedTextInserter: TextInserter {
     let base: any TextInserter
     let gate: PasteGate
-
-    func bound(to configuration: DictationPipelineConfiguration?) async -> any TextInserter {
-        GatedTextInserter(base: await base.bound(to: configuration), gate: gate)
-    }
 
     func insert(_ text: String) async throws {
         guard gate.isOpen else { return }

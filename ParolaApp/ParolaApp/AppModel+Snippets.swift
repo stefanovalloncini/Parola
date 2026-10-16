@@ -68,6 +68,6 @@ extension AppModel {
 
 struct NSPasteboardClipboardReader: ClipboardReader {
     func currentText() -> String? {
-        NSPasteboard.general.string(forType: .string)
+        PendingPasteRestores.userText()
     }
 }

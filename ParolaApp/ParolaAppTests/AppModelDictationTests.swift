@@ -299,6 +299,7 @@ struct AppModelDictationTests {
         #expect(processor != nil)
     }
 
+    // @unchecked: every field is touched only under `lock`.
     private final class PressLog: @unchecked Sendable {
         private let lock = NSLock()
         private var items: [DictationPipelineConfiguration] = []
@@ -317,7 +318,7 @@ struct AppModelDictationTests {
         func stopAndTranscribe() async throws -> String { "text" }
     }
 
-    private final class CountedHotkey: HotkeyMonitor, @unchecked Sendable {
+    private final class CountedHotkey: HotkeyMonitor {
         func start(handler: @escaping @Sendable (HotkeyEvent) -> Void) async {}
         func stop() async {}
     }
@@ -345,7 +346,7 @@ struct AppModelDictationTests {
 
     @Test("a setting changed between two presses reaches the second take without a restart", arguments: [
         "language", "model", "streaming", "prompt", "device", "pasteDelay", "workflows", "rules", "snippets",
-        "selfCorrection", "cleanupPrompt",
+        "selfCorrection", "cleanupPrompt", "contextSelection", "contextClipboard", "contextScreen",
     ])
     func settingsAreReadPerPress(_ setting: String) async {
         let model = makeModel()
@@ -361,7 +362,10 @@ struct AppModelDictationTests {
             case "rules": model.correctionRules = [CorrectionRule(from: "teh", to: "the")]
             case "snippets": model.snippets = [Snippet(trigger: "omw", replacement: "on my way")]
             case "selfCorrection": model.dictationStripSelfCorrections = true
-            default: model.dictationCleanupPromptID = DictationModePreset.builtIns.compactMap(\.promptID).first?.uuidString ?? ""
+            case "contextSelection": model.dictationContextSelection = true
+            case "contextClipboard": model.dictationContextClipboard = true
+            case "contextScreen": model.dictationContextScreen = true
+            default: model.dictationCleanupPromptID = Prompt.builtIns[0].id.uuidString
             }
         }
         let first = log.configurations[0]
@@ -383,13 +387,21 @@ struct AppModelDictationTests {
         case "selfCorrection":
             #expect(await first.postProcessor.process("scratch that, hi") != "hi")
             #expect(await second.postProcessor.process("scratch that, hi") == "hi")
-        default: break
+        case "cleanupPrompt":
+            #expect((first.postProcessor as? PromptDictationProcessor)?.defaultPrompt == nil)
+            #expect((second.postProcessor as? PromptDictationProcessor)?.defaultPrompt?.id == Prompt.builtIns[0].id)
+        case "contextSelection":
+            #expect((second.postProcessor as? PromptDictationProcessor)?.contextConfig.selectionEnabled == true)
+        case "contextClipboard":
+            #expect((second.postProcessor as? PromptDictationProcessor)?.contextConfig.clipboardEnabled == true)
+        default:
+            #expect((second.postProcessor as? PromptDictationProcessor)?.contextConfig.screenEnabled == true)
         }
         #expect(log.monitorCount == 1, "\(setting) must not restart the monitor")
         model.abortDictation()
     }
 
-    @Test("the hotkey key, its modifiers and the enabled switch restart the monitor", arguments: ["key", "modifiers", "enabled"])
+    @Test("the hotkey key, its modifiers, the mode and the enabled switch restart the monitor", arguments: ["key", "modifiers", "mode", "enabled"])
     func hotkeySettingsRestartTheMonitor(_ setting: String) async {
         let model = makeModel()
         let log = PressLog()
@@ -405,6 +417,7 @@ struct AppModelDictationTests {
         switch setting {
         case "key": model.dictationKeyCode = 97
         case "modifiers": model.dictationKeyModifiers = Int(NSEvent.ModifierFlags.command.rawValue)
+        case "mode": model.dictationModeRaw = DictationMode.toggle.rawValue
         default:
             model.dictationEnabled = false
             #expect(!model.dictationController.isRunning)
@@ -449,7 +462,7 @@ struct AppModelDictationTests {
         let model = makeModel()
         model.initialPrompt = "Parola, WhisperKit, Valloncini"
         model.startDictation()
-        #expect(model.dictationController.configuration?.initialPrompt == "Parola, WhisperKit, Valloncini")
+        #expect(model.dictationController.configuration?.pipeline.initialPrompt == "Parola, WhisperKit, Valloncini")
         model.stopDictation()
     }
 
@@ -458,7 +471,7 @@ struct AppModelDictationTests {
         let model = makeModel()
         model.initialPrompt = ""
         model.startDictation()
-        #expect(model.dictationController.configuration?.initialPrompt == nil)
+        #expect(model.dictationController.configuration?.pipeline.initialPrompt == nil)
         model.stopDictation()
     }
 
@@ -495,7 +508,7 @@ struct AppModelDictationTests {
         let model = makeModel()
         model.inputDeviceUID = "usb-mic-uid"
         model.startDictation()
-        #expect(model.dictationController.configuration?.deviceUID == "usb-mic-uid")
+        #expect(model.dictationController.configuration?.pipeline.deviceUID == "usb-mic-uid")
         model.stopDictation()
     }
 
@@ -600,14 +613,9 @@ struct AppModelDictationTests {
     @Test("only a configuration allowed to listen gets the global key monitor")
     func hotkeyMonitorFollowsTheGate() {
         var configuration = DictationController.Configuration(
-            modelName: "openai_whisper-tiny",
-            language: nil,
-            deviceUID: nil,
-            streamingEnabled: false,
+            pipeline: DictationPipelineConfiguration(modelName: "openai_whisper-tiny", postProcessor: IdentityPostProcessor()),
             hotkeyKeyCode: 96,
-            mode: .pushToTalk,
-            workflows: [:],
-            postProcessor: IdentityPostProcessor()
+            mode: .pushToTalk
         )
         #expect(DictationController.hotkeyMonitor(for: configuration) is SilentHotkeyMonitor)
 

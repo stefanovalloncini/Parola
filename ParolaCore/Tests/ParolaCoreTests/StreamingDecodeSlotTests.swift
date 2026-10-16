@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import WhisperKit
 @testable import ParolaCore
 
 @Suite("Streaming decode slot")
@@ -55,4 +56,54 @@ struct StreamingDecodeSlotTests {
 private actor OrderLog {
     private(set) var items: [String] = []
     func add(_ item: String) { items.append(item) }
+}
+
+@Suite("Streaming decode slot wiring")
+struct StreamingDecodeSlotWiringTests {
+    private static let tiny = "openai_whisper-tiny"
+
+    private func overlap(slot: StreamingDecodeSlot?) async throws -> Int {
+        let probe = CacheProbe()
+        let cache = StreamingModelCache.probing(probe)
+        let store = ModelStore(modelsDirectory: FileManager.default.temporaryDirectory
+            .appendingPathComponent("slot-wiring-\(UUID().uuidString)"))
+        try store.seedInstalledModel(Self.tiny)
+        let lease = try await cache.borrow(Self.tiny, store: store)
+        let gate = UninterruptibleGate()
+        let active = Awaitable(0)
+        let peak = Awaitable(0)
+        let decoder = StreamingRealtimeLoop.Decoder(options: DecodingOptions()) { _, _, _ in
+            active.update { $0 += 1 }
+            peak.update { $0 = max($0, active.value) }
+            await gate.wait()
+            active.update { $0 -= 1 }
+            return TranscriptionResult(text: "", segments: [], language: "en", timings: TranscriptionTimings())
+        }
+        func session() -> StreamingTranscriptionSession {
+            StreamingTranscriptionSession(
+                modelStore: store, modelCache: cache, decodeSlot: slot, makeDecoder: { _, _ in decoder }
+            )
+        }
+        let first = try await session().decoder(holding: lease, options: TranscriptionOptions())
+        let second = try await session().decoder(holding: lease, options: TranscriptionOptions())
+        let one = Task { try await first.transcribe([], DecodingOptions(), { _ in nil }) }
+        let two = Task { try await second.transcribe([], DecodingOptions(), { _ in nil }) }
+        await gate.arrivals.wait(atLeast: 1, "a decode to start")
+        if slot == nil { await gate.arrivals.wait(atLeast: 2, "both decodes to start") }
+        gate.open()
+        _ = try await one.value
+        _ = try await two.value
+        await lease.release()
+        return peak.value
+    }
+
+    @Test("dictation sessions sharing a slot never decode at once", .timeLimit(.minutes(1)))
+    func slotSerialises() async throws {
+        #expect(try await overlap(slot: StreamingDecodeSlot()) == 1)
+    }
+
+    @Test("sessions without a slot decode side by side", .timeLimit(.minutes(1)))
+    func noSlotNoLimit() async throws {
+        #expect(try await overlap(slot: nil) == 2)
+    }
 }

@@ -20,6 +20,7 @@ public actor DictationCoordinator {
     private var mediaSession: MediaSession?
     private var mediaConfigProvider: (@Sendable () async -> MediaSessionConfig)?
     private var configurationProvider: (@Sendable () async -> DictationPipelineConfiguration)?
+    private var targetProvider: (@Sendable (DictationPipelineConfiguration) async -> DictationTarget?)?
     private var willListen: (@Sendable () async -> Void)?
     private var eventTask: Task<Void, Never>?
     private var eventContinuation: AsyncStream<(HotkeyEvent, Date)>.Continuation?
@@ -47,10 +48,14 @@ public actor DictationCoordinator {
     private var shutDown = false
 
     private struct Job {
-        let finalizing: Task<String, any Error>
-        let take: DictationTake
         let settle: AsyncStream<Void>.Continuation
+        var take: DictationTake?
+        var finalizing: Task<String, any Error>?
     }
+
+    /// True from the moment a capture ends until the recorder is free and the state is published; a press in between is replayed after.
+    private var endInFlight = false
+    private var deferredPress: Date?
 
     private var isListening = false
     private var resting: State = .idle
@@ -60,9 +65,7 @@ public actor DictationCoordinator {
     private var lastSettled: AsyncStream<Void>?
     private var drainWaiters: [CheckedContinuation<Void, Never>] = []
 
-    /// Counts released takes; one a stop gave up on stays at or below `abandonedFinishes`, so its late text is dropped.
     private var finishes: UInt64 = 0
-    private var abandonedFinishes: UInt64 = 0
 
     private let features: FeatureSet
 
@@ -75,6 +78,7 @@ public actor DictationCoordinator {
         mediaSession: MediaSession? = nil,
         mediaConfigProvider: (@Sendable () async -> MediaSessionConfig)? = nil,
         configurationProvider: (@Sendable () async -> DictationPipelineConfiguration)? = nil,
+        targetProvider: (@Sendable (DictationPipelineConfiguration) async -> DictationTarget?)? = nil,
         willListen: (@Sendable () async -> Void)? = nil,
         features: FeatureSet = .resolve(),
         onStateChange: @escaping @Sendable (State) async -> Void
@@ -87,6 +91,7 @@ public actor DictationCoordinator {
         self.mediaSession = mediaSession
         self.mediaConfigProvider = mediaConfigProvider
         self.configurationProvider = configurationProvider
+        self.targetProvider = targetProvider
         self.willListen = willListen
         self.features = features
         self.onStateChange = onStateChange
@@ -101,6 +106,7 @@ public actor DictationCoordinator {
         mediaSession: MediaSession? = nil,
         mediaConfigProvider: (@Sendable () async -> MediaSessionConfig)? = nil,
         configurationProvider: (@Sendable () async -> DictationPipelineConfiguration)? = nil,
+        targetProvider: (@Sendable (DictationPipelineConfiguration) async -> DictationTarget?)? = nil,
         willListen: (@Sendable () async -> Void)? = nil,
         features: FeatureSet = .resolve()
     ) {
@@ -112,6 +118,7 @@ public actor DictationCoordinator {
         self.mediaSession = mediaSession
         self.mediaConfigProvider = mediaConfigProvider
         self.configurationProvider = configurationProvider
+        self.targetProvider = targetProvider
         self.willListen = willListen
         self.features = features
         self.onStateChange = { _ in }
@@ -185,7 +192,7 @@ public actor DictationCoordinator {
         } else if startInFlight {
             await recorder.stopAndDiscard()
         }
-        await dropTakes(upTo: finishes)
+        await dropTakes(Array(jobs.keys))
         resting = .idle
         await publishState()
     }
@@ -197,15 +204,24 @@ public actor DictationCoordinator {
         isListening = false
         captureConfiguration = nil
         hybridLocked = false
+        endInFlight = true
         await publishState()
         await mediaSession?.exitRecording(holder: .dictation)
         await recorder.stopAndDiscard()
+        await finishEnding()
     }
 
     /// Waits until every released take has been inserted, failed or dropped.
     public func drain() async {
-        guard !jobs.isEmpty else { return }
+        guard processing > 0 else { return }
         await withCheckedContinuation { drainWaiters.append($0) }
+    }
+
+    private func finishEnding() async {
+        endInFlight = false
+        guard let pressedAt = deferredPress else { return }
+        deferredPress = nil
+        await handle(.press, capturedAt: pressedAt)
     }
 
     private func teardownMonitor() async {
@@ -235,42 +251,39 @@ public actor DictationCoordinator {
         }
     }
 
-    /// Gives up on the final transcription under way now: the session goes idle and its late text is never inserted.
+    /// Gives up on the take being processed now, the oldest one: its late text is never inserted and queued takes still run.
     /// Returns false when none is running. The recorder can stay busy, so the caller replaces this coordinator afterwards.
     @discardableResult
     public func abandonTranscription() async -> Bool {
-        guard case .transcribing = state else { return false }
-        return await abandon(finishes)
+        guard case .transcribing = state, let oldest = jobs.keys.min() else { return false }
+        return await abandon(oldest)
     }
 
-    /// Waits up to `limit` for the final transcription under way now, then gives that one up as
-    /// ``abandonTranscription()`` does. A session that starts meanwhile is never touched.
+    /// Waits up to `limit` for the take being processed now, then gives that one up as
+    /// ``abandonTranscription()`` does. A take that starts meanwhile is never touched.
     public func giveUpOnTranscription(after limit: Duration) async -> Bool {
-        guard case .transcribing = state else { return false }
-        let finish = finishes
+        guard case .transcribing = state, let oldest = jobs.keys.min() else { return false }
         try? await Task.sleep(for: limit)
-        return await abandon(finish)
+        return await abandon(oldest)
     }
 
-    private func abandon(_ finish: UInt64) async -> Bool {
-        guard case .transcribing = state, finish == finishes, finish > abandonedFinishes else { return false }
+    private func abandon(_ id: UInt64) async -> Bool {
+        guard case .transcribing = state, jobs[id] != nil else { return false }
         ParolaLog.notice(.dictation, "final transcription abandoned in \(mode)")
-        await dropTakes(upTo: finish, cancelling: false)
+        await dropTakes([id], cancelling: false)
         resting = .idle
         await publishState()
         return true
     }
 
-    private func dropTakes(upTo finish: UInt64, cancelling: Bool = true) async {
-        abandonedFinishes = max(abandonedFinishes, finish)
-        let dropped = jobs.filter { $0.key <= finish }
-        for (id, job) in dropped {
-            jobs[id] = nil
+    private func dropTakes(_ ids: [UInt64], cancelling: Bool = true) async {
+        for id in ids {
+            guard let job = jobs.removeValue(forKey: id) else { continue }
             processing -= 1
             job.settle.finish()
             if cancelling {
-                job.finalizing.cancel()
-                await job.take.discard()
+                job.finalizing?.cancel()
+                await job.take?.discard()
             }
         }
         resumeDrainWaitersIfIdle()
@@ -293,6 +306,10 @@ public actor DictationCoordinator {
             }
             // A press while the start is in flight would pass the .idle guard and
             // double-start the recorder, orphaning the first session.
+            return
+        }
+        if endInFlight {
+            if case .press = event { deferredPress = capturedAt }
             return
         }
         switch mode {
@@ -351,7 +368,7 @@ public actor DictationCoordinator {
 
     private func beginListening() async {
         guard !isListening else { return }
-        resting = .idle
+        if case .failed = state { resting = .idle }
         generation &+= 1
         let myGeneration = generation
         startInFlight = true
@@ -428,72 +445,73 @@ public actor DictationCoordinator {
         hybridLocked = false
         isListening = false
         processing += 1
+        endInFlight = true
         let configuration = captureConfiguration
         captureConfiguration = nil
+        let (settled, settle) = AsyncStream<Void>.makeStream()
+        let previous = lastSettled
+        lastSettled = settled
+        jobs[id] = Job(settle: settle)
+        let binding = Task { await bindTake(configuration) }
+        let startedAt = ContinuousClock.now
         await publishState()
         await mediaSession?.exitRecording(holder: .dictation)
-        let startedAt = ContinuousClock.now
         let take: DictationTake
         do {
             take = try await recorder.stopCapture()
         } catch {
-            guard id > abandonedFinishes else { return }
-            processing -= 1
-            await fail(error, startedAt: startedAt)
+            binding.cancel()
+            await failJob(id, error, startedAt: startedAt)
+            await finishEnding()
             return
         }
-        guard id > abandonedFinishes else {
-            processing -= 1
+        guard jobs[id] != nil else {
+            binding.cancel()
             await take.discard()
-            await publishState()
+            await finishEnding()
             return
         }
-        let target = await inserter.bound(to: configuration)
-        let processor = configuration?.postProcessor ?? postProcessor
         let finalizing = Task { try await take.finalize() }
-        let (settled, settle) = AsyncStream<Void>.makeStream()
-        let previous = lastSettled
-        lastSettled = settled
-        jobs[id] = Job(finalizing: finalizing, take: take, settle: settle)
-        Task { [weak self] in
-            await self?.complete(
-                id, finalizing: finalizing, after: previous, processor: processor, target: target, startedAt: startedAt
-            )
+        jobs[id]?.take = take
+        jobs[id]?.finalizing = finalizing
+        Task {
+            await complete(id, finalizing: finalizing, binding: binding, after: previous, startedAt: startedAt)
         }
+        await finishEnding()
+    }
+
+    private func bindTake(_ configuration: DictationPipelineConfiguration?) async -> DictationTakeBinding {
+        guard let configuration else { return DictationTakeBinding(postProcessor: postProcessor, inserter: inserter) }
+        guard let bind = configuration.bind else {
+            return DictationTakeBinding(postProcessor: configuration.postProcessor, inserter: inserter)
+        }
+        return bind(await targetProvider?(configuration))
     }
 
     private func complete(
         _ id: UInt64,
         finalizing: Task<String, any Error>,
+        binding: Task<DictationTakeBinding, Never>,
         after previous: AsyncStream<Void>?,
-        processor: any TextPostProcessor,
-        target: any TextInserter,
         startedAt: ContinuousClock.Instant
     ) async {
         let raw = await finalizing.result
         if let previous { for await _ in previous {} }
-        guard let job = jobs[id], id > abandonedFinishes else { return }
+        guard jobs[id] != nil else { return }
+        let bound = await binding.value
         do {
             let trimmed = try raw.get().trimmingCharacters(in: .whitespacesAndNewlines)
-            if !trimmed.isEmpty {
-                let processed = await processor.process(trimmed)
+            if !trimmed.isEmpty, jobs[id] != nil {
+                let processed = await bound.postProcessor.process(trimmed)
                 let final = SnippetMarker.stripped(processed).trimmingCharacters(in: .whitespacesAndNewlines)
-                if !final.isEmpty, id > abandonedFinishes {
-                    try await target.insert(final)
+                if !final.isEmpty, jobs[id] != nil {
+                    try await bound.inserter.insert(final)
                 }
             }
-            if id > abandonedFinishes { resting = .idle }
         } catch {
-            if id > abandonedFinishes {
-                ParolaLog.error(
-                    .dictation, "dictation finish failed in \(mode)",
-                    [.elapsed: .duration(startedAt.duration(to: .now)), .error: .error(error)]
-                )
-                resting = .failed(error.localizedDescription)
-            }
+            if jobs[id] != nil { noteFailure(error, startedAt: startedAt) }
         }
-        guard jobs[id] != nil else { return }
-        jobs[id] = nil
+        guard let job = jobs.removeValue(forKey: id) else { return }
         processing -= 1
         job.settle.finish()
         await publishState()
@@ -501,19 +519,27 @@ public actor DictationCoordinator {
     }
 
     private func resumeDrainWaitersIfIdle() {
-        guard jobs.isEmpty else { return }
+        guard processing == 0 else { return }
         let waiters = drainWaiters
         drainWaiters = []
         for waiter in waiters { waiter.resume() }
     }
 
-    private func fail(_ error: any Error, startedAt: ContinuousClock.Instant) async {
+    private func noteFailure(_ error: any Error, startedAt: ContinuousClock.Instant) {
         ParolaLog.error(
             .dictation, "dictation finish failed in \(mode)",
             [.elapsed: .duration(startedAt.duration(to: .now)), .error: .error(error)]
         )
         resting = .failed(error.localizedDescription)
+    }
+
+    private func failJob(_ id: UInt64, _ error: any Error, startedAt: ContinuousClock.Instant) async {
+        guard let job = jobs.removeValue(forKey: id) else { return }
+        processing -= 1
+        job.settle.finish()
+        noteFailure(error, startedAt: startedAt)
         await publishState()
+        resumeDrainWaitersIfIdle()
     }
 
     private func publishState() async {

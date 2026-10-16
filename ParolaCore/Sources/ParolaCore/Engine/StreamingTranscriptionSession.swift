@@ -72,6 +72,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
     private var isStarting = false
     private var pendingEnd: PendingEnd?
     nonisolated let persistAudio: Bool
+    private let decodeSlot: StreamingDecodeSlot?
     nonisolated let waitsForModelOnStop: Bool
 
     enum PendingEnd { case stop, cancel }
@@ -80,11 +81,13 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
     /// for the model and decodes it. Otherwise a stop during the load drops that audio.
     public init(
         modelStore: ModelStore = .shared, persistAudio: Bool = false, deviceUID: String? = nil,
-        source: CaptionSource? = nil, waitsForModelOnStop: Bool = false, purpose: StreamingPurpose = .take
+        source: CaptionSource? = nil, waitsForModelOnStop: Bool = false, purpose: StreamingPurpose = .take,
+        serializesDecodes: Bool = false
     ) {
         self.init(
             modelStore: modelStore, persistAudio: persistAudio, source: source ?? .microphone(deviceUID: deviceUID),
-            waitsForModelOnStop: waitsForModelOnStop, purpose: purpose, modelCache: .shared
+            waitsForModelOnStop: waitsForModelOnStop, purpose: purpose, modelCache: .shared,
+            decodeSlot: serializesDecodes ? .dictation : nil
         )
     }
 
@@ -95,6 +98,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         waitsForModelOnStop: Bool = false,
         purpose: StreamingPurpose = .take,
         modelCache: StreamingModelCache,
+        decodeSlot: StreamingDecodeSlot? = nil,
         capture: (@Sendable (CaptionSource) -> CaptionCapture)? = nil,
         makeDecoder: @escaping MakeDecoder = StreamingTranscriptionSession.decoder(over:options:),
         clock: any Clock<Duration> = ContinuousClock()
@@ -105,6 +109,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         self.purpose = purpose
         self.waitsForModelOnStop = persistAudio || waitsForModelOnStop
         self.modelCache = modelCache
+        self.decodeSlot = decodeSlot
         self.captureFor = capture ?? { CaptionCapture.live($0, clock: clock) }
         self.makeDecoder = makeDecoder
         self.clock = clock
@@ -267,23 +272,24 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
     }
 
     /// Keeps the borrowed model with the take, so teardown returns it however the take ends.
-    private func decoder(
+    func decoder(
         holding lease: StreamingModelLease, options: TranscriptionOptions
     ) throws -> StreamingRealtimeLoop.Decoder {
         modelLease = lease
-        return try makeDecoder(lease, options)
+        let decoder = try makeDecoder(lease, options)
+        guard let slot = decodeSlot else { return decoder }
+        let transcribe = decoder.transcribe
+        return StreamingRealtimeLoop.Decoder(options: decoder.options) { samples, decodeOptions, progress in
+            try await slot.run { try await transcribe(samples, decodeOptions, progress) }
+        }
     }
 
     static func decoder(
         over lease: StreamingModelLease, options: TranscriptionOptions
     ) throws -> StreamingRealtimeLoop.Decoder {
-        let decoder: StreamingRealtimeLoop.Decoder = switch lease.payload {
+        switch lease.payload {
         case .whisper: try whisperDecoder(over: lease, options: options)
         case .parakeet: try ParakeetStreamingDecoder.over(lease: lease, options: options)
-        }
-        let transcribe = decoder.transcribe
-        return StreamingRealtimeLoop.Decoder(options: decoder.options) { samples, decodeOptions, progress in
-            try await StreamingDecodeSlot.shared.run { try await transcribe(samples, decodeOptions, progress) }
         }
     }
 

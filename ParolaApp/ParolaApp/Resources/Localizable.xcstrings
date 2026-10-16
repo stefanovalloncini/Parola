@@ -3753,6 +3753,17 @@
         }
       }
     },
+    "Copied: you switched apps": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copiato: hai cambiato app"
+          }
+        }
+      }
+    },
     "Copies a recording or meeting's audio to the Auto-Export folder, as it was saved.": {
       "extractionState": "manual",
       "localizations": {

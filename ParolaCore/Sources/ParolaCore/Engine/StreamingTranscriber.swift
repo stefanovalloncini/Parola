@@ -49,7 +49,8 @@ public enum StreamingTranscriberFactory {
         persistAudio: Bool = false,
         waitsForModelOnStop: Bool = false,
         purpose: StreamingPurpose = .take,
-        model: String? = nil
+        model: String? = nil,
+        serializesDecodes: Bool = false
     ) -> any StreamingTranscriber {
         let source = source ?? .microphone(deviceUID: deviceUID)
         if let response = MockStreamingTranscriberRegistry.shared.resolve() {
@@ -61,7 +62,7 @@ public enum StreamingTranscriberFactory {
         }
         return StreamingTranscriptionSession(
             modelStore: modelStore, persistAudio: persistAudio, source: source, waitsForModelOnStop: waitsForModelOnStop,
-            purpose: purpose
+            purpose: purpose, serializesDecodes: serializesDecodes
         )
     }
 

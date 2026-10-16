@@ -1,11 +1,14 @@
 import CoreGraphics
 import Foundation
+import AppKit
 import os
 import Testing
 @testable import Parola
 import ParolaCore
 import ParolaDictation
+import ParolaTestSupport
 
+// @unchecked: every field is touched only under `lock`.
 private final class SpySession: StreamingTranscriber, @unchecked Sendable {
     private let lock = NSLock()
     private var continuation: AsyncStream<StreamingEvent>.Continuation?
@@ -27,7 +30,6 @@ private final class SpySession: StreamingTranscriber, @unchecked Sendable {
     ) async throws -> AsyncStream<StreamingEvent> {
         let (stream, continuation) = AsyncStream.makeStream(of: StreamingEvent.self)
         lock.withLock { self.continuation = continuation; calls.append("start") }
-        continuation.yield(.confirmed(TranscriptSegment(id: 0, start: 0, end: 1, text: text)))
         return stream
     }
 
@@ -36,7 +38,9 @@ private final class SpySession: StreamingTranscriber, @unchecked Sendable {
     func stop() async {
         lock.withLock { calls.append("stop") }
         for await _ in stopGate {}
-        lock.withLock { continuation }?.finish()
+        let events = lock.withLock { continuation }
+        events?.yield(.confirmed(TranscriptSegment(id: 0, start: 0, end: 1, text: text)))
+        events?.finish()
     }
 
     func cancel() async {
@@ -80,7 +84,6 @@ struct DictationBackToBackCaptureTests {
         )
 
         try await recorder.start()
-        await settle()
         let first = try await recorder.stopCapture()
         #expect(made.withLock { $0[0].log } == ["start", "stopCapturing"])
 
@@ -95,21 +98,264 @@ struct DictationBackToBackCaptureTests {
         #expect(try await recorder.stopAndTranscribe() == "two")
     }
 
-    @Test("an insertion mode is fixed when the take is bound")
-    func insertionModeIsBoundAtRelease() async {
-        let mode = OSAllocatedUnfairLock(initialState: DictationInsertionMode.keystroke)
-        let inserter = PerAppTextInserter(resolver: { _ in mode.withLock { $0 } })
-        let configuration = DictationPipelineConfiguration(postProcessor: PassThrough(), pasteDelayMs: 5000)
+    @Test("the tail words reach the partials while the take is being transcribed", .timeLimit(.minutes(1)))
+    func tailWordsReachThePartials() async throws {
+        let (gate, open) = AsyncStream<Void>.makeStream()
+        let recorder = MicDictationRecorder(
+            model: "openai_whisper-large-v3_turbo",
+            language: nil,
+            streamingEnabled: true,
+            makeStreamingSession: { SpySession(text: "tail words", stopGate: gate) },
+            warmFallbackModel: { _ in }
+        )
+        try await recorder.start()
+        let asRecorder: any DictationRecorder = recorder
+        let stream = await asRecorder.partials()
+        var partials = stream.makeAsyncIterator()
+        let take = try await recorder.stopCapture()
 
-        let typed = await inserter.bound(to: configuration)
-        mode.withLock { $0 = .paste }
-        let pasted = await inserter.bound(to: configuration)
+        let finalizing = Task { try await take.finalize() }
+        open.finish()
 
-        #expect(typed is KeystrokeTextInserter)
-        #expect((pasted as? ClipboardPasteInserter)?.preDelayMs == 2000)
+        let heard = await partials.next()
+        withExtendedLifetime(stream) {}
+        #expect(heard == "tail words", "heard \(String(describing: heard))")
+        #expect(try await finalizing.value == "tail words")
+    }
+
+    @Test("a start while another take is capturing fails instead of doing nothing")
+    func secondStartFails() async throws {
+        let (_, open) = AsyncStream<Void>.makeStream()
+        open.finish()
+        let recorder = MicDictationRecorder(
+            model: "openai_whisper-large-v3_turbo",
+            language: nil,
+            streamingEnabled: true,
+            makeStreamingSession: { SpySession(text: "x", stopGate: AsyncStream { $0.finish() }) },
+            warmFallbackModel: { _ in }
+        )
+        try await recorder.start()
+
+        await #expect(throws: (any Error).self) { try await recorder.start() }
+        await recorder.stopAndDiscard()
+    }
+}
+
+@MainActor
+@Suite("Dictation target and clipboard")
+struct DictationTargetTests {
+    private func freshPasteboard() -> NSPasteboard {
+        let pasteboard = NSPasteboard.withUniqueName()
+        pasteboard.clearContents()
+        return pasteboard
+    }
+
+    // @unchecked: `items` is touched only under `lock`.
+    private final class Landed: @unchecked Sendable {
+        private let lock = NSLock()
+        private var items: [String] = []
+        var texts: [String] { lock.withLock { items } }
+        func add(_ text: String) { lock.withLock { items.append(text) } }
+    }
+
+    private struct Recording: TextInserter {
+        let landed: Landed
+        func insert(_ text: String) async throws { landed.add(text) }
+    }
+
+    @Test("a take lands in the app it was dictated into")
+    func sameAppInserts() async throws {
+        let landed = Landed()
+        let pasteboard = freshPasteboard()
+        var inserter = TargetedTextInserter(base: Recording(landed: landed), target: DictationTarget(processID: 41))
+        inserter.frontmostProcessID = { 41 }
+        inserter.pasteboardName = pasteboard.name
+
+        try await inserter.insert("hello")
+
+        #expect(landed.texts == ["hello"])
+        #expect(pasteboard.string(forType: .string) == nil)
+    }
+
+    @Test("a switched app gets the clipboard notice instead of the text")
+    func switchedAppCopiesAndFails() async {
+        let landed = Landed()
+        let pasteboard = freshPasteboard()
+        var inserter = TargetedTextInserter(base: Recording(landed: landed), target: DictationTarget(processID: 41))
+        inserter.frontmostProcessID = { 99 }
+        inserter.pasteboardName = pasteboard.name
+
+        await #expect(throws: TextInsertionError.self) { try await inserter.insert("hello") }
+
+        #expect(landed.texts.isEmpty)
+        #expect(pasteboard.string(forType: .string) == "hello")
+        #expect(TextInsertionError.targetChanged.errorDescription == "Copied: you switched apps")
+    }
+
+    @Test("the cleanup prompt follows the take's own app, not the one in front")
+    func promptFollowsTheTarget() async {
+        let mail = Prompt(name: "Mail", instructions: "mail")
+        let chat = Prompt(name: "Chat", instructions: "chat")
+        let used = OSAllocatedUnfairLock<[String]>(initialState: [])
+        let template = PromptDictationProcessor(
+            defaultPrompt: nil,
+            overrides: ["com.mail": [DictationOverrideEntry(prompt: mail, urlPattern: nil)],
+                        "com.chat": [DictationOverrideEntry(prompt: chat, urlPattern: nil)]],
+            cleanupRunner: { prompt, input in
+                used.withLock { $0.append(prompt.name) }
+                return input
+            }
+        )
+
+        _ = await template.targeting(DictationTarget(processID: 1, bundleID: "com.mail", appName: "Mail")).process("hi there")
+        _ = await template.targeting(DictationTarget(processID: 2, bundleID: "com.chat", appName: "Chat")).process("hi there")
+
+        #expect(used.withLock { $0 } == ["Mail", "Chat"])
+    }
+
+    @Test("a take's binding takes its insertion mode and delay from its own target")
+    func bindingFollowsTheTargetWorkflow() {
+        let model = AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("target"))
+        model.dictationPerAppOverridesJSON = "{}"
+        model.setDictationOverrideInsertion(.keystroke, for: "com.typed")
+        model.dictationPasteDelayMs = 300
+        let bind = model.dictationPipelineConfiguration().bind
+
+        let typed = (bind?(DictationTarget(processID: 1, bundleID: "com.typed")).inserter as? TargetedTextInserter)
+        let pasted = (bind?(DictationTarget(processID: 2, bundleID: "com.other")).inserter as? TargetedTextInserter)
+
+        #expect(typed?.base is KeystrokeTextInserter)
+        #expect((pasted?.base as? ClipboardPasteInserter)?.preDelayMs == 300)
+        #expect(typed?.target?.processID == 1)
+    }
+
+    @Test("a pending clipboard restore keeps the user's text readable, not the pasted take")
+    func clipboardReadsSkipThePastedText() async throws {
+        let pasteboard = freshPasteboard()
+        pasteboard.setString("mine", forType: .string)
+        let inserter = ClipboardPasteInserter(
+            trustCheck: { true }, pasteboardName: pasteboard.name, restoreDelay: .seconds(600), postPaste: {}
+        )
+
+        try await inserter.insert("dictated")
+
+        #expect(pasteboard.string(forType: .string) == "dictated")
+        #expect(PendingPasteRestores.userText(on: pasteboard.name) == "mine")
+        _ = PendingPasteRestores.takeReusablePrior(on: pasteboard.name)
     }
 }
 
 private struct PassThrough: TextPostProcessor {
     func process(_ text: String) async -> String { text }
+}
+
+@MainActor
+@Suite("Dictation settings reload")
+struct DictationReloadTests {
+    // @unchecked: `made` is touched only under `lock`.
+    private final class Monitors: @unchecked Sendable {
+        private let lock = NSLock()
+        private var made = 0
+        var count: Int { lock.withLock { made } }
+        func note() { lock.withLock { made += 1 } }
+    }
+
+    private final class QuietMonitor: HotkeyMonitor {
+        func start(handler: @escaping @Sendable (HotkeyEvent) -> Void) async {}
+        func stop() async {}
+    }
+
+    private func armedModel(_ defaults: UserDefaults, monitors: Monitors) -> AppModel {
+        let model = AppModel(skipBootstrap: true, defaults: defaults, libraryURL: makeTempLibraryURL("reload"))
+        model.dictationPerAppOverridesJSON = "{}"
+        model.dictationController.hotkeyFactory = { _, _ in
+            monitors.note()
+            return QuietMonitor()
+        }
+        model.dictationController.inserterFactory = { CapturingTextInserter(store: CapturedInsertionStore()) }
+        model.dictationEnabled = true
+        return model
+    }
+
+    @Test("an unchanged reload leaves the monitor alone")
+    func unchangedReloadDoesNotRestart() {
+        let defaults = temporaryDefaults()
+        let monitors = Monitors()
+        let model = armedModel(defaults, monitors: monitors)
+
+        model.reloadSettings()
+        model.reapplyDictationAfterReload()
+
+        #expect(monitors.count == 1)
+        model.abortDictation()
+    }
+
+    @Test("a reload that changes the mode rebuilds the monitor with it")
+    func reloadAppliesTheMode() {
+        let defaults = temporaryDefaults()
+        let monitors = Monitors()
+        let model = armedModel(defaults, monitors: monitors)
+
+        defaults.set(DictationMode.toggle.rawValue, forKey: "dictationModeRaw")
+        model.reloadSettings()
+        model.reapplyDictationAfterReload()
+
+        #expect(monitors.count == 2)
+        #expect(model.dictationController.configuration?.mode == .toggle)
+        model.abortDictation()
+    }
+
+    @Test("a reload that changes the key rebuilds the monitor")
+    func reloadAppliesTheKey() {
+        let defaults = temporaryDefaults()
+        let monitors = Monitors()
+        let model = armedModel(defaults, monitors: monitors)
+
+        defaults.set(97, forKey: "dictationKeyCode")
+        model.reloadSettings()
+        model.reapplyDictationAfterReload()
+
+        #expect(monitors.count == 2)
+        #expect(model.dictationController.configuration?.hotkeyKeyCode == 97)
+        model.abortDictation()
+    }
+
+    @Test("a reload applies the indicator style without a restart")
+    func reloadAppliesTheIndicatorStyle() {
+        let defaults = temporaryDefaults()
+        let monitors = Monitors()
+        let model = armedModel(defaults, monitors: monitors)
+        let other = DictationIndicatorStyle.allCases.first { $0 != model.dictationIndicatorStyle }
+
+        defaults.set(other?.rawValue, forKey: "dictationIndicatorStyleRaw")
+        model.reloadSettings()
+        model.reapplyDictationAfterReload()
+
+        #expect(monitors.count == 1)
+        #expect(model.dictationController.indicatorStyle == other)
+        model.abortDictation()
+    }
+
+    @Test("an accessibility grant re-arms the monitor")
+    func grantRestartsTheMonitor() {
+        let monitors = Monitors()
+        let model = armedModel(temporaryDefaults(), monitors: monitors)
+        model.wireDictationController()
+
+        model.dictationPermissions.onAccessibilityGranted?()
+
+        #expect(monitors.count == 2)
+        model.abortDictation()
+    }
+
+    @Test("a press records the model it used, so turning dictation off unloads that one")
+    func pressRecordsTheModel() {
+        let model = AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("pressed"))
+        model.selectedModel = "openai_whisper-tiny"
+
+        _ = model.pressedPipelineConfiguration()
+        model.selectedModel = "openai_whisper-base"
+
+        #expect(model.lastDictationModel == "openai_whisper-tiny")
+    }
 }
