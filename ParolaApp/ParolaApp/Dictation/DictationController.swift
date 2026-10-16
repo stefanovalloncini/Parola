@@ -95,7 +95,7 @@ final class DictationController {
     private var coordinator: DictationCoordinator?
     /// Bumped whenever the live coordinator is replaced or dropped, so a replaced
     /// coordinator's trailing state callbacks can't overwrite the live session's state.
-    @ObservationIgnored private var coordinatorGeneration = 0
+    @ObservationIgnored private(set) var coordinatorGeneration = 0
     private var hud: NSPanel?
     private var hudPositioner: DictationHUDPositioner?
     private var levelTask: Task<Void, Never>?
@@ -402,7 +402,7 @@ final class DictationController {
         showHUD()
     }
 
-    private func handleStateChange(_ state: DictationCoordinator.State, generation: Int) {
+    func handleStateChange(_ state: DictationCoordinator.State, generation: Int) {
         guard generation == coordinatorGeneration else { return }
         if let line = Self.announcement(from: self.state, to: state) { speak(line.text, line.priority) }
         self.state = state

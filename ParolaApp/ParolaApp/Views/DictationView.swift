@@ -139,7 +139,20 @@ struct DictationView: View {
         )
     }
 
+    @ViewBuilder
     private var minimalBody: some View {
+        if let onStop, case .listening = state {
+            Button(action: onStop) { minimalDot }
+                .buttonStyle(.plain)
+                .help("Stop dictation")
+                .accessibilityLabel("Stop dictation")
+                .axLeaf("HUD.Button.Stop")
+        } else {
+            minimalDot
+        }
+    }
+
+    private var minimalDot: some View {
         ZStack {
             Circle()
                 .fill(Color.black.opacity(0.85))
