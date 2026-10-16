@@ -188,8 +188,11 @@ extension AppModel {
                     source: landing.source, entry: entry, title: landing.title, folderOptions: landing.watchedOptions
                 )
             }
+            var recording: Task<Void, Never>?
+            if policy.export == .rules, let entry { recording = exportRecording(of: entry, source: landing.source) }
             if let entry { await finishLanding(entry, landing, navigation: navigation) }
             await exports?.value
+            await recording?.value
             await sidecars?.value
         }
         return saving

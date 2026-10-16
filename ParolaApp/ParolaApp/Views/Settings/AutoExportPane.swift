@@ -50,6 +50,20 @@ struct AutoExportPane: View {
                     Button("Choose…") { model.chooseAutoExportFolder() }
                         .axLeaf("AutoExport.Button.ChooseFolder")
                 }
+                SettingRow(
+                    "Also Export the Recording",
+                    description: "Copies a recording or meeting's audio to the Auto-Export folder, as it was saved."
+                ) {
+                    Toggle("", isOn: $model.autoExportRecording).labelsHidden()
+                        .axLeaf("AutoExport.Toggle.Recording")
+                }
+                SettingRow(
+                    "Also Export the AI Summary",
+                    description: "Writes each summary to the Auto-Export folder as a Markdown file, when it is ready."
+                ) {
+                    Toggle("", isOn: $model.autoExportSummary).labelsHidden()
+                        .axLeaf("AutoExport.Toggle.Summary")
+                }
             }
 
             ResetPaneButton(scope: .autoExport)

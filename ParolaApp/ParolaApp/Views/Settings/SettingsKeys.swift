@@ -235,7 +235,7 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
                 "batchExportIncludeTimestamps", "batchExportFormatOptions"
             ]
         case .autoExport:
-            return ["autoExportRules", "autoExportFolder"]
+            return ["autoExportRules", "autoExportFolder", "autoExportRecording", "autoExportSummary"]
         case .sendTo:
             return ["destinations"]
         case .aiServices:

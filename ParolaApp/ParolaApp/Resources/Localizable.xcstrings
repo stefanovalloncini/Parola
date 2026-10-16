@@ -1672,6 +1672,28 @@
         }
       }
     },
+    "Also Export the AI Summary": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esporta anche il riassunto AI"
+          }
+        }
+      }
+    },
+    "Also Export the Recording": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esporta anche la registrazione"
+          }
+        }
+      }
+    },
     "An address on the internet has to start with https://. Plain http:// is only for this Mac and your local network.": {
       "extractionState": "manual",
       "localizations": {
@@ -3664,6 +3686,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Contenuto"
+          }
+        }
+      }
+    },
+    "Copies a recording or meeting's audio to the Auto-Export folder, as it was saved.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copia l'audio di una registrazione o di una riunione nella cartella di esportazione automatica, così com'è stato salvato."
           }
         }
       }
@@ -21302,6 +21335,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Scrive chi parla come [[Nome]] così Obsidian collega la nota a una persona."
+          }
+        }
+      }
+    },
+    "Writes each summary to the Auto-Export folder as a Markdown file, when it is ready.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scrive ogni riassunto nella cartella di esportazione automatica come file Markdown, appena è pronto."
           }
         }
       }

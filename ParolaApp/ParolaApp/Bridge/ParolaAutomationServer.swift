@@ -381,6 +381,7 @@ final class ParolaAutomationServer {
         "openEntriesInNewWindow", "playSoundWhenFinished", "appVisibilityMode",
         "duplicateImportPolicy", "libraryGroupsByDate",
         "showRecordingStatusItem", "showRecordingPill", "meetingRecordsMicrophone", "readAloudRate", "readAloudVoices",
+        "autoExportRecording", "autoExportSummary",
     ]
 
     static func watchedFoldersValue(_ model: AppModel) -> AutomationValue {

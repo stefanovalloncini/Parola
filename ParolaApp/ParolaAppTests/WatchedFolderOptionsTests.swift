@@ -133,7 +133,9 @@ struct WatchedFolderOptionsTests {
             "Folder Depth", "This Folder Only", "Include Subfolders", "Save to Library",
             "Off: the transcript is only exported.", "Choose an export format first.", "Export Formats", "Export To",
             "Next to the File", "Auto-Export Folder", "Choose an Auto-Export folder in Auto-Export settings.",
-            "Open Batch",
+            "Copies a recording or meeting's audio to the Auto-Export folder, as it was saved.",
+            "Writes each summary to the Auto-Export folder as a Markdown file, when it is ready.",
+            "Also Export the Recording", "Also Export the AI Summary", "Open Batch",
         ]
         for key in keys {
             let localized = bundle.localizedString(forKey: key, value: "\u{0}missing", table: nil)

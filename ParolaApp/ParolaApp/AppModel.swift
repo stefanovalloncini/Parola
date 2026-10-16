@@ -526,7 +526,10 @@ final class AppModel {
             }
         }
     }
+    var autoExportRecording: Bool = false { didSet { defaults.set(autoExportRecording, forKey: "autoExportRecording") } }
+    var autoExportSummary: Bool = false { didSet { defaults.set(autoExportSummary, forKey: "autoExportSummary") } }
     @ObservationIgnored var autoExportNoticeShown = false
+    @ObservationIgnored var summaryExports: Task<Void, Never>?
     /// Folders whose files are cleared later, so nothing is written beside them. A test seam.
     @ObservationIgnored var sweptFolders: @MainActor () -> [URL] = {
         [FileManager.default.temporaryDirectory, RecordingScratch.directory]
@@ -1359,6 +1362,8 @@ final class AppModel {
         self.burnOutline = readBool("burnOutline", default: true)
         self.htmlExportThemeRaw = defaults.string(forKey: "htmlExportTheme") ?? HtmlExportTheme.light.rawValue
         self.autoExportFolder = readJSON(AutoExportFolder.self, forKey: "autoExportFolder")
+        self.autoExportRecording = defaults.bool(forKey: "autoExportRecording")
+        self.autoExportSummary = defaults.bool(forKey: "autoExportSummary")
         self.dictationHudOpacity = readDouble("dictationHudOpacity", default: 1.0)
         self.lastFindQuery = defaults.string(forKey: "lastFindQuery") ?? ""
         self.userPrivacyMode = defaults.bool(forKey: "parola.userPrivacyMode")

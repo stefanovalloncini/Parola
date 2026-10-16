@@ -59,6 +59,7 @@ extension AppModel {
         if let entryID {
             do {
                 try await library.mutateTranscript(for: entryID) { $0.install(summary: summary, keepingChapters: keepingChapters) }
+                if !keepingChapters { queueSummaryExport(summary, of: entryID) }
             } catch {
                 ParolaLog.error(.library, "summary could not be saved to the library", [.error: .error(error)])
             }
