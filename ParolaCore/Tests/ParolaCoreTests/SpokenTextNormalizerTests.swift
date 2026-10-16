@@ -175,23 +175,35 @@ struct SpokenTextNormalizerTests {
         #expect(SpokenTextNormalizer.normalize("[Music]", language: "en") == "")
     }
 
-    @Test("a bracket span is dropped only when it looks like a marker", arguments: [
+    @Test("a bracket span is dropped when it is a marker, and keeps its words when it is a phrase", arguments: [
         ("He said [the report] was late.", "He said the report was late."),
         ("It was [Music] again.", "It was again."),
+        ("Then [sighs] and left.", "Then and left."),
+        ("Then [music playing] and left.", "Then and left."),
+        ("Then [inaudible 00:12] and left.", "Then and left."),
+        ("Then [MUSIC PLAYING] and left.", "Then and left."),
         ("Then [BLANK_AUDIO] followed.", "Then followed."),
         ("Then [BACKGROUND NOISE] followed.", "Then followed."),
-        ("Poi [risate] e basta.", "Poi e basta."),
         ("Poi [Applausi] e basta.", "Poi e basta."),
-        ("Then [people laughing] left.", "Then people laughing left."),
+        ("Poi [risate] e basta.", "Poi e basta."),
+        ("Then [people laughing] left.", "Then left."),
         ("Then [crowd laughter] left.", "Then left."),
-        ("Then [inaudible] left.", "Then left."),
-        ("Then [CROSSTALK] left.", "Then left."),
-        ("See [note] here.", "See note here."),
+        ("See [note] here.", "See here."),
+        ("Item [1] done.", "Item done."),
+        ("Item [] done.", "Item done."),
+        ("The door [door slams] shut.", "The door door slams shut."),
+        ("a [b [c] d] e", "a b d e"),
+        ("[[Music]] then talk", "then talk"),
         ("[Music] and [the end]", "and the end"),
     ])
     func bracketSpans(input: String, expected: String) {
         #expect(SpokenTextNormalizer.normalize(input, language: "en") == expected)
         #expect(SpokenTextNormalizer.strippingNonSpeechText(input) == expected)
+    }
+
+    @Test("a zero-width space and a byte order mark are still dropped")
+    func otherFormatCharactersDropped() {
+        #expect(SpokenTextNormalizer.strippingNonSpeechText("a\u{200B}b\u{FEFF}c") == "abc")
     }
 
     @Test("Persian words keep their zero-width non-joiner and joiner")

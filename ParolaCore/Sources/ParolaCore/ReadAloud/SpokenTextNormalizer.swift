@@ -484,16 +484,20 @@ public enum SpokenTextNormalizer {
     ]
 
     private static let bracketSoundWords: Set<String> = [
-        "music", "applause", "laughter", "laughs", "silence", "inaudible", "crosstalk", "noise",
-        "musica", "applausi", "risate", "silenzio",
+        "music", "applause", "laughter", "laughs", "laughing", "silence", "inaudible", "unintelligible",
+        "indistinct", "crosstalk", "noise", "sighs", "sigh", "coughs", "cough", "cheering", "beep", "static",
+        "chatter", "musica", "applausi", "applauso", "risate", "risata", "silenzio", "incomprensibile",
+        "rumore", "tosse", "sospiro",
     ]
 
     private static func looksLikeMarker(_ content: String) -> Bool {
         let words = content.split(whereSeparator: { $0.isWhitespace || $0 == "_" })
-        guard let last = words.last else { return true }
-        if bracketSoundWords.contains(last.lowercased()) { return true }
+        if words.count <= 1 { return true }
         let letters = content.filter(\.isLetter)
-        return !letters.isEmpty && letters == letters.uppercased()
+        if letters == letters.uppercased() { return true }
+        return words.contains { word in
+            bracketSoundWords.contains(word.lowercased().trimmingCharacters(in: .punctuationCharacters))
+        }
     }
 
     private static let urlWrapperPairs: [(open: String, close: String)] = [
@@ -509,10 +513,14 @@ public enum SpokenTextNormalizer {
                 || character.unicodeScalars.last?.value == 0x20E3
             return !isEmoji
         })
-        result = replaceMatches(pattern: "\\[([^\\]]*)\\]", in: result) { match, ns in
-            let content = ns.substring(with: match.range(at: 1))
-            return looksLikeMarker(content) ? "" : content
-        }
+        var previous: String
+        repeat {
+            previous = result
+            result = replaceMatches(pattern: "\\[([^\\[\\]]*)\\]", in: result) { match, ns in
+                let content = ns.substring(with: match.range(at: 1))
+                return looksLikeMarker(content) ? "" : content
+            }
+        } while result != previous
         result = replaceMatches(pattern: "\\(([^()]*)\\)", options: [.caseInsensitive], in: result) { match, ns in
             let content = ns.substring(with: match.range(at: 1)).trimmingCharacters(in: .whitespaces).lowercased()
             return nonSpeechParentheticals.contains(content) ? "" : nil
