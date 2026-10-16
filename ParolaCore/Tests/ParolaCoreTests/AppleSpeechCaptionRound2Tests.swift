@@ -43,6 +43,7 @@ private final class Analyzer: CaptionAnalyzing {
 private final class Capture: @unchecked Sendable {
     let startGate = UninterruptibleGate()
     let stopped = Awaitable(0)
+    let started = Awaitable(0)
     let parksStart: Bool
     var startThrows = false
     private let ended = OSAllocatedUnfairLock<(@Sendable (String) -> Void)?>(initialState: nil)
@@ -57,6 +58,7 @@ private final class Capture: @unchecked Sendable {
             requestPermission: { true }, deniedText: "denied",
             start: { [self] handler in
                 onBuffer.withLock { $0 = handler }
+                started.increment()
                 if parksStart { await startGate.wait() }
                 if startThrows { throw CaptionCaptureError(text: "start failed") }
             },
@@ -224,8 +226,7 @@ struct AppleSpeechCaptionStallTests {
         let capture = Capture(parksStart: false)
         let live = session(analyzer, capture)
         let events = collect(try await live.start(options: opts))
-        await events.wait(until: { _ in capture.stopped.value >= 0 && analyzer.dropsFeeds }, "a started session")
-        try await Task.sleep(for: .milliseconds(100))
+        await capture.started.wait(atLeast: 1, "the capture to start")
         for _ in 0..<5 { capture.push() }
         await events.wait(until: { $0.last == "<end>" }, "the stream to end")
         #expect(events.value == ["failed:\(FixedFailureText.appleSpeechStoppedListening)", "<end>"], "\(events.value)")
