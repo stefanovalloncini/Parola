@@ -137,6 +137,31 @@ struct FolderWatcherBaselineTests {
         await again.stop()
     }
 
+    @Test("a baseline saved before the depth was recorded reads as having looked inside subfolders")
+    func oldBaselineIsRecursive() async throws {
+        let folder = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let clock = FixedClock(start: Date())
+        let collected = CollectedURLs()
+        try FileManager.default.createDirectory(at: folder.appendingPathComponent("Archive"), withIntermediateDirectories: true)
+        try Fixture.writeSettled(folder.appendingPathComponent("Archive/old.wav"), clock: clock)
+        let before = makeWatcher(folder, clock: clock, scheduler: ManualScheduler(), collected: collected)
+        await before.start()
+        let saved = try #require(await before.baseline())
+        await before.stop()
+        var object = try #require(try JSONSerialization.jsonObject(with: JSONEncoder().encode(saved)) as? [String: Any])
+        object["recursive"] = nil
+        let old = try JSONDecoder().decode(FolderWatcher.Baseline.self, from: JSONSerialization.data(withJSONObject: object))
+        #expect(old.recursive == nil)
+        try Fixture.writeSettled(folder.appendingPathComponent("Archive/new.wav"), clock: clock)
+
+        let after = makeWatcher(folder, clock: clock, scheduler: ManualScheduler(), collected: collected)
+        await after.start(baseline: old)
+
+        #expect(Fixture.names(await after.pendingPaths) == ["new.wav"])
+        await after.stop()
+    }
+
     @Test("a baseline read back from JSON still matches after the folder was renamed")
     func baselineSurvivesCodingAndRootRename() async throws {
         let parent = try Fixture.makeTempDir()

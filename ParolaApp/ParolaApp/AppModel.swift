@@ -1305,7 +1305,7 @@ final class AppModel {
         reloadSettings()
     }
 
-    @ObservationIgnored private var isReloadingSettings = false
+    @ObservationIgnored private(set) var isReloadingSettings = false
     @ObservationIgnored private(set) var activeSideEffects: Set<BootstrapSideEffect> = []
     @ObservationIgnored let features: FeatureSet
     @ObservationIgnored let introduction: IntroductionController

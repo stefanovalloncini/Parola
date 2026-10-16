@@ -50,7 +50,11 @@ private struct WatchedFoldersPaneBody: View {
                 }
             }
 
-            SettingHelper(text: "New files added to a watched folder are transcribed automatically unless you turn that off in Options. That includes files added while Parola was closed. Files already there when you add the folder are ignored.")
+            if model.features.isEnabled(.batch) {
+                SettingHelper(text: "New files added to a watched folder are transcribed automatically unless you turn that off in Options. That includes files added while Parola was closed. Files already there when you add the folder are ignored.")
+            } else {
+                SettingHelper(text: "New files dropped into a watched folder are transcribed automatically, including ones added while Parola was closed. Files already there when you add the folder are ignored.")
+            }
             ResetPaneButton(scope: .watchedFolders)
         }
         .sheet(item: optionsFolder) { folder in

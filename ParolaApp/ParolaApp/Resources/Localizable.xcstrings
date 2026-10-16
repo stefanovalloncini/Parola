@@ -11730,7 +11730,7 @@
         }
       }
     },
-    "Not chosen: recordings and links skip auto-export.": {
+    "Not chosen: recordings and links skip Auto-Export.": {
       "extractionState": "manual",
       "localizations": {
         "it": {
@@ -21030,7 +21030,7 @@
         }
       }
     },
-    "When a transcription finishes, each rule writes its presets next to the source file, or into the auto-export folder for recordings and links.": {
+    "When a transcription finishes, each rule writes its presets next to the source file, or into the Auto-Export folder for recordings and links.": {
       "extractionState": "manual",
       "localizations": {
         "it": {

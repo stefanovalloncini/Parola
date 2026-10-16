@@ -40,13 +40,13 @@ struct AutoExportPane: View {
                 }
             }
 
-            SettingHelper(text: "When a transcription finishes, each rule writes its presets next to the source file, or into the auto-export folder for recordings and links.")
+            SettingHelper(text: "When a transcription finishes, each rule writes its presets next to the source file, or into the Auto-Export folder for recordings and links.")
 
             SettingsSection {
                 SettingRow(
                     "Auto-Export folder",
                     descriptionVerbatim: model.autoExportFolder.map { ($0.path as NSString).abbreviatingWithTildeInPath }
-                        ?? String(localized: "Not chosen: recordings and links skip auto-export.")
+                        ?? String(localized: "Not chosen: recordings and links skip Auto-Export.")
                 ) {
                     Button("Choose…") { model.chooseAutoExportFolder() }
                         .axLeaf("AutoExport.Button.ChooseFolder")

@@ -42,7 +42,7 @@ extension AppModel {
     /// The one way the preset library changes: every add, rename, delete and move lands here.
     func setExportPresets(_ presets: [ExportPreset]) {
         exportPresets = AppModel.normalizedExportPresets(presets, referencedIDs: referencedExportPresetIDs)
-        if watchedFoldersBuilt { watchedFolders.pruneExportPresets(keeping: Set(exportPresets.map(\.id))) }
+        if watchedFoldersBuilt, !isReloadingSettings { watchedFolders.pruneExportPresets(keeping: Set(exportPresets.map(\.id))) }
     }
 
     /// Ids a rule or the batch selection still points at, so normalization can put those presets back.
@@ -129,7 +129,7 @@ extension AppModel {
             ruleCount: autoExportRules.count { $0.presetIDs.contains(id) },
             inBatch: batchExportPresetIDs.contains(id),
             folderCount: watchedFolderOptions.count { $0.exportPresetIDs.contains(id) },
-            soleFormatFolderCount: watchedFolderOptions.count { $0.exportPresetIDs == [id] }
+            soleFormatFolderCount: watchedFolderOptions.count { $0.exportPresetIDs == [id] && !$0.savesToLibrary }
         )
     }
 

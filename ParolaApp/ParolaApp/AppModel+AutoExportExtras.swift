@@ -100,27 +100,30 @@ extension AppModel {
 
     nonisolated static func summaryOwnerPrefix(_ entryID: String) -> String { "\(entryID).summary:" }
 
-    /// The mark carries the hash of what was written, so a file the user edited since is theirs and stays.
+    /// The mark carries the hash and the name written, so a file the user edited, renamed or duplicated stays.
     @concurrent
     nonisolated static func writeSummaryFile(_ data: Data, into folder: URL, named title: String, entryID: String) async throws {
         let manager = FileManager.default
         let prefix = summaryOwnerPrefix(entryID)
+        var ours: [URL] = []
         for name in (try? manager.contentsOfDirectory(atPath: folder.path)) ?? [] {
             let url = folder.appendingPathComponent(name)
-            guard let owner = OutputMarker.owner(of: url), owner.hasPrefix(prefix),
-                  let current = try? Data(contentsOf: url), contentHash(current) == String(owner.dropFirst(prefix.count))
-            else { continue }
-            try manager.removeItem(at: url)
+            guard let owner = OutputMarker.owner(of: url), owner.hasPrefix(prefix) else { continue }
+            let parts = owner.dropFirst(prefix.count).split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false)
+            guard parts.count == 2, String(parts[1]) == name,
+                  let current = try? Data(contentsOf: url), contentHash(current) == String(parts[0]) else { continue }
+            ours.append(url)
         }
         let base = exportFileBaseName(title)
         var target = folder.appendingPathComponent(base + " – Summary").appendingPathExtension("md")
         var number = 2
-        while manager.fileExists(atPath: target.path) {
+        while manager.fileExists(atPath: target.path), !ours.contains(target) {
             target = folder.appendingPathComponent("\(base) (\(number)) – Summary").appendingPathExtension("md")
             number += 1
         }
         try data.write(to: target, options: .atomic)
-        OutputMarker.mark(target, owner: prefix + contentHash(data))
+        OutputMarker.mark(target, owner: prefix + contentHash(data) + ":" + target.lastPathComponent)
+        for url in ours where url != target { try? manager.removeItem(at: url) }
     }
 
     nonisolated static func contentHash(_ data: Data) -> String {

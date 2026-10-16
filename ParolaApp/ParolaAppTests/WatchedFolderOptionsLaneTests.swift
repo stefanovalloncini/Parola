@@ -489,9 +489,12 @@ extension TranscriberMockSuites {
                     let running = try #require(runningJob)
 
                     model.cancelBatchJob(running.id)
+                    #expect(model.batchTask == nil)
+                    await settle(for: .milliseconds(300))
 
                     let held = model.batchJobs.first { $0.displayName == "Held" }
                     #expect(held?.status == .pending)
+                    #expect(model.batchTask == nil)
                     await gate.open()
                 }
             }

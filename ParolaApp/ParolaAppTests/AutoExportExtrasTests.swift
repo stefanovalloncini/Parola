@@ -248,18 +248,45 @@ struct AutoExportExtrasTests {
         #expect(try String(contentsOf: rig.exports.appendingPathComponent("Weekly sync (2) – Summary.md"), encoding: .utf8) == "Second\n")
     }
 
-    @Test("a copy that fails leaves no hidden partial file behind")
+    @Test("a copy that fails after its staging file exists leaves no hidden partial file behind")
     func failedCopyLeavesNothing() async throws {
         let rig = try makeRig("failed-copy")
         defer { try? FileManager.default.removeItem(at: rig.root) }
-        let missing = rig.root.appendingPathComponent("gone.wav")
+        let blocker = rig.exports.appendingPathComponent("Weekly sync.wav", isDirectory: true)
+        try FileManager.default.createDirectory(at: blocker, withIntermediateDirectories: true)
+        try Data("inside".utf8).write(to: blocker.appendingPathComponent("keep.txt"))
+        OutputMarker.mark(blocker, owner: "x")
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: blocker.path)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: blocker.path) }
 
         await #expect(throws: (any Error).self) {
-            try await AppModel.copyOwned(missing, into: rig.exports, named: "Weekly sync", tail: "", owner: "x")
+            try await AppModel.copyOwned(rig.audio, into: rig.exports, named: "Weekly sync", tail: "", owner: "x")
         }
 
-        let hidden = (try? FileManager.default.contentsOfDirectory(atPath: rig.exports.path)) ?? []
-        #expect(hidden.isEmpty)
+        let left = (try? FileManager.default.contentsOfDirectory(atPath: rig.exports.path)) ?? []
+        #expect(left == ["Weekly sync.wav"])
+    }
+
+    @Test("a summary file the user renamed or duplicated without editing it is never removed")
+    func renamedOrDuplicatedSummaryStays() async throws {
+        let rig = try makeRig("renamed-copy", summary: true)
+        defer { try? FileManager.default.removeItem(at: rig.root) }
+        let entry = try #require(await land(rig, source: .microphone))
+        rig.model.queueSummaryExport(Summary(text: "First"), of: entry.id)
+        await rig.model.awaitSummaryExports()
+        let original = rig.exports.appendingPathComponent("Weekly sync – Summary.md")
+        let duplicate = rig.exports.appendingPathComponent("Weekly sync – Summary copy.md")
+        let renamed = rig.exports.appendingPathComponent("Weekly sync – first draft.md")
+        try FileManager.default.copyItem(at: original, to: duplicate)
+        try FileManager.default.moveItem(at: original, to: renamed)
+
+        rig.model.queueSummaryExport(Summary(text: "Second"), of: entry.id)
+        await rig.model.awaitSummaryExports()
+
+        #expect(names(rig.exports) == ["Weekly sync – Summary copy.md", "Weekly sync – Summary.md", "Weekly sync – first draft.md"])
+        #expect(try String(contentsOf: duplicate, encoding: .utf8) == "First\n")
+        #expect(try String(contentsOf: renamed, encoding: .utf8) == "First\n")
+        #expect(try String(contentsOf: original, encoding: .utf8) == "Second\n")
     }
 
     @Test("deleting a preset takes it out of the watched folders that name it")
