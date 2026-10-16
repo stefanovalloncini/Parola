@@ -123,10 +123,11 @@ struct SettingsPaneScopeTests {
 
     @Test("a pane that holds only a list people made has no Reset to Defaults")
     func listPanesHaveNoReset() {
-        let lists: [SettingsPaneScope] = [.watchedFolders, .snippets, .corrections, .ignoredSegments, .findReplace, .sendTo]
+        let lists: [SettingsPaneScope] = [.watchedFolders, .snippets, .corrections, .findReplace, .sendTo]
         for scope in lists {
             #expect(scope.resetKeys(features: .all).isEmpty, "\(scope.rawValue) still offers a reset")
         }
+        #expect(SettingsPaneScope.ignoredSegments.resetKeys(features: .all) == ["ignoredSegmentRules"])
         #expect(SettingsPaneScope.autoExport.resetKeys(features: .all) == ["autoExportRecording", "autoExportSummary"])
         #expect(SettingsPaneScope.aiServices.resetKeys(features: .all) == ["languageModelSelection", "remoteAIAcknowledged", "parola.userPrivacyMode"])
     }
