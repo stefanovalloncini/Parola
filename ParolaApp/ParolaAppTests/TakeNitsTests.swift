@@ -312,3 +312,17 @@ extension TranscriberMockSuites {
         }
     }
 }
+
+@MainActor
+@Suite("The Discard question is a sheet whenever a window can host it")
+struct DiscardPresentationTests {
+    @Test("main window first, another window next, the app-modal alert only with none on screen", arguments: [
+        (true, true, TakeRemote.DiscardPresentation.sheetOnMainWindow),
+        (true, false, .sheetOnMainWindow),
+        (false, true, .sheetOnOtherWindow),
+        (false, false, .appModal),
+    ])
+    func table(mainVisible: Bool, other: Bool, expected: TakeRemote.DiscardPresentation) {
+        #expect(TakeRemote.discardPresentation(mainWindowVisible: mainVisible, otherWindowAvailable: other) == expected)
+    }
+}

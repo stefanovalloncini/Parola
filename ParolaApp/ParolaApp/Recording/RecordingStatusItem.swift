@@ -210,7 +210,7 @@ final class RecordingStatusItem: NSObject {
 
     @objc private func discard() {
         guard let model else { return }
-        Task { await TakeRemote.discard(model, confirm: TakeRemote.askToDiscard) }
+        Task { await TakeRemote.discard(model, confirm: { await TakeRemote.askToDiscard(model) }) }
     }
 
     @objc private func showParola() {

@@ -182,7 +182,7 @@ struct RecordingCommands: View {
             .disabled(!menu.canCapture)
             .axLeaf("Menu.Recording.AddMarker")
         Button("Discard…") {
-            Task { await TakeRemote.discard(model, confirm: TakeRemote.askToDiscard) }
+            Task { await TakeRemote.discard(model, confirm: { await TakeRemote.askToDiscard(model) }) }
         }
         .disabled(!menu.canDiscard)
         .axLeaf("Menu.Recording.Discard")
@@ -374,7 +374,7 @@ struct CaptionsCommands: View {
                 liveCaptions.togglePresenter()
             }
             .keyboardShortcut("p", modifiers: [.command, .shift])
-            Button("Save Captions…") { liveCaptions.saveCaptionsHistory() }
+            Button("Save Captions…") { Task { await liveCaptions.saveCaptionsHistory(using: model.filePicker) } }
                 .disabled(!liveCaptions.hasHistory)
         }
     }

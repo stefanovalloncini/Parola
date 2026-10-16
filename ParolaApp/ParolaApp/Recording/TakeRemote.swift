@@ -170,6 +170,38 @@ enum TakeRemote {
         return discardAlert().runModal() == .alertSecondButtonReturn
     }
 
+    enum DiscardPresentation: Equatable {
+        case sheetOnMainWindow
+        case sheetOnOtherWindow
+        case appModal
+    }
+
+    /// A sheet keeps the main thread free for the bridge; the app-modal alert is the last resort when no window can host one.
+    static func discardPresentation(mainWindowVisible: Bool, otherWindowAvailable: Bool) -> DiscardPresentation {
+        if mainWindowVisible { return .sheetOnMainWindow }
+        return otherWindowAvailable ? .sheetOnOtherWindow : .appModal
+    }
+
+    /// The Recording menu and the status item ask here; the Stage button has its own in-window alert with the same words.
+    static func askToDiscard(_ model: AppModel) async -> Bool {
+        let main = model.mainWindow.flatMap { $0.isVisible && !$0.isMiniaturized ? $0 : nil }
+        let other = NSApp.windows.first {
+            $0 !== model.mainWindow && $0.isVisible && $0.styleMask.contains(.titled) && !($0 is NSPanel) && $0.attachedSheet == nil
+        }
+        switch discardPresentation(mainWindowVisible: main != nil, otherWindowAvailable: other != nil) {
+        case .sheetOnMainWindow:
+            guard let main else { return false }
+            NSApp.activate(ignoringOtherApps: true)
+            return await askToDiscard(on: main)
+        case .sheetOnOtherWindow:
+            guard let other else { return false }
+            NSApp.activate(ignoringOtherApps: true)
+            return await askToDiscard(on: other)
+        case .appModal:
+            return askToDiscard()
+        }
+    }
+
     /// The same question as a sheet on the window it is asked from.
     static func askToDiscard(on window: NSWindow) async -> Bool {
         await discardAlert().beginSheetModal(for: window) == .alertSecondButtonReturn
