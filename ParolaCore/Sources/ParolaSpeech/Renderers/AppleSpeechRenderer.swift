@@ -38,6 +38,8 @@ public final class AppleSpeechRenderer: SpeechRenderer {
 
     public private(set) var unusableIdentifiers: Set<String> = []
 
+    public var knownVoices: [VoiceDescriptor] { inventory }
+
     private let backend: Backend
     private let readInstalled: @MainActor () -> [VoiceDescriptor]
     private var inventory: [VoiceDescriptor]

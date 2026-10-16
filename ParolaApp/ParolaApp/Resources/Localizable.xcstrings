@@ -3844,17 +3844,6 @@
         }
       }
     },
-    "Couldn't read this aloud.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Impossibile leggere ad alta voce."
-          }
-        }
-      }
-    },
     "Paste the link of the Notion page to add transcripts under.": {
       "extractionState": "manual",
       "localizations": {
@@ -21831,6 +21820,281 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@ ha smesso di inviare audio prima che venisse registrato qualcosa."
+          }
+        }
+      }
+    },
+    "Choose a voice to read %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scegli una voce per leggere in %@"
+          }
+        }
+      }
+    },
+    "No voice on this Mac reads %@.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nessuna voce su questo Mac legge in %@."
+          }
+        }
+      }
+    },
+    "Built-in": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Integrato"
+          }
+        }
+      }
+    },
+    "Automatic (best installed)": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatica (la migliore installata)"
+          }
+        }
+      }
+    },
+    "%@ · Premium": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ · Premium"
+          }
+        }
+      }
+    },
+    "%@ · Enhanced": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ · Avanzata"
+          }
+        }
+      }
+    },
+    "%@ · Personal Voice": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ · Voce personale"
+          }
+        }
+      }
+    },
+    "%@ · Can't read aloud with this voice.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ · Questa voce non può leggere ad alta voce."
+          }
+        }
+      }
+    },
+    "the built-in voice": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "la voce integrata"
+          }
+        }
+      }
+    },
+    "Couldn't continue with %@.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossibile continuare con %@."
+          }
+        }
+      }
+    },
+    "Use": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usa"
+          }
+        }
+      }
+    },
+    "Get more voices…": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scarica altre voci…"
+          }
+        }
+      }
+    },
+    "Use the built-in voice for now": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usa la voce integrata per ora"
+          }
+        }
+      }
+    },
+    "Choose Voice…": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scegli la voce…"
+          }
+        }
+      }
+    },
+    "Try Again": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Riprova"
+          }
+        }
+      }
+    },
+    "The voice Parola reads with, one for each language.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La voce con cui Parola legge, una per ogni lingua."
+          }
+        }
+      }
+    },
+    "Voices": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Voci"
+          }
+        }
+      }
+    },
+    "How fast Parola reads. The reading toolbar menu changes the same setting.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La velocità di lettura. Il menu della barra strumenti cambia la stessa impostazione."
+          }
+        }
+      }
+    },
+    "Personal Voice": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Voce personale"
+          }
+        }
+      }
+    },
+    "Read in a voice you made": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Leggi con una voce creata da te"
+          }
+        }
+      }
+    },
+    "macOS asks before Parola can use a Personal Voice from this Mac.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "macOS chiede il permesso prima che Parola possa usare una voce personale di questo Mac."
+          }
+        }
+      }
+    },
+    "Use Personal Voice…": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usa la voce personale…"
+          }
+        }
+      }
+    },
+    "Parola can't use your Personal Voice. Allow it in System Settings, under Privacy & Security.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parola non può usare la tua voce personale. Consentilo in Impostazioni di Sistema, sotto Privacy e sicurezza."
+          }
+        }
+      }
+    },
+    "Personal Voice is on. You have none on this Mac yet.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La voce personale è attiva. Su questo Mac non ne hai ancora una."
+          }
+        }
+      }
+    },
+    "Personal Voice is on. Your voices are in each language's list.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La voce personale è attiva. Le tue voci sono nell'elenco di ogni lingua."
           }
         }
       }

@@ -15,6 +15,11 @@ struct ReadAloudEnvironment {
     var appNotifications: NotificationCenter
     var clock: any Clock<Duration>
     var mockVoice: MockVoiceSettings?
+    var appleVoices: @MainActor () -> AppleVoiceInventory = { AppleVoiceInventory() }
+    var previewRenderer: (@MainActor () -> any SpeechRenderer)?
+    var personalVoiceStatus: @MainActor () -> PersonalVoiceStatus = { .unsupported }
+    var requestPersonalVoice: @MainActor () async -> PersonalVoiceStatus = { .unsupported }
+    var openURL: @MainActor (URL) -> Bool = { _ in false }
 
     static func make(for bootstrap: AppBootstrap) -> ReadAloudEnvironment {
         let underTest = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
@@ -34,7 +39,12 @@ struct ReadAloudEnvironment {
             systemNotifications: { NSWorkspace.shared.notificationCenter },
             appNotifications: .default,
             clock: ContinuousClock(),
-            mockVoice: nil
+            mockVoice: nil,
+            appleVoices: { system.inventory() },
+            previewRenderer: { system.previewRenderer() },
+            personalVoiceStatus: { PersonalVoiceStatus(AVSpeechSynthesizer.personalVoiceAuthorizationStatus) },
+            requestPersonalVoice: { PersonalVoiceStatus(await AVSpeechSynthesizer.requestPersonalVoiceAuthorization()) },
+            openURL: { NSWorkspace.shared.open($0) }
         )
     }
 
@@ -52,7 +62,12 @@ struct ReadAloudEnvironment {
             systemNotifications: { systemNotifications },
             appNotifications: appNotifications,
             clock: clock,
-            mockVoice: voice
+            mockVoice: voice,
+            appleVoices: { voice.inventory },
+            previewRenderer: { voice.makeRenderer() },
+            personalVoiceStatus: { voice.personalVoiceStatus },
+            requestPersonalVoice: { voice.personalVoiceStatus },
+            openURL: { voice.record($0) }
         )
     }
 }
@@ -60,6 +75,7 @@ struct ReadAloudEnvironment {
 @MainActor
 final class LiveReadAloudSystem {
     private var apple: AppleSpeechRenderer?
+    private var preview: AppleSpeechRenderer?
     private var output: ReadAloudOutput?
     private let voices = StaleVoiceInventory()
 
@@ -74,6 +90,18 @@ final class LiveReadAloudSystem {
         return made
     }
 
+    func inventory() -> AppleVoiceInventory {
+        guard let renderer = renderer() as? AppleSpeechRenderer else { return AppleVoiceInventory() }
+        return AppleVoiceInventory(voices: renderer.knownVoices, unusable: renderer.unusableIdentifiers)
+    }
+
+    func previewRenderer() -> any SpeechRenderer {
+        if let preview { return preview }
+        let made = AppleSpeechRenderer()
+        preview = made
+        return made
+    }
+
     func sink() throws -> any ReadAloudOutputSink {
         if let output { return output }
         let made = try ReadAloudOutput()
@@ -83,6 +111,19 @@ final class LiveReadAloudSystem {
 
     func refreshVoices() {
         voices.markStale()
+        preview?.refreshVoices()
+    }
+}
+
+extension PersonalVoiceStatus {
+    init(_ status: AVSpeechSynthesizer.PersonalVoiceAuthorizationStatus) {
+        switch status {
+        case .authorized: self = .authorized
+        case .denied: self = .denied
+        case .notDetermined: self = .notDetermined
+        case .unsupported: self = .unsupported
+        @unknown default: self = .unsupported
+        }
     }
 }
 
@@ -115,7 +156,31 @@ final class MockVoiceSettings {
     private(set) var msPerUnit = MockVoiceSettings.defaultMsPerUnit
     private(set) var failAtUnit: Int?
     private(set) var isInstalled = false
+    private(set) var openedURLs: [URL] = []
     var languages = MockVoiceSettings.defaultLanguages
+    var personalVoiceStatus = PersonalVoiceStatus.notDetermined
+    var unusableVoices: Set<String> = []
+
+    var inventory: AppleVoiceInventory {
+        let voices = languages.sorted().flatMap { language in
+            [
+                VoiceDescriptor(
+                    identifier: "com.parola.mock.\(language).premium", name: "Mock Premium", language: language,
+                    quality: .premium, isNovelty: false, isPersonal: false, family: .standard
+                ),
+                VoiceDescriptor(
+                    identifier: "com.parola.mock.\(language).compact", name: "Mock Compact", language: language,
+                    quality: .default, isNovelty: false, isPersonal: false, family: .standard
+                ),
+            ]
+        }
+        return AppleVoiceInventory(voices: voices, unusable: unusableVoices)
+    }
+
+    func record(_ url: URL) -> Bool {
+        openedURLs.append(url)
+        return true
+    }
 
     func install(msPerUnit: Int, failAtUnit: Int?) {
         self.msPerUnit = max(1, msPerUnit)
@@ -127,6 +192,8 @@ final class MockVoiceSettings {
         msPerUnit = Self.defaultMsPerUnit
         failAtUnit = nil
         isInstalled = false
+        languages = Self.defaultLanguages
+        unusableVoices = []
     }
 
     func makeRenderer() -> any SpeechRenderer {

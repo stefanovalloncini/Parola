@@ -16,6 +16,7 @@ struct ReadAloudButtonStatus: Equatable {
     var titleKey: String
     var isEnabled: Bool
     var blockedMessage: String?
+    var failureMessage: String?
 
     static func resolve(
         state: ReadAloudController.State,
@@ -27,6 +28,7 @@ struct ReadAloudButtonStatus: Equatable {
         let action: Action
         let symbol: String
         let key: String
+        var failure: String?
         switch effective {
         case .reading:
             (action, symbol, key) = (.pause, "speaker.wave.2.fill", "Pause reading")
@@ -34,8 +36,9 @@ struct ReadAloudButtonStatus: Equatable {
             (action, symbol, key) = (.resume, "speaker.wave.2.fill", "Resume reading")
         case .preparing:
             (action, symbol, key) = (.none, "speaker.wave.2.fill", "Preparing…")
-        case .failed:
+        case .failed(let message):
             (action, symbol, key) = (.retry, "speaker.wave.2", "Try again")
+            failure = message
         case .idle, .noVoice:
             (action, symbol, key) = (.start, "speaker.wave.2", "Read aloud")
         }
@@ -46,7 +49,8 @@ struct ReadAloudButtonStatus: Equatable {
             symbol: symbol,
             titleKey: key,
             isEnabled: action != .none && !isBlocked && (hasContent || action == .pause || action == .resume),
-            blockedMessage: isBlocked ? blocked?.message : nil
+            blockedMessage: isBlocked ? blocked?.message : nil,
+            failureMessage: failure
         )
     }
 }
@@ -68,7 +72,7 @@ struct ReadAloudButton: View {
                 if status.isEnabled { perform(status.action, kind: kind) }
             }
             .disabled(!status.isEnabled && status.action != .none && model.readAloud.item == nil)
-            .help(status.blockedMessage.map { Text($0) } ?? Text(LocalizedStringKey(status.titleKey)))
+            .help((status.blockedMessage ?? status.failureMessage).map { Text($0) } ?? Text(LocalizedStringKey(status.titleKey)))
             .axLeaf("Toolbar.Transcript.Button.ReadAloud")
         }
     }
@@ -114,6 +118,15 @@ struct ReadAloudButton: View {
     @ViewBuilder
     private func menuItems(kind: ReadAloudRequest.Kind) -> some View {
         let blocked = model.readingBlockedReason != nil
+        if let failure = status(for: kind).failureMessage {
+            Button(failure) {}
+                .disabled(true)
+                .axLeaf("Toolbar.Transcript.MenuItem.FailureReason")
+            Button("Try Again") { Task { await model.retryReading() } }
+                .disabled(blocked)
+                .axLeaf("Toolbar.Transcript.MenuItem.TryAgain")
+            Divider()
+        }
         if kind == .transcript {
             if let target = model.transcript?.translation?.targetLanguage {
                 Button("Read Translation (\(LanguageDisplay.midSentenceName(for: target) ?? target))") {
@@ -128,6 +141,9 @@ struct ReadAloudButton: View {
             .disabled(blocked || model.currentSegmentID == nil)
             .axLeaf("Toolbar.Transcript.MenuItem.ReadFromCurrentSegment")
         }
+        Button("Choose Voice…") { model.presentVoiceChooser(for: kind) }
+            .disabled(!hasContent(kind))
+            .axLeaf("Toolbar.Transcript.MenuItem.ChooseVoice")
         Button("Stop Reading") { Task { await model.stopReading() } }
             .disabled(model.readAloud.item == nil)
             .axLeaf("Toolbar.Transcript.MenuItem.StopReading")

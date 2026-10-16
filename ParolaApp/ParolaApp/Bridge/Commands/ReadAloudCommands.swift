@@ -136,6 +136,68 @@ extension ParolaAutomationServer {
             ),
 
             AutomationCommand(
+                name: "listVoices",
+                area: .readAloud,
+                summary: "Lists the voices that read a language: apple:auto first, then each installed Apple voice in ranking order, with the voice's VoiceID, name, quality and whether it can read aloud. Also replies the language's saved voice.",
+                kind: .sync,
+                args: [
+                    .init(name: "language", kind: .string(), required: true, summary: "Language code, e.g. it or en-GB"),
+                ],
+                handler: { args, ctx in
+                    ParolaAutomationServer.voiceList(for: try args.string("language"), model: ctx.model)
+                }
+            ),
+
+            AutomationCommand(
+                name: "chooseVoice",
+                area: .readAloud,
+                summary: "Saves a voice for a language, as Use does in the chooser; when the chooser is open for that language, it also starts the parked reading. Replies {saved, voiceID} or {saved: false, reason}.",
+                kind: .mutating,
+                args: [
+                    .init(name: "language", kind: .string(), required: true, summary: "Language code"),
+                    .init(name: "voiceID", kind: .string(), required: true, summary: "A VoiceID from listVoices"),
+                ],
+                followsWith: ["waitForReadingState"],
+                handler: { args, ctx in
+                    let language = try args.string("language")
+                    let raw = try args.string("voiceID")
+                    guard let voice = VoiceID(rawValue: raw) else {
+                        throw AutomationError.invalidArgs(field: "voiceID", reason: "not a VoiceID: \(raw)")
+                    }
+                    guard ReadAloudVoices.isUsable(voice, for: language, in: ctx.model.readAloud.appleInventory) else {
+                        return .object(["saved": .bool(false), "reason": .string("voiceUnavailable"), "voiceID": .string(raw)])
+                    }
+                    await ctx.model.chooseVoice(voice, for: language)
+                    return .object(["saved": .bool(true), "voiceID": .string(raw)])
+                }
+            ),
+
+            AutomationCommand(
+                name: "previewVoice",
+                area: .readAloud,
+                summary: "Plays the sample sentence in a voice, pausing any reading as the chooser's Preview does. Replies {started} or {started: false, reason: blocked}.",
+                kind: .mutating,
+                args: [
+                    .init(name: "voiceID", kind: .string(), required: true, summary: "A VoiceID from listVoices"),
+                    .init(name: "language", kind: .string(), required: false, summary: "Sample language; defaults to the open chooser's or the reading's"),
+                ],
+                handler: { args, ctx in
+                    let raw = try args.string("voiceID")
+                    guard let voice = VoiceID(rawValue: raw) else {
+                        throw AutomationError.invalidArgs(field: "voiceID", reason: "not a VoiceID: \(raw)")
+                    }
+                    let controller = ctx.model.readAloud
+                    let language = try args.optionalString("language")
+                        ?? controller.voicePrompt?.language ?? controller.item?.language ?? "en"
+                    if let blocked = ctx.model.readingBlockedReason {
+                        return .object(["started": .bool(false), "reason": .string("blocked"), "blockedReason": .string(blocked.rawValue)])
+                    }
+                    let started = await ctx.model.previewVoice(voice, language: language)
+                    return .object(["started": .bool(started)])
+                }
+            ),
+
+            AutomationCommand(
                 name: "installMockVoice",
                 area: .test,
                 summary: "Test mode: reads with a silent voice whose every sentence lasts msPerUnit. failAtUnit makes that sentence fail. Clear it with clearMocks scope speech.",
@@ -143,6 +205,8 @@ extension ParolaAutomationServer {
                 args: [
                     .init(name: "msPerUnit", kind: .integer, required: false, summary: "How long each sentence plays, in ms", defaultValue: .int(MockVoiceSettings.defaultMsPerUnit)),
                     .init(name: "failAtUnit", kind: .integer, required: false, summary: "Sentence index that fails before any audio"),
+                    .init(name: "languages", kind: .stringArray, required: false, summary: "Base languages the mock voices read; any other language has no voice"),
+                    .init(name: "unusable", kind: .stringArray, required: false, summary: "Mock voice identifiers marked unusable for reading aloud"),
                 ],
                 handler: { args, ctx in
                     try requireTestMode(ctx)
@@ -153,6 +217,11 @@ extension ParolaAutomationServer {
                     guard ms > 0 else { throw AutomationError.invalidArgs(field: "msPerUnit", reason: "must be positive") }
                     let failAt = try args.optionalInt("failAtUnit")
                     voice.install(msPerUnit: ms, failAtUnit: failAt)
+                    if let languages = try args.optionalStringArray("languages") {
+                        voice.languages = Set(languages.map(ReadAloudVoices.key(for:)))
+                    }
+                    voice.unusableVoices = Set(try args.optionalStringArray("unusable") ?? [])
+                    ctx.model.readAloud.refreshVoices()
                     return .object([
                         "installed": .bool(true),
                         "msPerUnit": .int(ms),
@@ -174,7 +243,45 @@ extension ParolaAutomationServer {
             return .object([key: .bool(false), "reason": .string("unknownEntry")])
         case .nothingToRead:
             return .object([key: .bool(false), "reason": .string("nothingToRead")])
+        case .needsVoice:
+            return .object([key: .bool(false), "reason": .string("needsVoice")])
+        case .noVoice:
+            return .object([key: .bool(false), "reason": .string("noVoice")])
         }
+    }
+
+    static func voiceList(for language: String, model: AppModel) -> AutomationValue {
+        let inventory = model.readAloud.appleInventory
+        let ranked = ReadAloudVoices.candidates(for: language, in: inventory)
+        let unusable = ReadAloudVoices.unusableVoices(for: language, in: inventory)
+        func entry(_ voice: VoiceDescriptor, usable: Bool) -> AutomationValue {
+            let quality: String
+            switch voice.quality {
+            case .premium: quality = "premium"
+            case .enhanced: quality = "enhanced"
+            case .default: quality = "default"
+            }
+            return .object([
+                "voiceID": .string(VoiceID.apple(identifier: voice.identifier)?.rawValue ?? ""),
+                "name": .string(voice.name),
+                "quality": .string(quality),
+                "personal": .bool(voice.isPersonal),
+                "usable": .bool(usable),
+            ])
+        }
+        var voices: [AutomationValue] = []
+        if ReadAloudVoices.hasAppleVoice(for: language, in: inventory) {
+            voices.append(.object([
+                "voiceID": .string(VoiceID.appleAutomatic.rawValue), "name": .string("Automatic"),
+                "quality": .null, "personal": .bool(false), "usable": .bool(true),
+            ]))
+        }
+        voices += ranked.map { entry($0, usable: true) } + unusable.map { entry($0, usable: false) }
+        return .object([
+            "language": .string(ReadAloudVoices.key(for: language)),
+            "voices": .array(voices),
+            "saved": model.readAloudVoices[ReadAloudVoices.key(for: language)].map { .string($0.rawValue) } ?? .null,
+        ])
     }
 
     static func readingFields(_ model: AppModel) -> [String: AutomationValue] {
@@ -208,6 +315,13 @@ extension ParolaAutomationServer {
             "voiceID": item.map { .string($0.voice.rawValue) } ?? .null,
             "engine": item.map { .string(Self.engineName(for: $0.voice)) } ?? .null,
             "speed": .double(controller.speed),
+            "voicePrompt": controller.voicePrompt.map { prompt in
+                var origin = "main"
+                if case .entryWindow = prompt.origin { origin = "entryWindow" }
+                return .object([
+                    "language": .string(prompt.language), "state": .string(prompt.mode.rawValue), "origin": .string(origin),
+                ])
+            } ?? .null,
             "blockedReason": model.readingBlockedReason.map { .string($0.rawValue) } ?? .null,
         ])
     }

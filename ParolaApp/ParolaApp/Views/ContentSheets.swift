@@ -13,6 +13,12 @@ struct ContentSheetsModifier: ViewModifier {
             .sheet(item: $model.duplicateImport) { pending in
                 DuplicateImportSheet(pending: pending)
             }
+            .sheet(item: Binding(
+                get: { model.readAloud.voicePrompt.flatMap { $0.origin == .main ? $0 : nil } },
+                set: { if $0 == nil { model.dismissVoicePrompt() } }
+            )) { prompt in
+                ReadAloudVoiceSheet(prompt: prompt)
+            }
             .sheet(item: $model.promptOutput) { output in
                 PromptOutputSheet(output: output)
             }

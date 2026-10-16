@@ -459,6 +459,16 @@ final class AppModel {
             readAloud.setSpeed(readAloudRate)
         }
     }
+    var readAloudVoices: [String: VoiceID] = [:] {
+        didSet {
+            guard readAloudVoices != oldValue else { return }
+            if let json = ReadAloudVoices.encodeSaved(readAloudVoices) {
+                defaults.set(json, forKey: "readAloudVoices")
+            } else {
+                defaults.removeObject(forKey: "readAloudVoices")
+            }
+        }
+    }
     var karaokeHighlight: Bool = true { didSet { defaults.set(karaokeHighlight, forKey: "karaokeHighlight") } }
     var initialPrompt: String = "" { didSet { defaults.set(initialPrompt, forKey: "initialPrompt"); if !isReloadingSettings { scheduleDictationRestart() } } }
     var diarize: Bool = false { didSet { defaults.set(diarize, forKey: "diarize") } }
@@ -1315,6 +1325,7 @@ final class AppModel {
         self.karaokeHighlight = readBool("karaokeHighlight", default: true)
         let storedRate = readDouble("readAloudRate", default: 1)
         self.readAloudRate = ReadAloudController.speeds.contains(storedRate) ? storedRate : 1
+        self.readAloudVoices = ReadAloudVoices.decodeSaved(defaults.string(forKey: "readAloudVoices"))
         self.initialPrompt = defaults.string(forKey: "initialPrompt") ?? ""
         self.diarize = defaults.bool(forKey: "diarize")
         self.expectedSpeakersRaw = defaults.integer(forKey: "expectedSpeakersRaw")

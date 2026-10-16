@@ -74,7 +74,6 @@ struct ReadAloudButtonStatusTests {
             ("Read from Current Segment", "Leggi dal segmento corrente"),
             ("Read Aloud from Here", "Leggi ad alta voce da qui"),
             ("Read Translation (%@)", "Leggi la traduzione (%@)"),
-            ("Couldn't read this aloud.", "Impossibile leggere ad alta voce."),
             ("Couldn't open the audio output.", "Impossibile aprire l'uscita audio."),
         ]
         for (key, expected) in keys {

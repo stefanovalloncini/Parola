@@ -24,6 +24,8 @@ enum ReadAloudRefusal: Equatable, Sendable {
     case noTranscript
     case unknownEntry
     case nothingToRead
+    case needsVoice
+    case noVoice
 }
 
 extension AppModel {
@@ -49,40 +51,115 @@ extension AppModel {
     }
 
     @discardableResult
-    func readAloud(_ request: ReadAloudRequest) async -> ReadAloudRefusal? {
+    func readAloud(_ request: ReadAloudRequest, using voice: VoiceID? = nil) async -> ReadAloudRefusal? {
         if let blocked = readingBlockedReason { return .blocked(blocked) }
         guard let material = await readingMaterial(for: request.entryID) else {
             return request.entryID == nil ? .noTranscript : .unknownEntry
         }
-        let transcript = material.transcript
-        let source: ReadingSource
-        let language: String
-        let uiLanguage = Bundle.main.preferredLocalizations.first ?? "en"
-        switch request.kind {
-        case .transcript:
-            source = .transcript(fromSegment: request.fromSegment)
-            language = SpokenLanguage.forTranscript(transcript, uiLanguage: uiLanguage)
-        case .translation:
-            guard let translation = transcript.translation else { return .nothingToRead }
-            source = .translation(language: translation.targetLanguage)
-            language = SpokenLanguage.forTranslation(targetLanguage: translation.targetLanguage)
-        case .summary:
-            guard let summary = transcript.summary else { return .nothingToRead }
-            source = .summary
-            language = SpokenLanguage.forSummary(
-                text: summary.text,
-                chapterTitles: summary.chapters.map(\.title),
-                actionItems: summary.actionItems,
-                transcriptLanguage: SpokenLanguage.forTranscript(transcript, uiLanguage: uiLanguage)
-            )
-        }
-        let units = await readingUnits(source, of: transcript, language: language)
+        guard let (source, language) = readingSource(for: request, in: material.transcript) else { return .nothingToRead }
+        let units = await readingUnits(source, of: material.transcript, language: language)
         guard !units.isEmpty else { return .nothingToRead }
         if let blocked = readingBlockedReason { return .blocked(blocked) }
-        await readAloud.start(ReadAloudController.Plan(
+        var plan = ReadAloudController.Plan(
             entryID: material.id, source: source, title: material.title, language: language, units: units
-        ))
+        )
+        if let voice {
+            plan.voice = voice
+        } else {
+            switch voiceDecision(for: language) {
+            case .read(let resolved):
+                plan.voice = resolved
+            case .chooser:
+                readAloud.present(.init(language: language, mode: .choose, request: request, origin: .main))
+                return .needsVoice
+            case .noVoice:
+                let prompt = ReadAloudController.VoicePrompt(language: language, mode: .noVoice, request: request, origin: .main)
+                await readAloud.declareNoVoice(plan, prompt: prompt)
+                return .noVoice
+            }
+        }
+        await readAloud.start(plan)
         return nil
+    }
+
+    private func readingSource(for request: ReadAloudRequest, in transcript: Transcript) -> (ReadingSource, String)? {
+        let uiLanguage = Bundle.main.preferredLocalizations.first ?? "en"
+        let transcriptLanguage = SpokenLanguage.forTranscript(transcript, uiLanguage: uiLanguage)
+        switch request.kind {
+        case .transcript:
+            return (.transcript(fromSegment: request.fromSegment), transcriptLanguage)
+        case .translation:
+            guard let translation = transcript.translation else { return nil }
+            return (
+                .translation(language: translation.targetLanguage),
+                SpokenLanguage.forTranslation(targetLanguage: translation.targetLanguage)
+            )
+        case .summary:
+            guard let summary = transcript.summary else { return nil }
+            return (
+                .summary,
+                SpokenLanguage.forSummary(
+                    text: summary.text,
+                    chapterTitles: summary.chapters.map(\.title),
+                    actionItems: summary.actionItems,
+                    transcriptLanguage: transcriptLanguage
+                )
+            )
+        }
+    }
+
+    func voiceDecision(for language: String) -> ReadAloudVoiceDecision {
+        let inventory = readAloud.appleInventory
+        let saved = readAloudVoices[ReadAloudVoices.key(for: language)]
+        return ReadAloudVoices.decide(
+            saved: saved,
+            savedIsUsable: saved.map { ReadAloudVoices.isUsable($0, for: language, in: inventory) } ?? false,
+            neuralOffers: !ReadAloudVoices.neuralOffers(for: language).isEmpty,
+            appleVoices: ReadAloudVoices.hasAppleVoice(for: language, in: inventory)
+        )
+    }
+
+    func presentVoiceChooser(for kind: ReadAloudRequest.Kind) {
+        guard let transcript, let (_, language) = readingSource(for: ReadAloudRequest(kind: kind), in: transcript) else { return }
+        let inventory = readAloud.appleInventory
+        let hasVoice = ReadAloudVoices.hasAppleVoice(for: language, in: inventory)
+            || !ReadAloudVoices.neuralOffers(for: language).isEmpty
+        readAloud.present(.init(
+            language: language, mode: hasVoice ? .choose : .noVoice, request: ReadAloudRequest(kind: kind), origin: .main
+        ))
+    }
+
+    func dismissVoicePrompt() {
+        readAloud.dismissVoicePrompt()
+    }
+
+    func chooseVoice(_ voice: VoiceID, for language: String) async {
+        let key = ReadAloudVoices.key(for: language)
+        readAloudVoices[key] = voice
+        guard let prompt = readAloud.voicePrompt, ReadAloudVoices.key(for: prompt.language) == key else { return }
+        readAloud.dismissVoicePrompt()
+        if let request = prompt.request { await readAloud(request) }
+    }
+
+    func readWithBuiltInVoiceForNow() async {
+        guard let prompt = readAloud.voicePrompt else { return }
+        readAloud.dismissVoicePrompt()
+        if let request = prompt.request { await readAloud(request, using: .appleAutomatic) }
+    }
+
+    @discardableResult
+    func previewVoice(_ voice: VoiceID, language: String) async -> Bool {
+        await readAloud.preview(voice, language: language)
+    }
+
+    @discardableResult
+    func openMoreVoices() -> Bool {
+        ReadAloudVoices.systemSettingsURLs.contains { readAloud.openURL($0) }
+    }
+
+    func requestPersonalVoice() async {
+        _ = await readAloud.requestPersonalVoice()
+        readAloud.refreshVoices()
     }
 
     func readingUnits(_ source: ReadingSource, of transcript: Transcript, language: String) async -> [ReadingUnit] {
