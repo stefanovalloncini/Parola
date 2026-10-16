@@ -324,6 +324,8 @@ extension ParolaAutomationServer {
                     "language": .string(prompt.language), "state": .string(prompt.mode.rawValue), "origin": .string(origin),
                 ])
             } ?? .null,
+            "controlVisible": .bool(model.nowReadingLayout != .hidden),
+            "activityHeld": .bool(controller.activityHeld),
             "blockedReason": model.readingBlockedReason.map { .string($0.rawValue) } ?? .null,
         ])
     }

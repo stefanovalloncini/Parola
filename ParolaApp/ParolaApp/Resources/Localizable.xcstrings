@@ -22634,6 +22634,72 @@
           }
         }
       }
+    },
+    "Now Reading": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In lettura"
+          }
+        }
+      }
+    },
+    "Sentence %lld of %lld": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Frase %1$lld di %2$lld"
+          }
+        }
+      }
+    },
+    "Use Built-in Voice": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usa la voce integrata"
+          }
+        }
+      }
+    },
+    "Reading stopped": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lettura interrotta"
+          }
+        }
+      }
+    },
+    "Reading speed": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Velocità di lettura"
+          }
+        }
+      }
+    },
+    "Open what is being read": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apri ciò che viene letto"
+          }
+        }
+      }
     }
   },
   "version": "1.1"

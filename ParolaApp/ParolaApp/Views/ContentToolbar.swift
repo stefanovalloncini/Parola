@@ -19,6 +19,12 @@ struct ContentToolbar: ToolbarContent {
             TranscriptActionItems()
             ToolbarSpacer(.fixed, placement: .primaryAction)
         }
+        if model.nowReadingLayout != .hidden {
+            ToolbarItem(placement: .primaryAction) {
+                NowReadingControl(layout: model.nowReadingLayout)
+            }
+            .keepsOutOfOverflow()
+        }
         if RecordControl.primarySource(features: model.features) != nil {
             // Its own item with no shared glass behind it: Record and the capsule each wear their own.
             ToolbarItem(placement: .primaryAction) {
