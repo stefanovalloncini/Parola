@@ -11,6 +11,7 @@ struct ReadingTransport: Equatable {
     var toggleEnabled: Bool
     var stepEnabled: Bool
     var stopEnabled: Bool
+    var blockedMessage: String?
 
     var toggleTitle: String {
         switch toggle {
@@ -19,16 +20,29 @@ struct ReadingTransport: Equatable {
         }
     }
 
-    static func resolve(state: ReadAloudController.State, blocked: ReadAloudController.BlockedReason?) -> ReadingTransport {
+    static func resolve(
+        state: ReadAloudController.State, blocked: ReadAloudController.BlockedReason?, sentenceStarted: Bool
+    ) -> ReadingTransport {
+        let message = blocked?.message
+        let canStep = sentenceStarted && blocked == nil
         switch state {
         case .preparing, .reading:
-            ReadingTransport(toggle: .pause, toggleEnabled: true, stepEnabled: state == .reading && blocked == nil, stopEnabled: true)
+            return ReadingTransport(
+                toggle: .pause, toggleEnabled: true, stepEnabled: state == .reading && canStep, stopEnabled: true,
+                blockedMessage: message
+            )
         case .waiting, .paused:
-            ReadingTransport(toggle: .resume, toggleEnabled: blocked == nil, stepEnabled: blocked == nil, stopEnabled: true)
+            return ReadingTransport(
+                toggle: .resume, toggleEnabled: blocked == nil, stepEnabled: canStep, stopEnabled: true, blockedMessage: message
+            )
         case .failed:
-            ReadingTransport(toggle: .resume, toggleEnabled: false, stepEnabled: false, stopEnabled: true)
+            return ReadingTransport(
+                toggle: .resume, toggleEnabled: false, stepEnabled: false, stopEnabled: true, blockedMessage: message
+            )
         case .idle, .noVoice:
-            ReadingTransport(toggle: .pause, toggleEnabled: false, stepEnabled: false, stopEnabled: false)
+            return ReadingTransport(
+                toggle: .pause, toggleEnabled: false, stepEnabled: false, stopEnabled: false, blockedMessage: nil
+            )
         }
     }
 }

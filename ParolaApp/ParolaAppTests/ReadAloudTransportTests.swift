@@ -10,34 +10,50 @@ import ParolaTestSupport
 @MainActor
 @Suite("Read Aloud transport")
 struct ReadAloudTransportTests {
-    @Test("Pause/Resume, Previous, Skip and Stop follow the state and the block", arguments: [
-        (ReadAloudController.State.idle, nil as ReadAloudController.BlockedReason?, false, false, false),
-        (.noVoice("fa"), nil, false, false, false),
-        (.preparing, nil, true, false, true),
-        (.reading, nil, true, true, true),
-        (.reading, .take, true, false, true),
-        (.waiting(.slow), nil, true, true, true),
-        (.paused(.user), nil, true, true, true),
-        (.paused(.take), .take, false, false, true),
-        (.paused(.media), nil, true, true, true),
-        (.failed("x"), nil, false, false, true),
-    ] as [(ReadAloudController.State, ReadAloudController.BlockedReason?, Bool, Bool, Bool)])
+    @Test("Pause/Resume, Previous, Skip and Stop follow the state, the block and whether a sentence has started", arguments: [
+        (ReadAloudController.State.idle, nil as ReadAloudController.BlockedReason?, false, false, false, false),
+        (.noVoice("fa"), nil, false, false, false, false),
+        (.preparing, nil, false, true, false, true),
+        (.preparing, nil, true, true, false, true),
+        (.reading, nil, true, true, true, true),
+        (.reading, .take, true, true, false, true),
+        (.waiting(.slow), nil, true, true, true, true),
+        (.paused(.user), nil, true, true, true, true),
+        (.paused(.user), nil, false, true, false, true),
+        (.paused(.take), .take, true, false, false, true),
+        (.paused(.media), nil, true, true, true, true),
+        (.failed("x"), nil, false, false, false, true),
+    ] as [(ReadAloudController.State, ReadAloudController.BlockedReason?, Bool, Bool, Bool, Bool)])
     func table(
-        state: ReadAloudController.State, blocked: ReadAloudController.BlockedReason?,
+        state: ReadAloudController.State, blocked: ReadAloudController.BlockedReason?, started: Bool,
         toggle: Bool, step: Bool, stop: Bool
     ) {
-        let transport = ReadingTransport.resolve(state: state, blocked: blocked)
+        let transport = ReadingTransport.resolve(state: state, blocked: blocked, sentenceStarted: started)
         #expect(transport.toggleEnabled == toggle)
         #expect(transport.stepEnabled == step)
         #expect(transport.stopEnabled == stop)
     }
 
+    @Test("a block carries its reason on every disabled item, in English and Italian", arguments: [
+        (ReadAloudController.BlockedReason.take, "Reading waits until the recording ends.", "La lettura attende la fine della registrazione."),
+        (.dictation, "Reading waits until dictation ends.", "La lettura attende la fine della dettatura."),
+        (.captions, "Reading waits until live captions stop.", "La lettura attende la fine dei sottotitoli in tempo reale."),
+    ] as [(ReadAloudController.BlockedReason, String, String)])
+    func blockedReasons(reason: ReadAloudController.BlockedReason, english: String, italian: String) throws {
+        let transport = ReadingTransport.resolve(state: .paused(reason.pauseReason), blocked: reason, sentenceStarted: true)
+        #expect(transport.blockedMessage == english)
+        #expect(ReadingTransport.resolve(state: .reading, blocked: nil, sentenceStarted: true).blockedMessage == nil)
+        let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
+        let bundle = try #require(Bundle(path: path))
+        #expect(bundle.localizedString(forKey: english, value: "MISSING", table: nil) == italian)
+    }
+
     @Test("the one toggle item reads Pause Reading while it plays and Resume Reading otherwise")
     func toggleTitles() {
-        #expect(ReadingTransport.resolve(state: .reading, blocked: nil).toggleTitle == "Pause Reading")
-        #expect(ReadingTransport.resolve(state: .preparing, blocked: nil).toggleTitle == "Pause Reading")
-        #expect(ReadingTransport.resolve(state: .paused(.user), blocked: nil).toggleTitle == "Resume Reading")
-        #expect(ReadingTransport.resolve(state: .waiting(.slow), blocked: nil).toggleTitle == "Resume Reading")
+        #expect(ReadingTransport.resolve(state: .reading, blocked: nil, sentenceStarted: true).toggleTitle == "Pause Reading")
+        #expect(ReadingTransport.resolve(state: .preparing, blocked: nil, sentenceStarted: false).toggleTitle == "Pause Reading")
+        #expect(ReadingTransport.resolve(state: .paused(.user), blocked: nil, sentenceStarted: true).toggleTitle == "Resume Reading")
+        #expect(ReadingTransport.resolve(state: .waiting(.slow), blocked: nil, sentenceStarted: true).toggleTitle == "Resume Reading")
     }
 
     @Test("Previous restarts the sentence once more than 1.5 s of it has played, else goes back one")
@@ -53,10 +69,12 @@ struct ReadAloudTransportTests {
 
         await rig.controller.skip(by: 1)
         await waitUntil { rig.controller.item?.unitIndex == 1 }
+        let before = rig.sink.calls.filter { $0 == .schedule(unitID: 1) }.count
         rig.clock.advance(by: .seconds(2))
         await settle()
         await rig.controller.skip(by: -1)
-        await settle()
+        await waitUntil { rig.sink.calls.filter { $0 == .schedule(unitID: 1) }.count > before }
+        #expect(rig.sink.calls.filter { $0 == .schedule(unitID: 1) }.count > before)
         #expect(rig.controller.item?.unitIndex == 1)
     }
 
@@ -83,16 +101,20 @@ struct ReadAloudTransportTests {
         let model = AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("builtin-retry"))
         model.transcript = EntryWindowTestSupport.transcript(texts: ["One two three four.", "Five six seven eight."], speakers: [])
         model.phase = .ready
+        model.readAloudVoices = ["en": try #require(VoiceID.apple(identifier: "com.parola.mock.en.premium"))]
+        let saved = model.readAloudVoices
         model.readAloud.mockVoice?.install(msPerUnit: 20, failAtUnit: 1)
         await model.readAloud(ReadAloudRequest(kind: .transcript))
         await waitUntil { model.readAloud.state.name == "failed" }
+        #expect(model.readAloud.item?.voice != .appleAutomatic)
 
-        model.readAloud.mockVoice?.clear()
+        model.readAloud.mockVoice?.install(msPerUnit: 60_000, failAtUnit: nil)
         await model.retryReadingWithBuiltInVoice()
-        await waitUntil { model.readAloud.state != .preparing && model.readAloud.state.name != "failed" }
+        await waitUntil { model.readAloud.state == .reading }
 
-        #expect(model.readAloudVoices.isEmpty)
-        #expect(model.readAloud.item?.voice == .appleAutomatic || model.readAloud.state == .idle)
+        #expect(model.readAloudVoices == saved)
+        #expect(model.readAloud.item?.voice == .appleAutomatic)
+        #expect(model.readAloud.item?.unitIndex == 1)
         await model.stopReading()
     }
 }
@@ -168,19 +190,24 @@ struct ReadAloudPlaybackMenuTests {
         await model.stopReading()
     }
 
-    @Test("a failed reading of this entry retries from Read Aloud")
+    @Test("a failed reading of this entry retries from the failed unit, not from the top")
     func failedRetries() async throws {
-        let (model, entry) = try await seeded("pm-failed")
+        let model = EntryWindowTestSupport.makeModel("pm-failed")
+        let entry = try await EntryWindowTestSupport.seed(
+            model, texts: ["One two three four.", "Five six seven eight.", "Nine ten eleven twelve."],
+            speakers: [nil, nil, nil], audio: nil
+        )
         model.loadEntry(entry.id)
         await waitUntil { model.hasTranscript }
         model.readAloud.mockVoice?.install(msPerUnit: 20, failAtUnit: 1)
         await model.readAloudFromMenu()
         await waitUntil { model.readAloud.state.name == "failed" }
+        #expect(model.readAloud.item?.unitIndex == 1)
 
-        model.readAloud.mockVoice?.clear()
+        model.readAloud.mockVoice?.install(msPerUnit: 60_000, failAtUnit: nil)
         await model.readAloudFromMenu()
-        await waitUntil { model.readAloud.state != .preparing && model.readAloud.state.name != "failed" }
-        #expect(model.readAloud.state.name != "failed")
+        await waitUntil { model.readAloud.state == .reading }
+        #expect(model.readAloud.item?.unitIndex == 1)
         await model.stopReading()
     }
 
@@ -216,20 +243,67 @@ struct ReadAloudPlaybackMenuTests {
         #expect(model.readAloud.state == .idle)
     }
 
-    @Test("Read Aloud waits while a take blocks reading, and Previous and Skip are refused")
+    @Test("a take pauses the reading, disables its items with the reason, and hides the control")
     func blocked() async throws {
         let (model, entry) = try await seeded("pm-blocked")
+        model.readAloud.mockVoice?.install(msPerUnit: 60_000, failAtUnit: nil)
+        model.loadEntry(entry.id)
+        await waitUntil { model.hasTranscript }
+        await model.readAloudFromMenu()
+        await waitUntil { model.readAloud.state == .reading }
+        #expect(model.nowReadingLayout == .full || model.nowReadingLayout == .compact)
+
+        model.installTestTake(source: .microphone)
+        await waitUntil { model.readAloud.state == .paused(.take) }
+
+        #expect(model.readingBlockedReason == .take)
+        let transport = model.readingTransport
+        #expect(!transport.stepEnabled)
+        #expect(!transport.toggleEnabled)
+        #expect(transport.blockedMessage == ReadAloudController.BlockedReason.take.message)
+        #expect(model.nowReadingLayout == .hidden)
+        #expect(model.readAloudMenuStatus?.isEnabled != true)
+        #expect(await model.readAloud(ReadAloudRequest(kind: .transcript)) == .blocked(.take))
+        let menu = items(model)
+        #expect(menu.first { $0.title == "Skip Sentence" }?.isEnabled == false)
+        await model.stopReading()
+    }
+
+    @Test("Space, the toolbar and the menus toggle through the model: pause a playing reading, resume a paused one")
+    func toggleMapping() async throws {
+        let (model, entry) = try await seeded("pm-toggle")
+        model.readAloud.mockVoice?.install(msPerUnit: 60_000, failAtUnit: nil)
         model.loadEntry(entry.id)
         await waitUntil { model.hasTranscript }
         await model.readAloudFromMenu()
         await waitUntil { model.readAloud.state == .reading }
 
-        let transport = ReadingTransport.resolve(state: .paused(.take), blocked: .take)
-        #expect(!transport.stepEnabled)
-        #expect(!transport.toggleEnabled)
-        let status = ReadAloudButtonStatus.resolve(state: .idle, readsThis: false, blocked: .take, hasContent: true)
-        #expect(!status.isEnabled)
-        #expect(status.blockedMessage == ReadAloudController.BlockedReason.take.message)
+        await model.toggleReading()
+        #expect(model.readAloud.state == .paused(.user))
+        await model.toggleReading()
+        await waitUntil { model.readAloud.state == .reading }
+        #expect(model.readAloud.state == .reading)
+        await model.stopReading()
+    }
+
+    @Test("the key router drives a reading: ⌘→ skips, Space pauses, ⌘← goes back")
+    func handleDrivesReading() async throws {
+        let (model, entry) = try await seeded("pm-keys")
+        model.readAloud.mockVoice?.install(msPerUnit: 60_000, failAtUnit: nil)
+        model.loadEntry(entry.id)
+        await waitUntil { model.hasTranscript }
+        await model.readAloudFromMenu()
+        await waitUntil { model.readAloud.state == .reading }
+
+        #expect(PlaybackKeyMonitor.handle(keyCode: 124, modifiers: [.command], firstResponder: nil, inMainWindow: true, model: model))
+        await waitUntil { model.readAloud.item?.unitIndex == 1 }
+        #expect(model.readAloud.item?.unitIndex == 1)
+        #expect(PlaybackKeyMonitor.handle(keyCode: 123, modifiers: [.command], firstResponder: nil, inMainWindow: true, model: model))
+        await waitUntil { model.readAloud.item?.unitIndex == 0 }
+        #expect(model.readAloud.item?.unitIndex == 0)
+        #expect(PlaybackKeyMonitor.handle(keyCode: 49, modifiers: [], firstResponder: nil, inMainWindow: true, model: model))
+        await waitUntil { model.readAloud.state == .paused(.user) }
+        #expect(model.readAloud.state == .paused(.user))
         await model.stopReading()
     }
 

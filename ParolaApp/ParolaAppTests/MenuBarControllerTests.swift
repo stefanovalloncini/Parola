@@ -460,10 +460,10 @@ struct ReadingMenuTests {
     }
 
     private let playing = MenuBarController.Reading(
-        nowReading: "Now Reading: Transcript · Standup", toggleTitle: "Pause Reading", canToggle: true, canSkip: true
+        nowReading: "Now Reading: Transcript · Standup", toggleTitle: "Pause Reading", isPaused: false, canToggle: true, canSkip: true
     )
     private let paused = MenuBarController.Reading(
-        nowReading: "Now Reading: Summary · Standup", toggleTitle: "Resume Reading", canToggle: true, canSkip: true
+        nowReading: "Now Reading: Summary · Standup", toggleTitle: "Resume Reading", isPaused: true, canToggle: true, canSkip: true
     )
 
     @Test("with no reading the lists are what they were")
@@ -496,11 +496,77 @@ struct ReadingMenuTests {
 
     @Test("a blocked resume and a skip with nothing to skip are disabled")
     func disabledItems() {
-        let blocked = MenuBarController.Reading(nowReading: "x", toggleTitle: "Resume Reading", canToggle: false, canSkip: false)
+        let blocked = MenuBarController.Reading(
+            nowReading: "x", toggleTitle: "Resume Reading", isPaused: true, canToggle: false, canSkip: false,
+            blockedNote: "Reading waits until the recording ends."
+        )
         let items = MenuBarController.items(for: snapshot(blocked), target: nil)
+        #expect(titles(items).prefix(6) == ["Open Parola", "x", "Reading waits until the recording ends.", "Resume Reading", "Skip Sentence", "Stop Reading"])
         #expect(!items[2].isEnabled)
         #expect(!items[3].isEnabled)
-        #expect(items[4].isEnabled)
+        #expect(!items[4].isEnabled)
+        #expect(items[5].isEnabled)
+        let dock = MenuBarController.dockItems(for: snapshot(blocked), endTitle: nil, target: nil)
+        #expect(titles(dock).suffix(4) == ["Reading waits until the recording ends.", "Resume Reading", "Skip Sentence", "Stop Reading"])
+    }
+
+    @Test("the Dictation-only menu carries the reading items too, and is unchanged without a reading")
+    func dictationOnlyReading() {
+        let with = titles(MenuBarController.items(for: snapshot(playing, mode: .dictationOnly), target: nil))
+        #expect(with == ["Start Dictation", "—", "Pause Reading", "Skip Sentence", "Stop Reading", "—", "Open Parola", "Quit Parola"])
+        let paused = titles(MenuBarController.items(for: snapshot(paused, mode: .dictationOnly), target: nil))
+        #expect(paused[2] == "Resume Reading")
+        #expect(titles(MenuBarController.items(for: snapshot(nil, mode: .dictationOnly), target: nil)) == ["Start Dictation", "—", "Open Parola", "Quit Parola"])
+    }
+
+    @Test("the toggle item does what its title says: a pause selector while it plays, a resume selector while paused")
+    func toggleSelectors() {
+        let playingItems = MenuBarController.items(for: snapshot(playing), target: nil)
+        let pausedItems = MenuBarController.items(for: snapshot(paused), target: nil)
+        #expect(playingItems[2].action == NSSelectorFromString("pauseReading"))
+        #expect(pausedItems[2].action == NSSelectorFromString("resumeReading"))
+    }
+
+    @Test("an open menu's toggle is rewritten in place when the reading pauses")
+    func openMenuUpdates() {
+        let menu = MenuBarController.menu(for: snapshot(playing), target: nil)
+        MenuBarController.updateReadingItems(in: menu, for: paused, target: nil)
+        let toggle = menu.items.first { $0.identifier?.rawValue == "MenuBar.PauseReading" }
+        #expect(toggle?.title == "Resume Reading")
+        #expect(toggle?.action == NSSelectorFromString("resumeReading"))
+    }
+
+    @Test("a bound menu bar follows the reading: Pause, Resume, then nothing; a failure removes it")
+    func boundMenuFollowsReading() async {
+        let model = AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("menu-bound"))
+        model.transcript = EntryWindowTestSupport.transcript(
+            texts: ["One two three four.", "Five six seven eight.", "Nine ten eleven twelve."], speakers: []
+        )
+        model.phase = .ready
+        model.showMenuBarExtra = true
+        model.readAloud.mockVoice?.install(msPerUnit: 60_000, failAtUnit: nil)
+        let controller = MenuBarController()
+        controller.bind(model)
+        await model.readAloud(ReadAloudRequest(kind: .transcript))
+        await waitUntil { controller.lastSnapshot?.reading?.toggleTitle == "Pause Reading" }
+        #expect(controller.lastSnapshot?.reading?.toggleTitle == "Pause Reading")
+        let menu = MenuBarController.menu(for: controller.lastSnapshot ?? snapshot(nil), target: controller)
+        controller.readingMenuOpened(menu)
+
+        await model.pauseReading()
+        await waitUntil { controller.lastSnapshot?.reading?.toggleTitle == "Resume Reading" }
+        #expect(controller.lastSnapshot?.reading?.toggleTitle == "Resume Reading")
+        #expect(menu.items.first { $0.identifier?.rawValue == "MenuBar.PauseReading" }?.title == "Resume Reading")
+
+        await model.stopReading()
+        await waitUntil { controller.lastSnapshot?.reading == nil }
+        #expect(controller.lastSnapshot?.reading == nil)
+
+        model.readAloud.mockVoice?.install(msPerUnit: 20, failAtUnit: 1)
+        await model.readAloud(ReadAloudRequest(kind: .transcript))
+        await waitUntil { model.readAloud.state.name == "failed" }
+        #expect(MenuBarController.snapshot(for: model, mode: .full).reading == nil)
+        model.showMenuBarExtra = false
     }
 
     @Test("the Dock menu adds the same three items after the take items, and not the Now Reading line")

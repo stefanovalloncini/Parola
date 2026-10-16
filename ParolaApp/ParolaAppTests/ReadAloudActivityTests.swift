@@ -22,6 +22,20 @@ struct ReadAloudActivityTests {
         #expect(rig.activity.begun == 1)
     }
 
+    @Test("every state decides whether an activity is held: preparing, reading and waiting hold it, nothing else does", arguments: [
+        (ReadAloudController.State.idle, false),
+        (.preparing, true),
+        (.reading, true),
+        (.waiting(.slow), true),
+        (.paused(.user), false),
+        (.paused(.media), false),
+        (.failed("x"), false),
+        (.noVoice("fa"), false),
+    ] as [(ReadAloudController.State, Bool)])
+    func holdsByState(state: ReadAloudController.State, held: Bool) {
+        #expect(state.holdsActivity == held)
+    }
+
     @Test("a pause releases it and a resume holds it again")
     func pauseReleases() async {
         let rig = ReadAloudRig()

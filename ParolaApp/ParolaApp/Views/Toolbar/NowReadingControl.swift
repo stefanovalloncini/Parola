@@ -1,29 +1,53 @@
 import SwiftUI
 import ParolaCore
 
+/// How much toolbar room the window leaves: the control grows with it.
+enum NowReadingWidth: Equatable {
+    case narrow
+    case medium
+    case wide
+
+    static let mediumFrom: CGFloat = 1200
+    static let wideFrom: CGFloat = 1600
+
+    static func tier(for width: CGFloat) -> NowReadingWidth {
+        width >= wideFrom ? .wide : width >= mediumFrom ? .medium : .narrow
+    }
+}
+
 /// What the Now Reading item shows for a reading's state, whether a take runs, and how wide the window is.
 enum NowReadingLayout: Equatable {
     case hidden
     case full
     case compact
+    case minimal
     case failed
-    case failedCompact
 
-    static let fullWidth: CGFloat = 1000
-
-    static func resolve(state: ReadAloudController.State, takeActive: Bool, isNarrow: Bool) -> NowReadingLayout {
+    static func resolve(state: ReadAloudController.State, takeActive: Bool, width: NowReadingWidth) -> NowReadingLayout {
         guard !takeActive else { return .hidden }
         switch state {
         case .idle, .noVoice: return .hidden
-        case .preparing, .reading, .waiting, .paused: return isNarrow ? .compact : .full
-        case .failed: return isNarrow ? .failedCompact : .failed
+        case .preparing, .reading, .waiting, .paused:
+            switch width {
+            case .wide: return .full
+            case .medium: return .compact
+            case .narrow: return .minimal
+            }
+        case .failed: return .failed
         }
     }
 }
 
 extension AppModel {
+    /// On a narrow window the transcript toolbar has no room for another item, so the read button's menu carries the controls.
     var nowReadingLayout: NowReadingLayout {
-        NowReadingLayout.resolve(state: readAloud.state, takeActive: recordingActive, isNarrow: windowIsNarrowForReading)
+        let layout = NowReadingLayout.resolve(state: readAloud.state, takeActive: recordingActive, width: windowWidthTierForReading)
+        return layout == .minimal && transcriptToolbarShows ? .hidden : layout
+    }
+
+    var readButtonCarriesTransport: Bool {
+        windowWidthTierForReading == .narrow && transcriptToolbarShows && nowReadingLayout == .hidden
+            && !recordingActive && readAloud.item != nil
     }
 
     func openReading() async {
@@ -50,7 +74,9 @@ struct NowReadingControl: View {
             EmptyView()
         case .full, .compact:
             transport
-        case .failed, .failedCompact:
+        case .minimal:
+            minimal
+        case .failed:
             failure
         }
     }
@@ -65,12 +91,14 @@ struct NowReadingControl: View {
 
     private var transport: some View {
         let transport = model.readingTransport
-        return HStack(spacing: DS.Spacing.snug) {
+        let blocked = transport.blockedMessage
+        return HStack(spacing: isCompact ? DS.Spacing.hair : DS.Spacing.snug) {
             sourceMenu
             Button { Task { await model.skipReading(by: -1) } } label: {
                 Label("Previous Sentence", systemImage: "backward.end.fill")
             }
             .disabled(!transport.stepEnabled)
+            .help(blocked.map { Text($0) } ?? Text("Previous Sentence"))
             .axLeaf("Toolbar.Button.ReadingBack")
             Button { Task { await model.toggleReading() } } label: {
                 Label(
@@ -79,11 +107,13 @@ struct NowReadingControl: View {
                 )
             }
             .disabled(!transport.toggleEnabled)
+            .help(blocked.map { Text($0) } ?? Text(LocalizedStringKey(transport.toggle == .pause ? "Pause Reading" : "Resume Reading")))
             .axLeaf("Toolbar.Button.ReadingPause")
             Button { Task { await model.skipReading(by: 1) } } label: {
                 Label("Skip Sentence", systemImage: "forward.end.fill")
             }
             .disabled(!transport.stepEnabled)
+            .help(blocked.map { Text($0) } ?? Text("Skip Sentence"))
             .axLeaf("Toolbar.Button.ReadingSkip")
             if !isCompact {
                 speedMenu
@@ -91,21 +121,61 @@ struct NowReadingControl: View {
             Button { Task { await model.stopReading() } } label: {
                 Label("Stop Reading", systemImage: "stop.fill")
             }
+            .help("Stop Reading")
             .axLeaf("Toolbar.Button.ReadingStop")
         }
         .labelStyle(.iconOnly)
         .buttonStyle(.borderless)
-        .padding(.horizontal, DS.Spacing.snug)
+        .foregroundStyle(.primary)
+        .padding(.horizontal, isCompact ? 0 : DS.Spacing.snug)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Now Reading")
         .accessibilityValue(sentenceValue)
         .axBranch("Toolbar.NowReading")
     }
 
+    private var minimal: some View {
+        let transport = model.readingTransport
+        return Menu {
+            if let item = controller.item {
+                Text(item.title)
+                Text(sourceTitle)
+            }
+            Button("Open") { Task { await model.openReading() } }
+                .axLeaf("Toolbar.MenuItem.ReadingOpen")
+            Divider()
+            Button(LocalizedStringKey(transport.toggle == .pause ? "Pause Reading" : "Resume Reading")) {
+                Task { await model.toggleReading() }
+            }
+            .disabled(!transport.toggleEnabled)
+            .axLeaf("Toolbar.MenuItem.ReadingPause")
+            Button("Previous Sentence") { Task { await model.skipReading(by: -1) } }
+                .disabled(!transport.stepEnabled)
+                .axLeaf("Toolbar.MenuItem.ReadingBack")
+            Button("Skip Sentence") { Task { await model.skipReading(by: 1) } }
+                .disabled(!transport.stepEnabled)
+                .axLeaf("Toolbar.MenuItem.ReadingSkip")
+            Menu("Speed") { speedItems }
+                .axLeaf("Toolbar.MenuItem.ReadingSpeed")
+            Button("Stop Reading") { Task { await model.stopReading() } }
+                .axLeaf("Toolbar.MenuItem.ReadingStop")
+        } label: {
+            Image(systemName: transport.toggle == .pause ? "speaker.wave.2.fill" : "speaker.slash.fill")
+                .imageScale(.small)
+        }
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help(transport.blockedMessage.map { Text($0) } ?? Text("Now Reading"))
+        .accessibilityLabel("Now Reading")
+        .accessibilityValue(sentenceValue)
+        .axLeaf("Toolbar.Menu.ReadingMinimal")
+    }
+
     private var sourceMenu: some View {
         Menu {
             if let item = controller.item {
                 Text(item.title)
+                Text(sourceTitle)
             }
             Button("Open") { Task { await model.openReading() } }
                 .axLeaf("Toolbar.MenuItem.ReadingOpen")
@@ -114,14 +184,19 @@ struct NowReadingControl: View {
                     .axLeaf("Toolbar.MenuItem.ReadingSpeed")
             }
         } label: {
-            Label(sourceTitle, systemImage: "speaker.wave.2.fill")
-                .labelStyle(.titleAndIcon)
+            if isCompact {
+                Image(systemName: "speaker.wave.2.fill")
+            } else {
+                Label(sourceTitle, systemImage: "speaker.wave.2.fill")
+                    .labelStyle(.titleAndIcon)
+            }
         } primaryAction: {
             Task { await model.openReading() }
         }
-        .menuIndicator(.visible)
+        .menuIndicator(isCompact ? .hidden : .visible)
         .fixedSize()
-        .help("Open what is being read")
+        .help("Show the text being read")
+        .accessibilityLabel(sourceTitle)
         .axLeaf("Toolbar.Menu.ReadingSource")
     }
 
@@ -137,6 +212,7 @@ struct NowReadingControl: View {
         } label: {
             Text(verbatim: Self.speedLabel(controller.speed))
                 .monospacedDigit()
+                .foregroundStyle(.primary)
         }
         .menuIndicator(.hidden)
         .fixedSize()
@@ -159,41 +235,27 @@ struct NowReadingControl: View {
 
     @ViewBuilder
     private var failure: some View {
-        let message = model.readAloud.failureMessage(named: controller.item?.voiceName ?? "")
-        let blocked = model.readingBlockedReason != nil
-        if layout == .failedCompact {
+        if case .failed(let line) = controller.state {
+            let blocked = model.readingBlockedReason != nil
             Menu {
-                Text(message)
+                Text(line)
                 Button("Try Again") { Task { await model.retryReading() } }
                     .disabled(blocked)
                     .axLeaf("Toolbar.MenuItem.ReadingTryAgain")
-                Button("Use Built-in Voice") { Task { await model.retryReadingWithBuiltInVoice() } }
-                    .disabled(blocked)
-                    .axLeaf("Toolbar.MenuItem.ReadingBuiltIn")
+                if controller.canUseBuiltInVoice {
+                    Button("Use Built-in Voice") { Task { await model.retryReadingWithBuiltInVoice() } }
+                        .disabled(blocked)
+                        .axLeaf("Toolbar.MenuItem.ReadingBuiltIn")
+                }
                 Button("Stop Reading") { Task { await model.stopReading() } }
                     .axLeaf("Toolbar.MenuItem.ReadingStop")
             } label: {
-                Label("Reading stopped", systemImage: "exclamationmark.triangle")
+                Image(systemName: "exclamationmark.triangle")
             }
             .fixedSize()
-            .help(message)
+            .help(line)
+            .accessibilityLabel(line)
             .axLeaf("Toolbar.Menu.ReadingFailed")
-        } else {
-            HStack(spacing: DS.Spacing.snug) {
-                Image(systemName: "exclamationmark.triangle")
-                    .accessibilityHidden(true)
-                Text(message)
-                    .lineLimit(1)
-                    .axLeaf("Toolbar.Label.ReadingFailed")
-                Button("Try Again") { Task { await model.retryReading() } }
-                    .disabled(blocked)
-                    .axLeaf("Toolbar.Button.ReadingTryAgain")
-                Button("Use Built-in Voice") { Task { await model.retryReadingWithBuiltInVoice() } }
-                    .disabled(blocked)
-                    .axLeaf("Toolbar.Button.ReadingBuiltIn")
-            }
-            .buttonStyle(.borderless)
-            .padding(.horizontal, DS.Spacing.snug)
         }
     }
 }

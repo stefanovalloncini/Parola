@@ -6347,7 +6347,7 @@ final class AppModel {
     // MARK: - Transcript pane mode
 
     var transcriptPaneMode: TranscriptPaneMode = .transcript
-    var windowIsNarrowForReading = false
+    var windowWidthTierForReading = NowReadingWidth.wide
 
     // MARK: - Burn subtitles into video
 

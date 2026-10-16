@@ -22668,17 +22668,6 @@
         }
       }
     },
-    "Reading stopped": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Lettura interrotta"
-          }
-        }
-      }
-    },
     "Reading speed": {
       "extractionState": "manual",
       "localizations": {
@@ -22690,13 +22679,13 @@
         }
       }
     },
-    "Open what is being read": {
+    "Show the text being read": {
       "extractionState": "manual",
       "localizations": {
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Apri ciò che viene letto"
+            "value": "Mostra il testo in lettura"
           }
         }
       }

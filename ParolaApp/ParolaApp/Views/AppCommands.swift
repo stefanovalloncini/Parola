@@ -326,12 +326,15 @@ struct PlaybackCommands: View {
             Task { await model.toggleReading() }
         }
         .disabled(!transport.toggleEnabled)
+        .help(transport.blockedMessage ?? "")
         .axLeaf("Menu.Playback.PauseReading")
         Button("Previous Sentence") { Task { await model.skipReading(by: -1) } }
             .disabled(!transport.stepEnabled)
+            .help(transport.blockedMessage ?? "")
             .axLeaf("Menu.Playback.PreviousSentence")
         Button("Skip Sentence") { Task { await model.skipReading(by: 1) } }
             .disabled(!transport.stepEnabled)
+            .help(transport.blockedMessage ?? "")
             .axLeaf("Menu.Playback.SkipSentence")
         Button("Stop Reading") { Task { await model.stopReading() } }
             .disabled(!transport.stopEnabled)

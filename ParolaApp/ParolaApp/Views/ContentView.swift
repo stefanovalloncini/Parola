@@ -36,8 +36,8 @@ struct ContentView: View {
                 .toolbar { ContentToolbar() }
         }
         .modifier(TakeSidebarRelease())
-        .onGeometryChange(for: Bool.self) { $0.size.width < NowReadingLayout.fullWidth } action: {
-            model.windowIsNarrowForReading = $0
+        .onGeometryChange(for: NowReadingWidth.self) { NowReadingWidth.tier(for: $0.size.width) } action: {
+            model.windowWidthTierForReading = $0
         }
         .contentSheets()
         .background { TranslationHostView() }

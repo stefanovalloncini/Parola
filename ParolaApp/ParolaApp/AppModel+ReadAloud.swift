@@ -296,7 +296,9 @@ extension AppModel {
     }
 
     var readingTransport: ReadingTransport {
-        ReadingTransport.resolve(state: readAloud.state, blocked: readingBlockedReason)
+        ReadingTransport.resolve(
+            state: readAloud.state, blocked: readingBlockedReason, sentenceStarted: readAloud.sentenceStarted
+        )
     }
 
     var readAloudMenuStatus: ReadAloudButtonStatus? {

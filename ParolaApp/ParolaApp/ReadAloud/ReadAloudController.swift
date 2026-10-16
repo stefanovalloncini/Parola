@@ -94,6 +94,7 @@ final class ReadAloudController {
     private(set) var item: Item?
     private(set) var readingAnchors: [ReadingUnit.Anchored] = []
     private(set) var speed: Double = 1
+    private(set) var sentenceStarted = false
     var voicePrompt: VoicePrompt?
     private(set) var previewing: VoiceID?
 
@@ -202,6 +203,8 @@ final class ReadAloudController {
 
     var readingBlockedReason: BlockedReason? { blockedProvider() }
 
+    var canUseBuiltInVoice: Bool { item.map { $0.voice != .appleAutomatic } ?? false }
+
     var readingOwnsKeys: Bool {
         switch state {
         case .preparing, .reading, .waiting: true
@@ -243,6 +246,7 @@ final class ReadAloudController {
             entryID: plan.entryID, source: plan.source, title: plan.title, language: plan.language, voice: voice,
             voiceName: voiceName, unitIndex: min(startAt, max(plan.units.count - 1, 0)), unitCount: plan.units.count
         )
+        sentenceStarted = false
         state = .preparing
         pausePlayers()
         let previous = session
@@ -364,6 +368,7 @@ final class ReadAloudController {
         item = nil
         plan = nil
         readingAnchors = []
+        sentenceStarted = false
         await ending?.stop()
     }
 
@@ -432,6 +437,7 @@ final class ReadAloudController {
         item = nil
         plan = nil
         readingAnchors = []
+        sentenceStarted = false
     }
 
     func refreshVoices() {
@@ -588,6 +594,7 @@ final class ReadAloudController {
         guard mine == generation else { return }
         switch event {
         case .unitStarted(let index, let anchors):
+            sentenceStarted = true
             item?.unitIndex = index
             readingAnchors = anchors
             switch state {
@@ -607,6 +614,7 @@ final class ReadAloudController {
             readingAnchors = []
             session = nil
             hasPlayed = false
+            sentenceStarted = false
             state = .failed(failureMessage(named: item?.voiceName ?? ""))
         }
     }
@@ -627,6 +635,7 @@ final class ReadAloudController {
         plan = nil
         item = nil
         readingAnchors = []
+        sentenceStarted = false
         state = .idle
     }
 
@@ -658,7 +667,7 @@ final class ReadAloudController {
     var activityHeld: Bool { activityToken != nil }
 
     private func updateActivity() {
-        let wanted = state == .preparing || state == .reading
+        let wanted = state.holdsActivity
         if wanted, activityToken == nil {
             activityToken = environment.activity.begin()
         } else if !wanted, let token = activityToken {
@@ -767,6 +776,13 @@ extension ReadAloudController.State {
         case .waiting: "waiting"
         case .failed: "failed"
         case .noVoice: "noVoice"
+        }
+    }
+
+    var holdsActivity: Bool {
+        switch self {
+        case .preparing, .reading, .waiting: true
+        default: false
         }
     }
 
