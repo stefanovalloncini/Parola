@@ -226,9 +226,10 @@ public actor FolderWatcher {
     }
 
     /// Without a baseline every file already in the folder counts as seen, as when a folder is first
-    /// added. With one, files the baseline doesn't account for arrive once they settle. Ends in
-    /// `.watching`, or `.unavailable` when the folder can't be opened.
-    public func start(baseline: Baseline? = nil) async {
+    /// added. With one, files the baseline doesn't account for arrive once they settle, except, with
+    /// `countsSubfolderFilesAsSeen`, those inside subfolders. Ends in `.watching`, or `.unavailable`
+    /// when the folder can't be opened.
+    public func start(baseline: Baseline? = nil, countsSubfolderFilesAsSeen: Bool = false) async {
         guard fileDescriptor < 0 else { return }
         seed = baseline
         hasScanned = false
@@ -275,8 +276,13 @@ public actor FolderWatcher {
             }
             let listedKeys = Set(listed.map(\.key))
             var vanished = pathIndex(files.keys.filter { !listedKeys.contains($0) })
+            let accountedFor = Set(files.keys)
             for item in listed {
                 resolve(item, vanished: &vanished, now: now)
+                if countsSubfolderFilesAsSeen, !accountedFor.contains(item.key), files[item.key]?.status == .pending,
+                   item.path.dropFirst(rootPath.count + 1).contains("/") {
+                    setStatus(.existing, for: item.key, now: now)
+                }
             }
             depart(Set(vanished.values), now: now)
         } else {

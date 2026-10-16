@@ -78,6 +78,36 @@ struct FolderWatcherBaselineTests {
         #expect(collected.snapshot().map(\.lastPathComponent) == ["new.m4a"])
     }
 
+    @Test("widening to subfolders counts the files already inside them as seen, and still reports a new top-level file")
+    func wideningSkipsSubfolderBacklog() async throws {
+        let folder = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let clock = FixedClock(start: Date())
+        try Fixture.writeSettled(folder.appendingPathComponent("top.m4a"), clock: clock)
+
+        let collected = CollectedURLs()
+        let narrow = FolderWatcher.Options(recursive: false, settledInterval: .milliseconds(50), clock: clock, scheduler: ManualScheduler())
+        let before = FolderWatcher(folderURL: folder, options: narrow) { collected.append($0) }
+        await before.start()
+        let saved = try #require(await before.baseline())
+        await before.stop()
+
+        try FileManager.default.createDirectory(at: folder.appendingPathComponent("Archive"), withIntermediateDirectories: true)
+        try Fixture.writeSettled(folder.appendingPathComponent("Archive/old.wav"), clock: clock)
+        try Fixture.writeSettled(folder.appendingPathComponent("later.mp3"), clock: clock)
+
+        let scheduler = ManualScheduler()
+        let after = makeWatcher(folder, clock: clock, scheduler: scheduler, collected: collected)
+        await after.start(baseline: saved, countsSubfolderFilesAsSeen: true)
+        #expect(Fixture.names(await after.pendingPaths) == ["later.mp3"])
+        try await scheduler.advance(ticks: 3)
+        let kept = await after.baseline()?.entries.map(\.path) ?? []
+        await after.stop()
+
+        #expect(collected.snapshot().map(\.lastPathComponent) == ["later.mp3"])
+        #expect(kept.contains("Archive/old.wav"))
+    }
+
     @Test("a baseline read back from JSON still matches after the folder was renamed")
     func baselineSurvivesCodingAndRootRename() async throws {
         let parent = try Fixture.makeTempDir()
