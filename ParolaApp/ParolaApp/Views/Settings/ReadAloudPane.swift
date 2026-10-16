@@ -10,7 +10,7 @@ struct ReadAloudPane: View {
         return SettingsForm {
             voicesSection
             personalVoiceSection
-            SettingsSection("Listening") {
+            SettingsSection("Playback") {
                 SettingRow("Speed", description: "How fast Parola reads. The reading toolbar menu changes the same setting.") {
                     Picker("Speed", selection: $model.readAloudRate) {
                         ForEach(ReadAloudController.speeds, id: \.self) { rate in
@@ -99,7 +99,9 @@ private struct ReadAloudVoiceRow: View {
     @Environment(AppModel.self) private var model
 
     private var entries: [VoiceMenuEntry] {
-        ReadAloudVoices.menuEntries(for: language, in: model.readAloud.appleInventory)
+        ReadAloudVoices.settingsEntries(
+            for: language, in: model.readAloud.appleInventory, saved: model.readAloudVoices[ReadAloudVoices.key(for: language)]
+        )
     }
 
     private var name: String {
@@ -110,7 +112,7 @@ private struct ReadAloudVoiceRow: View {
         Binding(
             get: {
                 let saved = model.readAloudVoices[ReadAloudVoices.key(for: language)]
-                guard let saved, entries.contains(where: { $0.voice == saved && $0.isUsable }) else { return .appleAutomatic }
+                guard let saved, entries.contains(where: { $0.voice == saved }) else { return .appleAutomatic }
                 return saved
             },
             set: { model.readAloudVoices[ReadAloudVoices.key(for: language)] = $0 }

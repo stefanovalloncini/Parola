@@ -184,6 +184,22 @@ enum ReadAloudVoices {
         "zh": "这就是我朗读你的转录文本的声音。",
     ]
 
+    static func sampleText(for language: String, transcriptSentence: String?) -> String {
+        if let known = sampleSentences[key(for: language)] { return known }
+        if let sentence = transcriptSentence?.trimmingCharacters(in: .whitespacesAndNewlines),
+           sentence.split(whereSeparator: \.isWhitespace).count >= 4 {
+            return String(sentence.prefix(200))
+        }
+        return sampleSentence(for: language)
+    }
+
+    static func settingsEntries(for language: String, in inventory: AppleVoiceInventory, saved: VoiceID?) -> [VoiceMenuEntry] {
+        let entries = menuEntries(for: language, in: inventory)
+        guard !entries.isEmpty, let saved, saved != .appleAutomatic,
+              !entries.contains(where: { $0.voice == saved && $0.isUsable }) else { return entries }
+        return [VoiceMenuEntry(voice: saved, title: String(localized: "Voice not installed"), isUsable: false)] + entries
+    }
+
     static func sampleSentence(for language: String) -> String {
         sampleSentences[key(for: language)] ?? sampleSentences["en"] ?? ""
     }

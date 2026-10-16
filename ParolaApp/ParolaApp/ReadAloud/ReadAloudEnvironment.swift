@@ -75,7 +75,6 @@ struct ReadAloudEnvironment {
 @MainActor
 final class LiveReadAloudSystem {
     private var apple: AppleSpeechRenderer?
-    private var preview: AppleSpeechRenderer?
     private var output: ReadAloudOutput?
     private let voices = StaleVoiceInventory()
 
@@ -96,10 +95,8 @@ final class LiveReadAloudSystem {
     }
 
     func previewRenderer() -> any SpeechRenderer {
-        if let preview { return preview }
-        let made = AppleSpeechRenderer()
-        preview = made
-        return made
+        guard let main = renderer() as? AppleSpeechRenderer else { return AppleSpeechRenderer() }
+        return AppleSpeechRenderer(inventory: main.knownVoices, unusable: main.unusableIdentifiers)
     }
 
     func sink() throws -> any ReadAloudOutputSink {
@@ -111,7 +108,6 @@ final class LiveReadAloudSystem {
 
     func refreshVoices() {
         voices.markStale()
-        preview?.refreshVoices()
     }
 }
 

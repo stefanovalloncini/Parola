@@ -53,6 +53,7 @@ final class ReadAloudController {
         var title: String
         var language: String
         var voice: VoiceID
+        var voiceName = ""
         var unitIndex: Int
         var unitCount: Int
     }
@@ -236,9 +237,10 @@ final class ReadAloudController {
         tearDownSession()
         readingAnchors = []
         let voice = plan.voice
+        let voiceName = ReadAloudVoices.spokenName(of: voice, language: plan.language, in: environment.appleVoices())
         item = Item(
             entryID: plan.entryID, source: plan.source, title: plan.title, language: plan.language, voice: voice,
-            unitIndex: min(startAt, max(plan.units.count - 1, 0)), unitCount: plan.units.count
+            voiceName: voiceName, unitIndex: min(startAt, max(plan.units.count - 1, 0)), unitCount: plan.units.count
         )
         state = .preparing
         pausePlayers()
@@ -281,14 +283,14 @@ final class ReadAloudController {
             if case .noVoice = failure {
                 state = .noVoice(plan.language)
             } else {
-                state = .failed(failureMessage(for: voice, language: plan.language))
+                state = .failed(failureMessage(named: voiceName))
             }
             await tearDown(created)
             return
         } catch {
             guard mine == generation else { return }
             ParolaLog.error(.readAloud, "the voice could not be prepared", [.error: .error(error)])
-            state = .failed(failureMessage(for: voice, language: plan.language))
+            state = .failed(failureMessage(named: voiceName))
             await tearDown(created)
             return
         }
@@ -373,6 +375,7 @@ final class ReadAloudController {
     /// Withdraws Now Playing and marks the reading paused before the first suspension; the task ends once the output has paused.
     @discardableResult
     func yieldNow(to reason: PauseReason, fade: Bool = false) -> Task<Void, Never>? {
+        endPreviewNow()
         guard beginYield(to: reason) else { return nil }
         guard hasPlayed, let session else { return nil }
         return Task { await session.pause(fade: fade) }
@@ -398,6 +401,7 @@ final class ReadAloudController {
     func mediaStartedPlaying() {
         switch state {
         case .paused:
+            endPreviewNow()
             state = .paused(.media)
         case .preparing, .reading, .waiting:
             yieldNow(to: .media)
@@ -430,11 +434,17 @@ final class ReadAloudController {
 
     func refreshVoices() {
         environment.refreshVoices()
+        voicesRevision += 1
     }
 
     // MARK: - Voices
 
-    var appleInventory: AppleVoiceInventory { environment.appleVoices() }
+    private(set) var voicesRevision = 0
+
+    var appleInventory: AppleVoiceInventory {
+        _ = voicesRevision
+        return environment.appleVoices()
+    }
     var personalVoiceStatus: PersonalVoiceStatus { environment.personalVoiceStatus() }
 
     func requestPersonalVoice() async -> PersonalVoiceStatus {
@@ -463,14 +473,34 @@ final class ReadAloudController {
         voicePrompt = prompt
     }
 
-    func failureMessage(for voice: VoiceID, language: String) -> String {
-        let name = ReadAloudVoices.spokenName(of: voice, language: language, in: environment.appleVoices())
-        return String(localized: "Couldn't continue with \(name).")
+    func failureMessage(named name: String) -> String {
+        let shown = name.isEmpty ? String(localized: "the built-in voice") : name
+        return String(localized: "Couldn't continue with \(shown).")
+    }
+
+    func failedSegmentID() -> Int? {
+        guard case .failed = state, let plan, let item, plan.units.indices.contains(item.unitIndex) else { return nil }
+        return plan.units[item.unitIndex].anchors.lazy.compactMap { anchored -> Int? in
+            switch anchored.anchor {
+            case .segment(let id), .translation(let id): id
+            default: nil
+            }
+        }.first
+    }
+
+    private func endPreviewNow() {
+        previewTask?.cancel()
+        previewTask = nil
+        previewing = nil
+        guard let ending = previewSession else { return }
+        previewSession = nil
+        system?.sink.stop()
+        Task { await ending.stop() }
     }
 
     /// Pauses a running reading, then plays one fixed sentence in `voice` on the shared output.
     @discardableResult
-    func preview(_ voice: VoiceID, language: String) async -> Bool {
+    func preview(_ voice: VoiceID, language: String, text: String? = nil) async -> Bool {
         guard blockedProvider() == nil else { return false }
         await stopPreview()
         switch state {
@@ -478,6 +508,7 @@ final class ReadAloudController {
         default: break
         }
         guard blockedProvider() == nil else { return false }
+        pausePlayers()
         let sink: any ReadAloudOutputSink
         do {
             sink = try ensureSystem().sink
@@ -486,7 +517,7 @@ final class ReadAloudController {
             return false
         }
         let unit = ReadingUnit(
-            id: 0, text: ReadAloudVoices.sampleSentence(for: language), anchors: [], language: language, pauseAfter: 0
+            id: 0, text: text ?? ReadAloudVoices.sampleSentence(for: language), anchors: [], language: language, pauseAfter: 0
         )
         let made = ReadAloudSession(
             units: [unit], renderer: (environment.previewRenderer ?? environment.renderer)(), voice: voice,
@@ -574,7 +605,7 @@ final class ReadAloudController {
             readingAnchors = []
             session = nil
             hasPlayed = false
-            state = .failed(failureMessage(for: item?.voice ?? .appleAutomatic, language: item?.language ?? ""))
+            state = .failed(failureMessage(named: item?.voiceName ?? ""))
         }
     }
 

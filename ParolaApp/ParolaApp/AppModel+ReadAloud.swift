@@ -149,7 +149,13 @@ extension AppModel {
 
     @discardableResult
     func previewVoice(_ voice: VoiceID, language: String) async -> Bool {
-        await readAloud.preview(voice, language: language)
+        let sentence = transcript?.segments.first { $0.text.split(whereSeparator: \.isWhitespace).count >= 4 }?.text
+        let transcriptLanguage = transcript.map {
+            SpokenLanguage.forTranscript($0, uiLanguage: Bundle.main.preferredLocalizations.first ?? "en")
+        }
+        let matches = transcriptLanguage.map { ReadAloudVoices.key(for: $0) == ReadAloudVoices.key(for: language) } ?? false
+        let text = ReadAloudVoices.sampleText(for: language, transcriptSentence: matches ? sentence : nil)
+        return await readAloud.preview(voice, language: language, text: text)
     }
 
     @discardableResult
@@ -212,7 +218,23 @@ extension AppModel {
     }
 
     func retryReading() async {
-        await readAloud.retry()
+        guard let item = readAloud.item, case .failed = readAloud.state,
+              !ReadAloudVoices.isUsable(item.voice, for: item.language, in: readAloud.appleInventory) else {
+            await readAloud.retry()
+            return
+        }
+        let kind: ReadAloudRequest.Kind
+        switch item.source {
+        case .transcript: kind = .transcript
+        case .summary: kind = .summary
+        case .translation: kind = .translation
+        }
+        let request = ReadAloudRequest(
+            kind: kind,
+            entryID: item.entryID == Self.unsavedReadingID ? nil : item.entryID,
+            fromSegment: kind == .transcript ? readAloud.failedSegmentID() : nil
+        )
+        readAloud.present(.init(language: item.language, mode: .choose, request: request, origin: .main))
     }
 
     func setReadingSpeed(_ rate: Double) {

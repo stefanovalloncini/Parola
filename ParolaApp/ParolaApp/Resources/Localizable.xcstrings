@@ -21885,7 +21885,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@ · Avanzata"
+            "value": "%@ · Migliorata"
           }
         }
       }
@@ -22095,6 +22095,39 @@
           "stringUnit": {
             "state": "translated",
             "value": "La voce personale è attiva. Le tue voci sono nell'elenco di ogni lingua."
+          }
+        }
+      }
+    },
+    "No voice reads %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nessuna voce legge in %@"
+          }
+        }
+      }
+    },
+    "Built-in voice": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Voce integrata"
+          }
+        }
+      }
+    },
+    "Voice not installed": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Voce non installata"
           }
         }
       }

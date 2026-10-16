@@ -268,6 +268,8 @@ extension ParolaAutomationServer {
                                 "installed": .bool(voice.isInstalled),
                                 "msPerUnit": .int(voice.msPerUnit),
                                 "failAtUnit": voice.failAtUnit.map { .int($0) } ?? .null,
+                                "languages": .array(voice.languages.sorted().map { .string($0) }),
+                                "unusable": .array(voice.unusableVoices.sorted().map { .string($0) }),
                             ])
                         } ?? .null,
                     ])

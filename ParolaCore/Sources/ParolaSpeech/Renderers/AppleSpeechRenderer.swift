@@ -49,24 +49,30 @@ public final class AppleSpeechRenderer: SpeechRenderer {
     private var emptyRenders: [String: Int] = [:]
 
     public convenience init() {
-        let holder = SynthesizerHolder()
-        self.init(
-            backend: Backend(
-                write: { utterance, deliver in
-                    holder.synthesizer.write(
-                        utterance, toBufferCallback: Self.bufferCallback(deliver), toMarkerCallback: { _ in }
-                    )
-                },
-                reset: { holder.synthesizer = AVSpeechSynthesizer() }
-            ),
-            installed: { Self.installedVoices() }
-        )
+        self.init(backend: Self.liveBackend(), installed: { Self.installedVoices() })
     }
 
-    init(backend: Backend, installed: @escaping @MainActor () -> [VoiceDescriptor]) {
+    public convenience init(inventory: [VoiceDescriptor], unusable: Set<String>) {
+        self.init(backend: Self.liveBackend(), installed: { Self.installedVoices() }, seed: inventory)
+        unusableIdentifiers = unusable
+    }
+
+    init(backend: Backend, installed: @escaping @MainActor () -> [VoiceDescriptor], seed: [VoiceDescriptor]? = nil) {
         self.backend = backend
         self.readInstalled = installed
-        self.inventory = installed()
+        self.inventory = seed ?? installed()
+    }
+
+    private static func liveBackend() -> Backend {
+        let holder = SynthesizerHolder()
+        return Backend(
+            write: { utterance, deliver in
+                holder.synthesizer.write(
+                    utterance, toBufferCallback: Self.bufferCallback(deliver), toMarkerCallback: { _ in }
+                )
+            },
+            reset: { holder.synthesizer = AVSpeechSynthesizer() }
+        )
     }
 
     public func refreshVoices() {

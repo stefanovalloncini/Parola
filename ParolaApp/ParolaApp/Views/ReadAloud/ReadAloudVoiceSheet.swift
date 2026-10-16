@@ -17,12 +17,14 @@ struct ReadAloudVoiceSheet: View {
 
     var body: some View {
         SheetFrame(
-            titleVerbatim: String(localized: "Choose a voice to read \(languageName)"),
+            titleVerbatim: prompt.mode == .noVoice
+                ? String(localized: "No voice reads \(languageName)")
+                : String(localized: "Choose a voice to read \(languageName)"),
             onClose: { model.dismissVoicePrompt() },
             content: { contentBody },
             footer: { footerBody }
         )
-        .sheetSize(width: 480, minHeight: 200, maxHeight: 420)
+        .sheetSize(width: 480, minHeight: prompt.mode == .noVoice ? 120 : 200, maxHeight: 420)
         .footerHasCancel()
         .axBranch("VoiceSheet")
         .onAppear { selection = initialSelection }
@@ -40,15 +42,17 @@ struct ReadAloudVoiceSheet: View {
         VStack(alignment: .leading, spacing: DS.Spacing.regular) {
             switch prompt.mode {
             case .choose:
-                ReadAloudVoiceCard(
-                    entries: entries,
-                    selection: $selection,
-                    isPreviewing: model.readAloud.previewing != nil,
-                    canPreview: model.readingBlockedReason == nil,
-                    preview: { Task { await model.previewVoice(selection, language: prompt.language) } },
-                    stopPreview: { Task { await model.readAloud.stopPreview() } },
-                    use: { Task { await model.chooseVoice(selection, for: prompt.language) } }
-                )
+                if !entries.isEmpty {
+                    ReadAloudVoiceCard(
+                        entries: entries,
+                        selection: $selection,
+                        isPreviewing: model.readAloud.previewing != nil,
+                        canPreview: model.readingBlockedReason == nil,
+                        preview: { Task { await model.previewVoice(selection, language: prompt.language) } },
+                        stopPreview: { Task { await model.readAloud.stopPreview() } },
+                        use: { Task { await model.chooseVoice(selection, for: prompt.language) } }
+                    )
+                }
             case .noVoice:
                 Text("No voice on this Mac reads \(languageName).")
                     .font(DS.Font.body)
@@ -56,7 +60,7 @@ struct ReadAloudVoiceSheet: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .axLeaf("Text.NoVoice")
             }
-            Spacer(minLength: 0)
+            if prompt.mode == .choose { Spacer(minLength: 0) }
         }
         .padding(DS.Spacing.regular)
     }
@@ -67,7 +71,7 @@ struct ReadAloudVoiceSheet: View {
                 .sheetSecondaryAction()
                 .axLeaf("Button.MoreVoices")
             Spacer(minLength: 0)
-            if prompt.mode == .choose {
+            if prompt.mode == .choose, !entries.isEmpty {
                 Button("Use the built-in voice for now") { Task { await model.readWithBuiltInVoiceForNow() } }
                     .sheetSecondaryAction()
                     .axLeaf("Button.BuiltInForNow")
