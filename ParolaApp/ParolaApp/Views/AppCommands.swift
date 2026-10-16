@@ -311,6 +311,31 @@ struct PlaybackCommands: View {
         Toggle("Skip Silences", isOn: $model.skipSilences)
             .disabled(!model.keyWindowHasPlayer || model.keyWindowIsViewer)
             .axLeaf("Menu.Playback.SkipSilences")
+        Divider()
+        readAloudItems
+    }
+
+    @ViewBuilder
+    private var readAloudItems: some View {
+        let transport = model.readingTransport
+        Button("Read Aloud") { Task { await model.readAloudFromMenu() } }
+            .keyboardShortcut("r", modifiers: [.command, .option])
+            .disabled(model.introduction.isPresented || !(model.readAloudMenuStatus?.isEnabled ?? false))
+            .axLeaf("Menu.Playback.ReadAloud")
+        Button(LocalizedStringKey(transport.toggle == .pause ? "Pause Reading" : "Resume Reading")) {
+            Task { await model.toggleReading() }
+        }
+        .disabled(!transport.toggleEnabled)
+        .axLeaf("Menu.Playback.PauseReading")
+        Button("Previous Sentence") { Task { await model.skipReading(by: -1) } }
+            .disabled(!transport.stepEnabled)
+            .axLeaf("Menu.Playback.PreviousSentence")
+        Button("Skip Sentence") { Task { await model.skipReading(by: 1) } }
+            .disabled(!transport.stepEnabled)
+            .axLeaf("Menu.Playback.SkipSentence")
+        Button("Stop Reading") { Task { await model.stopReading() } }
+            .disabled(!transport.stopEnabled)
+            .axLeaf("Menu.Playback.StopReading")
     }
 
     private var rate: Binding<Double> {

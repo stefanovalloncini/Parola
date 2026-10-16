@@ -95,6 +95,7 @@ struct ShortcutCatalog {
                 Entry(label: text("Skip Back 5 Seconds"),        keys: "⌘ ←"),
                 Entry(label: text("Skip Forward 5 Seconds"),     keys: "⌘ →"),
                 Entry(label: text("Show Mini Player"),           keys: "⌘ ⌥ M"),
+                Entry(label: text("Read Aloud"),                 keys: "⌘ ⌥ R"),
             ]),
             Section(title: text("Navigation"), entries: [
                 Entry(label: text("Back to the List"),           keys: "⌘ ["),

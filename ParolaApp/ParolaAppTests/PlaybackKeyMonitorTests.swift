@@ -114,4 +114,53 @@ struct PlaybackKeyMonitorTests {
         #expect(typing == nil)
         #expect(commandSpace == nil)
     }
+
+    private static func reading(
+        _ keyCode: UInt16, _ modifiers: NSEvent.ModifierFlags = [], hasPlayer: Bool = false, text: Bool = false,
+        stage: Bool = false, isRepeat: Bool = false, owns: Bool = true
+    ) -> PlaybackKeyAction? {
+        PlaybackKeyMonitor.action(
+            keyCode: keyCode, modifiers: modifiers, textInputActive: text, hasPlayer: hasPlayer,
+            stageShowsTake: stage, isRepeat: isRepeat, readingOwnsKeys: owns
+        )
+    }
+
+    @Test("while reading owns the keys, Space toggles it even with no player, and with one")
+    func readingSpace() {
+        #expect(Self.reading(49) == .toggleReading)
+        #expect(Self.reading(49, hasPlayer: true) == .toggleReading)
+    }
+
+    @Test("a held Space is swallowed after the first press")
+    func readingSpaceRepeat() {
+        #expect(Self.reading(49, isRepeat: true) == .swallowRepeat)
+    }
+
+    @Test("Command+Left is the previous sentence and Command+Right skips, with or without a player")
+    func readingArrows() {
+        #expect(Self.reading(123, [.command]) == .previousSentence)
+        #expect(Self.reading(124, [.command], hasPlayer: true) == .skipSentence)
+    }
+
+    @Test("when reading does not own the keys, the player gets them as before")
+    func playerKeepsKeys() {
+        #expect(Self.reading(49, hasPlayer: true, owns: false) == .togglePlayPause)
+        #expect(Self.reading(123, [.command], hasPlayer: true, owns: false) == .skipBack)
+        #expect(Self.reading(124, [.command], hasPlayer: true, owns: false) == .skipForward)
+        #expect(Self.reading(49, owns: false) == nil)
+    }
+
+    @Test("the Stage comes before reading, and a text input keeps its keys")
+    func stageAndTextWin() {
+        #expect(Self.reading(49, stage: true) == .toggleTakePause)
+        #expect(Self.reading(49, text: true) == nil)
+        #expect(Self.reading(123, [.command], text: true) == nil)
+    }
+
+    @Test("modified keys other than the arrows are not reading's")
+    func otherModifiers() {
+        #expect(Self.reading(49, [.command]) == nil)
+        #expect(Self.reading(123) == nil)
+        #expect(Self.reading(124, [.command, .shift]) == nil)
+    }
 }

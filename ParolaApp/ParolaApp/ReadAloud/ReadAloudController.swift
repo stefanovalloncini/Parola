@@ -114,6 +114,7 @@ final class ReadAloudController {
     @ObservationIgnored private(set) var isInRefusalWindow = false
     @ObservationIgnored private var blockedProvider: @MainActor () -> BlockedReason? = { nil }
     @ObservationIgnored private var introductionProvider: @MainActor () -> Bool = { false }
+    @ObservationIgnored private var activityToken: (any NSObjectProtocol)?
     @ObservationIgnored private var playersProvider: @MainActor () -> [PlayerHandle] = { [] }
 
     init(environment: ReadAloudEnvironment) {
@@ -301,8 +302,9 @@ final class ReadAloudController {
         await created.play()
     }
 
-    func retry() async {
-        guard case .failed = state, let plan, let item else { return }
+    func retry(using voice: VoiceID? = nil) async {
+        guard case .failed = state, var plan, let item else { return }
+        if let voice { plan.voice = voice }
         await start(plan, startAt: item.unitIndex)
     }
 
@@ -650,6 +652,19 @@ final class ReadAloudController {
 
     private func stateChanged() {
         refreshNowPlaying()
+        updateActivity()
+    }
+
+    var activityHeld: Bool { activityToken != nil }
+
+    private func updateActivity() {
+        let wanted = state == .preparing || state == .reading
+        if wanted, activityToken == nil {
+            activityToken = environment.activity.begin()
+        } else if !wanted, let token = activityToken {
+            activityToken = nil
+            environment.activity.end(token)
+        }
     }
 
     private func refreshNowPlaying() {

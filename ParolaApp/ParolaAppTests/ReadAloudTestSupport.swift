@@ -170,10 +170,29 @@ final class TestClock: Clock, @unchecked Sendable {
 }
 
 @MainActor
+final class ActivityLog {
+    private(set) var begun = 0
+    private(set) var ended = 0
+
+    var held: Int { begun - ended }
+
+    var seam: ReadAloudActivity {
+        ReadAloudActivity(
+            begin: { [self] in
+                begun += 1
+                return NSObject()
+            },
+            end: { [self] _ in ended += 1 }
+        )
+    }
+}
+
+@MainActor
 final class ReadAloudRig {
     let sink = FakeReadAloudSink()
     let nowPlaying = RecordingNowPlaying()
     let clock = TestClock()
+    let activity = ActivityLog()
     let systemCenter = NotificationCenter()
     let appCenter = NotificationCenter()
     let renderer: MockSpeechRenderer
@@ -208,6 +227,7 @@ final class ReadAloudRig {
         let systemCenter = systemCenter
         let appCenter = appCenter
         let clock = clock
+        let activity = activity
         controller = ReadAloudController(environment: ReadAloudEnvironment(
             renderer: { () -> any SpeechRenderer in
                 if let cancelGate { return cancelGate }
@@ -219,7 +239,8 @@ final class ReadAloudRig {
             systemNotifications: { systemCenter },
             appNotifications: appCenter,
             clock: clock,
-            mockVoice: nil
+            mockVoice: nil,
+            activity: activity.seam
         ))
         controller.bind(
             blocked: { [unowned self] in

@@ -51,7 +51,9 @@ extension AppModel {
     }
 
     @discardableResult
-    func readAloud(_ request: ReadAloudRequest, using voice: VoiceID? = nil) async -> ReadAloudRefusal? {
+    func readAloud(
+        _ request: ReadAloudRequest, using voice: VoiceID? = nil, origin: ReadAloudController.VoicePrompt.Origin = .main
+    ) async -> ReadAloudRefusal? {
         if let blocked = readingBlockedReason { return .blocked(blocked) }
         guard let material = await readingMaterial(for: request.entryID) else {
             return request.entryID == nil ? .noTranscript : .unknownEntry
@@ -70,10 +72,10 @@ extension AppModel {
             case .read(let resolved):
                 plan.voice = resolved
             case .chooser:
-                readAloud.present(.init(language: language, mode: .choose, request: request, origin: .main))
+                readAloud.present(.init(language: language, mode: .choose, request: request, origin: origin))
                 return .needsVoice
             case .noVoice:
-                let prompt = ReadAloudController.VoicePrompt(language: language, mode: .noVoice, request: request, origin: .main)
+                let prompt = ReadAloudController.VoicePrompt(language: language, mode: .noVoice, request: request, origin: origin)
                 await readAloud.declareNoVoice(plan, prompt: prompt)
                 return .noVoice
             }
@@ -209,6 +211,13 @@ extension AppModel {
         return nil
     }
 
+    func toggleReading() async {
+        switch readAloud.state {
+        case .preparing, .reading: await pauseReading()
+        default: await resumeReading()
+        }
+    }
+
     func skipReading(by direction: Int) async {
         await readAloud.skip(by: direction)
     }
@@ -217,7 +226,7 @@ extension AppModel {
         await readAloud.stop()
     }
 
-    func retryReading() async {
+    func retryReading(origin: ReadAloudController.VoicePrompt.Origin = .main) async {
         guard let item = readAloud.item, case .failed = readAloud.state,
               !ReadAloudVoices.isUsable(item.voice, for: item.language, in: readAloud.appleInventory) else {
             await readAloud.retry()
@@ -234,7 +243,7 @@ extension AppModel {
             entryID: item.entryID == Self.unsavedReadingID ? nil : item.entryID,
             fromSegment: kind == .transcript ? readAloud.failedSegmentID() : nil
         )
-        readAloud.present(.init(language: item.language, mode: chooserMode(for: item.language), request: request, origin: .main))
+        readAloud.present(.init(language: item.language, mode: chooserMode(for: item.language), request: request, origin: origin))
     }
 
     private func chooserMode(for language: String) -> ReadAloudController.VoicePrompt.Mode {
@@ -243,8 +252,71 @@ extension AppModel {
         return hasVoice ? .choose : .noVoice
     }
 
+    func retryReadingWithBuiltInVoice() async {
+        await readAloud.retry(using: .appleAutomatic)
+    }
+
     func setReadingSpeed(_ rate: Double) {
         guard ReadAloudController.speeds.contains(rate) else { return }
         readAloudRate = rate
+    }
+}
+
+struct ReadAloudMenuTarget: Equatable {
+    var request: ReadAloudRequest
+    var entryID: String
+    var origin: ReadAloudController.VoicePrompt.Origin
+    var hasContent: Bool
+}
+
+extension AppModel {
+    var readAloudMenuTarget: ReadAloudMenuTarget? {
+        if let session = keyViewerSession {
+            let hasText = session.transcript?.segments.contains { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty } ?? false
+            return ReadAloudMenuTarget(
+                request: ReadAloudRequest(kind: .transcript, entryID: session.entryID),
+                entryID: session.entryID,
+                origin: .entryWindow(session.entryID),
+                hasContent: hasText
+            )
+        }
+        guard transcriptIsOnScreen else { return nil }
+        let kind: ReadAloudRequest.Kind
+        switch transcriptPaneMode {
+        case .transcript: kind = .transcript
+        case .summary: kind = .summary
+        case .chat: return nil
+        }
+        return ReadAloudMenuTarget(
+            request: ReadAloudRequest(kind: kind),
+            entryID: selectedEntryID ?? Self.unsavedReadingID,
+            origin: .main,
+            hasContent: kind == .summary ? transcript?.summary != nil : !transcriptIsEmpty
+        )
+    }
+
+    var readingTransport: ReadingTransport {
+        ReadingTransport.resolve(state: readAloud.state, blocked: readingBlockedReason)
+    }
+
+    var readAloudMenuStatus: ReadAloudButtonStatus? {
+        guard let target = readAloudMenuTarget else { return nil }
+        return ReadAloudButtonStatus.resolve(
+            state: readAloud.state,
+            readsThis: readAloud.reads(entryID: target.entryID, inPane: target.request.kind),
+            blocked: readingBlockedReason,
+            hasContent: target.hasContent
+        )
+    }
+
+    func readAloudFromMenu() async {
+        guard let target = readAloudMenuTarget, let status = readAloudMenuStatus, status.isEnabled else { return }
+        switch status.action {
+        case .start: await readAloud(target.request, origin: target.origin)
+        case .pause: await pauseReading()
+        case .resume: await resumeReading()
+        case .retry: await retryReading(origin: target.origin)
+        case .none: break
+        }
     }
 }

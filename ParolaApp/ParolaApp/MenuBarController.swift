@@ -46,6 +46,14 @@ final class MenuBarController: NSObject {
         /// Off while a take runs, as File ▸ New Recording is: a second Record would only be refused.
         var canRecordMicrophone: Bool = true
         var canRecordSystemAudio: Bool = true
+        var reading: Reading? = nil
+    }
+
+    struct Reading: Equatable {
+        var nowReading: String
+        var toggleTitle: String
+        var canToggle: Bool
+        var canSkip: Bool
     }
 
     /// What the status button shows; each change redraws the item, so it is set only when this changes.
@@ -97,6 +105,8 @@ final class MenuBarController: NSObject {
             _ = model.dictationState
             _ = model.libraryEntries
             _ = model.inputDeviceUID
+            _ = model.readAloud.state
+            _ = model.readAloud.item
             if model.features.isEnabled(.meetings) {
                 _ = model.detectedMeetingAppName
                 _ = model.meetingDetectedApp
@@ -122,6 +132,7 @@ final class MenuBarController: NSObject {
             showsSystemAudio: model.features.isEnabled(.meetings)
         )
         guard mode == .full else { return snapshot }
+        snapshot.reading = reading(of: model)
         if model.features.isEnabled(.meetings) {
             snapshot.detectedMeetingApp = model.detectedMeetingAppName
             snapshot.pendingMeetingApp = model.meetingDetectedApp
@@ -140,6 +151,31 @@ final class MenuBarController: NSObject {
         snapshot.pinned = entries.lazy.filter(\.pinned).prefix(5).map { Self.item($0, showsAITitle: model.showAITitles) }
         snapshot.recents = RecentEntries.most(of: entries, limit: 8).map { Self.item($0, showsAITitle: model.showAITitles) }
         return snapshot
+    }
+
+    private static func reading(of model: AppModel) -> Reading? {
+        let controller = model.readAloud
+        switch controller.state {
+        case .preparing, .reading, .waiting, .paused: break
+        case .idle, .failed, .noVoice: return nil
+        }
+        guard let item = controller.item else { return nil }
+        let transport = model.readingTransport
+        return Reading(
+            nowReading: String(localized: "Now Reading: \(ReadAloudController.label(of: item.source)) · \(item.title)"),
+            toggleTitle: transport.toggleTitle,
+            canToggle: transport.toggleEnabled,
+            canSkip: transport.stepEnabled
+        )
+    }
+
+    private static func readingItems(_ reading: Reading, target: AnyObject?) -> [NSMenuItem] {
+        let toggle = menuItem(title: reading.toggleTitle, action: #selector(toggleReading), target: target, identifier: "MenuBar.PauseReading")
+        toggle.isEnabled = reading.canToggle
+        let skip = menuItem(title: String(localized: "Skip Sentence"), action: #selector(skipSentence), target: target, identifier: "MenuBar.SkipSentence")
+        skip.isEnabled = reading.canSkip
+        let stop = menuItem(title: String(localized: "Stop Reading"), action: #selector(stopReading), target: target, identifier: "MenuBar.StopReading")
+        return [toggle, skip, stop]
     }
 
     private static func item(_ entry: LibraryEntry, showsAITitle: Bool) -> MenuSnapshot.Item {
@@ -279,6 +315,13 @@ final class MenuBarController: NSObject {
             items.append(.separator())
         }
         items.append(menuItem(title: String(localized: "Open Parola"), action: #selector(openParola), target: target))
+        if let reading = snapshot.reading {
+            let line = NSMenuItem(title: reading.nowReading, action: nil, keyEquivalent: "")
+            line.isEnabled = false
+            line.identifier = NSUserInterfaceItemIdentifier("MenuBar.NowReading")
+            items.append(line)
+            items.append(contentsOf: readingItems(reading, target: target))
+        }
         items.append(.separator())
 
         items.append(contentsOf: recordItems(for: snapshot, target: target, offeredAbove: snapshot.pendingMeetingApp))
@@ -362,6 +405,10 @@ final class MenuBarController: NSObject {
         if snapshot.showsDictation {
             items.append(menuItem(title: snapshot.dictateTitle, action: #selector(toggleDictation), target: target))
         }
+        if let reading = snapshot.reading {
+            if !items.isEmpty { items.append(.separator()) }
+            items.append(contentsOf: readingItems(reading, target: target))
+        }
         return items
     }
 
@@ -421,10 +468,28 @@ final class MenuBarController: NSObject {
         return item
     }
 
-    private static func menuItem(title: String, action: Selector, target: AnyObject?, key: String = "") -> NSMenuItem {
+    private static func menuItem(
+        title: String, action: Selector, target: AnyObject?, key: String = "", identifier: String? = nil
+    ) -> NSMenuItem {
         let item = NSMenuItem(title: title, action: action, keyEquivalent: key)
         item.target = target
+        item.identifier = identifier.map { NSUserInterfaceItemIdentifier($0) }
         return item
+    }
+
+    @objc private func toggleReading() {
+        guard let model else { return }
+        Task { await model.toggleReading() }
+    }
+
+    @objc private func skipSentence() {
+        guard let model else { return }
+        Task { await model.skipReading(by: 1) }
+    }
+
+    @objc private func stopReading() {
+        guard let model else { return }
+        Task { await model.stopReading() }
     }
 
     @objc private func openParola() {

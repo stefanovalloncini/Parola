@@ -5,6 +5,9 @@ enum PlaybackKeyAction: Equatable {
     case skipBack
     case skipForward
     case toggleTakePause
+    case toggleReading
+    case previousSentence
+    case skipSentence
     /// Space held on the Stage: the press toggled the take once, and its repeats end here.
     case swallowRepeat
 }
@@ -21,7 +24,8 @@ final class PlaybackKeyMonitor {
         hasPlayer: Bool,
         stageShowsTake: Bool = false,
         isRepeat: Bool = false,
-        focusedControlTakesSpace: Bool = false
+        focusedControlTakesSpace: Bool = false,
+        readingOwnsKeys: Bool = false
     ) -> PlaybackKeyAction? {
         guard !textInputActive else { return nil }
         let relevant = modifiers.intersection([.command, .option, .control, .shift])
@@ -29,6 +33,14 @@ final class PlaybackKeyMonitor {
         if stageShowsTake, keyCode == 49, relevant.isEmpty {
             guard !focusedControlTakesSpace else { return nil }
             return isRepeat ? .swallowRepeat : .toggleTakePause
+        }
+        if readingOwnsKeys {
+            switch (keyCode, relevant) {
+            case (49, []): return isRepeat ? .swallowRepeat : .toggleReading
+            case (123, [.command]): return .previousSentence
+            case (124, [.command]): return .skipSentence
+            default: break
+            }
         }
         guard hasPlayer else { return nil }
         switch (keyCode, relevant) {
@@ -55,13 +67,17 @@ final class PlaybackKeyMonitor {
             hasPlayer: model.keyWindowHasPlayer,
             stageShowsTake: inMainWindow && stageShowsTake(model),
             isRepeat: isRepeat,
-            focusedControlTakesSpace: takesSpace(firstResponder)
+            focusedControlTakesSpace: takesSpace(firstResponder),
+            readingOwnsKeys: model.readAloud.readingOwnsKeys
         ) else { return false }
         switch action {
         case .togglePlayPause: model.togglePlayPauseInKeyWindow()
         case .skipBack: model.skipInKeyWindow(by: PlaybackSkip.back.seconds)
         case .skipForward: model.skipInKeyWindow(by: PlaybackSkip.forward.seconds)
         case .toggleTakePause: StageControls.togglePause(model)
+        case .toggleReading: Task { await model.toggleReading() }
+        case .previousSentence: Task { await model.skipReading(by: -1) }
+        case .skipSentence: Task { await model.skipReading(by: 1) }
         case .swallowRepeat: break
         }
         return true

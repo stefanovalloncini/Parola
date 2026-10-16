@@ -4,6 +4,19 @@ import Foundation
 import ParolaCore
 import ParolaSpeech
 
+/// Keeps the Mac from idle-sleeping while a reading generates or plays; the display may still turn off.
+struct ReadAloudActivity {
+    var begin: @MainActor () -> any NSObjectProtocol
+    var end: @MainActor (any NSObjectProtocol) -> Void
+
+    static let inert = ReadAloudActivity(begin: { NSObject() }, end: { _ in })
+
+    static let processInfo = ReadAloudActivity(
+        begin: { ProcessInfo.processInfo.beginActivity(options: .userInitiated, reason: "Reading aloud") },
+        end: { ProcessInfo.processInfo.endActivity($0) }
+    )
+}
+
 /// Everything the controller reaches outside itself, so a test or a sandbox swaps the sound for silence.
 @MainActor
 struct ReadAloudEnvironment {
@@ -20,6 +33,7 @@ struct ReadAloudEnvironment {
     var personalVoiceStatus: @MainActor () -> PersonalVoiceStatus = { .unsupported }
     var requestPersonalVoice: @MainActor () async -> PersonalVoiceStatus = { .unsupported }
     var openURL: @MainActor (URL) -> Bool = { _ in false }
+    var activity: ReadAloudActivity = .inert
 
     static func make(for bootstrap: AppBootstrap) -> ReadAloudEnvironment {
         let underTest = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
@@ -44,7 +58,8 @@ struct ReadAloudEnvironment {
             previewRenderer: { system.previewRenderer() },
             personalVoiceStatus: { PersonalVoiceStatus(AVSpeechSynthesizer.personalVoiceAuthorizationStatus) },
             requestPersonalVoice: { PersonalVoiceStatus(await AVSpeechSynthesizer.requestPersonalVoiceAuthorization()) },
-            openURL: { NSWorkspace.shared.open($0) }
+            openURL: { NSWorkspace.shared.open($0) },
+            activity: .processInfo
         )
     }
 

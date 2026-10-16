@@ -22579,6 +22579,61 @@
           }
         }
       }
+    },
+    "Pause Reading": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Metti in pausa la lettura"
+          }
+        }
+      }
+    },
+    "Resume Reading": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Riprendi la lettura"
+          }
+        }
+      }
+    },
+    "Previous Sentence": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Frase precedente"
+          }
+        }
+      }
+    },
+    "Skip Sentence": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Salta la frase"
+          }
+        }
+      }
+    },
+    "Now Reading: %@ · %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In lettura: %1$@ · %2$@"
+          }
+        }
+      }
     }
   },
   "version": "1.1"

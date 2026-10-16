@@ -89,6 +89,12 @@ struct EntryWindowView: View {
         .animation(reduceMotion ? nil : .easeOut(duration: 0.15), value: showsEditHint)
         .navigationTitle(session.title)
         .background(WindowCloseReporter { model.releaseEntryWindow(session) })
+        .sheet(item: Binding(
+            get: { model.readAloud.voicePrompt.flatMap { $0.origin == .entryWindow(entryID) ? $0 : nil } },
+            set: { if $0 == nil { model.dismissVoicePrompt() } }
+        )) { prompt in
+            ReadAloudVoiceSheet(prompt: prompt)
+        }
         .axBranch("EntryWindow.\(entryID)")
     }
 

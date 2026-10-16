@@ -444,3 +444,95 @@ struct MenuBarMeetingCueTests {
         return rep.colorAt(x: Int(point.x), y: height - 1 - Int(point.y))?.usingColorSpace(.sRGB)
     }
 }
+
+@MainActor
+@Suite("Status-item and Dock menus while reading")
+struct ReadingMenuTests {
+    private func snapshot(_ reading: MenuBarController.Reading?, mode: MenuBarController.Mode = .full) -> MenuBarController.MenuSnapshot {
+        MenuBarController.MenuSnapshot(
+            mode: mode, dictateTitle: "Start Dictation", showsDictation: true, showsMicRecording: true, showsSystemAudio: false,
+            captionsShown: false, reading: reading
+        )
+    }
+
+    private func titles(_ items: [NSMenuItem]) -> [String] {
+        items.map { $0.isSeparatorItem ? "—" : $0.title }
+    }
+
+    private let playing = MenuBarController.Reading(
+        nowReading: "Now Reading: Transcript · Standup", toggleTitle: "Pause Reading", canToggle: true, canSkip: true
+    )
+    private let paused = MenuBarController.Reading(
+        nowReading: "Now Reading: Summary · Standup", toggleTitle: "Resume Reading", canToggle: true, canSkip: true
+    )
+
+    @Test("with no reading the lists are what they were")
+    func idleUnchanged() {
+        let full = titles(MenuBarController.items(for: snapshot(nil), target: nil))
+        #expect(full == [
+            "Open Parola", "—", "New Recording", "Start Dictation", "Open Files…", "—", "Settings…", "—", "No transcripts yet", "—",
+            "Quit Parola",
+        ])
+        #expect(!full.contains { $0.hasPrefix("Now Reading") })
+        let dictation = titles(MenuBarController.items(for: snapshot(nil, mode: .dictationOnly), target: nil))
+        #expect(dictation == ["Start Dictation", "—", "Open Parola", "Quit Parola"])
+        #expect(titles(MenuBarController.dockItems(for: snapshot(nil), endTitle: nil, target: nil)) == ["New Recording", "Start Dictation"])
+    }
+
+    @Test("a reading adds its line and three items under Open Parola")
+    func readingSection() {
+        let items = MenuBarController.items(for: snapshot(playing), target: nil)
+        let all = titles(items)
+        #expect(Array(all.prefix(6)) == ["Open Parola", "Now Reading: Transcript · Standup", "Pause Reading", "Skip Sentence", "Stop Reading", "—"], "\(all)")
+        #expect(items[1].isEnabled == false)
+        #expect(items.dropFirst(2).prefix(3).map { $0.identifier?.rawValue } == ["MenuBar.PauseReading", "MenuBar.SkipSentence", "MenuBar.StopReading"])
+    }
+
+    @Test("a paused reading offers Resume Reading in the same place")
+    func pausedSection() {
+        let all = titles(MenuBarController.items(for: snapshot(paused), target: nil))
+        #expect(all[1...4] == ["Now Reading: Summary · Standup", "Resume Reading", "Skip Sentence", "Stop Reading"])
+    }
+
+    @Test("a blocked resume and a skip with nothing to skip are disabled")
+    func disabledItems() {
+        let blocked = MenuBarController.Reading(nowReading: "x", toggleTitle: "Resume Reading", canToggle: false, canSkip: false)
+        let items = MenuBarController.items(for: snapshot(blocked), target: nil)
+        #expect(!items[2].isEnabled)
+        #expect(!items[3].isEnabled)
+        #expect(items[4].isEnabled)
+    }
+
+    @Test("the Dock menu adds the same three items after the take items, and not the Now Reading line")
+    func dockSection() {
+        let dock = MenuBarController.dockItems(for: snapshot(playing), endTitle: nil, target: nil)
+        #expect(titles(dock) == ["New Recording", "Start Dictation", "—", "Pause Reading", "Skip Sentence", "Stop Reading"])
+        let onlyReading = MenuBarController.dockItems(
+            for: MenuBarController.MenuSnapshot(
+                mode: .full, dictateTitle: "", showsDictation: false, showsMicRecording: false, showsSystemAudio: false, reading: paused
+            ),
+            endTitle: nil, target: nil
+        )
+        #expect(titles(onlyReading) == ["Resume Reading", "Skip Sentence", "Stop Reading"])
+    }
+
+    @Test("the snapshot of a model carries the reading and drops it when the reading ends or fails")
+    func snapshotFromModel() async {
+        let model = AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("menu-reading"))
+        model.transcript = EntryWindowTestSupport.transcript(texts: ["One two three four.", "Five six seven eight."], speakers: [])
+        model.phase = .ready
+        #expect(MenuBarController.snapshot(for: model, mode: .full).reading == nil)
+
+        await model.readAloud(ReadAloudRequest(kind: .transcript))
+        await waitUntil { model.readAloud.state == .reading }
+        let live = MenuBarController.snapshot(for: model, mode: .full).reading
+        #expect(live?.toggleTitle == "Pause Reading")
+        #expect(live?.nowReading.hasPrefix("Now Reading: Transcript · ") == true)
+
+        await model.pauseReading()
+        #expect(MenuBarController.snapshot(for: model, mode: .full).reading?.toggleTitle == "Resume Reading")
+
+        await model.stopReading()
+        #expect(MenuBarController.snapshot(for: model, mode: .full).reading == nil)
+    }
+}
