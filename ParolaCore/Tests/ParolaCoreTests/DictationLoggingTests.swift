@@ -94,6 +94,7 @@ struct DictationLoggingTests {
             await coordinator.startMonitoring()
             await coordinator.handle(.press)
             await coordinator.handle(.release)
+            await coordinator.drain()
 
             let finishFailureRecord = dictationRecords(sink).first {
                 $0.message.rendered == "dictation finish failed in pushToTalk"
@@ -113,6 +114,7 @@ struct DictationLoggingTests {
             await coordinator.startMonitoring()
             await coordinator.handle(.press)
             await coordinator.handle(.release)
+            await coordinator.drain()
 
             let transitions = dictationRecords(sink)
                 .filter { $0.message.rendered.hasPrefix("dictation state") }
@@ -135,6 +137,7 @@ struct DictationLoggingTests {
             await coordinator.startMonitoring()
             await coordinator.handle(.press)
             await coordinator.handle(.release)
+            await coordinator.drain()
 
             let transitions = dictationRecords(sink)
                 .filter { $0.message.rendered.hasPrefix("dictation state") }
