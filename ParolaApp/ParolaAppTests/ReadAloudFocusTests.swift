@@ -169,8 +169,8 @@ struct ReadAloudFocusTests {
         await waitUntil { log.events.contains(.held(unitID: 0)) }
 
         rig.blocked = .take
-        rig.controller.focusChanged()
-        await waitUntil { rig.controller.state == .paused(.take) }
+        await rig.controller.focusChanged()?.value
+        #expect(rig.controller.state == .paused(.take))
         await rig.renderer.releaseStart()
         await starting.value
         await settle()
@@ -180,6 +180,27 @@ struct ReadAloudFocusTests {
         rig.controller.focusChanged()
         #expect(await rig.controller.resume())
         await waitUntil { rig.sink.scheduledCount > 0 }
+    }
+
+    @Test("a block, its end and a new block reach the session in order")
+    func blockDeliveryKeepsOrder() async {
+        let log = SpeechEventLog()
+        let rig = ReadAloudRig(events: log.observer)
+        await rig.renderer.holdStart()
+        let starting = Task { await rig.controller.start(ReadAloudRig.plan()) }
+        await waitUntil { log.events.contains(.held(unitID: 0)) }
+
+        rig.blocked = .take
+        rig.controller.focusChanged()
+        rig.blocked = nil
+        rig.controller.focusChanged()
+        rig.blocked = .dictation
+        await rig.controller.focusChanged()?.value
+        await rig.renderer.releaseStart()
+        await starting.value
+        await settle()
+
+        #expect(rig.sink.scheduledCount == 0)
     }
 
     @Test("a take while reading with media pausing on leaves the reader paused after the take exits")

@@ -86,6 +86,7 @@ final class ReadAloudController {
     @ObservationIgnored private var observers: [(center: NotificationCenter, token: any NSObjectProtocol)] = []
     @ObservationIgnored private var refusalTask: Task<Void, Never>?
     @ObservationIgnored private var wasBlocked = false
+    @ObservationIgnored private var blockDelivery: Task<Void, Never>?
     @ObservationIgnored private(set) var isInRefusalWindow = false
     @ObservationIgnored private var blockedProvider: @MainActor () -> BlockedReason? = { nil }
     @ObservationIgnored private var introductionProvider: @MainActor () -> Bool = { false }
@@ -130,24 +131,36 @@ final class ReadAloudController {
         }
     }
 
-    func focusChanged() {
+    /// The returned task ends once the session knows about the block or its end.
+    @discardableResult
+    func focusChanged() -> Task<Void, Never>? {
         if introductionProvider() {
             Task { await stop() }
-            return
+            return nil
         }
         if let blocked = blockedProvider() {
             wasBlocked = true
             refusalTask?.cancel()
             isInRefusalWindow = false
             yieldNow(to: blocked.pauseReason)
-            let session = session
-            Task { await session?.setBlocked(true) }
+            return deliverBlock(true)
         } else if wasBlocked {
             wasBlocked = false
-            let session = session
-            Task { await session?.setBlocked(false) }
             openRefusalWindow()
+            return deliverBlock(false)
         }
+        return nil
+    }
+
+    private func deliverBlock(_ blocked: Bool) -> Task<Void, Never> {
+        let session = session
+        let previous = blockDelivery
+        let delivery = Task {
+            await previous?.value
+            await session?.setBlocked(blocked)
+        }
+        blockDelivery = delivery
+        return delivery
     }
 
     private func openRefusalWindow() {
