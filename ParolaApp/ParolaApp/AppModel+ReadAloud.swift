@@ -121,11 +121,8 @@ extension AppModel {
 
     func presentVoiceChooser(for kind: ReadAloudRequest.Kind) {
         guard let transcript, let (_, language) = readingSource(for: ReadAloudRequest(kind: kind), in: transcript) else { return }
-        let inventory = readAloud.appleInventory
-        let hasVoice = ReadAloudVoices.hasAppleVoice(for: language, in: inventory)
-            || !ReadAloudVoices.neuralOffers(for: language).isEmpty
         readAloud.present(.init(
-            language: language, mode: hasVoice ? .choose : .noVoice, request: ReadAloudRequest(kind: kind), origin: .main
+            language: language, mode: chooserMode(for: language), request: ReadAloudRequest(kind: kind), origin: .main
         ))
     }
 
@@ -149,13 +146,16 @@ extension AppModel {
 
     @discardableResult
     func previewVoice(_ voice: VoiceID, language: String) async -> Bool {
+        await readAloud.preview(voice, language: language, text: previewSampleText(for: language))
+    }
+
+    func previewSampleText(for language: String) -> String {
         let sentence = transcript?.segments.first { $0.text.split(whereSeparator: \.isWhitespace).count >= 4 }?.text
         let transcriptLanguage = transcript.map {
             SpokenLanguage.forTranscript($0, uiLanguage: Bundle.main.preferredLocalizations.first ?? "en")
         }
         let matches = transcriptLanguage.map { ReadAloudVoices.key(for: $0) == ReadAloudVoices.key(for: language) } ?? false
-        let text = ReadAloudVoices.sampleText(for: language, transcriptSentence: matches ? sentence : nil)
-        return await readAloud.preview(voice, language: language, text: text)
+        return ReadAloudVoices.sampleText(for: language, transcriptSentence: matches ? sentence : nil)
     }
 
     @discardableResult
@@ -234,7 +234,13 @@ extension AppModel {
             entryID: item.entryID == Self.unsavedReadingID ? nil : item.entryID,
             fromSegment: kind == .transcript ? readAloud.failedSegmentID() : nil
         )
-        readAloud.present(.init(language: item.language, mode: .choose, request: request, origin: .main))
+        readAloud.present(.init(language: item.language, mode: chooserMode(for: item.language), request: request, origin: .main))
+    }
+
+    private func chooserMode(for language: String) -> ReadAloudController.VoicePrompt.Mode {
+        let hasVoice = ReadAloudVoices.hasAppleVoice(for: language, in: readAloud.appleInventory)
+            || !ReadAloudVoices.neuralOffers(for: language).isEmpty
+        return hasVoice ? .choose : .noVoice
     }
 
     func setReadingSpeed(_ rate: Double) {

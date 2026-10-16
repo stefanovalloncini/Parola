@@ -54,7 +54,7 @@ struct ReadAloudVoiceSheet: View {
                     )
                 }
             case .noVoice:
-                Text("No voice on this Mac reads \(languageName).")
+                Text("Download a voice for \(languageName) in System Settings, then come back.")
                     .font(DS.Font.body)
                     .foregroundStyle(DS.Color.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)

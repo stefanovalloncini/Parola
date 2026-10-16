@@ -27,6 +27,82 @@ struct ReadAloudPreviewTests {
         #expect(rig.sink.stopCount > 0)
     }
 
+    @Test("the sink is silenced before the first await after a block")
+    func sinkPausedSynchronously() async {
+        let rig = ReadAloudRig()
+        #expect(await rig.controller.preview(voice, language: "en"))
+        let pauses = rig.sink.calls.filter { $0 == .pause(fade: false) }.count
+
+        rig.blocked = .take
+        rig.controller.focusChanged()
+
+        #expect(rig.sink.calls.filter { $0 == .pause(fade: false) }.count == pauses + 1)
+    }
+
+    @Test("a paused reading resumes after a preview that a block ended")
+    func pausedReadingSurvivesBlockedPreview() async {
+        let rig = ReadAloudRig()
+        await rig.start()
+        await rig.controller.pause()
+        #expect(await rig.controller.preview(voice, language: "en"))
+
+        rig.blocked = .take
+        rig.controller.focusChanged()
+        rig.blocked = nil
+        rig.controller.focusChanged()
+        #expect(await rig.controller.resume())
+
+        #expect(rig.controller.state == .reading)
+    }
+
+    @Test("media starting ends a preview when nothing is reading")
+    func mediaEndsPreviewFromIdle() async {
+        let rig = ReadAloudRig()
+        #expect(await rig.controller.preview(voice, language: "en"))
+
+        rig.controller.mediaStartedPlaying()
+
+        #expect(rig.controller.previewing == nil)
+    }
+
+    @Test("the voices the views read are observed, and a refresh fires the observation")
+    func inventoryObserved() {
+        let rig = ReadAloudRig()
+        let fired = FiredFlag()
+        withObservationTracking {
+            _ = rig.controller.appleInventory
+        } onChange: {
+            fired.value = true
+        }
+
+        rig.controller.refreshVoices()
+
+        #expect(fired.value)
+    }
+
+    @Test("the preview uses the transcript's sentence only when the transcript is in that language")
+    func previewSentenceFollowsLanguage() {
+        let model = AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("sample"))
+        model.transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "Una frase di prova abbastanza lunga.")],
+            language: "fa", modelName: "stub"
+        )
+        #expect(model.previewSampleText(for: "fa") == "Una frase di prova abbastanza lunga.")
+        #expect(model.previewSampleText(for: "ru") == ReadAloudVoices.sampleSentence(for: "en"))
+        #expect(model.previewSampleText(for: "en") == ReadAloudVoices.sampleSentence(for: "en"))
+    }
+
+    @Test("an installed voice that can't read keeps one entry, and a missing one gets the not-installed entry")
+    func noDuplicateEntries() {
+        let fed = VoiceDescriptor(identifier: "a.fed", name: "Federica", language: "it-IT", quality: .premium, isNovelty: false, isPersonal: false, family: .standard)
+        let alice = VoiceDescriptor(identifier: "a.alice", name: "Alice", language: "it-IT", quality: .default, isNovelty: false, isPersonal: false, family: .standard)
+        let inventory = AppleVoiceInventory(voices: [fed, alice], unusable: ["a.fed"])
+        let entries = ReadAloudVoices.settingsEntries(for: "it", in: inventory, saved: VoiceID.apple(identifier: "a.fed"))
+        #expect(Set(entries.map(\.id)).count == entries.count)
+        #expect(entries.filter { $0.voice == VoiceID.apple(identifier: "a.fed") }.count == 1)
+        #expect(!entries.contains { $0.title == "Voice not installed" })
+    }
+
     @Test("a block that starts during a preview stops it, and the paused reading stays paused")
     func blockStopsPreviewWhileReading() async {
         let rig = ReadAloudRig()
@@ -185,6 +261,7 @@ struct ReadAloudPreviewTests {
         await model.retryReading()
 
         #expect(model.readAloud.voicePrompt?.mode == .choose)
+        #expect(model.readAloudVoices["en"] == saved)
         #expect(model.readAloud.voicePrompt?.request == ReadAloudRequest(kind: .transcript, fromSegment: 2))
         #expect(model.readAloud.state != .reading)
     }
@@ -205,6 +282,52 @@ struct ReadAloudPreviewTests {
         await model.retryReading()
 
         #expect(model.readAloud.voicePrompt == nil)
+        await waitUntil { model.readAloud.state == .reading }
+        #expect(model.readAloud.item?.voice == .appleAutomatic)
         await model.stopReading()
     }
+
+    @Test("Try Again opens the no-voice sheet when no voice is left for the language")
+    func retryOpensNoVoiceMode() async {
+        let model = AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("retry3"))
+        model.transcript = Transcript(
+            segments: (0..<4).map { TranscriptSegment(id: $0, start: Double($0), end: Double($0) + 1, text: "Segment \($0) says something.") },
+            language: "en", modelName: "stub"
+        )
+        model.phase = .ready
+        model.readAloudVoices["en"] = VoiceID.apple(identifier: "com.parola.mock.en.premium")
+        model.readAloud.mockVoice?.install(msPerUnit: 20, failAtUnit: 2)
+        await model.readAloud(ReadAloudRequest(kind: .transcript))
+        await waitUntil { if case .failed = model.readAloud.state { true } else { false } }
+
+        model.readAloud.mockVoice?.unusableVoices = [
+            "com.parola.mock.en.premium", "com.parola.mock.en.compact",
+        ]
+        await model.retryReading()
+
+        #expect(model.readAloud.voicePrompt?.mode == .noVoice)
+    }
+
+    @Test("the failure line names the voice Automatic resolved to when the reading started")
+    func failureNamesStartVoice() async {
+        let model = AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("failname"))
+        model.transcript = Transcript(
+            segments: (0..<4).map { TranscriptSegment(id: $0, start: Double($0), end: Double($0) + 1, text: "Segment \($0) says something.") },
+            language: "en", modelName: "stub"
+        )
+        model.phase = .ready
+        model.readAloud.mockVoice?.install(msPerUnit: 20_000, failAtUnit: 1)
+        await model.readAloud(ReadAloudRequest(kind: .transcript))
+        await waitUntil { model.readAloud.state == .reading }
+
+        model.readAloud.mockVoice?.unusableVoices = ["com.parola.mock.en.premium"]
+        await model.skipReading(by: 1)
+        await waitUntil { if case .failed = model.readAloud.state { true } else { false } }
+
+        #expect(model.readAloud.state == .failed("Couldn't continue with Mock Premium."))
+    }
+}
+
+private final class FiredFlag: @unchecked Sendable {
+    var value = false
 }

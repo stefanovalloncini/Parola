@@ -144,6 +144,10 @@ private struct ReadAloudVoiceRow: View {
         }
     }
 
+    private var selectedIsUsable: Bool {
+        entries.first { $0.voice == selection.wrappedValue }?.isUsable ?? true
+    }
+
     @ViewBuilder
     private var previewButton: some View {
         if model.readAloud.previewing != nil {
@@ -151,7 +155,8 @@ private struct ReadAloudVoiceRow: View {
                 .axLeaf("ReadAloud.Button.StopPreview.\(language)")
         } else {
             Button("Preview") { Task { await model.previewVoice(selection.wrappedValue, language: language) } }
-                .disabled(model.readingBlockedReason != nil)
+                .disabled(model.readingBlockedReason != nil || !selectedIsUsable)
+                .help(selectedIsUsable ? Text("") : Text("This voice can't be used on this Mac."))
                 .axLeaf("ReadAloud.Button.Preview.\(language)")
         }
     }

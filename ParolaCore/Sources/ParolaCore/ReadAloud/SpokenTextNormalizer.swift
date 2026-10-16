@@ -494,7 +494,9 @@ public enum SpokenTextNormalizer {
         let words = content.split(whereSeparator: { $0.isWhitespace || $0 == "_" })
         if words.count <= 1 { return true }
         let letters = content.filter(\.isLetter)
-        if letters == letters.uppercased() { return true }
+        if letters.isEmpty { return true }
+        let cased = letters.filter(\.isCased)
+        if !cased.isEmpty, !cased.contains(where: \.isLowercase) { return true }
         return words.contains { word in
             bracketSoundWords.contains(word.lowercased().trimmingCharacters(in: .punctuationCharacters))
         }

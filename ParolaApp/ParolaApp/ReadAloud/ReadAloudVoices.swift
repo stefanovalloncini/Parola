@@ -196,7 +196,7 @@ enum ReadAloudVoices {
     static func settingsEntries(for language: String, in inventory: AppleVoiceInventory, saved: VoiceID?) -> [VoiceMenuEntry] {
         let entries = menuEntries(for: language, in: inventory)
         guard !entries.isEmpty, let saved, saved != .appleAutomatic,
-              !entries.contains(where: { $0.voice == saved && $0.isUsable }) else { return entries }
+              !entries.contains(where: { $0.voice == saved }) else { return entries }
         return [VoiceMenuEntry(voice: saved, title: String(localized: "Voice not installed"), isUsable: false)] + entries
     }
 

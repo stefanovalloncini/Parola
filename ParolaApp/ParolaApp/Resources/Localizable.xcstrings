@@ -22131,6 +22131,28 @@
           }
         }
       }
+    },
+    "This voice can't be used on this Mac.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questa voce non può essere usata su questo Mac."
+          }
+        }
+      }
+    },
+    "Download a voice for %@ in System Settings, then come back.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scarica una voce per %@ in Impostazioni di Sistema, poi torna qui."
+          }
+        }
+      }
     }
   },
   "version": "1.1"

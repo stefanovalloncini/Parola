@@ -399,9 +399,9 @@ final class ReadAloudController {
     }
 
     func mediaStartedPlaying() {
+        endPreviewNow()
         switch state {
         case .paused:
-            endPreviewNow()
             state = .paused(.media)
         case .preparing, .reading, .waiting:
             yieldNow(to: .media)
@@ -494,7 +494,7 @@ final class ReadAloudController {
         previewing = nil
         guard let ending = previewSession else { return }
         previewSession = nil
-        system?.sink.stop()
+        system?.sink.pause(fade: false)
         Task { await ending.stop() }
     }
 
