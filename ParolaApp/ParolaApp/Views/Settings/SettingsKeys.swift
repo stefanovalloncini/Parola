@@ -13,6 +13,7 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
     case snippets
     case corrections
     case translation
+    case readAloud
     case people
     case transcriptionDefaults
     case ignoredSegments
@@ -43,6 +44,7 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
         case .snippets: return "Snippets"
         case .corrections: return "Corrections"
         case .translation: return "Translation"
+        case .readAloud: return "Read Aloud"
         case .people: return "People"
         case .transcriptionDefaults: return "Transcription Defaults"
         case .ignoredSegments: return "Ignored Segments"
@@ -73,6 +75,7 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
         case .snippets: return String(localized: "Snippets")
         case .corrections: return String(localized: "Corrections")
         case .translation: return String(localized: "Translation")
+        case .readAloud: return String(localized: "Read Aloud")
         case .people: return String(localized: "People")
         case .transcriptionDefaults: return String(localized: "Transcription Defaults")
         case .ignoredSegments: return String(localized: "Ignored Segments")
@@ -104,6 +107,7 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
         case .snippets: return ["snippet", "expand", "abbreviation", "trigger", "placeholder", "date", "time"]
         case .corrections: return ["correction", "fix", "replace", "dictation", "vocabulary"]
         case .translation: return ["translate", "english", "side by side", "language"]
+        case .readAloud: return ["voice", "speak", "speech", "text to speech", "tts", "listen", "read aloud", "premium", "enhanced", "voce", "leggi", "lettura ad alta voce", "sintesi vocale"]
         case .people: return ["people", "person", "speaker", "diarize", "identify speakers", "name", "colour", "color", "merge"]
         case .transcriptionDefaults: return ["default", "model", "language", "engine", "whisper", "vocabulary", "jargon", "names", "speakers", "detect speakers", "diarize", "word timestamps", "apple speech", "playback"]
         case .ignoredSegments: return ["filler", "uh", "um", "ignore", "skip"]
@@ -209,6 +213,8 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
             return ["correctionRules"]
         case .translation:
             return ["translate", "translationSideBySide"]
+        case .readAloud:
+            return ["readAloudVoices", "readAloudRate"]
         case .people:
             return ["showMostUsedPeople"]
         case .transcriptionDefaults:
@@ -259,7 +265,7 @@ enum UnscopedSettingsKeys {
         "liveCaptions.fontSize", "liveCaptions.opacity", "presenter.fontSize",
         "introductionComplete",
         "summaryOptions", "autostartSummary",
-        "libraryGroupsByDate", "lastRecordSource", "readAloudRate",
+        "libraryGroupsByDate", "lastRecordSource",
     ]
 
     /// Where the recording pill and the dictation HUD were dragged: a full reset clears them, a backup leaves them out.

@@ -45,7 +45,7 @@ struct SettingsView: View {
 enum SettingsRoute: String, CaseIterable, Identifiable, Hashable {
     case general, customization, watchedFolders, recordMeetings, shortcuts
     case microphone, liveCaptions, dictation, snippets, corrections
-    case localModels, transcriptionDefaults, translation, people, ignoredSegments, findReplace
+    case localModels, transcriptionDefaults, translation, readAloud, people, ignoredSegments, findReplace
     case exportFormats, batchExport, autoExport, sendTo, integrations
     case aiServices, prompts
     case automation
@@ -121,6 +121,7 @@ private struct SettingsRouteMeta {
         .localModels: SettingsRouteMeta(titleKey: "Local Models", summaryKey: "Speech models on this Mac, and the space they take up.", symbol: "cpu", scope: nil),
         .transcriptionDefaults: SettingsRouteMeta(titleKey: "Transcription Defaults", summaryKey: "The model and language new transcriptions start with.", symbol: "slider.horizontal.3", scope: .transcriptionDefaults),
         .translation: SettingsRouteMeta(titleKey: "Translation", summaryKey: "How Parola translates a transcript, and how it shows the result.", symbol: "character.book.closed", scope: .translation),
+        .readAloud: SettingsRouteMeta(titleKey: "Read Aloud", summaryKey: "The voice Parola reads with, one for each language.", symbol: "speaker.wave.2", scope: .readAloud),
         .people: SettingsRouteMeta(titleKey: "People", summaryKey: "The speakers you name, the colour each one wears, and where they show up.", symbol: "person.2", scope: .people),
         .ignoredSegments: SettingsRouteMeta(titleKey: "Ignored Segments", summaryKey: "Segments dropped from a transcript when the text matches a pattern.", symbol: "line.3.horizontal.decrease.circle", scope: .ignoredSegments),
         .findReplace: SettingsRouteMeta(titleKey: "Find & Replace", summaryKey: "Substitutions applied to every transcript before it's saved.", symbol: "arrow.triangle.2.circlepath", scope: .findReplace),
@@ -152,7 +153,7 @@ enum SettingsSidebarCatalog {
             SidebarGroup(id: "capture", titleKey: "Settings.Group.Capture", routes: [.microphone, .recordMeetings, .liveCaptions]),
             SidebarGroup(id: "dictation", titleKey: "Settings.Group.Dictation", routes: [.dictation, .snippets, .corrections]),
             SidebarGroup(id: "sources", titleKey: "Settings.Group.Sources", routes: [.watchedFolders, .integrations]),
-            SidebarGroup(id: "transcription", titleKey: "Settings.Group.Transcription", routes: [.localModels, .transcriptionDefaults, .translation, .people, .ignoredSegments, .findReplace]),
+            SidebarGroup(id: "transcription", titleKey: "Settings.Group.Transcription", routes: [.localModels, .transcriptionDefaults, .translation, .readAloud, .people, .ignoredSegments, .findReplace]),
             SidebarGroup(id: "export", titleKey: "Settings.Group.Export", routes: [.exportFormats, .batchExport, .autoExport, .sendTo]),
             SidebarGroup(id: "ai", titleKey: "Settings.Group.AI", routes: [.aiServices, .prompts]),
             SidebarGroup(id: "automation", titleKey: "Settings.Group.Automation", routes: [.automation]),
@@ -257,6 +258,7 @@ extension SettingsRoute {
         case .localModels: ModelsSettingsPane()
         case .transcriptionDefaults: TranscriptionDefaultsPane()
         case .translation: TranslationPane()
+        case .readAloud: ReadAloudPane()
         case .people: PeoplePane()
         case .ignoredSegments: IgnoredSegmentsPane()
         case .findReplace: FindReplacePane()

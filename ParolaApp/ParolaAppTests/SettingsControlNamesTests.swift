@@ -36,6 +36,7 @@ struct SettingsControlNamesTests {
         case .corrections: CorrectionsPane()
         case .transcriptionDefaults: TranscriptionDefaultsPane()
         case .translation: TranslationPane()
+        case .readAloud: ReadAloudPane()
         case .people: PeoplePane()
         case .ignoredSegments: IgnoredSegmentsPane()
         case .findReplace: FindReplacePane()

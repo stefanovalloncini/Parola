@@ -70,6 +70,7 @@ struct SettingsPaneScopeTests {
             "micHotkeyEnabled", "micHotkeyKeyCode", "micHotkeyModifiers",
             "subtitleCaptionLength", "markdownTimestamps", "htmlExportTheme", "txtExportTimestamps",
             "pausePlayerOnAppHidden", "parola.userPrivacyMode", "batchExportFormatOptions",
+            "readAloudVoices", "readAloudRate",
         ]
         for key in expected {
             #expect(scoped.contains(key), "\(key) is missing from every pane scope")
@@ -91,11 +92,12 @@ struct SettingsPaneScopeTests {
         #expect(SettingsPaneScope.exportFormats.resetKeys(features: .all) == ["subtitleCaptionLength", "markdownTimestamps", "txtExportTimestamps", "htmlExportTheme"])
     }
 
-    @Test("the reading speed belongs to no pane yet, and still backs up and resets with the whole app")
-    func readAloudRateIsUnscoped() {
-        let scoped = Set(SettingsPaneScope.allCases.flatMap(\.defaultsKeys))
-        #expect(scoped.contains("readAloudRate") == false)
-        #expect(UnscopedSettingsKeys.all.contains("readAloudRate"))
+    @Test("the saved voices and the reading speed belong to the Read Aloud pane, and its Reset clears both")
+    func readAloudKeysAreScoped() {
+        #expect(SettingsPaneScope.readAloud.defaultsKeys == ["readAloudVoices", "readAloudRate"])
+        #expect(SettingsPaneScope.readAloud.resetKeys(features: .all) == ["readAloudVoices", "readAloudRate"])
+        #expect(UnscopedSettingsKeys.all.contains("readAloudRate") == false)
+        #expect(UnscopedSettingsKeys.all.contains("readAloudVoices") == false)
     }
 
     @Test("the models storage path stays out of every scope")

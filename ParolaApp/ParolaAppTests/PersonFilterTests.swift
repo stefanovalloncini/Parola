@@ -310,7 +310,7 @@ struct PersonFilterTests {
         #expect(SettingsPaneScope.people.defaultsKeys.contains("showMostUsedPeople"))
     }
 
-    @Test("the People pane sits in the transcription group, after Translation")
+    @Test("the People pane sits in the transcription group, after Translation and Read Aloud")
     func paneIsInTheSidebar() throws {
         let group = try #require(
             SettingsSidebarCatalog.all.first { $0.id == "transcription" }
@@ -318,7 +318,8 @@ struct PersonFilterTests {
         let routes = group.routes
         #expect(routes.contains(.people))
         if let translation = routes.firstIndex(of: .translation), let people = routes.firstIndex(of: .people) {
-            #expect(people == translation + 1)
+            #expect(people == translation + 2)
+            #expect(routes[translation + 1] == .readAloud)
         }
         #expect(SettingsRoute.people.isVisible(features: .all))
         #expect(SettingsSidebarCatalog.matches(route: .people, query: "speaker"))
