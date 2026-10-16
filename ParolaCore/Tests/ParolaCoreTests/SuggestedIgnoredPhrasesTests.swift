@@ -22,7 +22,12 @@ struct SuggestedIgnoredPhrasesTests {
         ("[Music]", "[music]"),
         ("♪♪", ""),
         ("  ", ""),
-        ("—", "")
+        ("—", ""),
+        ("-uh-", "uh"),
+        ("えっと。", "えっと"),
+        ("ええ！？", "ええ"),
+        ("uh,", "uh"),
+        ("、はい、", "はい")
     ])
     func normalizerTable(input: String, expected: String) {
         #expect(IgnoredSegments.normalized(input) == expected)
@@ -62,7 +67,10 @@ struct SuggestedIgnoredPhrasesTests {
     @Test("real whole-segment speech never matches the list", arguments: [
         "Thank you.", "Thanks.", "Thank you so much.", "Bye.", "Bye-bye.", "Okay.", "you", "Yes.", "Hello.",
         "Grazie.", "Grazie mille.", "Ciao.", "Gracias.", "Merci.", "Danke.", "Obrigado.", "Спасибо.",
-        "Subscribe", "See you next time", "Music", "Applause", "Watching"
+        "Subscribe", "See you next time", "Music", "Applause", "Watching",
+        "Thanks for listening.", "See you next week.", "Grazie a tutti.", "Grazie per l'attenzione.", "Alla prossima!",
+        "Muchas gracias.", "Merci beaucoup.", "Vielen Dank.", "Muito obrigado.", "Большое спасибо.",
+        "ありがとうございました", "谢谢", "谢谢大家", "Thank you for listening.", "Thank you very much."
     ])
     func speechStays(text: String) {
         #expect(kept([text], rules: SuggestedIgnoredPhrases.rules()) == [text])
@@ -71,7 +79,10 @@ struct SuggestedIgnoredPhrasesTests {
     @Test("hallucinated lines and tags are dropped", arguments: [
         "Thanks for watching!", "Thanks for watching.", "Thank you for watching.", "[Music]", "[MUSIC]",
         "♪♪", "(music)", "[BLANK_AUDIO]", "Grazie per la visione!", "¡Suscríbete!", "Danke fürs Zuschauen!",
-        "ご視聴ありがとうございました", "Продолжение следует..."
+        "ご視聴ありがとうございました", "Продолжение следует...",
+        "Vielen Dank für's Zuschauen.", "[Musica]", "(upbeat music)", "Редактор субтитров А.Синецкая Корректор А.Егорова",
+        "チャンネル登録をよろしくお願いします!", "请不吝点赞订阅转发打赏支持明镜与点点栏目",
+        "請不吝點贊訂閱轉發打賞支持明鏡與點點欄目"
     ])
     func hallucinationsDrop(text: String) {
         #expect(kept([text], rules: SuggestedIgnoredPhrases.rules()).isEmpty)
@@ -104,5 +115,41 @@ struct SuggestedIgnoredPhrasesTests {
     func missingEdges() {
         #expect(SuggestedIgnoredPhrases.missing(from: [IgnoredSegmentRule(pattern: "")]).count == SuggestedIgnoredPhrases.defaults.count)
         #expect(SuggestedIgnoredPhrases.missing(from: SuggestedIgnoredPhrases.rules()).isEmpty)
+    }
+
+    @Test("a tag next to speech is dropped and the speech stays, end to end on WhisperKit", arguments: [
+        "[Music]", "(upbeat music)", "♪", "♪♪"
+    ])
+    func tagNextToSpeechSurvivesTheMerge(tag: String) async {
+        let transcript = Transcript(
+            segments: [
+                TranscriptSegment(id: 0, start: 0, end: 3, text: tag),
+                TranscriptSegment(id: 1, start: 3.4, end: 6, text: "Hello everyone and welcome back"),
+                TranscriptSegment(id: 2, start: 6.2, end: 8, text: "to the show.")
+            ],
+            language: "en",
+            modelName: "openai_whisper-tiny"
+        )
+        let finished = await TranscriptFinisher.finish(
+            transcript, engine: .whisperKit, options: TranscriptionOptions(), audioURL: nil
+        )
+        let kept = IgnoredSegments.apply(rules: SuggestedIgnoredPhrases.rules(), to: finished.segments)
+        #expect(kept.map(\.text) == ["Hello everyone and welcome back to the show."])
+    }
+
+    @Test("a tag after speech is not glued to it either")
+    func tagAfterSpeech() async {
+        let transcript = Transcript(
+            segments: [
+                TranscriptSegment(id: 0, start: 0, end: 2, text: "So that is it"),
+                TranscriptSegment(id: 1, start: 2.2, end: 4, text: "[Music]")
+            ],
+            language: "en",
+            modelName: "openai_whisper-tiny"
+        )
+        let finished = await TranscriptFinisher.finish(
+            transcript, engine: .whisperKit, options: TranscriptionOptions(), audioURL: nil
+        )
+        #expect(finished.segments.map(\.text) == ["So that is it", "[Music]"])
     }
 }

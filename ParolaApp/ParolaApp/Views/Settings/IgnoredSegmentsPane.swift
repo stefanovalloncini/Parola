@@ -1,15 +1,37 @@
 import SwiftUI
 import ParolaCore
 
+private struct AddedNotice {
+    let count: Int
+    let total: Int
+}
+
 struct IgnoredSegmentsPane: View {
     @Environment(AppModel.self) private var model
     @State private var query = RuleListQuery()
     @State private var selection: IgnoredSegmentRule.ID?
-    @State private var addedCount: Int?
+    @State private var addedNotice: AddedNotice?
 
     var body: some View {
         let displayed = displayedRules
         return SettingsForm {
+            Section {
+                HStack {
+                    Button("Add Suggested Phrases") {
+                        let added = model.addSuggestedIgnoredPhrases()
+                        addedNotice = AddedNotice(count: added, total: model.ignoredSegmentRules.count)
+                    }
+                    .disabled(!hasMissingSuggestions)
+                    .help(hasMissingSuggestions ? "" : String(localized: "Every suggested phrase is already in the list."))
+                    .axLeaf("IgnoredSegments.Button.AddSuggested")
+                    if let addedNotice, addedNotice.total == model.ignoredSegmentRules.count {
+                        Text("Phrases added: \(addedNotice.count)")
+                            .foregroundStyle(.secondary)
+                            .axLeaf("IgnoredSegments.Text.AddedCount")
+                    }
+                }
+            }
+
             Section {
                 if model.ignoredSegmentRules.isEmpty {
                     InlineEmptyText("No patterns yet")
@@ -33,22 +55,6 @@ struct IgnoredSegmentsPane: View {
             } header: {
                 if query.showsToolbar(ruleCount: model.ignoredSegmentRules.count) {
                     RuleListToolbar(query: $query, placeholder: "Search patterns…", leafPrefix: "IgnoredSegments")
-                }
-            }
-
-            Section {
-                HStack {
-                    Button("Add Suggested Phrases") {
-                        addedCount = model.addSuggestedIgnoredPhrases()
-                    }
-                    .disabled(!hasMissingSuggestions)
-                    .help(hasMissingSuggestions ? "" : String(localized: "Every suggested phrase is already in the list."))
-                    .axLeaf("IgnoredSegments.Button.AddSuggested")
-                    if let addedCount {
-                        Text(addedCount == 0 ? String(localized: "No new phrases.") : String(localized: "Phrases added: \(addedCount)"))
-                            .foregroundStyle(.secondary)
-                            .axLeaf("IgnoredSegments.Text.AddedCount")
-                    }
                 }
             }
 

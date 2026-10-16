@@ -110,7 +110,7 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
         case .readAloud: return ["voice", "speak", "speech", "text to speech", "tts", "listen", "read aloud", "premium", "enhanced", "voce", "leggi", "lettura ad alta voce", "sintesi vocale"]
         case .people: return ["people", "person", "speaker", "diarize", "identify speakers", "name", "colour", "color", "merge"]
         case .transcriptionDefaults: return ["default", "model", "language", "engine", "whisper", "vocabulary", "jargon", "names", "speakers", "detect speakers", "diarize", "word timestamps", "apple speech", "playback"]
-        case .ignoredSegments: return ["filler", "uh", "um", "ignore", "skip"]
+        case .ignoredSegments: return ["filler", "uh", "um", "ignore", "skip", "music", "subscribe", "suggested", "hallucination", "thanks for watching", "applause", "musica", "iscriviti", "suggerite", "frasi", "allucinazioni", "riempitivi"]
         case .findReplace: return ["regex", "replace", "term pack", "substitution", "rule"]
         case .exportFormats: return ["preset", "format", "export formats", "txt", "srt", "vtt", "csv", "tsv", "docx", "pdf", "markdown", "html", "json", "jsonl", "fcpxml", "final cut", "lrc", "lyrics", "subtitles", "line length", "qc", "timestamps", "html theme"]
         case .batchExport: return ["batch", "multiple files", "drag drop", "queue", "folder", "preset"]
@@ -300,7 +300,11 @@ struct ResetPaneButton: View {
                         }
                         Button("Cancel", role: .cancel) {}
                     } message: {
-                        Text("Clears the saved settings on this pane, including any of them shown on another pane too.")
+                        if scope == .ignoredSegments {
+                            Text("Replaces your patterns with the suggested phrases.")
+                        } else {
+                            Text("Clears the saved settings on this pane, including any of them shown on another pane too.")
+                        }
                     }
                 }
             }

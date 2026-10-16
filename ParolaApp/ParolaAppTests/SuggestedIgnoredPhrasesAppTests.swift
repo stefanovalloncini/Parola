@@ -109,4 +109,52 @@ struct SuggestedIgnoredPhrasesAppTests {
         let out = model.postProcess(Transcript(segments: segments, language: "en", modelName: "tiny"))
         #expect(out.segments.map(\.text) == ["Hello there", "Thank you."])
     }
+
+    @Test("the pane's Reset and the model's reload bring the suggested list back")
+    func paneResetThroughTheService() {
+        let previous = DefaultsStore.current
+        let defaults = temporaryDefaults()
+        DefaultsStore.current = defaults
+        defer { DefaultsStore.current = previous }
+        let model = makeModel(defaults)
+        model.ignoredSegmentRules = [IgnoredSegmentRule(pattern: "mine")]
+
+        SettingsResetService.reset(scope: .ignoredSegments)
+        model.reloadSettings()
+
+        #expect(model.ignoredSegmentRules.map(\.pattern) == SuggestedIgnoredPhrases.defaults)
+    }
+
+    @Test("importing a subtitle file keeps its tags with the suggested rules on")
+    func subtitleImportRunsNoIgnoreRules() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("SuggestedPhrasesImport-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        let srt = """
+        1
+        00:00:00,000 --> 00:00:02,000
+        [Music]
+
+        2
+        00:00:02,500 --> 00:00:04,000
+        ♪♪
+
+        3
+        00:00:04,500 --> 00:00:06,000
+        (upbeat music)
+
+        4
+        00:00:06,500 --> 00:00:08,000
+        Thanks for watching!
+        """
+        let url = scratch.appendingPathComponent("tags.srt")
+        try Data(srt.utf8).write(to: url)
+        let model = makeModel(temporaryDefaults())
+        #expect(model.ignoredSegmentRules.count == SuggestedIgnoredPhrases.defaults.count)
+
+        model.importSubtitle(fileURL: url)
+
+        #expect(model.transcript?.segments.map(\.text) == ["[Music]", "♪♪", "(upbeat music)", "Thanks for watching!"])
+    }
 }

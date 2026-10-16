@@ -98,8 +98,11 @@ struct AppModelRulesTests {
     }
 
     @Test("a fresh model with no stored rules starts with the suggested ignore phrases")
-    func defaultsAreEmpty() throws {
-        let model = try makeModel(defaults: freshDefaults())
+    func freshModelSeedsSuggestedPhrases() throws {
+        let defaults = freshDefaults()
+        let model = try makeModel(defaults: defaults)
+        let reader = makeReader(defaults: defaults)
+        #expect(reader.ignoredSegmentRules == model.ignoredSegmentRules)
         #expect(model.autoExportRules.isEmpty)
         #expect(model.ignoredSegmentRules.map(\.pattern) == SuggestedIgnoredPhrases.defaults)
         #expect(model.findReplaceRules.isEmpty)

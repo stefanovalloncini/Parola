@@ -16,7 +16,9 @@ struct HallucinationPhrasesTests {
             seg(1, "Subtitles by the Amara.org community"),
             seg(2, "Sottotitoli e revisione a cura di QTSS"),
             seg(3, "Untertitel der Amara.org-Community"),
-            seg(4, "字幕由Amara.org社区提供")
+            seg(4, "字幕由Amara.org社区提供"),
+            seg(5, "Sous-titrage Société Radio-Canada"),
+            seg(6, "CC por Antarctica Films Argentina.")
         ]
 
         let out = IgnoredSegments.applyBuiltInDefaults(to: input)

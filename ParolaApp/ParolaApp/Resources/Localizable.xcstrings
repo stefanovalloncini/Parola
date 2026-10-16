@@ -22547,17 +22547,6 @@
         }
       }
     },
-    "No new phrases.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nessuna frase nuova."
-          }
-        }
-      }
-    },
     "Phrases added: %lld": {
       "extractionState": "manual",
       "localizations": {
@@ -22575,7 +22564,18 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Un segmento viene rimosso quando tutto il suo testo è uguale a un pattern, senza contare maiuscole e punteggiatura intorno. I modelli vocali a volte inventano frasi come “Thanks for watching!” o “[Music]” sul silenzio o sulla musica: le frasi suggerite le tolgono. Vale per le nuove trascrizioni; quelle salvate non cambiano."
+            "value": "Un segmento viene rimosso quando tutto il suo testo è uguale a un pattern, ignorando maiuscole e punteggiatura ai bordi. Durante il silenzio o la musica i modelli di trascrizione a volte inventano frasi come “Grazie per la visione!” o “[Music]”: le frasi suggerite le tolgono. Vale per le nuove trascrizioni; quelle salvate non cambiano."
+          }
+        }
+      }
+    },
+    "Replaces your patterns with the suggested phrases.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sostituisce i tuoi pattern con le frasi suggerite."
           }
         }
       }

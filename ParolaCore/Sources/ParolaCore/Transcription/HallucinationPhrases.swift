@@ -18,7 +18,9 @@ public enum HallucinationPhrases {
         "Ondertiteling door de Amara.org gemeenschap",
         "Субтитры сделал DimaTorzok",
         "Субтитры создавал DimaTorzok",
-        "字幕由Amara.org社区提供"
+        "字幕由Amara.org社区提供",
+        "Sous-titrage Société Radio-Canada",
+        "CC por Antarctica Films Argentina"
     ]
 
     static let matchSet: Set<String> = Set(defaults.map(IgnoredSegments.normalized))

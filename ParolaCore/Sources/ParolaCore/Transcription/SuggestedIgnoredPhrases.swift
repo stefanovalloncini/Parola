@@ -20,6 +20,7 @@ public enum SuggestedIgnoredPhrases {
         "(upbeat music)",
         "♪",
         "[Música]",
+        "[Musica]",
         "[Musique]",
         "[Musik]",
         "Grazie per la visione!",
@@ -33,6 +34,7 @@ public enum SuggestedIgnoredPhrases {
         "Abonnez-vous !",
         "Danke fürs Zuschauen!",
         "Vielen Dank fürs Zuschauen.",
+        "Vielen Dank für's Zuschauen.",
         "Untertitel im Auftrag des ZDF für funk, 2017",
         "Untertitel im Auftrag des ZDF, 2018",
         "Untertitel im Auftrag des ZDF, 2020",
@@ -44,10 +46,14 @@ public enum SuggestedIgnoredPhrases {
         "Спасибо за просмотр!",
         "Подписывайтесь на канал!",
         "Редактор субтитров А.Семкин Корректор А.Егорова",
+        "Редактор субтитров А.Синецкая Корректор А.Егорова",
         "ご視聴ありがとうございました",
         "チャンネル登録をお願いします",
+        "チャンネル登録をよろしくお願いします!",
         "谢谢观看",
-        "请不吝点赞 订阅 转发 打赏支持明镜与点点栏目"
+        "请不吝点赞 订阅 转发 打赏支持明镜与点点栏目",
+        "请不吝点赞订阅转发打赏支持明镜与点点栏目",
+        "請不吝點贊訂閱轉發打賞支持明鏡與點點欄目"
     ]
 
     public static func rules() -> [IgnoredSegmentRule] {

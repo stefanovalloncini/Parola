@@ -42,6 +42,7 @@ public enum SentenceMerger {
         limits: SentenceMergeLimits
     ) -> Bool {
         guard open.speaker == next.speaker else { return false }
+        guard !isNonSpeechTag(open.text), !isNonSpeechTag(next.text) else { return false }
         guard (open.words == nil) == (next.words == nil) else { return false }
         guard !endsSentence(open.text) else { return false }
         guard next.start - open.end <= limits.maximumGapSeconds else { return false }
@@ -66,6 +67,12 @@ public enum SentenceMerger {
 
     private static func wordCount(_ text: String) -> Int {
         text.split(whereSeparator: \.isWhitespace).count
+    }
+
+    private static func isNonSpeechTag(_ text: String) -> Bool {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if IgnoredSegments.normalized(trimmed).isEmpty { return true }
+        return (trimmed.hasPrefix("[") && trimmed.hasSuffix("]")) || (trimmed.hasPrefix("(") && trimmed.hasSuffix(")"))
     }
 
     private static func endsSentence(_ text: String) -> Bool {

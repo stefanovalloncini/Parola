@@ -3001,7 +3001,7 @@ final class AppModel {
             phase = .failed(message: "No subtitles found in \(fileURL.lastPathComponent).")
             return
         }
-        let processed = postProcess(imported)
+        let processed = TranscriptPostProcessor(ignoredRules: [], findReplaceRules: findReplaceRules).apply(imported)
         let landing = Self.landingSignposter.beginInterval("install")
         defer { Self.landingSignposter.endInterval("install", landing) }
         clearDerivedArtifacts()
