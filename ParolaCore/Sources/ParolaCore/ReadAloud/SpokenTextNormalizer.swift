@@ -483,6 +483,19 @@ public enum SpokenTextNormalizer {
         "ride", "ridendo", "risata", "risate", "applausi", "sospira", "tossisce", "silenzio", "pausa",
     ]
 
+    private static let bracketSoundWords: Set<String> = [
+        "music", "applause", "laughter", "laughs", "silence", "inaudible", "crosstalk", "noise",
+        "musica", "applausi", "risate", "silenzio",
+    ]
+
+    private static func looksLikeMarker(_ content: String) -> Bool {
+        let words = content.split(whereSeparator: { $0.isWhitespace || $0 == "_" })
+        guard let last = words.last else { return true }
+        if bracketSoundWords.contains(last.lowercased()) { return true }
+        let letters = content.filter(\.isLetter)
+        return !letters.isEmpty && letters == letters.uppercased()
+    }
+
     private static let urlWrapperPairs: [(open: String, close: String)] = [
         ("(", ")"), ("[", "]"), ("<", ">"), ("\"", "\""),
     ]
@@ -496,7 +509,10 @@ public enum SpokenTextNormalizer {
                 || character.unicodeScalars.last?.value == 0x20E3
             return !isEmoji
         })
-        result = replaceMatches(pattern: "\\[[^\\]]*\\]", in: result) { _, _ in "" }
+        result = replaceMatches(pattern: "\\[([^\\]]*)\\]", in: result) { match, ns in
+            let content = ns.substring(with: match.range(at: 1))
+            return looksLikeMarker(content) ? "" : content
+        }
         result = replaceMatches(pattern: "\\(([^()]*)\\)", options: [.caseInsensitive], in: result) { match, ns in
             let content = ns.substring(with: match.range(at: 1)).trimmingCharacters(in: .whitespaces).lowercased()
             return nonSpeechParentheticals.contains(content) ? "" : nil
@@ -529,9 +545,11 @@ public enum SpokenTextNormalizer {
 
     /// Collapses whitespace and drops every Unicode format character (category Cf — soft hyphens from
     /// `NumberFormatter`'s Italian spell-out, zero-width spaces, BOM, …), which a TTS engine would
-    /// otherwise tokenize as a stray click or pause.
+    /// otherwise tokenize as a stray click or pause. The joiners U+200C and U+200D stay: Persian and Indic words need them.
     private static func finish(_ text: String) -> String {
-        let withoutFormatCharacters = String(text.unicodeScalars.filter { $0.properties.generalCategory != .format })
+        let withoutFormatCharacters = String(text.unicodeScalars.filter {
+            $0.properties.generalCategory != .format || $0.value == 0x200C || $0.value == 0x200D
+        })
         return withoutFormatCharacters.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }.joined(separator: " ")
     }
 

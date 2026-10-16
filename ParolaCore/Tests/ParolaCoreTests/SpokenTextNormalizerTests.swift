@@ -175,6 +175,34 @@ struct SpokenTextNormalizerTests {
         #expect(SpokenTextNormalizer.normalize("[Music]", language: "en") == "")
     }
 
+    @Test("a bracket span is dropped only when it looks like a marker", arguments: [
+        ("He said [the report] was late.", "He said the report was late."),
+        ("It was [Music] again.", "It was again."),
+        ("Then [BLANK_AUDIO] followed.", "Then followed."),
+        ("Then [BACKGROUND NOISE] followed.", "Then followed."),
+        ("Poi [risate] e basta.", "Poi e basta."),
+        ("Poi [Applausi] e basta.", "Poi e basta."),
+        ("Then [people laughing] left.", "Then people laughing left."),
+        ("Then [crowd laughter] left.", "Then left."),
+        ("Then [inaudible] left.", "Then left."),
+        ("Then [CROSSTALK] left.", "Then left."),
+        ("See [note] here.", "See note here."),
+        ("[Music] and [the end]", "and the end"),
+    ])
+    func bracketSpans(input: String, expected: String) {
+        #expect(SpokenTextNormalizer.normalize(input, language: "en") == expected)
+        #expect(SpokenTextNormalizer.strippingNonSpeechText(input) == expected)
+    }
+
+    @Test("Persian words keep their zero-width non-joiner and joiner")
+    func zeroWidthJoinersSurvive() {
+        let persian = "می\u{200C}خواهم"
+        #expect(SpokenTextNormalizer.strippingNonSpeechText(persian) == persian)
+        #expect(SpokenTextNormalizer.normalize(persian, language: "fa") == persian)
+        let joined = "a\u{200D}b"
+        #expect(SpokenTextNormalizer.strippingNonSpeechText(joined) == joined)
+    }
+
     @Test("an emoji is stripped and whitespace collapses")
     func emojiIsStripped() {
         #expect(SpokenTextNormalizer.normalize("Great news! 🎉 Let's go.", language: "en") == "Great news! Let's go.")
