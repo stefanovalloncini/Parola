@@ -130,9 +130,12 @@ public actor FolderWatcher {
         }
 
         public var entries: [Entry]
+        /// Whether the watcher that made this looked inside subfolders; nil for a baseline saved before that was recorded.
+        public var recursive: Bool?
 
-        public init(entries: [Entry] = []) {
+        public init(entries: [Entry] = [], recursive: Bool? = nil) {
             self.entries = entries
+            self.recursive = recursive
         }
     }
 
@@ -226,10 +229,10 @@ public actor FolderWatcher {
     }
 
     /// Without a baseline every file already in the folder counts as seen, as when a folder is first
-    /// added. With one, files the baseline doesn't account for arrive once they settle, except, with
-    /// `countsSubfolderFilesAsSeen`, those inside subfolders. Ends in `.watching`, or `.unavailable`
-    /// when the folder can't be opened.
-    public func start(baseline: Baseline? = nil, countsSubfolderFilesAsSeen: Bool = false) async {
+    /// added. With one, files the baseline doesn't account for arrive once they settle, except those inside
+    /// subfolders when the baseline was made without looking there and this watcher does. Ends in
+    /// `.watching`, or `.unavailable` when the folder can't be opened.
+    public func start(baseline: Baseline? = nil) async {
         guard fileDescriptor < 0 else { return }
         seed = baseline
         hasScanned = false
@@ -277,6 +280,7 @@ public actor FolderWatcher {
             let listedKeys = Set(listed.map(\.key))
             var vanished = pathIndex(files.keys.filter { !listedKeys.contains($0) })
             let accountedFor = Set(files.keys)
+            let countsSubfolderFilesAsSeen = options.recursive && baseline.recursive == false
             for item in listed {
                 resolve(item, vanished: &vanished, now: now)
                 if countsSubfolderFilesAsSeen, !accountedFor.contains(item.key), files[item.key]?.status == .pending,
@@ -698,7 +702,7 @@ public actor FolderWatcher {
                 created: file.created
             )
         }
-        return Baseline(entries: entries.sorted { $0.path < $1.path })
+        return Baseline(entries: entries.sorted { $0.path < $1.path }, recursive: options.recursive)
     }
 
     private func publishBaselineChange() {

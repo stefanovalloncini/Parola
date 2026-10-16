@@ -98,7 +98,7 @@ struct FolderWatcherBaselineTests {
 
         let scheduler = ManualScheduler()
         let after = makeWatcher(folder, clock: clock, scheduler: scheduler, collected: collected)
-        await after.start(baseline: saved, countsSubfolderFilesAsSeen: true)
+        await after.start(baseline: saved)
         #expect(Fixture.names(await after.pendingPaths) == ["later.mp3"])
         try await scheduler.advance(ticks: 3)
         let kept = await after.baseline()?.entries.map(\.path) ?? []
@@ -106,6 +106,35 @@ struct FolderWatcherBaselineTests {
 
         #expect(collected.snapshot().map(\.lastPathComponent) == ["later.mp3"])
         #expect(kept.contains("Archive/old.wav"))
+    }
+
+    @Test("a baseline made without subfolders is recognised from its saved depth, through JSON, at any later start")
+    func wideningIsDecidedFromTheBaseline() async throws {
+        let folder = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let clock = FixedClock(start: Date())
+        let collected = CollectedURLs()
+        let narrow = FolderWatcher.Options(recursive: false, settledInterval: .milliseconds(50), clock: clock, scheduler: ManualScheduler())
+        let before = FolderWatcher(folderURL: folder, options: narrow) { collected.append($0) }
+        await before.start()
+        let data = try JSONEncoder().encode(try #require(await before.baseline()))
+        await before.stop()
+        try FileManager.default.createDirectory(at: folder.appendingPathComponent("Archive"), withIntermediateDirectories: true)
+        try Fixture.writeSettled(folder.appendingPathComponent("Archive/old.wav"), clock: clock)
+
+        let scheduler = ManualScheduler()
+        let after = makeWatcher(folder, clock: clock, scheduler: scheduler, collected: collected)
+        await after.start(baseline: try JSONDecoder().decode(FolderWatcher.Baseline.self, from: data))
+        #expect(await after.pendingPaths.isEmpty)
+        let saved = try #require(await after.baseline())
+        await after.stop()
+        #expect(saved.recursive == true)
+
+        try Fixture.writeSettled(folder.appendingPathComponent("Archive/new.wav"), clock: clock)
+        let again = makeWatcher(folder, clock: clock, scheduler: scheduler, collected: collected)
+        await again.start(baseline: saved)
+        #expect(Fixture.names(await again.pendingPaths) == ["new.wav"])
+        await again.stop()
     }
 
     @Test("a baseline read back from JSON still matches after the folder was renamed")
