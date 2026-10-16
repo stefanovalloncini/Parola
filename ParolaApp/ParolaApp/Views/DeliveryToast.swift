@@ -57,11 +57,13 @@ struct DeliveryToast: View {
         switch notice.state {
         case .sent(let location):
             if let location, !location.isFileURL {
-                Button("Open") {
-                    NSWorkspace.shared.open(location)
+                if location.scheme?.lowercased() == "https" {
+                    Button("Open") {
+                        NSWorkspace.shared.open(location)
+                    }
+                    .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
+                    .axLeaf("Delivery.Button.Open")
                 }
-                .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
-                .axLeaf("Delivery.Button.Open")
             } else if let location {
                 Button("Reveal") {
                     NSWorkspace.shared.activateFileViewerSelecting([location])

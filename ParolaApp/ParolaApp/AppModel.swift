@@ -1086,11 +1086,16 @@ final class AppModel {
     /// A notice waiting to be dismissed that a newer one went over: it comes back once the strip is clear again. One deep, never a queue.
     @ObservationIgnored var coveredNotice: ExportNotice?
     @ObservationIgnored lazy var deliveryEngine: DeliveryEngine = makeDeliveryEngine()
-    /// A sandbox or a test keeps destination secrets in memory, the way it keeps API keys.
     @ObservationIgnored lazy var deliveryEnvironment = DeliveryEnvironment(
-        secrets: apiKeyStore is InMemoryAPIKeyStore ? InMemorySecretStore() : KeychainSecretStore.shared,
-        transport: { URLSessionTransport(trust: $0) },
-        clock: clock
+        secrets: deliverySecrets,
+        transport: { URLSessionTransport.shared(trust: $0) },
+        clock: clock,
+        notionHeadings: NotionHeadings(
+            summary: String(localized: "Summary"),
+            actionItems: String(localized: "Action Items"),
+            chapters: String(localized: "Chapters"),
+            transcript: String(localized: "Transcript")
+        )
     )
     @ObservationIgnored var volumeMountObservation: NotificationObservation?
 
@@ -2454,6 +2459,7 @@ final class AppModel {
     @ObservationIgnored let clock: any Clock<Duration>
     @ObservationIgnored let managedConfiguration: ManagedConfiguration
     @ObservationIgnored let apiKeyStore: any APIKeyStore
+    @ObservationIgnored let deliverySecrets: any SecretStore
 
     // MARK: - Bootstrap
 
@@ -2466,6 +2472,8 @@ final class AppModel {
         // A sandbox or a test must never reach the real keychain, so test mode keeps keys in memory.
         self.apiKeyStore = bootstrap.apiKeyStore
             ?? (bootstrap.mode == .test ? InMemoryAPIKeyStore() : KeychainAPIKeyStore.shared)
+        self.deliverySecrets = bootstrap.deliverySecrets
+            ?? (bootstrap.mode == .test ? InMemorySecretStore() : KeychainSecretStore.shared)
         self.features = bootstrap.enabledFeaturesOverride.map(FeatureSet.init(enabled:))
             ?? FeatureSet.resolve(managed: managed)
         let engineChoices = IntroductionEngineChoices.compute(
@@ -2617,7 +2625,8 @@ final class AppModel {
             filePicker: filePicker,
             enabledFeaturesOverride: features,
             // A test that skips bootstrap must not reach the real keychain either.
-            apiKeyStore: apiKeyStore ?? (skipBootstrap ? InMemoryAPIKeyStore() : nil)
+            apiKeyStore: apiKeyStore ?? (skipBootstrap ? InMemoryAPIKeyStore() : nil),
+            deliverySecrets: skipBootstrap ? InMemorySecretStore() : nil
         )
         self.init(bootstrap: bootstrap)
     }

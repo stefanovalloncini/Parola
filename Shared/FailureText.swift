@@ -57,6 +57,8 @@ enum FailureText {
             return String(localized: "Parola stopped trying to send to \(name).", bundle: bundle)
         case .alreadySending(let name):
             return String(localized: "Parola is already sending that transcript to \(name).", bundle: bundle)
+        case .rejected(_, let error):
+            return message(for: error, bundle: bundle)
         }
     }
 
@@ -148,14 +150,40 @@ enum FailureText {
             return detail.isEmpty
                 ? String(localized: "\(name) answered HTTP \(status).", bundle: bundle)
                 : String(localized: "\(name) answered HTTP \(status). \(detail)", bundle: bundle)
-        case .networkFailed(let host, let text):
-            return String(localized: "Parola couldn't reach \(host). \(text)", bundle: bundle)
+        case .networkFailed(let host, let failure):
+            return String(localized: "Parola couldn't reach \(host). \(networkFailure(failure, bundle: bundle))", bundle: bundle)
         case .missingSecret(let name):
             return String(localized: "\(name) has no saved key. Enter it again in Send To settings.", bundle: bundle)
-        case .invalidSetup(let name, let text):
-            return String(localized: "\(name) isn't set up correctly. \(text)", bundle: bundle)
-        case .partialDelivery(let name, let sent, let total, let text):
-            return String(localized: "\(name) got \(sent) of \(total) blocks before it failed, and the page stays there. \(text)", bundle: bundle)
+        case .invalidSetup(let name, let problem):
+            return String(localized: "\(name) isn't set up correctly. \(setupProblem(problem, bundle: bundle))", bundle: bundle)
+        case .partialDelivery(let name, let sent, let total, let underlying, _):
+            return String(localized: "\(name) got \(sent) of \(total) blocks before it failed, and the page stays there. \(delivery(underlying, bundle: bundle))", bundle: bundle)
+        }
+    }
+
+    private nonisolated static func networkFailure(_ failure: NetworkFailure, bundle: Bundle) -> String {
+        switch failure {
+        case .offline: return String(localized: "There is no internet connection.", bundle: bundle)
+        case .timedOut: return String(localized: "The server took too long to answer.", bundle: bundle)
+        case .cannotConnect: return String(localized: "The server refused the connection.", bundle: bundle)
+        case .hostNotFound: return String(localized: "The address couldn't be found.", bundle: bundle)
+        case .tlsFailed: return String(localized: "The server's certificate isn't trusted.", bundle: bundle)
+        case .cancelled: return String(localized: "The send was cancelled.", bundle: bundle)
+        case .other: return String(localized: "The connection failed.", bundle: bundle)
+        }
+    }
+
+    private nonisolated static func setupProblem(_ problem: SetupProblem, bundle: Bundle) -> String {
+        switch problem {
+        case .notionPage: return String(localized: "Paste the link of the Notion page to add transcripts under.", bundle: bundle)
+        case .address(let error):
+            switch error {
+            case .empty: return String(localized: "Enter the webhook address.", bundle: bundle)
+            case .notAURL: return String(localized: "That isn't a web address.", bundle: bundle)
+            case .unsupportedScheme: return String(localized: "The address has to start with https:// or http://.", bundle: bundle)
+            case .insecurePublicHost:
+                return String(localized: "An address on the internet has to start with https://. Plain http:// is only for this Mac and your local network.", bundle: bundle)
+            }
         }
     }
 

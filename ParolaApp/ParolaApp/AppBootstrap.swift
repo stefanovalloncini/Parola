@@ -19,6 +19,8 @@ struct AppBootstrap: @unchecked Sendable {
     /// Where API keys are read and written. Left nil, a test-mode launch keeps them in memory and
     /// a normal launch uses the keychain, so a sandbox never writes into the real one.
     let apiKeyStore: (any APIKeyStore)?
+    /// Where Send To secrets live, with the same default as `apiKeyStore`.
+    let deliverySecrets: (any SecretStore)?
     /// Nil fetches links through yt-dlp.
     let linkFetcher: (any LinkFetcher)?
 
@@ -35,6 +37,7 @@ struct AppBootstrap: @unchecked Sendable {
         fileReadDeadline: Duration = FileReadDeadline.header,
         showsIntroduction: Bool = false,
         apiKeyStore: (any APIKeyStore)? = nil,
+        deliverySecrets: (any SecretStore)? = nil,
         linkFetcher: (any LinkFetcher)? = nil
     ) {
         self.mode = mode
@@ -49,6 +52,7 @@ struct AppBootstrap: @unchecked Sendable {
         self.fileReadDeadline = fileReadDeadline
         self.showsIntroduction = showsIntroduction
         self.apiKeyStore = apiKeyStore
+        self.deliverySecrets = deliverySecrets
         self.linkFetcher = linkFetcher
     }
 
@@ -92,7 +96,8 @@ struct AppBootstrap: @unchecked Sendable {
             defaultsSuite: sandbox.defaultsSuite,
             sideEffects: [],
             filePicker: TestFilePicker(),
-            apiKeyStore: InMemoryAPIKeyStore()
+            apiKeyStore: InMemoryAPIKeyStore(),
+            deliverySecrets: InMemorySecretStore()
         )
     }
 

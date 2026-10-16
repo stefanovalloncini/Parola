@@ -148,7 +148,7 @@ public struct WebhookDestination: DeliveryDestinationSettings, Codable, Sendable
         let url: URL
         switch WebhookURLPolicy.validate(urlText) {
         case .success(let valid): url = valid
-        case .failure(let error): throw DeliveryError.invalidSetup(name, error.message)
+        case .failure(let error): throw DeliveryError.invalidSetup(name, .address(error))
         }
         var request = URLRequest(url: url, timeoutInterval: URLSessionTransport.timeout)
         request.httpMethod = "POST"
@@ -157,7 +157,7 @@ public struct WebhookDestination: DeliveryDestinationSettings, Codable, Sendable
         for header in headers {
             let headerName = header.name.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !headerName.isEmpty else { continue }
-            let value = try await environment.secrets.get(header.secretRef) ?? ""
+            let value = try await environment.secret(header.secretRef, destination: name)
             request.setValue(value, forHTTPHeaderField: headerName)
         }
         request.httpBody = try WebhookBody(payload, includeSegments: includeSegments).encoded()

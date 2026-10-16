@@ -119,7 +119,7 @@ public struct ObsidianLocalRESTDestination: DeliveryDestinationSettings, Codable
     private func baseURL() throws -> URL {
         switch Self.validateBaseURL(baseURLText) {
         case .success(let url): return url
-        case .failure(let error): throw DeliveryError.invalidSetup(name, error.message)
+        case .failure(let error): throw DeliveryError.invalidSetup(name, .address(error))
         }
     }
 
@@ -174,11 +174,11 @@ public struct ObsidianLocalRESTDestination: DeliveryDestinationSettings, Codable
 
     private func makeRequest(_ method: String, path: String, base: URL, key: String) throws -> URLRequest {
         guard var components = URLComponents(url: base, resolvingAgainstBaseURL: false) else {
-            throw DeliveryError.invalidSetup(name, WebhookURLError.notAURL.message)
+            throw DeliveryError.invalidSetup(name, .address(.notAURL))
         }
         components.percentEncodedPath = components.percentEncodedPath + path
         guard let url = components.url else {
-            throw DeliveryError.invalidSetup(name, WebhookURLError.notAURL.message)
+            throw DeliveryError.invalidSetup(name, .address(.notAURL))
         }
         var request = URLRequest(url: url, timeoutInterval: URLSessionTransport.timeout)
         request.httpMethod = method

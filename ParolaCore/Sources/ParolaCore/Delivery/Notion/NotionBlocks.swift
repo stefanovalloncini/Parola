@@ -8,26 +8,39 @@ public enum NotionBlocks {
     static let paragraphTarget = 1000
     static let maxRunsPerBlock = 50
 
-    public static func blocks(for payload: DeliveryPayload) -> [DestinationConfig] {
+    public static func blocks(for payload: DeliveryPayload, headings: NotionHeadings = NotionHeadings()) -> [DestinationConfig] {
         var blocks: [DestinationConfig] = []
+        func heading(_ text: String) {
+            blocks.append(block("heading_2", ["rich_text": .array(richText(text))]))
+        }
         if let summary = payload.summary {
             let paragraphs = summary.text.components(separatedBy: "\n\n")
                 .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
                 .filter { !$0.isEmpty }
-            for paragraph in paragraphs {
-                blocks.append(contentsOf: textBlocks(type: "paragraph", runs: richText(paragraph)))
+            if !paragraphs.isEmpty {
+                heading(headings.summary)
+                for paragraph in paragraphs {
+                    blocks.append(contentsOf: textBlocks(type: "paragraph", runs: richText(paragraph)))
+                }
             }
-            for item in summary.actionItems where !item.trimmingCharacters(in: .whitespaces).isEmpty {
-                blocks.append(block("to_do", ["rich_text": .array(richText(item)), "checked": .bool(false)]))
+            let items = summary.actionItems.filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+            if !items.isEmpty {
+                heading(headings.actionItems)
+                for item in items {
+                    blocks.append(block("to_do", ["rich_text": .array(richText(item)), "checked": .bool(false)]))
+                }
             }
-            for chapter in summary.chapters {
-                let line = "\(Timecode.format(chapter.start)) \(chapter.title)"
-                blocks.append(contentsOf: textBlocks(type: "bulleted_list_item", runs: richText(line)))
+            if !summary.chapters.isEmpty {
+                heading(headings.chapters)
+                for chapter in summary.chapters {
+                    let line = "\(Timecode.format(chapter.start)) \(chapter.title)"
+                    blocks.append(contentsOf: textBlocks(type: "bulleted_list_item", runs: richText(line)))
+                }
             }
         }
         let turns = transcriptTurns(payload.transcript)
         if !turns.isEmpty {
-            blocks.append(block("heading_2", ["rich_text": .array(richText("Transcript"))]))
+            heading(headings.transcript)
             for turn in turns {
                 var runs: [DestinationConfig] = []
                 if let speaker = turn.speaker { runs.append(run(speaker + " ", bold: true)) }
@@ -38,49 +51,55 @@ public enum NotionBlocks {
         return blocks
     }
 
-    /// Runs of at most `limit` UTF-16 units, split at a space where there is one.
+    /// Runs of at most `limit` UTF-16 units that join back into the text exactly, each cut after a space
+    /// where there is one and between characters otherwise.
     public static func chunks(_ text: String, limit: Int = maxRunLength) -> [String] {
         guard text.utf16.count > limit else { return text.isEmpty ? [] : [text] }
         var result: [String] = []
-        var current = ""
-        var currentUnits = 0
-        func flush() {
-            if !current.isEmpty { result.append(current) }
-            current = ""
-            currentUnits = 0
-        }
-        for word in text.split(separator: " ", omittingEmptySubsequences: false) {
-            let units = word.utf16.count
-            if units > limit {
-                flush()
-                var piece = ""
-                var pieceUnits = 0
-                for character in word {
-                    let size = character.utf16.count
-                    if pieceUnits + size > limit {
-                        result.append(piece)
-                        piece = ""
-                        pieceUnits = 0
-                    }
-                    piece.append(character)
-                    pieceUnits += size
-                }
-                current = piece
-                currentUnits = pieceUnits
+        var current: [Character] = []
+        var units = 0
+        var breakAfter: Int?
+        for character in text {
+            let size = character.utf16.count
+            if size > limit {
+                if !current.isEmpty { result.append(String(current)) }
+                current = []
+                units = 0
+                breakAfter = nil
+                result.append(contentsOf: scalarPieces(of: character, limit: limit))
                 continue
             }
-            let needed = current.isEmpty ? units : currentUnits + 1 + units
-            if needed > limit {
-                flush()
-                current = String(word)
-                currentUnits = units
-            } else {
-                current = current.isEmpty ? String(word) : current + " " + word
-                currentUnits = needed
+            while units + size > limit {
+                let cut = breakAfter ?? current.count
+                result.append(String(current[..<cut]))
+                current = Array(current[cut...])
+                units = current.reduce(0) { $0 + $1.utf16.count }
+                breakAfter = nil
             }
+            current.append(character)
+            units += size
+            if character.isWhitespace { breakAfter = current.count }
         }
-        flush()
+        if !current.isEmpty { result.append(String(current)) }
         return result
+    }
+
+    private static func scalarPieces(of character: Character, limit: Int) -> [String] {
+        var pieces: [String] = []
+        var piece = String.UnicodeScalarView()
+        var units = 0
+        for scalar in character.unicodeScalars {
+            let size = scalar.utf16.count
+            if units + size > limit {
+                pieces.append(String(piece))
+                piece = String.UnicodeScalarView()
+                units = 0
+            }
+            piece.append(scalar)
+            units += size
+        }
+        if !piece.isEmpty { pieces.append(String(piece)) }
+        return pieces
     }
 
     static func richText(_ text: String, bold: Bool = false) -> [DestinationConfig] {

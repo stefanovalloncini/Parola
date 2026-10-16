@@ -280,6 +280,8 @@ private struct DestinationRow: View {
                 .pickerStyle(.menu)
                 .frame(width: 150, alignment: .trailing)
                 .axLeaf(leaf("Picker.TitleFormat"))
+            } else {
+                Color.clear.frame(width: 150, height: 1)
             }
         }
     }

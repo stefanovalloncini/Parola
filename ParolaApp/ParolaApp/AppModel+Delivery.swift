@@ -182,9 +182,17 @@ extension AppModel {
     /// only caller; a batch run never reaches it.
     func autoSendEntry(_ entryID: LibraryEntry.ID) async {
         guard destinationsEnabled else { return }
-        let attempts = await deliveryEngine.sendAutomatically(entryID: entryID)
-        guard !attempts.isEmpty else { return }
-        deliveryNotice = Self.notice(for: attempts, entryID: entryID)
+        let collector = AttemptCollector()
+        let attempts = await deliveryEngine.sendAutomatically(entryID: entryID) { [weak self] attempt in
+            let landed = await collector.add(attempt)
+            await self?.showAutoSendNotice(landed, entryID: entryID)
+        }
+        showAutoSendNotice(attempts, entryID: entryID)
+    }
+
+    private func showAutoSendNotice(_ attempts: [DeliveryAttempt], entryID: LibraryEntry.ID) {
+        guard let notice = Self.notice(for: attempts, entryID: entryID) else { return }
+        deliveryNotice = notice
     }
 
     /// One line for a fan-out: the first destination that did not deliver, or every destination
@@ -279,6 +287,16 @@ extension AppModel {
         case .queued(_, let nextAt): return .queued(nextAt)
         case .skipped(let reason): return .failed(FailureText.message(for: reason))
         }
+    }
+}
+
+/// The outcomes of an automatic send as they land, one destination at a time.
+private actor AttemptCollector {
+    private var attempts: [DeliveryAttempt] = []
+
+    func add(_ attempt: DeliveryAttempt) -> [DeliveryAttempt] {
+        attempts.append(attempt)
+        return attempts
     }
 }
 

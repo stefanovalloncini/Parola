@@ -8,6 +8,7 @@ struct NotionDestinationEditor: View {
     @State private var pageLink: String
     @State private var isSecretSaved = false
     @State private var saveError: String?
+    @State private var saving = false
     let isNew: Bool
     let onSave: (NotionDestination) -> Void
     let onCancel: () -> Void
@@ -26,7 +27,7 @@ struct NotionDestinationEditor: View {
     }
 
     var body: some View {
-        SheetFrame(title: isNew ? "New Destination" : "Edit Destination", onClose: onCancel) {
+        SheetFrame(title: isNew ? "New Destination" : "Edit Destination", onClose: cancel) {
             Form {
                 SettingsSection("Notion") {
                     SettingRow("Name", description: "What this destination is called in the Send to menu.") {
@@ -70,14 +71,15 @@ struct NotionDestinationEditor: View {
                     SettingsWarning(saveError).font(DS.Font.secondary)
                 }
                 Spacer()
-                Button("Cancel", action: onCancel)
+                Button("Cancel", action: cancel)
                     .sheetSecondaryAction()
+                    .disabled(saving)
                     .keyboardShortcut(.cancelAction)
                     .axLeaf("SendTo.Button.CancelEdit")
                 Button("Save", action: save)
                     .sheetPrimaryAction()
                     .keyboardShortcut(.defaultAction)
-                    .disabled(parsedPage == nil || draft.name.trimmingCharacters(in: .whitespaces).isEmpty || !(isSecretSaved || !secretInput.isEmpty))
+                    .disabled(parsedPage == nil || draft.name.trimmingCharacters(in: .whitespaces).isEmpty || !(isSecretSaved || !secretInput.isEmpty) || saving)
                     .axLeaf("SendTo.Button.Save")
             }
         }
@@ -98,7 +100,14 @@ struct NotionDestinationEditor: View {
         return await model.checkNotionConnection(candidate, unsavedSecrets: unsavedSecrets)
     }
 
+    private func cancel() {
+        guard !saving else { return }
+        onCancel()
+    }
+
     private func save() {
+        guard !saving else { return }
+        saving = true
         var cleaned = draft
         cleaned.parentPageID = parsedPage ?? ""
         let secrets = unsavedSecrets
@@ -108,6 +117,7 @@ struct NotionDestinationEditor: View {
                 onSave(cleaned)
             } catch {
                 saveError = FailureText.message(for: error)
+                saving = false
             }
         }
     }

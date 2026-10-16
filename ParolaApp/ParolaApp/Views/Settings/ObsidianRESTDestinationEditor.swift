@@ -7,6 +7,7 @@ struct ObsidianRESTDestinationEditor: View {
     @State private var keyInput = ""
     @State private var isKeySaved = false
     @State private var saveError: String?
+    @State private var saving = false
     let isNew: Bool
     let onSave: (ObsidianLocalRESTDestination) -> Void
     let onCancel: () -> Void
@@ -24,7 +25,7 @@ struct ObsidianRESTDestinationEditor: View {
     }
 
     var body: some View {
-        SheetFrame(title: isNew ? "New Destination" : "Edit Destination", onClose: onCancel) {
+        SheetFrame(title: isNew ? "New Destination" : "Edit Destination", onClose: cancel) {
             Form {
                 connectionSection
                 namingSection
@@ -48,14 +49,15 @@ struct ObsidianRESTDestinationEditor: View {
                     SettingsWarning(saveError).font(DS.Font.secondary)
                 }
                 Spacer()
-                Button("Cancel", action: onCancel)
+                Button("Cancel", action: cancel)
                     .sheetSecondaryAction()
+                    .disabled(saving)
                     .keyboardShortcut(.cancelAction)
                     .axLeaf("SendTo.Button.CancelEdit")
                 Button("Save", action: save)
                     .sheetPrimaryAction()
                     .keyboardShortcut(.defaultAction)
-                    .disabled(!addressIsValid || draft.name.trimmingCharacters(in: .whitespaces).isEmpty || !(isKeySaved || !keyInput.isEmpty))
+                    .disabled(!addressIsValid || draft.name.trimmingCharacters(in: .whitespaces).isEmpty || !(isKeySaved || !keyInput.isEmpty) || saving)
                     .axLeaf("SendTo.Button.Save")
             }
         }
@@ -87,6 +89,12 @@ struct ObsidianRESTDestinationEditor: View {
                 SettingsWarning(message)
                     .font(DS.Font.secondary)
                     .axLeaf("SendTo.Label.AddressProblem")
+            }
+            if isUnencrypted {
+                Label("Not encrypted. Anyone on the network can read what Parola sends.", systemImage: "lock.open.fill")
+                    .font(DS.Font.secondary)
+                    .foregroundStyle(DS.Color.secondaryText)
+                    .axLeaf("SendTo.Label.NotEncrypted")
             }
             SecretFieldRow(
                 title: "API key",
@@ -147,6 +155,11 @@ struct ObsidianRESTDestinationEditor: View {
         return String(localized: "Use an https:// address, or an http:// one on this Mac or your local network.")
     }
 
+    private var isUnencrypted: Bool {
+        guard case .success(let url) = ObsidianLocalRESTDestination.validateBaseURL(draft.baseURLText) else { return false }
+        return WebhookURLPolicy.isUnencrypted(url) && !LoopbackTrust.isLoopback(host: url.host ?? "")
+    }
+
     private var unsavedSecrets: [String: String] {
         keyInput.isEmpty ? [:] : [draft.secretRef: keyInput]
     }
@@ -159,7 +172,14 @@ struct ObsidianRESTDestinationEditor: View {
         await model.sendObsidianRESTTestNote(draft, unsavedSecrets: unsavedSecrets)
     }
 
+    private func cancel() {
+        guard !saving else { return }
+        onCancel()
+    }
+
     private func save() {
+        guard !saving else { return }
+        saving = true
         var cleaned = draft
         cleaned.baseURLText = cleaned.baseURLText.trimmingCharacters(in: .whitespacesAndNewlines)
         let secrets = unsavedSecrets
@@ -169,6 +189,7 @@ struct ObsidianRESTDestinationEditor: View {
                 onSave(cleaned)
             } catch {
                 saveError = FailureText.message(for: error)
+                saving = false
             }
         }
     }

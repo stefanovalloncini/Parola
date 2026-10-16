@@ -87,6 +87,24 @@ struct DeliveryNetworkTests {
         ("http://nas/hook", true),
         ("http://example.com/hook", false),
         ("http://8.8.8.8/hook", false),
+        ("http://134744072/hook", false),
+        ("http://0x08080808/hook", false),
+        ("http://0x8.8.8.8/hook", false),
+        ("http://010.0.0.1/hook", false),
+        ("http://127.1/hook", true),
+        ("http://169.254.10.1/hook", true),
+        ("http://[fe80::1]/hook", true),
+        ("http://[febf::1]/hook", true),
+        ("http://[fe90::1]/hook", true),
+        ("http://[fec0::1]/hook", false),
+        ("http://[fd12:3456::1]/hook", true),
+        ("http://[fc00::1]/hook", true),
+        ("http://[fc::1]/hook", false),
+        ("http://[2001:db8::1]/hook", false),
+        ("http://[::ffff:127.0.0.1]/hook", false),
+        ("http://nas.lan/hook", true),
+        ("http://box.home.arpa/hook", true),
+        ("http://123/hook", false),
         ("ftp://example.com/hook", false),
         ("example.com/hook", false),
         ("", false),
@@ -185,7 +203,7 @@ struct DeliveryNetworkTests {
         #expect(NotionPageID.parse(text) == nil)
     }
 
-    @Test("blocks come in the order: summary, action items, chapters, transcript")
+    @Test("each present section opens with a heading, in the order summary, action items, chapters, transcript")
     func blockOrder() throws {
         var payload = ObsidianNoteRendererTests.payload()
         payload.summary = Summary(
@@ -195,16 +213,30 @@ struct DeliveryNetworkTests {
         )
         let blocks = NotionBlocks.blocks(for: payload)
         let types = blocks.compactMap { $0.object?["type"]?.string }
-        #expect(types == ["paragraph", "paragraph", "to_do", "bulleted_list_item", "bulleted_list_item", "heading_2", "paragraph", "paragraph", "paragraph"])
-        let chapterText = Self.plainText(blocks[3])
-        #expect(chapterText == "00:00 Welcome")
-        #expect(Self.plainText(blocks[4]) == "1:02:05 Later")
-        #expect(Self.plainText(blocks[5]) == "Transcript")
-        let first = try #require(blocks[6].object?["paragraph"]?.object?["rich_text"])
+        #expect(types == [
+            "heading_2", "paragraph", "paragraph",
+            "heading_2", "to_do",
+            "heading_2", "bulleted_list_item", "bulleted_list_item",
+            "heading_2", "paragraph", "paragraph", "paragraph",
+        ])
+        #expect([0, 3, 5, 8].map { Self.plainText(blocks[$0]) } == ["Summary", "Action Items", "Chapters", "Transcript"])
+        #expect(Self.plainText(blocks[6]) == "00:00 Welcome")
+        #expect(Self.plainText(blocks[7]) == "1:02:05 Later")
+        let first = try #require(blocks[9].object?["paragraph"]?.object?["rich_text"])
         guard case .array(let runs) = first else { Issue.record("no runs"); return }
         #expect(runs.first?.object?["annotations"]?.object?["bold"] == .bool(true))
         #expect(runs.first?.object?["text"]?.object?["content"]?.string == "Ada ")
         #expect(runs.last?.object?["text"]?.object?["content"]?.string == "Welcome back to the show.")
+    }
+
+    @Test("a section with nothing in it gets no heading, and the headings come from the environment")
+    func headingsAreOptionalAndLocalised() {
+        var payload = ObsidianNoteRendererTests.payload()
+        payload.summary = Summary(text: "Only a summary.")
+        let headings = NotionHeadings(summary: "Riepilogo", actionItems: "Azioni", chapters: "Capitoli", transcript: "Trascrizione")
+        let blocks = NotionBlocks.blocks(for: payload, headings: headings)
+        let headingTexts = blocks.filter { $0.object?["type"]?.string == "heading_2" }.map(Self.plainText)
+        #expect(headingTexts == ["Riepilogo", "Trascrizione"])
     }
 
     @Test("an unlabelled transcript has no bold run, and consecutive speech joins into a paragraph")
@@ -218,20 +250,45 @@ struct DeliveryNetworkTests {
         #expect(!String(describing: blocks[1]).contains("annotations"))
     }
 
-    @Test("no run is longer than 2000 characters")
+    @Test("no run is longer than 2000 characters and the runs join back into the text")
     func runLimit() {
-        let long = String(repeating: "word ", count: 1000)
+        let long = (0..<1500).map { "word\($0)" }.joined(separator: " ")
         let chunks = NotionBlocks.chunks(long)
-        #expect(chunks.count == 3)
+        #expect(chunks.count > 3)
         #expect(chunks.allSatisfy { $0.utf16.count <= 2000 })
-        #expect(chunks.joined(separator: " ").replacingOccurrences(of: "  ", with: " ").contains("word word"))
+        #expect(chunks.joined() == long)
+        #expect(chunks.dropLast().allSatisfy { $0.hasSuffix(" ") }, "cut after a space, not in the middle of a word")
 
         let unbroken = String(repeating: "x", count: 4500)
         #expect(NotionBlocks.chunks(unbroken).map(\.count) == [2000, 2000, 500])
-        let emoji = String(repeating: "😀", count: 1500)
-        #expect(NotionBlocks.chunks(emoji).allSatisfy { $0.utf16.count <= 2000 })
+        #expect(NotionBlocks.chunks(unbroken).joined() == unbroken)
+        let mixed = String(repeating: "ab ", count: 300) + String(repeating: "y", count: 2500) + " end"
+        #expect(NotionBlocks.chunks(mixed).joined() == mixed)
+        #expect(NotionBlocks.chunks(mixed).allSatisfy { $0.utf16.count <= 2000 })
         #expect(NotionBlocks.chunks("short") == ["short"])
         #expect(NotionBlocks.chunks("").isEmpty)
+    }
+
+    @Test("a cut never falls inside a character", arguments: [
+        String(repeating: "😀", count: 1500),
+        String(repeating: "👩‍👩‍👧‍👦", count: 400),
+        String(repeating: "e\u{301}", count: 1500),
+        String(repeating: "👩‍👩‍👧‍👦 ", count: 300),
+    ])
+    func graphemeSafeCuts(text: String) {
+        let chunks = NotionBlocks.chunks(text)
+        #expect(chunks.count > 1)
+        #expect(chunks.allSatisfy { $0.utf16.count <= 2000 && !$0.isEmpty })
+        #expect(chunks.joined() == text)
+        #expect(Array(chunks.joined()) == chunks.flatMap { Array($0) }, "every boundary is a character boundary")
+    }
+
+    @Test("one character longer than the limit is split by scalar without an empty run")
+    func giantGrapheme() {
+        let giant = "e" + String(repeating: "\u{301}", count: 2100)
+        let chunks = NotionBlocks.chunks("start " + giant)
+        #expect(chunks.allSatisfy { $0.utf16.count <= 2000 && !$0.isEmpty })
+        #expect(chunks.joined() == "start " + giant)
     }
 
     @Test("a long summary paragraph splits into runs of at most 2000 characters")
@@ -239,11 +296,23 @@ struct DeliveryNetworkTests {
         var payload = ObsidianNoteRendererTests.payload()
         payload.summary = Summary(text: String(repeating: "y", count: 4500))
         let blocks = NotionBlocks.blocks(for: payload)
-        guard case .array(let runs)? = blocks[0].object?["paragraph"]?.object?["rich_text"] else {
+        guard case .array(let runs)? = blocks[1].object?["paragraph"]?.object?["rich_text"] else {
             Issue.record("no runs")
             return
         }
         #expect(runs.compactMap { $0.object?["text"]?.object?["content"]?.string?.count } == [2000, 2000, 500])
+    }
+
+    @Test("a block holds at most 50 runs, and a longer paragraph carries on in another block")
+    func runsPerBlock() {
+        var payload = ObsidianNoteRendererTests.payload()
+        payload.summary = Summary(text: String(repeating: "y", count: 2000 * 120))
+        let paragraphs = NotionBlocks.blocks(for: payload).filter { $0.object?["type"]?.string == "paragraph" }
+        let counts = paragraphs.compactMap { block -> Int? in
+            guard case .array(let runs)? = block.object?["paragraph"]?.object?["rich_text"] else { return nil }
+            return runs.count
+        }
+        #expect(Array(counts.prefix(3)) == [50, 50, 20])
     }
 
     @Test("a page is created with the first 100 blocks and the rest are appended in batches of 100")
@@ -282,7 +351,7 @@ struct DeliveryNetworkTests {
         #expect(receipt.location?.absoluteString == "https://www.notion.so/page-1")
     }
 
-    @Test("a 429 waits for Retry-After on the clock and tries again")
+    @Test("a 429 waits exactly the Retry-After seconds on the clock and then tries again")
     func notionRateLimit() async throws {
         let clock = TestClock()
         let transport = StubTransport(script: [
@@ -297,11 +366,34 @@ struct DeliveryNetworkTests {
         await clock.waitForSleeper()
         #expect(await transport.requests.count == 1)
         clock.advance(by: .seconds(6))
-        #expect(await transport.requests.count == 1)
+        #expect(clock.sleeperCount == 1, "still waiting after 6 of 7 seconds")
         clock.advance(by: .seconds(1))
         _ = try await delivery.value
 
         #expect(await transport.requests.count == 2)
+    }
+
+    @Test("the Retry-After wait", arguments: [
+        ("7", 7.0), ("0", 1.0), ("600", 60.0), ("2.5", 2.5), ("soon", 1.0), ("-3", 1.0),
+    ])
+    func retryAfterSeconds(header: String, expected: Double) {
+        let result = HTTPResult(status: 429, headers: ["retry-after": header])
+        #expect(NotionDestination.retryDelay(result) == expected)
+        #expect(NotionDestination.retryDelay(HTTPResult(status: 429)) == 1)
+    }
+
+    @Test("Retry-After as an HTTP date counts from now")
+    func retryAfterDate() {
+        let now = Date(timeIntervalSince1970: 1_792_000_000)
+        let later = now.addingTimeInterval(20)
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(identifier: "GMT")
+        formatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss 'GMT'"
+        let result = HTTPResult(status: 429, headers: ["retry-after": formatter.string(from: later)])
+        #expect(NotionDestination.retryDelay(result, now: now) == 20)
+        let far = HTTPResult(status: 429, headers: ["retry-after": formatter.string(from: now.addingTimeInterval(9000))])
+        #expect(NotionDestination.retryDelay(far, now: now) == 60)
     }
 
     @Test("a rate limit that never lifts becomes a failure after three waits")
@@ -338,12 +430,14 @@ struct DeliveryNetworkTests {
             _ = try await destination.deliver(payload)
             Issue.record("expected a failure")
         } catch let error as DeliveryError {
-            guard case .partialDelivery(_, let sent, let total, _) = error else {
+            guard case .partialDelivery(_, let sent, let total, let underlying, let resume) = error else {
                 Issue.record("wrong error \(error)")
                 return
             }
             #expect(sent == 100)
             #expect(total == 151)
+            #expect(underlying == .httpStatus("Notes", 500, ""))
+            #expect(resume.hasPrefix("page-1|100|"))
         } catch {
             Issue.record("wrong error \(error)")
         }
@@ -605,6 +699,311 @@ struct DeliveryNetworkTests {
         #expect(log.first?.detail == "Zap answered HTTP 500.")
         let logText = String(decoding: try JSONEncoder().encode(log), as: UTF8.self)
         #expect(!logText.contains("engine-secret-value"))
+    }
+
+    // MARK: - Trust, redirects and secrets
+
+    @Test("the certificate decision follows the challenge kind and the host", arguments: [
+        (NSURLAuthenticationMethodServerTrust, "127.0.0.1", false, LoopbackTrust.Decision.acceptCertificate),
+        (NSURLAuthenticationMethodServerTrust, "localhost", false, .acceptCertificate),
+        (NSURLAuthenticationMethodServerTrust, "::1", false, .acceptCertificate),
+        (NSURLAuthenticationMethodServerTrust, "192.168.1.5", false, .defaultHandling),
+        (NSURLAuthenticationMethodServerTrust, "example.com", false, .defaultHandling),
+        (NSURLAuthenticationMethodServerTrust, "example.com", true, .defaultHandling),
+        (NSURLAuthenticationMethodClientCertificate, "127.0.0.1", false, .defaultHandling),
+        (NSURLAuthenticationMethodHTTPBasic, "127.0.0.1", true, .defaultHandling),
+    ])
+    func trustDecision(method: String, host: String, systemTrust: Bool, expected: LoopbackTrust.Decision) {
+        #expect(LoopbackTrust.decision(authenticationMethod: method, host: host, systemTrustPassed: systemTrust) == expected)
+    }
+
+    @Test("a redirect is followed only to the same scheme, host and port", arguments: [
+        ("https://hooks.example.com/a", "https://hooks.example.com/b", true),
+        ("https://hooks.example.com/a", "https://HOOKS.example.com/b", true),
+        ("https://hooks.example.com/a", "https://other.example.com/a", false),
+        ("https://hooks.example.com/a", "http://hooks.example.com/a", false),
+        ("https://hooks.example.com/a", "https://hooks.example.com:8443/a", false),
+        ("http://127.0.0.1:9/a", "http://localhost:9/a", false),
+    ])
+    func redirects(from: String, to: String, allowed: Bool) {
+        #expect(RedirectPolicy.allows(from: URL(string: from), to: URL(string: to)) == allowed)
+        #expect(!RedirectPolicy.allows(from: nil, to: URL(string: to)))
+    }
+
+    @Test("a header whose value is gone stops the delivery before any request")
+    func headerWithoutValue() async {
+        let transport = StubTransport()
+        let header = WebhookHeader(name: "X-Key", secretRef: "gone")
+        let destination = webhook(headers: [header], environment: NetworkTestRig.environment(transport: transport))
+        await #expect(throws: DeliveryError.missingSecret("Zap")) { try await destination.deliver(ObsidianNoteRendererTests.payload()) }
+        #expect(await transport.requests.isEmpty)
+    }
+
+    @Test("a transport failure never carries a header value, in the error or in the engine log", .logFacade)
+    func transportFailureKeepsSecretsOut() async throws {
+        let transport = StubTransport(script: [.failure(URLError(.cannotConnectToHost))])
+        let header = WebhookHeader(name: "Authorization", secretRef: "ref")
+        let environment = NetworkTestRig.environment(
+            transport: transport, secrets: InMemorySecretStore(values: ["ref": "Bearer leak-canary"])
+        )
+        let destination = AnyDestination.webhook(webhook(headers: [header], environment: environment))
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("parola-net-\(UUID())", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let engine = DeliveryEngine(
+            destinations: { [destination] },
+            payload: { id in
+                var payload = ObsidianNoteRendererTests.payload()
+                payload.entryID = id
+                return payload
+            },
+            store: DeliveryQueueStore(directory: directory),
+            clock: TestClock()
+        )
+
+        let outcome = await engine.send(entryID: "entry-1", to: destination.id)
+
+        #expect(outcome.queuedDate != nil)
+        let error = DeliveryError.networkFailed("hooks.example.com", NetworkFailure(URLError(.cannotConnectToHost)))
+        #expect(!error.localizedDescription.contains("leak-canary"))
+        let log = String(decoding: try JSONEncoder().encode(await engine.recentLog()), as: UTF8.self)
+        #expect(!log.contains("leak-canary"))
+        #expect(log.contains("The server refused the connection."))
+    }
+
+    @Test("URL errors map to the failure the app words", arguments: [
+        (URLError.Code.notConnectedToInternet, NetworkFailure.offline),
+        (.timedOut, .timedOut),
+        (.cannotConnectToHost, .cannotConnect),
+        (.networkConnectionLost, .cannotConnect),
+        (.cannotFindHost, .hostNotFound),
+        (.dnsLookupFailed, .hostNotFound),
+        (.secureConnectionFailed, .tlsFailed),
+        (.serverCertificateUntrusted, .tlsFailed),
+        (.cancelled, .cancelled),
+        (.badURL, .other),
+    ])
+    func networkFailureMapping(code: URLError.Code, expected: NetworkFailure) {
+        #expect(NetworkFailure(URLError(code)) == expected)
+    }
+
+    // MARK: - Permanent failures and resume
+
+    @Test("which failures are permanent", arguments: [
+        (DeliveryError.httpStatus("Z", 400, ""), true), (.httpStatus("Z", 401, ""), true), (.httpStatus("Z", 403, ""), true),
+        (.httpStatus("Z", 404, ""), true), (.httpStatus("Z", 410, ""), true), (.httpStatus("Z", 422, ""), true),
+        (.httpStatus("Z", 307, ""), true),
+        (.httpStatus("Z", 408, ""), false), (.httpStatus("Z", 429, ""), false), (.httpStatus("Z", 500, ""), false),
+        (.httpStatus("Z", 503, ""), false),
+        (.networkFailed("h", .timedOut), false), (.writeFailed("p", "r"), false),
+        (.invalidSetup("Z", .notionPage), true), (.invalidSetup("Z", .address(.empty)), true), (.missingSecret("Z"), true),
+        (.partialDelivery("Z", sent: 1, total: 2, underlying: .httpStatus("Z", 401, ""), resume: "r"), true),
+        (.partialDelivery("Z", sent: 1, total: 2, underlying: .httpStatus("Z", 500, ""), resume: "r"), false),
+    ])
+    func permanence(error: DeliveryError, permanent: Bool) {
+        #expect(error.isPermanent == permanent)
+    }
+
+    private func engine(
+        for destination: AnyDestination, clock: TestClock = TestClock(), directory: URL
+    ) -> DeliveryEngine {
+        DeliveryEngine(
+            destinations: { [destination] },
+            payload: { id in
+                var payload = ObsidianNoteRendererTests.payload()
+                payload.entryID = id
+                return payload
+            },
+            store: DeliveryQueueStore(directory: directory),
+            clock: clock
+        )
+    }
+
+    private func tempDirectory() -> URL {
+        FileManager.default.temporaryDirectory.appendingPathComponent("parola-net-\(UUID())", isDirectory: true)
+    }
+
+    @Test("a refusal the server will repeat is dropped with its reason, not queued", .logFacade)
+    func permanentFailureIsNotRetried() async throws {
+        let transport = StubTransport(script: [.success(HTTPResult(status: 401))])
+        let destination = AnyDestination.webhook(webhook(environment: NetworkTestRig.environment(transport: transport)))
+        let directory = tempDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let engine = engine(for: destination, directory: directory)
+
+        let outcome = await engine.send(entryID: "entry-1", to: destination.id)
+
+        #expect(outcome == .skipped(reason: .rejected("Zap", .httpStatus("Zap", 401, ""))))
+        #expect(await engine.pending().isEmpty)
+        #expect(await engine.recentLog().map(\.event) == [.dropped])
+        #expect(DeliverySkipReason.rejected("Zap", .httpStatus("Zap", 401, "")).message == "Zap answered HTTP 401.")
+    }
+
+    @Test("a transient failure is queued", .logFacade, arguments: [408, 429, 500, 503])
+    func transientFailureIsQueued(status: Int) async throws {
+        let transport = StubTransport(script: [.success(HTTPResult(status: status))])
+        let destination = AnyDestination.webhook(webhook(environment: NetworkTestRig.environment(transport: transport)))
+        let directory = tempDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let engine = engine(for: destination, directory: directory)
+
+        let outcome = await engine.send(entryID: "entry-1", to: destination.id)
+
+        guard case .queued = outcome else {
+            Issue.record("expected queued, got \(outcome)")
+            return
+        }
+        #expect(await engine.pending().count == 1)
+    }
+
+    private func notionEngine(
+        transport: any DeliveryHTTPTransport, directory: URL, paragraphs: Int = 150
+    ) -> (DeliveryEngine, AnyDestination) {
+        let (destination, _) = notion(environment: DeliveryEnvironment(
+            secrets: InMemorySecretStore(), transport: { _ in transport }
+        ))
+        let stored = AnyDestination.notion(destination)
+        let engine = DeliveryEngine(
+            destinations: { [stored] },
+            payload: { id in
+                var payload = NetworkTestRig.manySegmentsPayload(paragraphs: paragraphs)
+                payload.entryID = id
+                return payload
+            },
+            store: DeliveryQueueStore(directory: directory),
+            clock: TestClock()
+        )
+        return (engine, stored)
+    }
+
+    @Test("a retry carries on with the same Notion page instead of making another", .logFacade)
+    func notionResumes() async throws {
+        let transport = StubTransport(script: [
+            .success(NetworkTestRig.json(["id": "page-1", "url": "https://www.notion.so/page-1"])),
+            .success(HTTPResult(status: 500)),
+            .success(HTTPResult(status: 200)),
+        ])
+        let directory = tempDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let (engine, stored) = notionEngine(transport: transport, directory: directory)
+
+        let first = await engine.send(entryID: "entry-1", to: stored.id)
+        guard case .queued = first else {
+            Issue.record("expected queued, got \(first)")
+            return
+        }
+        let queued = try #require(await engine.pending().first)
+        #expect(queued.resume?.hasPrefix("page-1|100|") == true)
+
+        let second = await engine.send(entryID: "entry-1", to: stored.id)
+
+        let receipt = try #require(second.receipt)
+        #expect(receipt.location?.absoluteString == "https://www.notion.so/page-1")
+        let requests = await transport.requests
+        #expect(requests.map(\.httpMethod) == ["POST", "PATCH", "PATCH"])
+        #expect(requests.map { $0.url?.path } == ["/v1/pages", "/v1/blocks/page-1/children", "/v1/blocks/page-1/children"])
+        let resumed = NetworkTestRig.object(requests[2])
+        #expect((resumed["children"] as? [Any])?.count == 51)
+        #expect(await engine.pending().isEmpty)
+    }
+
+    @Test("a transcript that changed since the failed send starts a new page")
+    func notionFingerprintMismatch() async throws {
+        let transport = StubTransport(fallback: NetworkTestRig.json(["id": "page-2"]))
+        let (destination, _) = notion(environment: NetworkTestRig.environment(transport: transport))
+        let payload = NetworkTestRig.manySegmentsPayload(paragraphs: 150)
+
+        _ = try await destination.deliver(payload, resume: "page-1|100|deadbeef|")
+
+        let requests = await transport.requests
+        #expect(requests.first?.httpMethod == "POST")
+        #expect(requests.first?.url?.path == "/v1/pages")
+    }
+
+    @Test("a send cancelled partway keeps its progress for the retry", .logFacade)
+    func notionCancelledPartway() async throws {
+        let gated = GatedTransport()
+        let directory = tempDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let (destination, _) = notion(environment: DeliveryEnvironment(secrets: InMemorySecretStore(), transport: { _ in gated }))
+        let payload = NetworkTestRig.manySegmentsPayload(paragraphs: 150)
+
+        let task = Task { try await destination.deliver(payload) }
+        #expect(await pollUntil { await gated.arrivals == 1 })
+        await gated.release(.success(NetworkTestRig.json(["id": "page-1"])))
+        #expect(await pollUntil { await gated.arrivals == 2 })
+        task.cancel()
+        await gated.release(.failure(URLError(.cancelled)))
+
+        do {
+            _ = try await task.value
+            Issue.record("expected a failure")
+        } catch let error as DeliveryError {
+            guard case .partialDelivery(_, let sent, _, let underlying, let resume) = error else {
+                Issue.record("wrong error \(error)")
+                return
+            }
+            #expect(sent == 100)
+            #expect(underlying == .networkFailed("api.notion.com", .cancelled))
+            #expect(resume.hasPrefix("page-1|100|"))
+        }
+    }
+
+    @Test("cancelling an entry while a slow send is in flight does not queue it again", .logFacade)
+    func cancelDuringSend() async throws {
+        let gated = GatedTransport()
+        let slow = AnyDestination.webhook(WebhookDestination(
+            name: "Zap", urlText: "https://hooks.example.com/catch/1",
+            environment: DeliveryEnvironment(secrets: InMemorySecretStore(), transport: { _ in gated })
+        ))
+        let directory = tempDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let engine = engine(for: slow, directory: directory)
+
+        let sending = Task { await engine.send(entryID: "entry-1", to: slow.id) }
+        #expect(await pollUntil { await gated.arrivals == 1 })
+        await engine.cancel(entryID: "entry-1")
+        await gated.release(.success(HTTPResult(status: 500)))
+        let outcome = await sending.value
+
+        guard case .skipped = outcome else {
+            Issue.record("expected skipped, got \(outcome)")
+            return
+        }
+        #expect(await engine.pending().isEmpty)
+        #expect(await engine.recentLog().last?.event == .dropped)
+    }
+
+    @Test("a slow network destination does not hold up the others in an automatic send", .logFacade)
+    func autoSendRunsTogether() async throws {
+        let gated = GatedTransport()
+        let slow = AnyDestination.webhook(WebhookDestination(
+            name: "Slow hook", autoSend: true, urlText: "https://hooks.example.com/catch/1",
+            environment: DeliveryEnvironment(secrets: InMemorySecretStore(), transport: { _ in gated })
+        ))
+        let recorder = MockDeliveryRecorder()
+        let fast = MockDestination(name: "Fast vault", autoSend: true, recorder: recorder)
+        let directory = tempDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let engine = DeliveryEngine(
+            destinations: { [slow, .mock(fast)] },
+            payload: { id in
+                var payload = ObsidianNoteRendererTests.payload()
+                payload.entryID = id
+                return payload
+            },
+            store: DeliveryQueueStore(directory: directory),
+            clock: TestClock()
+        )
+        let progress = ProgressLog()
+
+        let all = Task { await engine.sendAutomatically(entryID: "entry-1") { await progress.add($0) } }
+        #expect(await pollUntil { await progress.names == ["Fast vault"] })
+        #expect(await gated.arrivals == 1, "the slow hook is still waiting")
+        await gated.release(.success(HTTPResult(status: 200)))
+        let attempts = await all.value
+
+        #expect(attempts.map(\.destinationName) == ["Slow hook", "Fast vault"], "the result keeps the list order")
+        #expect(attempts.allSatisfy { $0.outcome.isDelivered })
     }
 
     // MARK: - Helpers

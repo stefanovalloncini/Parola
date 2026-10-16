@@ -27,6 +27,8 @@ public enum DeliverySkipReason: Sendable, Equatable {
     case payloadUnavailable(String)
     case givenUp(String)
     case alreadySending(String)
+    /// The destination refused the delivery for a reason sending again cannot fix.
+    case rejected(String, DeliveryError)
 
     public var message: String {
         switch self {
@@ -42,6 +44,8 @@ public enum DeliverySkipReason: Sendable, Equatable {
             return "Parola stopped trying to send to \(name)."
         case .alreadySending(let name):
             return "Parola is already sending that transcript to \(name)."
+        case .rejected(_, let error):
+            return error.localizedDescription
         }
     }
 }
@@ -69,15 +73,18 @@ public struct QueuedDelivery: Codable, Sendable, Equatable {
     /// How many checks in a row found the destination out of reach. These count no attempt, and a
     /// delivery with any is one that a fixed destination or a mounted drive brings forward.
     public var unreachableChecks: Int
+    /// What the destination asked to be handed back on the next attempt, such as the page a failed send had begun.
+    public var resume: String?
 
     public var isWaitingForDestination: Bool { unreachableChecks > 0 }
 
-    public init(entryID: LibraryEntry.ID, destinationID: UUID, attempt: Int, nextAttemptAt: Date, unreachableChecks: Int = 0) {
+    public init(entryID: LibraryEntry.ID, destinationID: UUID, attempt: Int, nextAttemptAt: Date, unreachableChecks: Int = 0, resume: String? = nil) {
         self.entryID = entryID
         self.destinationID = destinationID
         self.attempt = attempt
         self.nextAttemptAt = nextAttemptAt
         self.unreachableChecks = unreachableChecks
+        self.resume = resume
     }
 
     public init(from decoder: any Decoder) throws {
@@ -87,6 +94,7 @@ public struct QueuedDelivery: Codable, Sendable, Equatable {
         attempt = try c.decode(Int.self, forKey: .attempt)
         nextAttemptAt = try c.decode(Date.self, forKey: .nextAttemptAt)
         unreachableChecks = try c.decodeIfPresent(Int.self, forKey: .unreachableChecks) ?? 0
+        resume = try c.decodeIfPresent(String.self, forKey: .resume)
     }
 }
 
@@ -242,6 +250,7 @@ public actor DeliveryEngine {
     private var log: DeliveryLog
     private var timers: [QueueKey: Task<Void, Never>] = [:]
     private var inFlight: Set<QueueKey> = []
+    private var cancelledInFlight: Set<QueueKey> = []
 
     public init(
         destinations: @escaping @Sendable () async -> [AnyDestination],
@@ -306,8 +315,13 @@ public actor DeliveryEngine {
         }
     }
 
-    /// Every enabled auto-send destination that takes this entry's category.
-    public func sendAutomatically(entryID: LibraryEntry.ID) async -> [DeliveryAttempt] {
+    /// Every enabled auto-send destination that takes this entry's category. The destinations run at the
+    /// same time, so a slow one never holds up the others; `progress` hears each outcome as it lands, and
+    /// the result is in the destinations' order.
+    public func sendAutomatically(
+        entryID: LibraryEntry.ID,
+        progress: @escaping @Sendable (DeliveryAttempt) async -> Void = { _ in }
+    ) async -> [DeliveryAttempt] {
         let candidates = await destinationsProvider()
             .compactMap(\.destination)
             .filter { $0.isEnabled && $0.autoSend }
@@ -322,17 +336,22 @@ public actor DeliveryEngine {
             }
             return []
         }
-        var attempts: [DeliveryAttempt] = []
-        for destination in candidates where destination.accepts(payload.category) {
-            attempts.append(
-                DeliveryAttempt(
-                    destinationID: destination.id,
-                    destinationName: destination.name,
-                    outcome: await attempt(payload: payload, destination: destination)
-                )
-            )
+        let accepted = candidates.filter { $0.accepts(payload.category) }
+        var attempts: [(Int, DeliveryAttempt)] = []
+        await withTaskGroup(of: (Int, DeliveryAttempt).self) { group in
+            for (index, destination) in accepted.enumerated() {
+                group.addTask {
+                    let outcome = await self.attempt(payload: payload, destination: destination)
+                    let attempt = DeliveryAttempt(
+                        destinationID: destination.id, destinationName: destination.name, outcome: outcome
+                    )
+                    await progress(attempt)
+                    return (index, attempt)
+                }
+            }
+            for await result in group { attempts.append(result) }
         }
-        return attempts
+        return attempts.sorted { $0.0 < $1.0 }.map(\.1)
     }
 
     // MARK: - Queue
@@ -342,6 +361,7 @@ public actor DeliveryEngine {
     /// Stops retrying every delivery of an entry the user deleted: a trashed transcript must not
     /// reach a vault when it comes back online.
     public func cancel(entryID: LibraryEntry.ID) async {
+        for key in inFlight where key.entryID == entryID { cancelledInFlight.insert(key) }
         guard queue.contains(where: { $0.entryID == entryID }) else { return }
         // Names first: a retry that runs during this await drops its own item, and the keys read after it leave that one out.
         let names = Dictionary(
@@ -406,10 +426,14 @@ public actor DeliveryEngine {
                 entryID: key.entryID, destinationID: key.destinationID, name: destination.name
             )
         }
-        defer { inFlight.remove(key) }
-        let attemptsSoFar = queue.first { $0.entryID == key.entryID && $0.destinationID == key.destinationID }?.attempt ?? 0
+        defer {
+            inFlight.remove(key)
+            cancelledInFlight.remove(key)
+        }
+        let queued = queue.first { $0.entryID == key.entryID && $0.destinationID == key.destinationID }
+        let attemptsSoFar = queued?.attempt ?? 0
         do {
-            let receipt = try await destination.deliver(payload)
+            let receipt = try await destination.deliver(payload, resume: queued?.resume)
             dequeue(key)
             await recordReceipt(receipt, payload.entryID)
             append(
@@ -418,6 +442,12 @@ public actor DeliveryEngine {
             )
             return .delivered(receipt)
         } catch {
+            if cancelledInFlight.contains(key) {
+                dequeue(key)
+                let reason = DeliveryPayloadError.entryGone(key.entryID).localizedDescription
+                append(.dropped, entryID: key.entryID, destination: destination, attempt: attemptsSoFar + 1, detail: reason)
+                return .skipped(reason: .payloadUnavailable(reason))
+            }
             return failed(key, destination: destination, attempt: attemptsSoFar + 1, error: error)
         }
     }
@@ -431,6 +461,15 @@ public actor DeliveryEngine {
         if case DeliveryError.vaultUnavailable = error {
             return waitForDestination(key, destination: destination, error: error)
         }
+        let deliveryError = error as? DeliveryError
+        if let deliveryError, deliveryError.isPermanent {
+            dequeue(key)
+            append(
+                .dropped, entryID: key.entryID, destination: destination,
+                attempt: attempt, detail: error.localizedDescription
+            )
+            return .skipped(reason: .rejected(destination.name, deliveryError))
+        }
         guard attempt < Self.maxAttempts else {
             dequeue(key)
             append(
@@ -439,12 +478,15 @@ public actor DeliveryEngine {
             )
             return .skipped(reason: .givenUp(destination.name))
         }
+        let resume = deliveryError?.resumeToken ?? queue.first {
+            $0.entryID == key.entryID && $0.destinationID == key.destinationID
+        }?.resume
         let delay = Self.delay(forAttempt: attempt)
         let nextAt = Date().addingTimeInterval(delay.wallSeconds)
         enqueue(
             QueuedDelivery(
                 entryID: key.entryID, destinationID: key.destinationID,
-                attempt: attempt, nextAttemptAt: nextAt
+                attempt: attempt, nextAttemptAt: nextAt, resume: resume
             )
         )
         append(
@@ -530,7 +572,7 @@ public actor DeliveryEngine {
         enqueue(
             QueuedDelivery(
                 entryID: key.entryID, destinationID: key.destinationID,
-                attempt: attempts, nextAttemptAt: nextAt, unreachableChecks: checks
+                attempt: attempts, nextAttemptAt: nextAt, unreachableChecks: checks, resume: current?.resume
             )
         )
         append(.queued, entryID: key.entryID, destination: destination, attempt: attempts, detail: error.localizedDescription)

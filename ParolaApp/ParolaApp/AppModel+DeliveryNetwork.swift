@@ -15,6 +15,12 @@ extension AppModel {
         }
     }
 
+    func savedSecretReferences(_ references: [String]) async -> Set<String> {
+        var saved: Set<String> = []
+        for reference in references where await hasSavedSecret(reference) { saved.insert(reference) }
+        return saved
+    }
+
     func hasSavedSecret(_ reference: String) async -> Bool {
         ((try? await deliveryEnvironment.secrets.get(reference)) ?? nil)?.isEmpty == false
     }

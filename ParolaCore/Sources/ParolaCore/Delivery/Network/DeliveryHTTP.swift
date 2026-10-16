@@ -30,6 +30,17 @@ public enum TransportTrust: Sendable, Equatable {
 public struct URLSessionTransport: DeliveryHTTPTransport {
     public static let timeout: TimeInterval = 30
 
+    /// One session per trust level for the whole process, so connections are reused and none is left behind.
+    public static func shared(trust: TransportTrust) -> URLSessionTransport {
+        switch trust {
+        case .system: return systemShared
+        case .loopbackSelfSigned: return loopbackShared
+        }
+    }
+
+    private static let systemShared = URLSessionTransport(trust: .system)
+    private static let loopbackShared = URLSessionTransport(trust: .loopbackSelfSigned)
+
     private let session: URLSession
 
     public init(trust: TransportTrust = .system) {
@@ -38,12 +49,7 @@ public struct URLSessionTransport: DeliveryHTTPTransport {
         configuration.timeoutIntervalForResource = Self.timeout * 4
         configuration.waitsForConnectivity = false
         configuration.httpCookieStorage = nil
-        switch trust {
-        case .system:
-            session = URLSession(configuration: configuration)
-        case .loopbackSelfSigned:
-            session = URLSession(configuration: configuration, delegate: LoopbackTrustDelegate(), delegateQueue: nil)
-        }
+        session = URLSession(configuration: configuration, delegate: DeliverySessionDelegate(trust: trust), delegateQueue: nil)
     }
 
     public func send(_ request: URLRequest) async throws -> HTTPResult {
@@ -58,6 +64,11 @@ public struct URLSessionTransport: DeliveryHTTPTransport {
 }
 
 public enum LoopbackTrust {
+    public enum Decision: Sendable, Equatable {
+        case acceptCertificate
+        case defaultHandling
+    }
+
     public static func isLoopback(host: String) -> Bool {
         let bare = host.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "[]"))
         return bare == "localhost" || bare == "127.0.0.1" || bare == "::1"
@@ -67,24 +78,74 @@ public enum LoopbackTrust {
     public static func accepts(host: String, systemTrustPassed: Bool) -> Bool {
         systemTrustPassed || isLoopback(host: host)
     }
+
+    /// What a session set to `.loopbackSelfSigned` does with an authentication challenge. A certificate
+    /// without a trusted chain is accepted only for a server trust challenge from a loopback host.
+    public static func decision(authenticationMethod: String, host: String, systemTrustPassed: @autoclosure () -> Bool) -> Decision {
+        guard authenticationMethod == NSURLAuthenticationMethodServerTrust, isLoopback(host: host) else {
+            return .defaultHandling
+        }
+        return accepts(host: host, systemTrustPassed: systemTrustPassed()) ? .acceptCertificate : .defaultHandling
+    }
 }
 
-final class LoopbackTrustDelegate: NSObject, URLSessionDelegate, Sendable {
+/// A redirect is followed only within the same scheme, host and port: a header secret and a transcript
+/// must not follow a hook to another address.
+public enum RedirectPolicy {
+    public static func allows(from original: URL?, to target: URL?) -> Bool {
+        guard let original, let target else { return false }
+        return original.scheme?.lowercased() == target.scheme?.lowercased()
+            && original.host?.lowercased() == target.host?.lowercased()
+            && original.port == target.port
+    }
+}
+
+final class DeliverySessionDelegate: NSObject, URLSessionTaskDelegate, Sendable {
+    private let trust: TransportTrust
+
+    init(trust: TransportTrust) {
+        self.trust = trust
+    }
+
     func urlSession(
         _ session: URLSession,
         didReceive challenge: URLAuthenticationChallenge
     ) async -> (URLSession.AuthChallengeDisposition, URLCredential?) {
         let space = challenge.protectionSpace
-        guard space.authenticationMethod == NSURLAuthenticationMethodServerTrust,
-              let trust = space.serverTrust,
-              LoopbackTrust.isLoopback(host: space.host) else {
-            return (.performDefaultHandling, nil)
-        }
-        let systemTrustPassed = SecTrustEvaluateWithError(trust, nil)
-        guard LoopbackTrust.accepts(host: space.host, systemTrustPassed: systemTrustPassed) else {
-            return (.performDefaultHandling, nil)
-        }
-        return (.useCredential, URLCredential(trust: trust))
+        guard trust == .loopbackSelfSigned, let serverTrust = space.serverTrust else { return (.performDefaultHandling, nil) }
+        let decision = LoopbackTrust.decision(
+            authenticationMethod: space.authenticationMethod,
+            host: space.host,
+            systemTrustPassed: SecTrustEvaluateWithError(serverTrust, nil)
+        )
+        return decision == .acceptCertificate ? (.useCredential, URLCredential(trust: serverTrust)) : (.performDefaultHandling, nil)
+    }
+
+    func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        willPerformHTTPRedirection response: HTTPURLResponse,
+        newRequest request: URLRequest
+    ) async -> URLRequest? {
+        RedirectPolicy.allows(from: task.originalRequest?.url, to: request.url) ? request : nil
+    }
+}
+
+/// The section names of a Notion page, in the app's language.
+public struct NotionHeadings: Sendable, Equatable {
+    public var summary: String
+    public var actionItems: String
+    public var chapters: String
+    public var transcript: String
+
+    public init(
+        summary: String = "Summary", actionItems: String = "Action Items",
+        chapters: String = "Chapters", transcript: String = "Transcript"
+    ) {
+        self.summary = summary
+        self.actionItems = actionItems
+        self.chapters = chapters
+        self.transcript = transcript
     }
 }
 
@@ -94,22 +155,26 @@ public struct DeliveryEnvironment: Sendable, Equatable {
     public var secrets: any SecretStore
     public var transport: @Sendable (TransportTrust) -> any DeliveryHTTPTransport
     public var clock: any Clock<Duration>
+    public var notionHeadings: NotionHeadings
 
     public init(
         secrets: any SecretStore,
         transport: @escaping @Sendable (TransportTrust) -> any DeliveryHTTPTransport,
-        clock: any Clock<Duration> = ContinuousClock()
+        clock: any Clock<Duration> = ContinuousClock(),
+        notionHeadings: NotionHeadings = NotionHeadings()
     ) {
         self.secrets = secrets
         self.transport = transport
         self.clock = clock
+        self.notionHeadings = notionHeadings
     }
 
     public static let live = DeliveryEnvironment(
         secrets: KeychainSecretStore.shared,
-        transport: { URLSessionTransport(trust: $0) }
+        transport: { URLSessionTransport.shared(trust: $0) }
     )
 
+    /// Never part of a destination's identity: two destinations with the same settings are equal whatever they are wired to.
     public static func == (lhs: DeliveryEnvironment, rhs: DeliveryEnvironment) -> Bool { true }
 
     public func withSecretOverrides(_ overrides: [String: String]) -> DeliveryEnvironment {
@@ -131,13 +196,10 @@ public struct DeliveryEnvironment: Sendable, Equatable {
         } catch is CancellationError {
             throw CancellationError()
         } catch {
-            throw DeliveryError.networkFailed(request.url?.host ?? destination, Self.reason(for: error))
+            let failure = NetworkFailure(error)
+            if failure == .cancelled { throw CancellationError() }
+            throw DeliveryError.networkFailed(request.url?.host ?? destination, failure)
         }
-    }
-
-    /// The error's own words, which for a URL error name the problem and the host and never a header.
-    private static func reason(for error: any Error) -> String {
-        (error as? URLError).map { $0.localizedDescription } ?? error.localizedDescription
     }
 }
 
@@ -147,28 +209,36 @@ public enum NetworkHostPolicy {
         let host = rawHost.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "[]"))
         if host.isEmpty { return false }
         if LoopbackTrust.isLoopback(host: host) { return true }
-        if let octets = ipv4Octets(host) {
-            switch (octets[0], octets[1]) {
+        if let address = ipv4(host) {
+            let first = UInt8(address >> 24)
+            let second = UInt8((address >> 16) & 0xFF)
+            switch (first, second) {
             case (127, _), (10, _), (192, 168), (169, 254): return true
             case (172, 16...31): return true
             default: return false
             }
         }
-        if host.contains(":") {
-            return host.hasPrefix("fe80:") || host.hasPrefix("fc") || host.hasPrefix("fd")
+        if let bytes = ipv6(host) {
+            let isLoopback = bytes.dropLast().allSatisfy { $0 == 0 } && bytes.last == 1
+            let isUniqueLocal = bytes[0] & 0xFE == 0xFC
+            let isLinkLocal = bytes[0] == 0xFE && bytes[1] & 0xC0 == 0x80
+            return isLoopback || isUniqueLocal || isLinkLocal
         }
         if host.hasSuffix(".local") || host.hasSuffix(".lan") || host.hasSuffix(".home.arpa") { return true }
-        return !host.contains(".")
+        return !host.contains(".") && host.contains(where: \.isLetter)
     }
 
-    private static func ipv4Octets(_ host: String) -> [Int]? {
-        let parts = host.split(separator: ".", omittingEmptySubsequences: false)
-        guard parts.count == 4 else { return nil }
-        let octets = parts.compactMap { part -> Int? in
-            guard part.allSatisfy(\.isASCII), let value = Int(part), (0...255).contains(value) else { return nil }
-            return value
-        }
-        return octets.count == 4 ? octets : nil
+    /// The address the system resolver reads a host as, in every form it accepts: `8.8.8.8`, `134744072`, `0x8.8.8.8`.
+    private static func ipv4(_ host: String) -> UInt32? {
+        var address = in_addr()
+        guard inet_aton(host, &address) == 1 else { return nil }
+        return UInt32(bigEndian: address.s_addr)
+    }
+
+    private static func ipv6(_ host: String) -> [UInt8]? {
+        var address = in6_addr()
+        guard inet_pton(AF_INET6, host, &address) == 1 else { return nil }
+        return withUnsafeBytes(of: &address) { Array($0) }
     }
 }
 

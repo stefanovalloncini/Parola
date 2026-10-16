@@ -76,50 +76,103 @@ public struct NotionDestination: DeliveryDestinationSettings, Codable, Sendable,
     // MARK: - Delivery
 
     public func deliver(_ payload: DeliveryPayload) async throws -> DeliveryReceipt {
-        guard NotionPageID.parse(parentPageID) != nil else {
-            throw DeliveryError.invalidSetup(name, "Paste the link of the Notion page to add transcripts under.")
+        try await deliver(payload, resume: nil)
+    }
+
+    public func deliver(_ payload: DeliveryPayload, resume: String?) async throws -> DeliveryReceipt {
+        guard let parent = NotionPageID.parse(parentPageID) else {
+            throw DeliveryError.invalidSetup(name, .notionPage)
         }
-        let blocks = NotionBlocks.blocks(for: payload)
-        let first = Array(blocks.prefix(NotionBlocks.maxBlocksPerRequest))
+        let blocks = NotionBlocks.blocks(for: payload, headings: environment.notionHeadings)
         let title = titleFormat.title(for: payload)
+        let fingerprint = Self.fingerprint(title: title, blocks: blocks)
+        var progress: PageProgress
+        if let saved = PageProgress(token: resume), saved.fingerprint == fingerprint, saved.sent <= blocks.count {
+            progress = saved
+        } else {
+            progress = try await createPage(parent: parent, title: title, blocks: blocks, fingerprint: fingerprint)
+        }
+        while progress.sent < blocks.count {
+            let batch = Array(blocks[progress.sent...].prefix(NotionBlocks.maxBlocksPerRequest))
+            do {
+                let appended = try await call("PATCH", "/v1/blocks/\(progress.pageID)/children", body: .object(["children": .array(batch)]))
+                try ensureSuccess(appended)
+            } catch {
+                let cause: DeliveryError
+                if error is CancellationError {
+                    cause = .networkFailed(Self.host, .cancelled)
+                } else {
+                    cause = error as? DeliveryError ?? .networkFailed(Self.host, .other)
+                }
+                throw DeliveryError.partialDelivery(
+                    name, sent: progress.sent, total: blocks.count, underlying: cause, resume: progress.token
+                )
+            }
+            progress.sent += batch.count
+        }
+        return DeliveryReceipt(
+            destinationID: id, destinationName: name, deliveredAt: Date(),
+            location: progress.url.flatMap(URL.init(string:))
+        )
+    }
+
+    private func createPage(parent: String, title: String, blocks: [DestinationConfig], fingerprint: String) async throws -> PageProgress {
+        let first = Array(blocks.prefix(NotionBlocks.maxBlocksPerRequest))
         let created = try await call("POST", "/v1/pages", body: .object([
-            "parent": .object(["page_id": .string(parentPageID)]),
+            "parent": .object(["page_id": .string(parent)]),
             "properties": .object([
                 "title": .object(["title": .array(Array(NotionBlocks.richText(title.isEmpty ? "Untitled" : title).prefix(1)))]),
             ]),
             "children": .array(first),
         ]))
         try ensureSuccess(created)
-        let page = try? JSONDecoder().decode(CreatedPage.self, from: created.body)
-        guard let pageID = page?.id else {
+        guard let page = try? JSONDecoder().decode(CreatedPage.self, from: created.body) else {
             throw DeliveryError.httpStatus(name, created.status, "Notion's answer had no page in it.")
         }
-        var sent = first.count
-        var rest = blocks.dropFirst(first.count)
-        while !rest.isEmpty {
-            let batch = Array(rest.prefix(NotionBlocks.maxBlocksPerRequest))
-            do {
-                let appended = try await call("PATCH", "/v1/blocks/\(pageID)/children", body: .object(["children": .array(batch)]))
-                try ensureSuccess(appended)
-            } catch is CancellationError {
-                throw CancellationError()
-            } catch {
-                throw DeliveryError.partialDelivery(
-                    name, sent: sent, total: blocks.count, reason: error.localizedDescription
-                )
-            }
-            sent += batch.count
-            rest = rest.dropFirst(batch.count)
+        return PageProgress(pageID: page.id, url: page.url, sent: first.count, fingerprint: fingerprint)
+    }
+
+    static let host = "api.notion.com"
+
+    /// Stable across launches, so a retry after a restart can tell the transcript has not changed.
+    static func fingerprint(title: String, blocks: [DestinationConfig]) -> String {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let data = (try? encoder.encode(blocks)) ?? Data()
+        var hash: UInt64 = 14_695_981_039_346_656_037
+        for byte in Data(title.utf8) + data {
+            hash ^= UInt64(byte)
+            hash &*= 1_099_511_628_211
         }
-        return DeliveryReceipt(
-            destinationID: id, destinationName: name, deliveredAt: Date(),
-            location: page?.url.flatMap(URL.init(string:))
-        )
+        return String(hash, radix: 16)
+    }
+
+    struct PageProgress: Equatable {
+        var pageID: String
+        var url: String?
+        var sent: Int
+        var fingerprint: String
+
+        init(pageID: String, url: String?, sent: Int, fingerprint: String) {
+            self.pageID = pageID
+            self.url = url
+            self.sent = sent
+            self.fingerprint = fingerprint
+        }
+
+        init?(token: String?) {
+            guard let token else { return nil }
+            let parts = token.split(separator: "|", maxSplits: 3, omittingEmptySubsequences: false).map(String.init)
+            guard parts.count == 4, let sent = Int(parts[1]) else { return nil }
+            self.init(pageID: parts[0], url: parts[3].isEmpty ? nil : parts[3], sent: sent, fingerprint: parts[2])
+        }
+
+        var token: String { "\(pageID)|\(sent)|\(fingerprint)|\(url ?? "")" }
     }
 
     public func checkConnection() async throws -> ConnectionStatus {
         guard let page = NotionPageID.parse(parentPageID) else {
-            throw DeliveryError.invalidSetup(name, "Paste the link of the Notion page to add transcripts under.")
+            throw DeliveryError.invalidSetup(name, .notionPage)
         }
         let result = try await call("GET", "/v1/pages/\(page)", body: nil)
         switch result.status {
@@ -137,7 +190,7 @@ public struct NotionDestination: DeliveryDestinationSettings, Codable, Sendable,
 
     private func call(_ method: String, _ path: String, body: DestinationConfig?) async throws -> HTTPResult {
         guard let url = URL(string: Self.baseURL + path) else {
-            throw DeliveryError.invalidSetup(name, "The page link isn't valid.")
+            throw DeliveryError.invalidSetup(name, .notionPage)
         }
         let secret = try await environment.secret(secretRef, destination: name)
         var request = URLRequest(url: url, timeoutInterval: URLSessionTransport.timeout)
@@ -158,9 +211,29 @@ public struct NotionDestination: DeliveryDestinationSettings, Codable, Sendable,
         return result
     }
 
-    static func retryDelay(_ result: HTTPResult) -> Double {
-        let seconds = result.headers["retry-after"].flatMap(Double.init) ?? 1
+    /// Seconds to wait: `Retry-After` as a number of seconds or as an HTTP date, kept between 1 and 60.
+    static func retryDelay(_ result: HTTPResult, now: Date = Date()) -> Double {
+        let seconds: Double
+        if let header = result.headers["retry-after"]?.trimmingCharacters(in: .whitespaces) {
+            if let number = Double(header) {
+                seconds = number
+            } else if let date = Self.httpDate(header) {
+                seconds = date.timeIntervalSince(now)
+            } else {
+                seconds = 1
+            }
+        } else {
+            seconds = 1
+        }
         return min(max(seconds, 1), 60)
+    }
+
+    private static func httpDate(_ text: String) -> Date? {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(identifier: "GMT")
+        formatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
+        return formatter.date(from: text)
     }
 
     private func ensureSuccess(_ result: HTTPResult) throws {

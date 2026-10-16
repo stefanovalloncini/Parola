@@ -69,3 +69,41 @@ enum NetworkTestRig {
         return payload
     }
 }
+
+/// Holds every request until the test lets it go, so a delivery can be caught mid-flight.
+actor GatedTransport: DeliveryHTTPTransport {
+    private var waiting: [CheckedContinuation<HTTPResult, any Error>] = []
+    private(set) var arrivals = 0
+
+    func send(_ request: URLRequest) async throws -> HTTPResult {
+        arrivals += 1
+        return try await withCheckedThrowingContinuation { waiting.append($0) }
+    }
+
+    func release(_ result: Result<HTTPResult, any Error>) {
+        let held = waiting
+        waiting = []
+        for continuation in held { continuation.resume(with: result) }
+    }
+}
+
+actor ProgressLog {
+    private(set) var names: [String] = []
+    func add(_ attempt: DeliveryAttempt) { names.append(attempt.destinationName) }
+}
+
+func pollUntil(_ condition: @Sendable () async -> Bool) async -> Bool {
+    let deadline = ContinuousClock.now + .seconds(10)
+    while ContinuousClock.now < deadline {
+        if await condition() { return true }
+        try? await Task.sleep(for: .milliseconds(10))
+    }
+    return await condition()
+}
+
+extension DeliveryOutcome {
+    var queuedDate: Date? {
+        guard case .queued(_, let nextAt) = self else { return nil }
+        return nextAt
+    }
+}

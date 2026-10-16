@@ -87,12 +87,18 @@ public protocol DeliveryDestination: Sendable, Identifiable {
     /// mounted. Cheap: the engine asks before it reads a transcript for a retry.
     func checkReachable() async throws
     func deliver(_ payload: DeliveryPayload) async throws -> DeliveryReceipt
+    /// `resume` is whatever the destination's last failed attempt asked to be handed back.
+    func deliver(_ payload: DeliveryPayload, resume: String?) async throws -> DeliveryReceipt
 }
 
 public extension DeliveryDestination {
     var kind: DestinationKind { Self.kind }
 
     func checkReachable() async throws {}
+
+    func deliver(_ payload: DeliveryPayload, resume: String?) async throws -> DeliveryReceipt {
+        try await deliver(payload)
+    }
 
     func accepts(_ category: EntryCategory) -> Bool {
         categories.contains(category)
@@ -110,15 +116,76 @@ public protocol DeliveryDestinationSettings: DeliveryDestination {
 extension ObsidianVaultFolderDestination: DeliveryDestinationSettings {}
 extension MockDestination: DeliveryDestinationSettings {}
 
+/// Why a connection to a server failed, without the system's wording, so the app can say it in its own language.
+public enum NetworkFailure: String, Sendable, Equatable {
+    case offline, timedOut, cannotConnect, hostNotFound, tlsFailed, cancelled, other
+
+    public init(_ error: any Error) {
+        switch (error as? URLError)?.code {
+        case .notConnectedToInternet, .dataNotAllowed, .internationalRoamingOff: self = .offline
+        case .timedOut: self = .timedOut
+        case .cannotConnectToHost, .networkConnectionLost: self = .cannotConnect
+        case .cannotFindHost, .dnsLookupFailed: self = .hostNotFound
+        case .secureConnectionFailed, .serverCertificateUntrusted, .serverCertificateHasBadDate,
+             .serverCertificateHasUnknownRoot, .serverCertificateNotYetValid, .clientCertificateRejected,
+             .clientCertificateRequired:
+            self = .tlsFailed
+        case .cancelled: self = .cancelled
+        default: self = .other
+        }
+    }
+
+    public var message: String {
+        switch self {
+        case .offline: return "There is no internet connection."
+        case .timedOut: return "The server took too long to answer."
+        case .cannotConnect: return "The server refused the connection."
+        case .hostNotFound: return "The address couldn't be found."
+        case .tlsFailed: return "The server's certificate isn't trusted."
+        case .cancelled: return "The send was cancelled."
+        case .other: return "The connection failed."
+        }
+    }
+}
+
+/// What is wrong with a destination's settings.
+public enum SetupProblem: Sendable, Equatable {
+    case address(WebhookURLError)
+    case notionPage
+
+    public var message: String {
+        switch self {
+        case .address(let error): return error.message
+        case .notionPage: return "Paste the link of the Notion page to add transcripts under."
+        }
+    }
+}
+
 /// Why a delivery could not be made.
 public enum DeliveryError: Error, LocalizedError, Equatable {
     case vaultUnavailable(String, String)
     case writeFailed(String, String)
     case httpStatus(String, Int, String)
-    case networkFailed(String, String)
+    case networkFailed(String, NetworkFailure)
     case missingSecret(String)
-    case invalidSetup(String, String)
-    case partialDelivery(String, sent: Int, total: Int, reason: String)
+    case invalidSetup(String, SetupProblem)
+    /// Some of a page went out and the rest did not. `resume` lets the next attempt carry on from there.
+    indirect case partialDelivery(String, sent: Int, total: Int, underlying: DeliveryError, resume: String)
+
+    /// A failure that sending again cannot fix: the server refused the request, or the settings are wrong.
+    public var isPermanent: Bool {
+        switch self {
+        case .httpStatus(_, let status, _): return [400, 401, 403, 404, 410, 422].contains(status) || (300..<400).contains(status)
+        case .invalidSetup, .missingSecret: return true
+        case .partialDelivery(_, _, _, let underlying, _): return underlying.isPermanent
+        case .vaultUnavailable, .writeFailed, .networkFailed: return false
+        }
+    }
+
+    var resumeToken: String? {
+        guard case .partialDelivery(_, _, _, _, let resume) = self else { return nil }
+        return resume
+    }
 
     public var errorDescription: String? {
         switch self {
@@ -130,14 +197,14 @@ public enum DeliveryError: Error, LocalizedError, Equatable {
         case .httpStatus(let name, let status, let detail):
             let tail = detail.isEmpty ? "" : " \(detail)"
             return "\(name) answered HTTP \(status).\(tail)"
-        case .networkFailed(let host, let reason):
-            return "Parola couldn't reach \(host). \(reason)"
+        case .networkFailed(let host, let failure):
+            return "Parola couldn't reach \(host). \(failure.message)"
         case .missingSecret(let name):
             return "\(name) has no saved key. Enter it again in Send To settings."
-        case .invalidSetup(let name, let reason):
-            return "\(name) isn't set up correctly. \(reason)"
-        case .partialDelivery(let name, let sent, let total, let reason):
-            return "\(name) got \(sent) of \(total) blocks before it failed, and the page stays there. \(reason)"
+        case .invalidSetup(let name, let problem):
+            return "\(name) isn't set up correctly. \(problem.message)"
+        case .partialDelivery(let name, let sent, let total, let underlying, _):
+            return "\(name) got \(sent) of \(total) blocks before it failed, and the page stays there. \(underlying.localizedDescription)"
         }
     }
 }

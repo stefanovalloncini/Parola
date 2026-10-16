@@ -6,6 +6,8 @@ struct WebhookDestinationEditor: View {
     @State private var draft: WebhookDestination
     @State private var headerValues: [UUID: String] = [:]
     @State private var saveError: String?
+    @State private var saving = false
+    @State private var savedRefs: Set<String> = []
     let isNew: Bool
     let onSave: (WebhookDestination) -> Void
     let onCancel: () -> Void
@@ -23,7 +25,7 @@ struct WebhookDestinationEditor: View {
     }
 
     var body: some View {
-        SheetFrame(title: isNew ? "New Destination" : "Edit Destination", onClose: onCancel) {
+        SheetFrame(title: isNew ? "New Destination" : "Edit Destination", onClose: cancel) {
             Form {
                 addressSection
                 headersSection
@@ -42,19 +44,21 @@ struct WebhookDestinationEditor: View {
                     SettingsWarning(saveError).font(DS.Font.secondary)
                 }
                 Spacer()
-                Button("Cancel", action: onCancel)
+                Button("Cancel", action: cancel)
                     .sheetSecondaryAction()
+                    .disabled(saving)
                     .keyboardShortcut(.cancelAction)
                     .axLeaf("SendTo.Button.CancelEdit")
                 Button("Save", action: save)
                     .sheetPrimaryAction()
                     .keyboardShortcut(.defaultAction)
-                    .disabled(!urlIsValid || draft.name.trimmingCharacters(in: .whitespaces).isEmpty)
+                    .disabled(!urlIsValid || draft.name.trimmingCharacters(in: .whitespaces).isEmpty || headersProblem != nil || saving)
                     .axLeaf("SendTo.Button.Save")
             }
         }
         .sheetSize(width: 560, minHeight: 480, maxHeight: 720)
         .footerHasCancel()
+        .task(id: draft.headers.map(\.secretRef)) { savedRefs = await model.savedSecretReferences(draft.headers.map(\.secretRef)) }
     }
 
     // MARK: - Sections
@@ -117,6 +121,11 @@ struct WebhookDestinationEditor: View {
                     .axLeaf("SendTo.Button.AddHeader")
                 Spacer()
             }
+            if let headersProblem {
+                SettingsWarning(headersProblem)
+                    .font(DS.Font.secondary)
+                    .axLeaf("SendTo.Label.HeadersProblem")
+            }
             Text("Header values are kept in the Keychain.")
                 .font(DS.Font.secondary)
                 .foregroundStyle(DS.Color.secondaryText)
@@ -161,9 +170,21 @@ struct WebhookDestinationEditor: View {
         Binding(get: { headerValues[id] ?? "" }, set: { headerValues[id] = $0 })
     }
 
+    private var namedHeaders: [WebhookHeader] {
+        draft.headers.filter { !$0.name.trimmingCharacters(in: .whitespaces).isEmpty }
+    }
+
+    private var headersProblem: String? {
+        if namedHeaders.count != draft.headers.count { return String(localized: "Every header needs a name.") }
+        let missingValue = namedHeaders.contains { header in
+            (headerValues[header.id] ?? "").isEmpty && !savedRefs.contains(header.secretRef)
+        }
+        return missingValue ? String(localized: "Add a value for each header.") : nil
+    }
+
     private var unsavedSecrets: [String: String] {
         var values: [String: String] = [:]
-        for header in draft.headers {
+        for header in namedHeaders {
             if let value = headerValues[header.id], !value.isEmpty { values[header.secretRef] = value }
         }
         return values
@@ -175,9 +196,16 @@ struct WebhookDestinationEditor: View {
         await model.sendWebhookTest(draft, unsavedSecrets: unsavedSecrets)
     }
 
+    private func cancel() {
+        guard !saving else { return }
+        onCancel()
+    }
+
     private func save() {
+        guard !saving else { return }
+        saving = true
         var cleaned = draft
-        cleaned.headers.removeAll { $0.name.trimmingCharacters(in: .whitespaces).isEmpty }
+        cleaned.headers = namedHeaders
         cleaned.urlText = cleaned.urlText.trimmingCharacters(in: .whitespacesAndNewlines)
         let secrets = unsavedSecrets
         Task {
@@ -186,6 +214,7 @@ struct WebhookDestinationEditor: View {
                 onSave(cleaned)
             } catch {
                 saveError = FailureText.message(for: error)
+                saving = false
             }
         }
     }

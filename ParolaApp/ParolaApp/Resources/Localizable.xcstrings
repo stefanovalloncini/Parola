@@ -1529,6 +1529,17 @@
         }
       }
     },
+    "Add a value for each header.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aggiungi un valore a ogni intestazione."
+          }
+        }
+      }
+    },
     "Add Header": {
       "extractionState": "manual",
       "localizations": {
@@ -3591,6 +3602,28 @@
         }
       }
     },
+    "Enter the webhook address.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Inserisci l'indirizzo del webhook."
+          }
+        }
+      }
+    },
+    "Every header needs a name.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ogni intestazione ha bisogno di un nome."
+          }
+        }
+      }
+    },
     "Header values are kept in the Keychain.": {
       "extractionState": "manual",
       "localizations": {
@@ -3729,7 +3762,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pagina principale"
+            "value": "Pagina superiore"
           }
         }
       }
@@ -3796,6 +3829,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Impossibile leggere ad alta voce."
+          }
+        }
+      }
+    },
+    "Paste the link of the Notion page to add transcripts under.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Incolla il link della pagina Notion sotto cui aggiungere le trascrizioni."
           }
         }
       }
@@ -17560,6 +17604,17 @@
         }
       }
     },
+    "The address couldn't be found.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non trovo l'indirizzo."
+          }
+        }
+      }
+    },
     "The address has to start with https:// or http://.": {
       "extractionState": "manual",
       "localizations": {
@@ -17571,6 +17626,17 @@
         }
       }
     },
+    "The connection failed.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La connessione non è riuscita."
+          }
+        }
+      }
+    },
     "The plugin answered, but it didn't accept the API key.": {
       "extractionState": "manual",
       "localizations": {
@@ -17578,6 +17644,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Il plugin ha risposto, ma non ha accettato la chiave API."
+          }
+        }
+      }
+    },
+    "The send was cancelled.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L'invio è stato annullato."
           }
         }
       }
@@ -17600,6 +17677,50 @@
           "stringUnit": {
             "state": "translated",
             "value": "Il server ha risposto HTTP %lld."
+          }
+        }
+      }
+    },
+    "The server refused the connection.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il server ha rifiutato la connessione."
+          }
+        }
+      }
+    },
+    "The server took too long to answer.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il server ha impiegato troppo a rispondere."
+          }
+        }
+      }
+    },
+    "The server's certificate isn't trusted.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il certificato del server non è attendibile."
+          }
+        }
+      }
+    },
+    "There is no internet connection.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non c'è connessione a internet."
           }
         }
       }
@@ -20609,7 +20730,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Dove ascolta il plugin Local REST API. Obsidian deve essere aperto. Il suo certificato è autofirmato e Parola si fida solo su questo Mac."
+            "value": "Dove ascolta il plugin Local REST API. Obsidian deve essere aperto. Il suo certificato è autofirmato e Parola se ne fida solo su questo Mac."
           }
         }
       }

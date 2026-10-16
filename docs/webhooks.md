@@ -6,12 +6,15 @@ A webhook destination posts each transcript you send to it as JSON. It works wit
 
 - Method: `POST`
 - Content-Type: `application/json`
-- Timeout: 30 seconds
+- Timeout: 30 seconds without an answer, and 2 minutes for the whole request
 - Headers: whatever you add in Send To settings. Header values are kept in the Keychain, not in Parola's settings.
+- Redirects: Parola follows a redirect only to the same scheme, host and port. Any other redirect counts as a failed delivery.
 
-An address has to start with `https://`. Plain `http://` is accepted for this Mac and the local network (`localhost`, `127.0.0.1`, `192.168.x.x`, `10.x.x.x`, `172.16-31.x.x`, `.local` names) and shows a "Not encrypted" note. `http://` to a public host is refused when you save.
+An address has to start with `https://`. Plain `http://` is accepted for this Mac and the local network and shows a "Not encrypted" note: `localhost`, `127.0.0.0/8`, `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `169.254.0.0/16`, the IPv6 ranges `::1`, `fc00::/7` and `fe80::/10`, names ending in `.local`, `.lan` or `.home.arpa`, and single-word names such as `nas`. Numeric forms like `134744072` or `0x08080808` count as the address they stand for. `http://` to a public host is refused when you save.
 
-Any 2xx answer counts as delivered. Any other status, or a network error, is a failed delivery and Parola retries it the way it retries every destination.
+The address is stored in Parola's settings, so it appears in a Settings export. A catch-hook address (Zapier, Make, n8n) or one with `user:password@` works like a password: anyone who has it can post to the hook.
+
+A 2xx answer counts as delivered. These answers will not change on a second try, so Parola stops and reports them: 400, 401, 403, 404, 410, 422, and any redirect it does not follow. A timeout, a 408, a 429, a 5xx or a network error is retried the way every destination is retried.
 
 ## Body
 
