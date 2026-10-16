@@ -204,7 +204,7 @@ extension ParolaAutomationServer {
                 summary: "Clears installed mocks. Test-mode only.",
                 kind: .mutating,
                 args: [
-                    .init(name: "scope", kind: .string(enum: ["transcriber", "llm", "audio", "media", "translator", "speech", "all"]), required: false, summary: "Scope to clear", defaultValue: .string("all")),
+                    .init(name: "scope", kind: .string(enum: ["transcriber", "llm", "audio", "media", "translator", "speech", "streaming", "all"]), required: false, summary: "Scope to clear", defaultValue: .string("all")),
                 ],
                 handler: { args, ctx in
                     try requireTestMode(ctx)
@@ -216,6 +216,10 @@ extension ParolaAutomationServer {
                         CapturedInsertionStore.shared.clear()
                         // The next run would swap the cached mock out anyway; this frees it now.
                         await ctx.model.unloadTranscriptionSession()
+                    }
+                    if scope == "streaming" {
+                        MockStreamingTranscriberRegistry.shared.clear()
+                        await ctx.server.releaseHeldStreamingStart()
                     }
                     if scope == "llm" || scope == "all" {
                         await MockLanguageModelStore.shared.clear()
