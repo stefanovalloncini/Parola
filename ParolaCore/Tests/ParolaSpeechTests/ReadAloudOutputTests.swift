@@ -545,6 +545,8 @@ private func render(_ output: ReadAloudOutput, seconds: Double) throws -> [Float
         await Task.yield()
     }
     await events.wait(count: count)
+    // The mixer ramps a retirement's volume change over the next render; take it here, in the quiet after the unit.
+    rendered += try render(output, seconds: 0.1)
     return rendered
 }
 
