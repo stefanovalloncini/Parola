@@ -39,15 +39,8 @@ enum NowReadingLayout: Equatable {
 }
 
 extension AppModel {
-    /// On a narrow window the transcript toolbar has no room for another item, so the read button's menu carries the controls.
     var nowReadingLayout: NowReadingLayout {
-        let layout = NowReadingLayout.resolve(state: readAloud.state, takeActive: recordingActive, width: windowWidthTierForReading)
-        return layout == .minimal && transcriptToolbarShows ? .hidden : layout
-    }
-
-    var readButtonCarriesTransport: Bool {
-        windowWidthTierForReading == .narrow && transcriptToolbarShows && nowReadingLayout == .hidden
-            && !recordingActive && readAloud.item != nil
+        NowReadingLayout.resolve(state: readAloud.state, takeActive: recordingActive, width: windowWidthTierForReading)
     }
 
     func openReading() async {
@@ -87,6 +80,21 @@ struct NowReadingControl: View {
     private var sentenceValue: String {
         guard let item = controller.item else { return "" }
         return String(localized: "Sentence \(min(item.unitIndex + 1, item.unitCount)) of \(item.unitCount)")
+    }
+
+    private var stateValue: String {
+        guard let item = controller.item else { return "" }
+        return Self.spokenState(controller.state, sentence: min(item.unitIndex + 1, item.unitCount), of: item.unitCount)
+    }
+
+    static func spokenState(_ state: ReadAloudController.State, sentence: Int, of count: Int) -> String {
+        switch state {
+        case .preparing: String(localized: "Preparing…")
+        case .reading: String(localized: "Playing, Sentence \(sentence) of \(count)")
+        case .waiting: String(localized: "Waiting for the voice, Sentence \(sentence) of \(count)")
+        case .paused: String(localized: "Paused, Sentence \(sentence) of \(count)")
+        case .idle, .failed, .noVoice: ""
+        }
     }
 
     private var transport: some View {
@@ -137,12 +145,12 @@ struct NowReadingControl: View {
     private var minimal: some View {
         let transport = model.readingTransport
         return Menu {
+            Button("Open") { Task { await model.openReading() } }
+                .axLeaf("Toolbar.MenuItem.ReadingOpen")
             if let item = controller.item {
                 Text(item.title)
                 Text(sourceTitle)
             }
-            Button("Open") { Task { await model.openReading() } }
-                .axLeaf("Toolbar.MenuItem.ReadingOpen")
             Divider()
             Button(LocalizedStringKey(transport.toggle == .pause ? "Pause Reading" : "Resume Reading")) {
                 Task { await model.toggleReading() }
@@ -160,25 +168,28 @@ struct NowReadingControl: View {
             Button("Stop Reading") { Task { await model.stopReading() } }
                 .axLeaf("Toolbar.MenuItem.ReadingStop")
         } label: {
-            Image(systemName: transport.toggle == .pause ? "speaker.wave.2.fill" : "speaker.slash.fill")
+            Image(systemName: transport.toggle == .pause ? "speaker.wave.1.fill" : "speaker.slash.fill")
                 .imageScale(.small)
+                .frame(width: 14)
+        } primaryAction: {
+            Task { await model.toggleReading() }
         }
-        .menuIndicator(.hidden)
+        .menuIndicator(.visible)
         .fixedSize()
-        .help(transport.blockedMessage.map { Text($0) } ?? Text("Now Reading"))
+        .help(transport.blockedMessage.map { Text($0) } ?? Text(LocalizedStringKey(transport.toggle == .pause ? "Pause Reading" : "Resume Reading")))
         .accessibilityLabel("Now Reading")
-        .accessibilityValue(sentenceValue)
+        .accessibilityValue(stateValue)
         .axLeaf("Toolbar.Menu.ReadingMinimal")
     }
 
     private var sourceMenu: some View {
         Menu {
+            Button("Open") { Task { await model.openReading() } }
+                .axLeaf("Toolbar.MenuItem.ReadingOpen")
             if let item = controller.item {
                 Text(item.title)
                 Text(sourceTitle)
             }
-            Button("Open") { Task { await model.openReading() } }
-                .axLeaf("Toolbar.MenuItem.ReadingOpen")
             if isCompact {
                 Menu("Speed") { speedItems }
                     .axLeaf("Toolbar.MenuItem.ReadingSpeed")
@@ -190,8 +201,6 @@ struct NowReadingControl: View {
                 Label(sourceTitle, systemImage: "speaker.wave.2.fill")
                     .labelStyle(.titleAndIcon)
             }
-        } primaryAction: {
-            Task { await model.openReading() }
         }
         .menuIndicator(isCompact ? .hidden : .visible)
         .fixedSize()

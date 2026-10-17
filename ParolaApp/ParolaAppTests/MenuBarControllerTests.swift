@@ -536,6 +536,74 @@ struct ReadingMenuTests {
         #expect(toggle?.action == NSSelectorFromString("resumeReading"))
     }
 
+    @Test("the snapshot of a model in Dictation-only mode carries the reading, and a take adds the blocked note")
+    func snapshotModesAndNote() async {
+        let model = AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("menu-modes"))
+        model.transcript = EntryWindowTestSupport.transcript(texts: ["One two three four.", "Five six seven eight."], speakers: [])
+        model.phase = .ready
+        model.readAloud.mockVoice?.install(msPerUnit: 60_000, failAtUnit: nil)
+        #expect(MenuBarController.snapshot(for: model, mode: .dictationOnly).reading == nil)
+        await model.readAloud(ReadAloudRequest(kind: .transcript))
+        await waitUntil { model.readAloud.state == .reading }
+
+        #expect(MenuBarController.snapshot(for: model, mode: .dictationOnly).reading?.toggleTitle == "Pause Reading")
+        #expect(MenuBarController.snapshot(for: model, mode: .full).reading?.blockedNote == nil)
+
+        model.installTestTake(source: .microphone)
+        await waitUntil { model.readAloud.state == .paused(.take) }
+        let note = MenuBarController.snapshot(for: model, mode: .full).reading?.blockedNote
+        #expect(note == ReadAloudController.BlockedReason.take.message)
+        await model.stopReading()
+    }
+
+    @Test("the blocked line is added to and removed from an open menu in place")
+    func openMenuNote() {
+        let note = "Reading waits until the recording ends."
+        let blocked = MenuBarController.Reading(
+            nowReading: "x", toggleTitle: "Resume Reading", isPaused: true, canToggle: false, canSkip: false, blockedNote: note
+        )
+        let menu = MenuBarController.menu(for: snapshot(playing), target: nil)
+        #expect(!titles(menu.items).contains(note))
+
+        MenuBarController.updateReadingItems(in: menu, for: blocked, target: nil)
+        let all = titles(menu.items)
+        #expect(all.firstIndex(of: note) == all.firstIndex(of: "Resume Reading").map { $0 - 1 })
+
+        MenuBarController.updateReadingItems(in: menu, for: paused, target: nil)
+        #expect(!titles(menu.items).contains(note))
+    }
+
+    @Test("an open Dock menu is registered, so it is rewritten like the status item")
+    func dockMenuHasADelegate() {
+        let model = AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("menu-dock"))
+        let controller = MenuBarController()
+        controller.bind(model)
+        #expect(controller.dockMenu()?.delegate === controller)
+    }
+
+    @Test("with no status item at all the open Dock menu still follows the reading")
+    func dockOnlyOpenMenuFollows() async {
+        let model = AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("menu-hidden"))
+        model.transcript = EntryWindowTestSupport.transcript(texts: ["One two three four.", "Five six seven eight."], speakers: [])
+        model.phase = .ready
+        model.showMenuBarExtra = false
+        model.dictationEnabled = false
+        model.readAloud.mockVoice?.install(msPerUnit: 60_000, failAtUnit: nil)
+        let controller = MenuBarController()
+        controller.bind(model)
+        await model.readAloud(ReadAloudRequest(kind: .transcript))
+        await waitUntil { controller.lastSnapshot?.reading?.toggleTitle == "Pause Reading" }
+        #expect(controller.lastSnapshot?.mode == .hidden)
+        let dock = controller.dockMenu()
+        let menu = dock ?? NSMenu()
+        controller.menuWillOpen(menu)
+
+        await model.pauseReading()
+        await waitUntil { menu.items.first { $0.identifier?.rawValue == "MenuBar.PauseReading" }?.title == "Resume Reading" }
+        #expect(menu.items.first { $0.identifier?.rawValue == "MenuBar.PauseReading" }?.title == "Resume Reading")
+        await model.stopReading()
+    }
+
     @Test("a bound menu bar follows the reading: Pause, Resume, then nothing; a failure removes it")
     func boundMenuFollowsReading() async {
         let model = AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("menu-bound"))
@@ -551,7 +619,7 @@ struct ReadingMenuTests {
         await waitUntil { controller.lastSnapshot?.reading?.toggleTitle == "Pause Reading" }
         #expect(controller.lastSnapshot?.reading?.toggleTitle == "Pause Reading")
         let menu = MenuBarController.menu(for: controller.lastSnapshot ?? snapshot(nil), target: controller)
-        controller.readingMenuOpened(menu)
+        controller.menuWillOpen(menu)
 
         await model.pauseReading()
         await waitUntil { controller.lastSnapshot?.reading?.toggleTitle == "Resume Reading" }

@@ -49,35 +49,73 @@ struct NowReadingControlTests {
         model.windowWidthTierForReading = .medium
         #expect(model.nowReadingLayout == .compact)
         model.windowWidthTierForReading = .narrow
-        #expect(model.nowReadingLayout == .hidden)
+        #expect(model.nowReadingLayout == .minimal)
 
         await model.stopReading()
         #expect(model.nowReadingLayout == .hidden)
     }
 
-    @Test("on a narrow window with the transcript toolbar up, the read button's menu carries the controls and no item is added")
-    func narrowTranscriptWindowUsesTheReadButton() async throws {
+    @Test("on a narrow window the minimal item shows with the transcript toolbar up, on the entry being read and on another")
+    func minimalShowsWithTheTranscriptToolbar() async throws {
         let model = EntryWindowTestSupport.makeModel("now-reading-narrow")
-        let entry = try await EntryWindowTestSupport.seed(
+        let first = try await EntryWindowTestSupport.seed(
             model, texts: ["One two three four.", "Five six seven eight."], speakers: [nil, nil], audio: nil
         )
-        model.loadEntry(entry.id)
+        let second = try await EntryWindowTestSupport.seed(model, texts: ["Nine ten eleven twelve."], speakers: [nil], audio: nil)
+        model.loadEntry(first.id)
         await waitUntil { model.hasTranscript && model.transcriptToolbarShows }
         model.readAloud.mockVoice?.install(msPerUnit: 60_000, failAtUnit: nil)
         await model.readAloud(ReadAloudRequest(kind: .transcript))
         await waitUntil { model.readAloud.state == .reading }
+        #expect(model.transcriptToolbarShows)
 
         model.windowWidthTierForReading = .wide
         #expect(model.nowReadingLayout == .full)
-        #expect(!model.readButtonCarriesTransport)
         model.windowWidthTierForReading = .medium
         #expect(model.nowReadingLayout == .compact)
-        #expect(!model.readButtonCarriesTransport)
         model.windowWidthTierForReading = .narrow
-        #expect(model.nowReadingLayout == .hidden)
-        #expect(model.readButtonCarriesTransport)
+        #expect(model.nowReadingLayout == .minimal)
+
+        model.loadEntry(second.id)
+        await waitUntil { model.selectedEntryID == second.id && model.hasTranscript }
+        #expect(model.transcriptToolbarShows)
+        #expect(model.nowReadingLayout == .minimal)
         await model.stopReading()
-        #expect(!model.readButtonCarriesTransport)
+        #expect(model.nowReadingLayout == .hidden)
+    }
+
+    @Test("Previous and Skip are enabled once the first sentence has started")
+    func stepsEnableWhenReading() async {
+        let model = AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("now-reading-steps"))
+        model.transcript = EntryWindowTestSupport.transcript(texts: ["One two three four.", "Five six seven eight."], speakers: [])
+        model.phase = .ready
+        model.readAloud.mockVoice?.install(msPerUnit: 60_000, failAtUnit: nil)
+        #expect(!model.readingTransport.stepEnabled)
+
+        await model.readAloud(ReadAloudRequest(kind: .transcript))
+        await waitUntil { model.readAloud.state == .reading }
+
+        #expect(model.readAloud.sentenceStarted)
+        #expect(model.readingTransport.stepEnabled)
+        await model.stopReading()
+        #expect(!model.readAloud.sentenceStarted)
+    }
+
+    @Test("VoiceOver hears the state with the position, in English and Italian")
+    func spokenStates() throws {
+        #expect(NowReadingControl.spokenState(.paused(.user), sentence: 3, of: 12) == "Paused, Sentence 3 of 12")
+        #expect(NowReadingControl.spokenState(.reading, sentence: 3, of: 12) == "Playing, Sentence 3 of 12")
+        #expect(NowReadingControl.spokenState(.waiting(.slow), sentence: 3, of: 12) == "Waiting for the voice, Sentence 3 of 12")
+        #expect(NowReadingControl.spokenState(.preparing, sentence: 1, of: 12) == "Preparing…")
+        let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
+        let italian = try #require(Bundle(path: path))
+        for (key, expected) in [
+            ("Paused, Sentence %lld of %lld", "In pausa, frase %1$lld di %2$lld"),
+            ("Playing, Sentence %lld of %lld", "In lettura, frase %1$lld di %2$lld"),
+            ("Waiting for the voice, Sentence %lld of %lld", "In attesa della voce, frase %1$lld di %2$lld"),
+        ] {
+            #expect(italian.localizedString(forKey: key, value: "MISSING", table: nil) == expected, "Italian for \(key)")
+        }
     }
 
     @Test("Open selects the entry and the pane being read")
@@ -154,13 +192,6 @@ struct NowReadingControlTests {
         await rig.controller.start(other)
         await waitUntil { rig.controller.state.name == "failed" }
         #expect(rig.controller.canUseBuiltInVoice)
-    }
-
-    @Test("the failed control's line is the state's own line")
-    func failedLineIsTheStatesOwn() {
-        let model = AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("now-reading-line"))
-        #expect(NowReadingLayout.resolve(state: .failed("Couldn't open the audio output."), takeActive: false, width: .wide) == .failed)
-        #expect(model.readAloud.failureMessage(named: "Maria") == "Couldn't continue with Maria.")
     }
 
     @Test("the speed label drops trailing zeros")

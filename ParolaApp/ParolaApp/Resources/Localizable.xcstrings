@@ -22689,6 +22689,39 @@
           }
         }
       }
+    },
+    "Playing, Sentence %lld of %lld": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In lettura, frase %1$lld di %2$lld"
+          }
+        }
+      }
+    },
+    "Paused, Sentence %lld of %lld": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In pausa, frase %1$lld di %2$lld"
+          }
+        }
+      }
+    },
+    "Waiting for the voice, Sentence %lld of %lld": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In attesa della voce, frase %1$lld di %2$lld"
+          }
+        }
+      }
     }
   },
   "version": "1.1"

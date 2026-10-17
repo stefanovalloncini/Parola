@@ -179,9 +179,7 @@ final class MenuBarController: NSObject {
     private static func readingItems(_ reading: Reading, target: AnyObject?) -> [NSMenuItem] {
         var items: [NSMenuItem] = []
         if let note = reading.blockedNote {
-            let line = NSMenuItem(title: note, action: nil, keyEquivalent: "")
-            line.isEnabled = false
-            items.append(line)
+            items.append(noteItem(note))
         }
         let toggle = menuItem(
             title: reading.toggleTitle, action: reading.isPaused ? #selector(resumeReading) : #selector(pauseReading),
@@ -194,8 +192,28 @@ final class MenuBarController: NSObject {
         return items + [toggle, skip, stop]
     }
 
+    private static func noteItem(_ note: String) -> NSMenuItem {
+        let line = NSMenuItem(title: note, action: nil, keyEquivalent: "")
+        line.isEnabled = false
+        line.identifier = NSUserInterfaceItemIdentifier(readingNoteIdentifier)
+        return line
+    }
+
+    private static let readingNoteIdentifier = "MenuBar.ReadingNote"
+
     /// An open menu keeps the items it was built with, so a state change rewrites the reading items where they stand.
     static func updateReadingItems(in menu: NSMenu, for reading: Reading, target: AnyObject?) {
+        let noteIndex = menu.items.firstIndex { $0.identifier?.rawValue == readingNoteIdentifier }
+        let toggleIndex = menu.items.firstIndex { $0.identifier?.rawValue == readingIdentifiers[0] }
+        if let note = reading.blockedNote {
+            if let noteIndex {
+                menu.items[noteIndex].title = note
+            } else if let toggleIndex {
+                menu.insertItem(noteItem(note), at: toggleIndex)
+            }
+        } else if let noteIndex {
+            menu.removeItem(at: noteIndex)
+        }
         for item in menu.items {
             switch item.identifier?.rawValue {
             case readingIdentifiers[0]:
@@ -222,12 +240,12 @@ final class MenuBarController: NSObject {
         if snapshot.mode != lastSnapshot?.mode {
             applyVisibility(snapshot.mode != .hidden)
         }
+        if snapshot != lastSnapshot, let openMenu, let reading = snapshot.reading {
+            Self.updateReadingItems(in: openMenu, for: reading, target: self)
+        }
         guard snapshot.mode != .hidden else { return }
         applyIcon(meetingCue: snapshot.pendingMeetingApp)
         guard snapshot != lastSnapshot else { return }
-        if let openMenu, let reading = snapshot.reading {
-            Self.updateReadingItems(in: openMenu, for: reading, target: self)
-        }
         rebuildMenu(snapshot)
     }
 
@@ -458,6 +476,7 @@ final class MenuBarController: NSObject {
         guard !items.isEmpty else { return nil }
         let menu = NSMenu()
         menu.autoenablesItems = false
+        menu.delegate = self
         for item in items {
             menu.addItem(item)
         }

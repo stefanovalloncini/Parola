@@ -141,35 +141,11 @@ struct ReadAloudButton: View {
             .disabled(blocked || model.currentSegmentID == nil)
             .axLeaf("Toolbar.Transcript.MenuItem.ReadFromCurrentSegment")
         }
-        if model.readButtonCarriesTransport {
-            transportItems
-        }
         Button("Choose Voice…") { model.presentVoiceChooser(for: kind) }
             .disabled(!hasContent(kind))
             .axLeaf("Toolbar.Transcript.MenuItem.ChooseVoice")
         Button("Stop Reading") { Task { await model.stopReading() } }
             .disabled(model.readAloud.item == nil)
             .axLeaf("Toolbar.Transcript.MenuItem.StopReading")
-    }
-
-    @ViewBuilder
-    private var transportItems: some View {
-        let transport = model.readingTransport
-        Button("Previous Sentence") { Task { await model.skipReading(by: -1) } }
-            .disabled(!transport.stepEnabled)
-            .help(transport.blockedMessage ?? "")
-            .axLeaf("Toolbar.Transcript.MenuItem.ReadingBack")
-        Button("Skip Sentence") { Task { await model.skipReading(by: 1) } }
-            .disabled(!transport.stepEnabled)
-            .help(transport.blockedMessage ?? "")
-            .axLeaf("Toolbar.Transcript.MenuItem.ReadingSkip")
-        Picker("Speed", selection: Binding(get: { model.readAloud.speed }, set: { model.setReadingSpeed($0) })) {
-            ForEach(ReadAloudController.speeds, id: \.self) { speed in
-                Text(verbatim: NowReadingControl.speedLabel(speed)).tag(speed)
-            }
-        }
-        .pickerStyle(.menu)
-        .axLeaf("Toolbar.Transcript.MenuItem.ReadingSpeed")
-        Divider()
     }
 }

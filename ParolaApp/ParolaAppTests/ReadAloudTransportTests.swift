@@ -307,6 +307,21 @@ struct ReadAloudPlaybackMenuTests {
         await model.stopReading()
     }
 
+    @Test("a paused reading's Playback item reads Resume Reading, and Pause Reading while it plays")
+    func playbackItemFollowsTheState() async throws {
+        let (model, entry) = try await seeded("pm-title")
+        model.readAloud.mockVoice?.install(msPerUnit: 60_000, failAtUnit: nil)
+        model.loadEntry(entry.id)
+        await waitUntil { model.hasTranscript }
+        await model.readAloudFromMenu()
+        await waitUntil { model.readAloud.state == .reading }
+        #expect(items(model).contains { $0.title == "Pause Reading" && $0.isEnabled })
+
+        await model.pauseReading()
+        #expect(items(model).contains { $0.title == "Resume Reading" && $0.isEnabled })
+        await model.stopReading()
+    }
+
     @Test("the cheat sheet lists Read Aloud ⌥⌘R under Playback")
     func cheatSheet() {
         let playback = ShortcutCatalog.sections(features: .all).first { $0.title == "Playback" }

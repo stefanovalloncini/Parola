@@ -85,6 +85,20 @@ struct ReadAloudActivityTests {
         #expect(rig.activity.held == 0)
     }
 
+    @Test("a reading that waits on a slow voice keeps the activity, and a pause then releases it")
+    func waitingKeepsIt() async {
+        let rig = ReadAloudRig()
+        await rig.start()
+
+        rig.controller.handle(.waiting(.slow), generation: rig.controller.currentGeneration)
+
+        #expect(rig.controller.state == .waiting(.slow))
+        #expect(rig.activity.held == 1)
+        #expect(rig.controller.activityHeld)
+        await rig.controller.pause()
+        #expect(rig.activity.held == 0)
+    }
+
     @Test("a refused start never holds one")
     func blockedStartHoldsNothing() async {
         let rig = ReadAloudRig()

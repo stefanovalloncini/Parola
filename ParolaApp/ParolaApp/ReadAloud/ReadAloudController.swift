@@ -203,6 +203,8 @@ final class ReadAloudController {
 
     var readingBlockedReason: BlockedReason? { blockedProvider() }
 
+    var currentGeneration: Int { generation }
+
     var canUseBuiltInVoice: Bool { item.map { $0.voice != .appleAutomatic } ?? false }
 
     var readingOwnsKeys: Bool {
@@ -590,7 +592,7 @@ final class ReadAloudController {
         }
     }
 
-    private func handle(_ event: ReadAloudSessionEvent, generation mine: Int) {
+    func handle(_ event: ReadAloudSessionEvent, generation mine: Int) {
         guard mine == generation else { return }
         switch event {
         case .unitStarted(let index, let anchors):
