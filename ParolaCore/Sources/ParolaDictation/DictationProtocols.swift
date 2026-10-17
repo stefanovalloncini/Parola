@@ -59,6 +59,7 @@ public extension DictationRecorder {
     func start(configuration: DictationPipelineConfiguration) async throws {
         try await start()
     }
+    /// Transcribes before returning, so it can't release the mic at once; a recorder that can split the stop from the decode should implement `stopCapture()`.
     func stopCapture() async throws -> DictationTake {
         let text = try await stopAndTranscribe()
         return DictationTake(finalize: { text })

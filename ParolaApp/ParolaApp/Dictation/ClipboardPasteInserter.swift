@@ -42,6 +42,7 @@ struct ClipboardPasteInserter: TextInserter {
     var pasteboardName: NSPasteboard.Name = .general
     var restoreDelay: Duration = .milliseconds(300)
     var postPaste: @MainActor @Sendable () -> Void = { ClipboardPasteInserter.postCmdV() }
+    var beforePaste: (@Sendable () async throws -> Void)?
 
     func insert(_ text: String) async throws {
         if preDelayMs > 0 {
@@ -55,6 +56,7 @@ struct ClipboardPasteInserter: TextInserter {
         } else {
             prior = await PasteboardSnapshot.capture(named: name)
         }
+        try await beforePaste?()
         try await MainActor.run {
             let pasteboard = NSPasteboard(name: name)
             pasteboard.clearContents()

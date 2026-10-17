@@ -246,11 +246,11 @@ extension AppModel {
         }
     }
 
-    /// Unlike a restart's stop, this drops a final still on its way: nothing is pasted once dictation is off.
     func dictationModelToRelease() -> String {
         lastDictationModel ?? dictationController.configuration?.pipeline.modelName ?? selectedModel
     }
 
+    /// Unlike a restart's stop, this drops a final still on its way: nothing is pasted once dictation is off.
     func turnOffDictation() {
         let mayBeTranscribing = dictationController.state != .idle
         let configuredModel = dictationModelToRelease()

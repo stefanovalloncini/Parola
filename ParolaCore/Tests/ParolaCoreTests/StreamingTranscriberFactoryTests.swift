@@ -91,4 +91,16 @@ struct StreamingTranscriberFactoryTests {
         #expect(made?.source == .systemAudio)
         #expect(MockStreamingTranscriberRegistry.shared.madeSources() == [.systemAudio, .microphone(deviceUID: "usb")])
     }
+
+    @Test("the factory hands the serializer's slot to the session, and none without one")
+    func factoryWiresTheSerializer() {
+        MockStreamingTranscriberRegistry.shared.clear()
+        let serializer = DecodeSerializer()
+
+        let serialized = StreamingTranscriberFactory.make(decodeSerializer: serializer) as? StreamingTranscriptionSession
+        let plain = StreamingTranscriberFactory.make() as? StreamingTranscriptionSession
+
+        #expect(serialized?.decodeSlot === serializer.slot)
+        #expect(plain?.decodeSlot == nil)
+    }
 }

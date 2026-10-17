@@ -339,8 +339,6 @@ struct AppModelDictationTests {
         change()
         model.dictationController.simulatePress()
         _ = await waitUntil { log.configurations.count == 2 }
-        model.dictationController.simulateRelease()
-        _ = await waitUntil { model.dictationController.state == .idle }
         return log
     }
 
@@ -749,8 +747,11 @@ struct AppModelDictationTests {
     func restartBehindAStuckTake() async {
         let model = makeModel()
         let recorders = RecorderTally()
+        let armed = ArmedMonitors()
+        model.dictationController.hotkeyFactory = { _, _ in ArmedMonitor(armed) }
         model.dictationController.recorderFactory = { _ in recorders.make() }
         model.dictationEnabled = true
+        _ = await waitUntil { armed.started == 1 }
         model.dictationController.simulatePress()
         _ = await waitUntil { model.dictationState == .listening }
         model.stopDictationFromIntent()
@@ -758,6 +759,8 @@ struct AppModelDictationTests {
         #expect(transcribing)
 
         model.dictationKeyCode = 97
+        let rearmed = await waitUntil { armed.started == 2 }
+        #expect(rearmed, "the new monitor armed without waiting for the stuck take")
         model.dictationController.simulatePress()
 
         let listens = await waitUntil { model.dictationState == .listening }
@@ -766,14 +769,56 @@ struct AppModelDictationTests {
         model.abortDictation()
     }
 
-    @Test("turning dictation off unloads the model the last press used")
-    func turnOffUnloadsTheLastPressedModel() {
+    @Test("turning dictation off hands the residency the model the last press used")
+    func turnOffUnloadsTheLastPressedModel() async {
         let model = makeModel()
+        let recorders = RecorderTally()
+        let holder = UnloadSpy()
+        model.modelResidency.attach(fileSession: UnloadSpy()) { holder }
+        model.dictationController.recorderFactory = { _ in recorders.make() }
         model.selectedModel = "openai_whisper-tiny"
-        _ = model.pressedPipelineConfiguration()
+        model.dictationEnabled = true
+        model.dictationController.simulatePress()
+        _ = await waitUntil { model.dictationState == .listening }
+        model.stopDictationFromIntent()
+        let transcribing = await waitUntil { model.dictationState == .transcribing }
+        #expect(transcribing)
         model.selectedModel = "openai_whisper-base"
 
-        #expect(model.dictationModelToRelease() == "openai_whisper-tiny")
+        model.dictationEnabled = false
+
+        let asked = await waitUntil { await holder.unloads == ["openai_whisper-tiny"] }
+        #expect(asked)
+        for recorder in recorders.made { await recorder.release() }
+    }
+
+    @Test("turning dictation off discards the take still being processed, not just its paste")
+    func turnOffDiscardsQueuedTakes() async {
+        let model = makeModel()
+        let recorders = RecorderTally()
+        model.dictationController.recorderFactory = { _ in recorders.make() }
+        model.dictationEnabled = true
+        model.dictationController.simulatePress()
+        _ = await waitUntil { model.dictationState == .listening }
+        model.stopDictationFromIntent()
+        let transcribing = await waitUntil { model.dictationState == .transcribing }
+        #expect(transcribing)
+
+        model.dictationEnabled = false
+
+        let discarded = await waitUntil { await recorders.made.first?.discards == 1 }
+        #expect(discarded)
+        for recorder in recorders.made { await recorder.release() }
+    }
+
+    @Test("the pipeline hands every take a processor whose context is scoped to its own app")
+    func pipelineScopesContext() {
+        let model = makeModel()
+        model.dictationContextSelection = true
+
+        let processor = model.dictationPipelineConfiguration().postProcessor as? PromptDictationProcessor
+
+        #expect(processor?.scopedContext != nil)
     }
 
     /// Dictation on, a final held in its recorder, and every paste recorded instead of posted.
@@ -874,9 +919,13 @@ private struct IdentityPostProcessor: TextPostProcessor {
 }
 
 private actor StuckRecorder: DictationRecorder {
+    private(set) var discards = 0
+
     func stopCapture() async throws -> DictationTake {
-        DictationTake(finalize: { try await self.stopAndTranscribe() })
+        DictationTake(finalize: { try await self.stopAndTranscribe() }, discard: { await self.noteDiscard() })
     }
+
+    private func noteDiscard() { discards += 1 }
 
     private let text: String
     private var gate: CheckedContinuation<Void, Never>?
@@ -912,4 +961,26 @@ private final class RecorderTally {
         made.append(recorder)
         return recorder
     }
+}
+
+private final class ArmedMonitors: @unchecked Sendable {
+    // @unchecked: `count` is touched only under `lock`.
+    private let lock = NSLock()
+    private var count = 0
+    var started: Int { lock.withLock { count } }
+    func note() { lock.withLock { count += 1 } }
+}
+
+private final class ArmedMonitor: HotkeyMonitor {
+    let armed: ArmedMonitors
+    init(_ armed: ArmedMonitors) { self.armed = armed }
+    func start(handler: @escaping @Sendable (HotkeyEvent) -> Void) async { armed.note() }
+    func stop() async {}
+}
+
+private actor UnloadSpy: LoadedModelHolder {
+    private(set) var unloads: [String] = []
+    func loadedModelName() async -> String? { nil }
+    func unloadModel(ifLoaded name: String) async { unloads.append(name) }
+    func prewarm(modelName: String) async {}
 }

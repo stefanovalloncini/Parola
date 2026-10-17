@@ -153,6 +153,12 @@ actor MicDictationRecorder: DictationRecorder {
         MicTake.options(for: defaults, language: defaults.language)
     }
 
+    static func makeDefaultSession(
+        clock: any Clock<Duration>, deviceUID: String?, serializer: DecodeSerializer
+    ) -> any StreamingTranscriber {
+        StreamingTranscriberFactory.make(clock: clock, deviceUID: deviceUID, decodeSerializer: serializer)
+    }
+
     /// Dictation audio is scratch: it goes once read or given up on. Only a file named for dictation, never a test fixture.
     static func discardScratch(_ url: URL) {
         guard url.lastPathComponent.hasPrefix(RecordingScratch.dictationPrefix + "-") else { return }
@@ -315,7 +321,7 @@ private actor MicTake {
 
     private func startStreaming() async throws {
         let session = makeStreamingSession?(settings.deviceUID, decodeSerializer)
-            ?? StreamingTranscriberFactory.make(clock: clock, deviceUID: settings.deviceUID, decodeSerializer: decodeSerializer)
+            ?? MicDictationRecorder.makeDefaultSession(clock: clock, deviceUID: settings.deviceUID, serializer: decodeSerializer)
         streamingSegments = []
         streamingPartial = ""
         streamingFailure = nil

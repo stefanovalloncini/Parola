@@ -73,6 +73,10 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
     private var pendingEnd: PendingEnd?
     nonisolated let persistAudio: Bool
     nonisolated let decodeSlot: StreamingDecodeSlot?
+
+    public nonisolated func decodesThrough(_ serializer: DecodeSerializer) -> Bool {
+        decodeSlot === serializer.slot
+    }
     nonisolated let waitsForModelOnStop: Bool
 
     enum PendingEnd { case stop, cancel }

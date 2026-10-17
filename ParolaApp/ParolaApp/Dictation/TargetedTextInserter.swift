@@ -14,14 +14,22 @@ struct TargetedTextInserter: TextInserter {
 
     func insert(_ text: String) async throws {
         if pasteDelayMs > 0 { await sleep(.milliseconds(pasteDelayMs)) }
-        if let target, let current = await frontmostProcessID(), current != target.processID {
-            await MainActor.run {
-                let pasteboard = NSPasteboard(name: pasteboardName)
-                pasteboard.clearContents()
-                pasteboard.setString(text, forType: .string)
-            }
-            throw TextInsertionError.targetChanged
+        guard var paste = base as? ClipboardPasteInserter else {
+            try await verifyTarget(copying: text)
+            try await base.insert(text)
+            return
         }
-        try await base.insert(text)
+        paste.beforePaste = { try await verifyTarget(copying: text) }
+        try await paste.insert(text)
+    }
+
+    private func verifyTarget(copying text: String) async throws {
+        guard let target, let current = await frontmostProcessID(), current != target.processID else { return }
+        await MainActor.run {
+            let pasteboard = NSPasteboard(name: pasteboardName)
+            pasteboard.clearContents()
+            pasteboard.setString(text, forType: .string)
+        }
+        throw TextInsertionError.targetChanged
     }
 }

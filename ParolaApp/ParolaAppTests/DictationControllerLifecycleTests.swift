@@ -320,7 +320,7 @@ struct DictationControllerLifecycleTests {
         controller.stop()
     }
 
-    @Test("a restart arms the next monitor at once, and the old flush still finishes uncancelled")
+    @Test("a restart arms the next monitor at once, and the old flush still finishes uncancelled", .timeLimit(.minutes(1)))
     func restartDoesNotCancelTheLastUtterance() async {
         let log = MonitorLog()
         let controller = DictationController()

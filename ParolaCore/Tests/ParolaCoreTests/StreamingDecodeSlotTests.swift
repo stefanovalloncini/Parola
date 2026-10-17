@@ -60,6 +60,34 @@ private actor OrderLog {
 
 @Suite("Streaming decode slot ownership")
 struct StreamingDecodeSlotOwnershipTests {
+    @Test("a late release from a cut decode never frees the slot a later decode holds", .timeLimit(.minutes(1)))
+    func lateReleaseKeepsTheNewHolder() async throws {
+        let slot = StreamingDecodeSlot()
+        let oldGate = UninterruptibleGate()
+        let newGate = UninterruptibleGate()
+        defer {
+            oldGate.open()
+            newGate.open()
+        }
+        let old = Task { try await slot.run { await oldGate.wait() } }
+        await oldGate.arrivals.wait(atLeast: 1, "the first decode to hold the slot")
+        old.cancel()
+        let current = Task { try await slot.run { await newGate.wait() } }
+        await newGate.arrivals.wait(atLeast: 1, "the second decode to take the freed slot")
+
+        oldGate.open()
+        _ = try await old.value
+        let third = Task { try await slot.run { 3 } }
+        while await slot.queuedCount == 0 {
+            try Task.checkCancellation()
+            await Task.yield()
+        }
+
+        newGate.open()
+        _ = try await current.value
+        #expect(try await third.value == 3)
+    }
+
     @Test("a decode cut by cancellation frees the slot even if its work never returns", .timeLimit(.minutes(1)))
     func cancelledDecodeReleasesTheSlot() async throws {
         let slot = StreamingDecodeSlot()
@@ -72,17 +100,6 @@ struct StreamingDecodeSlotOwnershipTests {
         let ran = try await slot.run { 7 }
 
         #expect(ran == 7)
-    }
-
-    @Test("the factory hands the serializer's slot to the session, and none without one")
-    func factoryWiresTheSerializer() async {
-        let serializer = DecodeSerializer()
-
-        let serialized = StreamingTranscriberFactory.make(decodeSerializer: serializer) as? StreamingTranscriptionSession
-        let plain = StreamingTranscriberFactory.make() as? StreamingTranscriptionSession
-
-        #expect(serialized?.decodeSlot === serializer.slot)
-        #expect(plain?.decodeSlot == nil)
     }
 }
 

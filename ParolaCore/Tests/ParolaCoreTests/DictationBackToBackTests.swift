@@ -61,8 +61,13 @@ private actor ScriptedRecorder: DictationRecorder {
     private(set) var discarded = 0
     private(set) var takesDiscarded = 0
     private var capturing = false
+    private let cancelSignal: AsyncStream<Void>.Continuation
+    let cancelledFinalizes: AsyncStream<Void>
 
-    init(_ script: [Take]) { self.script = script }
+    init(_ script: [Take]) {
+        self.script = script
+        (cancelledFinalizes, cancelSignal) = AsyncStream.makeStream()
+    }
 
     func start() async throws {
         started.append(nil)
@@ -81,11 +86,16 @@ private actor ScriptedRecorder: DictationRecorder {
         capturing = false
         let take = script.isEmpty ? Take(text: "") : script.removeFirst()
         await take.stopGate?.pass()
+        let cancelSignal = cancelSignal
         return DictationTake(
             finalize: {
-                await take.finalizeGate?.pass()
-                if let failure = take.failure { throw ScriptedFailure(text: failure) }
-                return take.text
+                try await withTaskCancellationHandler {
+                    await take.finalizeGate?.pass()
+                    if let failure = take.failure { throw ScriptedFailure(text: failure) }
+                    return take.text
+                } onCancel: {
+                    cancelSignal.yield()
+                }
             },
             discard: { await self.noteTakeDiscarded() }
         )
@@ -699,8 +709,8 @@ extension DictationBackToBackTests {
         #expect(await recorder.realStarts == 1)
     }
 
-    @Test("a push-to-talk hold released inside a Stop finish still takes its words", .timeLimit(.minutes(1)))
-    func pushToTalkPressAfterTheEndStarts() async {
+    @Test("a push-to-talk press inside a Stop finish starts once it ends, and its later release takes the words", .timeLimit(.minutes(1)))
+    func pressInsideAStopFinishStartsOnceItEnds() async {
         let hold = HoldOnce()
         let store = ScriptedInserter()
         let recorder = SingleSlotRecorder()
@@ -808,9 +818,113 @@ extension DictationBackToBackTests {
 
         #expect(await coord.abandonTranscription())
         await cleanup.open()
-        await coord.drain()
+        await coord.finishedProcessing()
 
         #expect(await inserter.inserted.isEmpty)
+    }
+
+    @Test("Cancel and give-up cancel and discard the take's work", .timeLimit(.minutes(1)))
+    func abandonCancelsTheWork() async {
+        let tail = Gate()
+        let recorder = ScriptedRecorder([.init(text: "one", finalizeGate: tail)])
+        let coord = makeCoordinator(recorder: recorder, inserter: ScriptedInserter())
+        var cancelled = recorder.cancelledFinalizes.makeAsyncIterator()
+        await coord.handle(.press)
+        await coord.handle(.release)
+        await tail.waitEntered()
+
+        #expect(await coord.abandonTranscription())
+
+        #expect(await recorder.takesDiscarded == 1)
+        _ = await cancelled.next()
+        await tail.open()
+    }
+
+    @Test("a Cancel on a take whose capture stop hangs frees the hotkey", .timeLimit(.minutes(1)))
+    func cancelDuringHungStop() async {
+        let stop = Gate()
+        let recorder = ScriptedRecorder([.init(text: "one", stopGate: stop)])
+        let coord = makeCoordinator(recorder: recorder, inserter: ScriptedInserter())
+        await coord.handle(.press)
+        let releasing = Task { await coord.handle(.release) }
+        await stop.waitEntered()
+
+        #expect(await coord.abandonTranscription())
+        await coord.handle(.press)
+
+        #expect(await coord.state == .listening)
+        #expect(await recorder.started.count == 2)
+        await stop.open()
+        await releasing.value
+        #expect(await coord.state == .listening, "the late stop must not end the new capture")
+    }
+
+    @Test("hybrid: two short taps inside a cancel cancel each other", .timeLimit(.minutes(1)))
+    func hybridTapPairDuringCancel() async {
+        let hold = HoldOnce()
+        let recorder = SingleSlotRecorder()
+        let coord = DictationCoordinator(
+            hotkey: QuietHotkey(), recorder: recorder, inserter: ScriptedInserter(), mode: .hybrid, features: .all
+        ) { state in if state == .idle { await hold.hold() } }
+        let t = Date()
+        await coord.handle(.press, capturedAt: t)
+        let cancelling = Task { await coord.cancelListening() }
+        await hold.waitEntered()
+        await coord.handle(.press, capturedAt: t.addingTimeInterval(1))
+        await coord.handle(.release, capturedAt: t.addingTimeInterval(1.1))
+        await coord.handle(.press, capturedAt: t.addingTimeInterval(1.2))
+        await coord.handle(.release, capturedAt: t.addingTimeInterval(1.3))
+        await hold.open()
+        await cancelling.value
+
+        #expect(await coord.state == .idle)
+        #expect(await recorder.realStarts == 1)
+    }
+
+    @Test("hybrid: one short tap inside a cancel locks a new take on, and the next tap ends it", .timeLimit(.minutes(1)))
+    func hybridSingleTapDuringCancel() async {
+        let hold = HoldOnce()
+        let store = ScriptedInserter()
+        let recorder = SingleSlotRecorder()
+        let coord = DictationCoordinator(
+            hotkey: QuietHotkey(), recorder: recorder, inserter: store, mode: .hybrid, features: .all
+        ) { state in if state == .idle { await hold.hold() } }
+        let t = Date()
+        await coord.handle(.press, capturedAt: t)
+        let cancelling = Task { await coord.cancelListening() }
+        await hold.waitEntered()
+        await coord.handle(.press, capturedAt: t.addingTimeInterval(1))
+        await coord.handle(.release, capturedAt: t.addingTimeInterval(1.1))
+        await hold.open()
+        await cancelling.value
+        #expect(await coord.state == .listening)
+
+        await coord.handle(.press, capturedAt: t.addingTimeInterval(3))
+        await coord.handle(.release, capturedAt: t.addingTimeInterval(3.1))
+        await coord.drain()
+
+        #expect(await store.inserted == ["take2"])
+        #expect(await recorder.realStarts == 2)
+    }
+
+    @Test("an Escape during a cancel's wind-down drops the press held back behind it", .timeLimit(.minutes(1)))
+    func cancelDuringWindDownDropsHeldPress() async {
+        let hold = HoldOnce()
+        let recorder = SingleSlotRecorder()
+        let coord = DictationCoordinator(
+            hotkey: QuietHotkey(), recorder: recorder, inserter: ScriptedInserter(), features: .all
+        ) { state in if state == .idle { await hold.hold() } }
+        await coord.handle(.press)
+        let cancelling = Task { await coord.cancelListening() }
+        await hold.waitEntered()
+        await coord.handle(.press)
+
+        await coord.cancelListening()
+        await hold.open()
+        await cancelling.value
+
+        #expect(await coord.state == .idle)
+        #expect(await recorder.realStarts == 1)
     }
 
     @Test("a press keeps a failure nobody has seen while another take is processed", .timeLimit(.minutes(1)))

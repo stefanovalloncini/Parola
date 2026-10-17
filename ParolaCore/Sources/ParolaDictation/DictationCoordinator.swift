@@ -55,6 +55,7 @@ public actor DictationCoordinator {
 
     /// True from the moment a capture ends until the recorder is free and the state is published; a press in between is replayed after.
     private var endInFlight = false
+    private var endToken: UInt64 = 0
     private var deferredEvents: [(event: HotkeyEvent, at: Date)] = []
 
     private var isListening = false
@@ -63,6 +64,7 @@ public actor DictationCoordinator {
     private var captureConfiguration: DictationPipelineConfiguration?
     private var jobs: [UInt64: Job] = [:]
     private var lastSettled: AsyncStream<Void>?
+    private var completions: [UInt64: Task<Void, Never>] = [:]
     private var drainWaiters: [CheckedContinuation<Void, Never>] = []
 
     private var finishes: UInt64 = 0
@@ -200,16 +202,19 @@ public actor DictationCoordinator {
 
     /// Drops the take being recorded and leaves the ones still being processed alone.
     public func cancelListening() async {
-        guard isListening else { return }
+        guard isListening else {
+            if endInFlight { deferredEvents = [] }
+            return
+        }
         generation &+= 1
         isListening = false
         captureConfiguration = nil
         hybridLocked = false
-        endInFlight = true
+        let token = beginEnding()
         await publishState()
         await mediaSession?.exitRecording(holder: .dictation)
         await recorder.stopAndDiscard()
-        await finishEnding()
+        await finishEnding(token)
     }
 
     /// Waits until every released take has been inserted, failed or dropped.
@@ -218,7 +223,19 @@ public actor DictationCoordinator {
         await withCheckedContinuation { drainWaiters.append($0) }
     }
 
-    private func finishEnding() async {
+    /// Test seam: waits for every take's processing task to run to its end, including takes already dropped.
+    func finishedProcessing() async {
+        while let task = completions.values.first { await task.value }
+    }
+
+    private func beginEnding() -> UInt64 {
+        endInFlight = true
+        endToken &+= 1
+        return endToken
+    }
+
+    private func finishEnding(_ token: UInt64) async {
+        guard token == endToken, endInFlight else { return }
         endInFlight = false
         let replay = deferredEvents
         deferredEvents = []
@@ -297,10 +314,15 @@ public actor DictationCoordinator {
     }
 
     private func abandon(_ id: UInt64) async -> Bool {
-        guard case .transcribing = state, jobs[id] != nil else { return false }
+        guard case .transcribing = state, let job = jobs[id] else { return false }
         ParolaLog.notice(.dictation, "final transcription abandoned in \(mode)")
+        let stopStillRunning = job.take == nil && endInFlight
         await dropTakes([id])
         await publishState()
+        if stopStillRunning {
+            endToken &+= 1
+            await finishEnding(endToken)
+        }
         return true
     }
 
@@ -473,7 +495,7 @@ public actor DictationCoordinator {
         hybridLocked = false
         isListening = false
         processing += 1
-        endInFlight = true
+        let token = beginEnding()
         let configuration = captureConfiguration
         captureConfiguration = nil
         let (settled, settle) = AsyncStream<Void>.makeStream()
@@ -490,22 +512,23 @@ public actor DictationCoordinator {
         } catch {
             binding.cancel()
             await failJob(id, error, startedAt: startedAt)
-            await finishEnding()
+            await finishEnding(token)
             return
         }
         guard jobs[id] != nil else {
             binding.cancel()
             await take.discard()
-            await finishEnding()
+            await finishEnding(token)
             return
         }
         let finalizing = Task { try await take.finalize() }
         jobs[id]?.take = take
         jobs[id]?.finalizing = finalizing
-        Task {
+        completions[id] = Task {
             await complete(id, finalizing: finalizing, binding: binding, after: previous, startedAt: startedAt)
+            completions[id] = nil
         }
-        await finishEnding()
+        await finishEnding(token)
     }
 
     private func bindTake(_ configuration: DictationPipelineConfiguration?) async -> DictationTakeBinding {

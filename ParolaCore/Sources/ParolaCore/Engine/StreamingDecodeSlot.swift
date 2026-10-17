@@ -23,6 +23,8 @@ actor StreamingDecodeSlot {
         }
     }
 
+    var queuedCount: Int { waiters.count }
+
     private func acquire() async throws -> UInt64 {
         try Task.checkCancellation()
         nextID &+= 1

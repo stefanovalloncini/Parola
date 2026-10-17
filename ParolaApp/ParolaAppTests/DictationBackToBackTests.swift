@@ -316,7 +316,10 @@ struct DictationContextScopeTests {
         let front = OSAllocatedUnfairLock<Int32>(initialState: 41)
         let pasteboard = NSPasteboard.withUniqueName()
         pasteboard.clearContents()
-        var inserter = TargetedTextInserter(base: ClipboardPasteInserter(), target: DictationTarget(processID: 41), pasteDelayMs: 500)
+        var inserter = TargetedTextInserter(
+            base: ClipboardPasteInserter(trustCheck: { true }, pasteboardName: pasteboard.name, postPaste: {}),
+            target: DictationTarget(processID: 41), pasteDelayMs: 500
+        )
         inserter.frontmostProcessID = { front.withLock { $0 } }
         inserter.sleep = { _ in front.withLock { $0 = 99 } }
         inserter.pasteboardName = pasteboard.name
@@ -324,6 +327,17 @@ struct DictationContextScopeTests {
         await #expect(throws: TextInsertionError.self) { try await inserter.insert("hello") }
 
         #expect(pasteboard.string(forType: .string) == "hello")
+    }
+
+    @Test("the recorder's default session carries its decode serializer")
+    func defaultSessionCarriesTheSerializer() {
+        let serializer = DecodeSerializer()
+
+        let session = MicDictationRecorder.makeDefaultSession(
+            clock: ContinuousClock(), deviceUID: nil, serializer: serializer
+        ) as? StreamingTranscriptionSession
+
+        #expect(session?.decodesThrough(serializer) == true)
     }
 
     @Test("one recorder hands every take the same decode serializer, and another recorder its own")
