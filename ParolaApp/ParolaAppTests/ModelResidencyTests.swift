@@ -103,6 +103,10 @@ private actor ListeningRecorder: DictationRecorder {
 }
 
 private actor SlowFinalRecorder: DictationRecorder {
+    func stopCapture() async throws -> DictationTake {
+        DictationTake(finalize: { try await self.stopAndTranscribe() })
+    }
+
     let gate: Gate
     init(gate: Gate) { self.gate = gate }
     func start() async throws {}

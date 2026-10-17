@@ -72,7 +72,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
     private var isStarting = false
     private var pendingEnd: PendingEnd?
     nonisolated let persistAudio: Bool
-    private let decodeSlot: StreamingDecodeSlot?
+    nonisolated let decodeSlot: StreamingDecodeSlot?
     nonisolated let waitsForModelOnStop: Bool
 
     enum PendingEnd { case stop, cancel }
@@ -82,12 +82,12 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
     public init(
         modelStore: ModelStore = .shared, persistAudio: Bool = false, deviceUID: String? = nil,
         source: CaptionSource? = nil, waitsForModelOnStop: Bool = false, purpose: StreamingPurpose = .take,
-        serializesDecodes: Bool = false
+        decodeSerializer: DecodeSerializer? = nil
     ) {
         self.init(
             modelStore: modelStore, persistAudio: persistAudio, source: source ?? .microphone(deviceUID: deviceUID),
             waitsForModelOnStop: waitsForModelOnStop, purpose: purpose, modelCache: .shared,
-            decodeSlot: serializesDecodes ? .dictation : nil
+            decodeSlot: decodeSerializer?.slot
         )
     }
 

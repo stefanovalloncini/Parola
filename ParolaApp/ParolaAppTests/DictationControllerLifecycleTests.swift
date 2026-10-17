@@ -59,6 +59,10 @@ private struct MeteredRecorder: DictationRecorder {
 
 /// Holds its final until released, and remembers whether the flush was cancelled on the way.
 private actor HeldFlushRecorder: DictationRecorder {
+    func stopCapture() async throws -> DictationTake {
+        DictationTake(finalize: { try await self.stopAndTranscribe() })
+    }
+
     private var gate: CheckedContinuation<Void, Never>?
     private(set) var holding = false
     private(set) var finishedCancelled: Bool?
@@ -316,7 +320,7 @@ struct DictationControllerLifecycleTests {
         controller.stop()
     }
 
-    @Test("a restart arms the next monitor after the bound, and the old flush still finishes uncancelled")
+    @Test("a restart arms the next monitor at once, and the old flush still finishes uncancelled")
     func restartDoesNotCancelTheLastUtterance() async {
         let log = MonitorLog()
         let controller = DictationController()
@@ -324,7 +328,6 @@ struct DictationControllerLifecycleTests {
         let held = HeldFlushRecorder()
         controller.hotkeyFactory = { _, _ in SpyHotkeyMonitor(id: counter.next(), log: log) }
         controller.recorderFactory = { _ in held }
-        controller.teardownBound = .milliseconds(50)
 
         controller.start(configuration: makeConfiguration())
         await log.waitForOps(2)

@@ -58,6 +58,34 @@ private actor OrderLog {
     func add(_ item: String) { items.append(item) }
 }
 
+@Suite("Streaming decode slot ownership")
+struct StreamingDecodeSlotOwnershipTests {
+    @Test("a decode cut by cancellation frees the slot even if its work never returns", .timeLimit(.minutes(1)))
+    func cancelledDecodeReleasesTheSlot() async throws {
+        let slot = StreamingDecodeSlot()
+        let hung = UninterruptibleGate()
+        defer { hung.open() }
+        let first = Task { try await slot.run { await hung.wait() } }
+        await hung.arrivals.wait(atLeast: 1, "the first decode to hold the slot")
+
+        first.cancel()
+        let ran = try await slot.run { 7 }
+
+        #expect(ran == 7)
+    }
+
+    @Test("the factory hands the serializer's slot to the session, and none without one")
+    func factoryWiresTheSerializer() async {
+        let serializer = DecodeSerializer()
+
+        let serialized = StreamingTranscriberFactory.make(decodeSerializer: serializer) as? StreamingTranscriptionSession
+        let plain = StreamingTranscriberFactory.make() as? StreamingTranscriptionSession
+
+        #expect(serialized?.decodeSlot === serializer.slot)
+        #expect(plain?.decodeSlot == nil)
+    }
+}
+
 @Suite("Streaming decode slot wiring")
 struct StreamingDecodeSlotWiringTests {
     private static let tiny = "openai_whisper-tiny"

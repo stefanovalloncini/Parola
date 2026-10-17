@@ -19,7 +19,8 @@ actor MicDictationRecorder: DictationRecorder {
 
     private let fallbackSession: TranscriptionSession
     private let clock: any Clock<Duration>
-    private let makeStreamingSession: (@Sendable (_ deviceUID: String?) -> any StreamingTranscriber)?
+    private let makeStreamingSession: (@Sendable (_ deviceUID: String?, _ serializer: DecodeSerializer) -> any StreamingTranscriber)?
+    private let decodeSerializer = DecodeSerializer()
     private let warmFallbackModel: @Sendable (String) async -> Void
     private let onRunEnded: (@Sendable () -> Void)?
 
@@ -39,6 +40,7 @@ actor MicDictationRecorder: DictationRecorder {
         downloadProgress: (@Sendable (Double) -> Void)? = nil,
         clock: any Clock<Duration> = ContinuousClock(),
         makeStreamingSession: (@Sendable () -> any StreamingTranscriber)? = nil,
+        makeSerializedSession: (@Sendable (String?, DecodeSerializer) -> any StreamingTranscriber)? = nil,
         warmFallbackModel: (@Sendable (String) async -> Void)? = nil
     ) {
         defaults = Settings(
@@ -52,8 +54,10 @@ actor MicDictationRecorder: DictationRecorder {
         self.workflowResolver = workflowResolver
         self.downloadProgress = downloadProgress
         self.clock = clock
-        if let makeStreamingSession {
-            self.makeStreamingSession = { @Sendable _ in makeStreamingSession() }
+        if let makeSerializedSession {
+            self.makeStreamingSession = makeSerializedSession
+        } else if let makeStreamingSession {
+            self.makeStreamingSession = { @Sendable _, _ in makeStreamingSession() }
         } else {
             self.makeStreamingSession = nil
         }
@@ -84,6 +88,7 @@ actor MicDictationRecorder: DictationRecorder {
             fallbackSession: fallbackSession,
             clock: clock,
             makeStreamingSession: makeStreamingSession,
+            decodeSerializer: decodeSerializer,
             warmFallbackModel: warmFallbackModel,
             onRunEnded: onRunEnded,
             onPartial: { [weak self] text in await self?.broadcastPartial(text, from: id) }
@@ -172,7 +177,8 @@ private actor MicTake {
     private let downloadProgress: (@Sendable (Double) -> Void)?
     private let fallbackSession: TranscriptionSession
     private let clock: any Clock<Duration>
-    private let makeStreamingSession: (@Sendable (String?) -> any StreamingTranscriber)?
+    private let makeStreamingSession: (@Sendable (String?, DecodeSerializer) -> any StreamingTranscriber)?
+    private let decodeSerializer: DecodeSerializer
     private let warmFallbackModel: @Sendable (String) async -> Void
     private let onRunEnded: (@Sendable () -> Void)?
     private let onPartial: @Sendable (String) async -> Void
@@ -194,7 +200,8 @@ private actor MicTake {
         downloadProgress: (@Sendable (Double) -> Void)?,
         fallbackSession: TranscriptionSession,
         clock: any Clock<Duration>,
-        makeStreamingSession: (@Sendable (String?) -> any StreamingTranscriber)?,
+        makeStreamingSession: (@Sendable (String?, DecodeSerializer) -> any StreamingTranscriber)?,
+        decodeSerializer: DecodeSerializer,
         warmFallbackModel: @escaping @Sendable (String) async -> Void,
         onRunEnded: (@Sendable () -> Void)?,
         onPartial: @escaping @Sendable (String) async -> Void
@@ -206,6 +213,7 @@ private actor MicTake {
         self.fallbackSession = fallbackSession
         self.clock = clock
         self.makeStreamingSession = makeStreamingSession
+        self.decodeSerializer = decodeSerializer
         self.warmFallbackModel = warmFallbackModel
         self.onRunEnded = onRunEnded
         self.onPartial = onPartial
@@ -306,8 +314,8 @@ private actor MicTake {
     }
 
     private func startStreaming() async throws {
-        let session = makeStreamingSession?(settings.deviceUID)
-            ?? StreamingTranscriberFactory.make(clock: clock, deviceUID: settings.deviceUID, serializesDecodes: true)
+        let session = makeStreamingSession?(settings.deviceUID, decodeSerializer)
+            ?? StreamingTranscriberFactory.make(clock: clock, deviceUID: settings.deviceUID, decodeSerializer: decodeSerializer)
         streamingSegments = []
         streamingPartial = ""
         streamingFailure = nil

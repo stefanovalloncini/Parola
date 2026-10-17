@@ -111,16 +111,18 @@ struct DictationBackToBackCaptureTests {
         try await recorder.start()
         let asRecorder: any DictationRecorder = recorder
         let stream = await asRecorder.partials()
-        var partials = stream.makeAsyncIterator()
+        let firstPartial = Task { () -> String? in
+            for await text in stream { return text }
+            return nil
+        }
         let take = try await recorder.stopCapture()
 
-        let finalizing = Task { try await take.finalize() }
         open.finish()
+        let text = try await take.finalize()
 
-        let heard = await partials.next()
-        withExtendedLifetime(stream) {}
+        let heard = await AsyncTimeout.run(.seconds(5)) { await firstPartial.value } ?? nil
         #expect(heard == "tail words", "heard \(String(describing: heard))")
-        #expect(try await finalizing.value == "tail words")
+        #expect(text == "tail words")
     }
 
     @Test("a start while another take is capturing fails instead of doing nothing")
@@ -225,7 +227,9 @@ struct DictationTargetTests {
         let pasted = (bind?(DictationTarget(processID: 2, bundleID: "com.other")).inserter as? TargetedTextInserter)
 
         #expect(typed?.base is KeystrokeTextInserter)
-        #expect((pasted?.base as? ClipboardPasteInserter)?.preDelayMs == 300)
+        #expect(pasted?.base is ClipboardPasteInserter)
+        #expect(pasted?.pasteDelayMs == 300)
+        #expect(typed?.pasteDelayMs == 0)
         #expect(typed?.target?.processID == 1)
     }
 
@@ -247,6 +251,110 @@ struct DictationTargetTests {
 
 private struct PassThrough: TextPostProcessor {
     func process(_ text: String) async -> String { text }
+}
+
+private struct ScopedSource: DictationContextSource {
+    let pid: Int32
+    func currentSelection() async -> String? { "selected in \(pid)" }
+    func clipboardContents() async -> String? { nil }
+    func windowOCR() async -> String? { "window of \(pid)" }
+}
+
+@MainActor
+@Suite("Dictation context scope and clipboard call sites")
+struct DictationContextScopeTests {
+    @Test("a selection owned by another app is never taken")
+    func selectionOwnerMustBeTheTarget() {
+        #expect(MacContextSource.accepts(owner: 10, target: 10))
+        #expect(!MacContextSource.accepts(owner: 11, target: 10))
+        #expect(MacContextSource.accepts(owner: 11, target: nil))
+    }
+
+    @Test("a take's cleanup prompt carries context from its own app only")
+    func promptContextFollowsTheTarget() async {
+        let seen = OSAllocatedUnfairLock<[String]>(initialState: [])
+        var template = PromptDictationProcessor(
+            defaultPrompt: Prompt(name: "Cleanup", instructions: "clean"),
+            overrides: [:],
+            contextProvider: DictationContextProvider(source: ScopedSource(pid: 999)),
+            contextConfig: DictationContextConfig(selectionEnabled: true, screenEnabled: true),
+            cleanupRunner: { prompt, input in
+                seen.withLock { $0.append(prompt.instructions) }
+                return input
+            }
+        )
+        template.scopedContext = { DictationContextProvider(source: ScopedSource(pid: $0)) }
+
+        _ = await template.targeting(DictationTarget(processID: 7, bundleID: "com.a")).process("hello there")
+
+        let instructions = seen.withLock { $0 }.first ?? ""
+        #expect(instructions.contains("selected in 7"))
+        #expect(instructions.contains("window of 7"))
+        #expect(!instructions.contains("999"))
+    }
+
+    @Test("both clipboard call sites read the user's text while a paste restore is pending")
+    func clipboardCallSitesSkipThePastedText() async throws {
+        let pasteboard = NSPasteboard.withUniqueName()
+        pasteboard.clearContents()
+        pasteboard.setString("mine", forType: .string)
+        let inserter = ClipboardPasteInserter(
+            trustCheck: { true }, pasteboardName: pasteboard.name, restoreDelay: .seconds(600), postPaste: {}
+        )
+        try await inserter.insert("dictated")
+
+        let snippet = NSPasteboardClipboardReader(pasteboardName: pasteboard.name).currentText()
+        let context = await MacContextSource(clipboardName: pasteboard.name).clipboardContents()
+
+        #expect(snippet == "mine")
+        #expect(context == "mine")
+        _ = PendingPasteRestores.takeReusablePrior(on: pasteboard.name)
+    }
+
+    @Test("the paste delay runs before the target check, so a switch during it is caught")
+    func targetCheckFollowsThePasteDelay() async {
+        let front = OSAllocatedUnfairLock<Int32>(initialState: 41)
+        let pasteboard = NSPasteboard.withUniqueName()
+        pasteboard.clearContents()
+        var inserter = TargetedTextInserter(base: ClipboardPasteInserter(), target: DictationTarget(processID: 41), pasteDelayMs: 500)
+        inserter.frontmostProcessID = { front.withLock { $0 } }
+        inserter.sleep = { _ in front.withLock { $0 = 99 } }
+        inserter.pasteboardName = pasteboard.name
+
+        await #expect(throws: TextInsertionError.self) { try await inserter.insert("hello") }
+
+        #expect(pasteboard.string(forType: .string) == "hello")
+    }
+
+    @Test("one recorder hands every take the same decode serializer, and another recorder its own")
+    func recorderOwnsItsSerializer() async throws {
+        let seen = OSAllocatedUnfairLock<[ObjectIdentifier]>(initialState: [])
+        func make() -> MicDictationRecorder {
+            MicDictationRecorder(
+                model: "openai_whisper-large-v3_turbo",
+                language: nil,
+                streamingEnabled: true,
+                makeSerializedSession: { _, serializer in
+                    seen.withLock { $0.append(ObjectIdentifier(serializer)) }
+                    return SpySession(text: "x", stopGate: AsyncStream { $0.finish() })
+                },
+                warmFallbackModel: { _ in }
+            )
+        }
+        let one = make()
+        try await one.start()
+        await one.stopAndDiscard()
+        try await one.start()
+        await one.stopAndDiscard()
+        let two = make()
+        try await two.start()
+        await two.stopAndDiscard()
+
+        let ids = seen.withLock { $0 }
+        #expect(ids.count == 3)
+        #expect(ids[0] == ids[1])
+        #expect(ids[0] != ids[2])
+    }
 }
 
 @MainActor

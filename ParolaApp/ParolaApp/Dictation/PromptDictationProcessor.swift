@@ -12,17 +12,21 @@ struct PromptDictationProcessor: TextPostProcessor {
     let defaultPrompt: Prompt?
     let overrides: [String: [DictationOverrideEntry]]
     let triggerPrompts: [Prompt]
-    let contextProvider: DictationContextProvider?
+    var contextProvider: DictationContextProvider?
     let contextConfig: DictationContextConfig
     let language: String?
     let urlResolver: (@Sendable @MainActor (String) async -> URL?)?
     let cleanupTimeout: Duration
     let cleanupRunner: @Sendable (Prompt, String) async -> String?
     var target: DictationTarget?
+    var scopedContext: (@Sendable (Int32) -> DictationContextProvider)?
 
     func targeting(_ target: DictationTarget?) -> PromptDictationProcessor {
         var copy = self
         copy.target = target
+        if contextProvider != nil, let target, let scopedContext {
+            copy.contextProvider = scopedContext(target.processID)
+        }
         return copy
     }
 

@@ -8,6 +8,14 @@ import ScreenCaptureKit
 import Vision
 
 struct MacContextSource: DictationContextSource {
+    var targetProcessID: Int32?
+    var clipboardName: NSPasteboard.Name = .general
+
+    /// Context belongs to the take's own app: what another app has selected or shows is never its context.
+    nonisolated static func accepts(owner: Int32, target: Int32?) -> Bool {
+        target.map { $0 == owner } ?? true
+    }
+
     // DispatchQueue, not Task.detached: detached jobs around XPC-bridging calls (AX here)
     // have crashed twice with SIGBUS EXC_ARM_DA_ALIGN in runJobInEstablishedExecutorContext.
     func currentSelection() async -> String? {
@@ -20,7 +28,7 @@ struct MacContextSource: DictationContextSource {
 
     func clipboardContents() async -> String? {
         await MainActor.run {
-            PendingPasteRestores.userText()
+            PendingPasteRestores.userText(on: clipboardName)
         }
     }
 
@@ -43,6 +51,8 @@ struct MacContextSource: DictationContextSource {
         )
         guard focusedResult == .success, let element = focused else { return nil }
         let axElement = element as! AXUIElement
+        var owner: pid_t = 0
+        guard AXUIElementGetPid(axElement, &owner) == .success, Self.accepts(owner: owner, target: targetProcessID) else { return nil }
         var selectedText: CFTypeRef?
         let textResult = AXUIElementCopyAttributeValue(
             axElement,
@@ -55,10 +65,14 @@ struct MacContextSource: DictationContextSource {
 
     private func captureFrontmostWindow() async throws -> CGImage {
         let content = try await SCShareableContent.current
-        guard let frontmostApp = await MainActor.run(body: { NSWorkspace.shared.frontmostApplication }) else {
+        let pid: pid_t
+        if let targetProcessID {
+            pid = targetProcessID
+        } else if let frontmostApp = await MainActor.run(body: { NSWorkspace.shared.frontmostApplication }) {
+            pid = frontmostApp.processIdentifier
+        } else {
             throw ContextError.noFrontmostApp
         }
-        let pid = frontmostApp.processIdentifier
         let candidate = content.windows.first { window in
             window.owningApplication?.processID == pid
                 && window.isOnScreen

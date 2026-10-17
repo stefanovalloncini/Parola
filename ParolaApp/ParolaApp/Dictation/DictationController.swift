@@ -54,7 +54,6 @@ final class DictationController {
 
     @ObservationIgnored var speak: @MainActor (String, NSAccessibilityPriorityLevel) -> Void = { announce($0, priority: $1) }
     @ObservationIgnored var transcriptionStopGrace: Duration = .seconds(3)
-    @ObservationIgnored var teardownBound: Duration = .seconds(30)
 
     @ObservationIgnored var anchorProvider: any FieldAnchorProviding = FocusedFieldLocator()
     @ObservationIgnored private let anchorQueue = DispatchQueue(label: "app.parola.dictation.anchor", qos: .userInitiated)
@@ -112,16 +111,6 @@ final class DictationController {
         }
     }
 
-    /// Chained like `enqueueMonitorWork`, but the next op waits for this one at most `limit`, and this one is never cancelled.
-    private func enqueueMonitorWork(waitingAtMost limit: Duration, _ op: @escaping @Sendable () async -> Void) {
-        let previous = monitorWork
-        let work = Task {
-            await previous?.value
-            await op()
-        }
-        monitorWork = Task { _ = await AsyncTimeout.run(limit) { await work.value } }
-    }
-
     isolated deinit {
         levelTask?.cancel()
         partialTask?.cancel()
@@ -139,7 +128,7 @@ final class DictationController {
         let pipeline = configuration.pipeline
         let hotkey = hotkeyFactory?(configuration.hotkeyKeyCode, configuration.hotkeyModifiers)
             ?? Self.hotkeyMonitor(for: configuration)
-        // Own session so a stop never queues behind a file job; it outlives restarts, and rearm() replaces it.
+        // Own session so a stop never queues behind a file job; it outlives restarts.
         let recorder = recorderFactory?(configuration) ?? MicDictationRecorder(
             model: pipeline.modelName,
             language: pipeline.language,
@@ -221,8 +210,8 @@ final class DictationController {
             return
         }
         coordinator = nil
-        // A last utterance still lands and is inserted, however long its flush takes; only the next install stops waiting for it.
-        enqueueMonitorWork(waitingAtMost: teardownBound) { await coord.stopMonitoring() }
+        // A last utterance still lands and is inserted, but nothing waits for it: a stuck take never holds up the next install.
+        enqueueMonitorWork { await coord.stopMonitoring(waitingForTakes: false) }
         stopPartialStream()
         stopWatchingEscape()
         modelDownloadProgress = nil
@@ -278,24 +267,13 @@ final class DictationController {
             Task { await coord.stopListening() }
             return
         }
-        let generation = coordinatorGeneration
-        Task { [weak self] in
-            guard await coord.giveUpOnTranscription(after: grace) else { return }
-            guard let self, generation == self.coordinatorGeneration else { return }
-            self.rearm()
-        }
+        Task { _ = await coord.giveUpOnTranscription(after: grace) }
     }
 
-    /// The HUD's Cancel: the final under way is dropped at once and nothing is pasted.
+    /// The HUD's Cancel: the take being processed is dropped at once and nothing is pasted; queued takes keep running.
     func cancelTranscription() {
         guard let coord = coordinator, case .transcribing = state else { return }
-        let generation = coordinatorGeneration
-        hideHUD()
-        Task { [weak self] in
-            guard await coord.abandonTranscription() else { return }
-            guard let self, generation == self.coordinatorGeneration else { return }
-            self.rearm()
-        }
+        Task { _ = await coord.abandonTranscription() }
     }
 
     /// Escape, as with macOS Dictation: what is being said or transcribed is dropped, and nothing is pasted.
@@ -374,18 +352,6 @@ final class DictationController {
             return
         }
         Task { await coord.stopListening() }
-    }
-
-    /// The coordinator that gave up may still be stuck in its recorder, so a fresh pair takes over.
-    private func rearm() {
-        guard let configuration else { return }
-        stop()
-        let abandoned = fallbackSession
-        fallbackSession = TranscriptionSession()
-        Task {
-            if let name = await abandoned.currentModel() { await abandoned.unloadModel(ifLoaded: name) }
-        }
-        start(configuration: configuration)
     }
 
     var isRunning: Bool { coordinator != nil }

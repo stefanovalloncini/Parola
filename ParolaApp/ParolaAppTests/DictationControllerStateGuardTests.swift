@@ -13,6 +13,10 @@ private final class QuietHotkeyMonitorBox: HotkeyMonitor {
 /// `stopAndTranscribe` parks until released, standing in for a slow flush
 /// (transcription + LLM cleanup) of a session the controller already dropped.
 private actor SlowFlushRecorder: DictationRecorder {
+    func stopCapture() async throws -> DictationTake {
+        DictationTake(finalize: { try await self.stopAndTranscribe() })
+    }
+
     private var released = false
     private var waiters: [CheckedContinuation<Void, Never>] = []
 

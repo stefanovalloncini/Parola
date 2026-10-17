@@ -665,7 +665,7 @@ struct AppModelDictationTests {
         #expect(!model.dictationController.isRunning)
     }
 
-    @Test("a bridge stop while the final transcription hangs gives up after the grace and re-arms a fresh recorder")
+    @Test("a bridge stop while the final transcription hangs gives up after the grace, and the hotkey answers at once")
     func stopWhileTranscribingGivesUp() async {
         let model = makeModel()
         let recorders = RecorderTally()
@@ -681,11 +681,14 @@ struct AppModelDictationTests {
         #expect(transcribing)
 
         model.stopDictationFromBridge()
-        let recordersMadeTwo = await waitUntil { recorders.made.count == 2 }
-        #expect(recordersMadeTwo)
-        #expect(model.dictationState == .idle)
-        #expect(model.dictationController.state == .idle)
+        let idle = await waitUntil { model.dictationState == .idle }
+        #expect(idle)
         #expect(model.dictationController.isRunning)
+
+        model.dictationController.simulatePress()
+        let listensAgain = await waitUntil { model.dictationState == .listening }
+        #expect(listensAgain)
+        #expect(recorders.made.count == 1, "giving up never re-arms")
 
         for recorder in recorders.made { await recorder.release() }
         model.abortDictation()
@@ -716,7 +719,7 @@ struct AppModelDictationTests {
         model.abortDictation()
     }
 
-    @Test("Cancel drops the final at once, without the stop's grace, and re-arms a fresh recorder")
+    @Test("Cancel drops the final at once, without the stop's grace, and the hotkey answers at once")
     func cancelDropsTheFinalAtOnce() async {
         let model = makeModel()
         let recorders = RecorderTally()
@@ -732,11 +735,45 @@ struct AppModelDictationTests {
 
         model.dictationController.cancelTranscription()
 
-        let recordersMadeTwo = await waitUntil(timeoutMs: 2000) { recorders.made.count == 2 }
-        #expect(recordersMadeTwo)
-        #expect(model.dictationState == .idle)
+        let idle = await waitUntil { model.dictationState == .idle }
+        #expect(idle)
+        model.dictationController.simulatePress()
+        let listensAgain = await waitUntil { model.dictationState == .listening }
+        #expect(listensAgain)
+        #expect(recorders.made.count == 1, "cancelling never re-arms")
         for recorder in recorders.made { await recorder.release() }
         model.abortDictation()
+    }
+
+    @Test("a settings restart behind a stuck take doesn't wait for it: the new coordinator answers a press")
+    func restartBehindAStuckTake() async {
+        let model = makeModel()
+        let recorders = RecorderTally()
+        model.dictationController.recorderFactory = { _ in recorders.make() }
+        model.dictationEnabled = true
+        model.dictationController.simulatePress()
+        _ = await waitUntil { model.dictationState == .listening }
+        model.stopDictationFromIntent()
+        let transcribing = await waitUntil { model.dictationState == .transcribing }
+        #expect(transcribing)
+
+        model.dictationKeyCode = 97
+        model.dictationController.simulatePress()
+
+        let listens = await waitUntil { model.dictationState == .listening }
+        #expect(listens)
+        for recorder in recorders.made { await recorder.release() }
+        model.abortDictation()
+    }
+
+    @Test("turning dictation off unloads the model the last press used")
+    func turnOffUnloadsTheLastPressedModel() {
+        let model = makeModel()
+        model.selectedModel = "openai_whisper-tiny"
+        _ = model.pressedPipelineConfiguration()
+        model.selectedModel = "openai_whisper-base"
+
+        #expect(model.dictationModelToRelease() == "openai_whisper-tiny")
     }
 
     /// Dictation on, a final held in its recorder, and every paste recorded instead of posted.
@@ -837,6 +874,10 @@ private struct IdentityPostProcessor: TextPostProcessor {
 }
 
 private actor StuckRecorder: DictationRecorder {
+    func stopCapture() async throws -> DictationTake {
+        DictationTake(finalize: { try await self.stopAndTranscribe() })
+    }
+
     private let text: String
     private var gate: CheckedContinuation<Void, Never>?
     private(set) var returned = false

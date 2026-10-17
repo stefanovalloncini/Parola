@@ -55,7 +55,7 @@ public actor DictationCoordinator {
 
     /// True from the moment a capture ends until the recorder is free and the state is published; a press in between is replayed after.
     private var endInFlight = false
-    private var deferredPress: Date?
+    private var deferredEvents: [(event: HotkeyEvent, at: Date)] = []
 
     private var isListening = false
     private var resting: State = .idle
@@ -164,9 +164,10 @@ public actor DictationCoordinator {
     }
 
     /// Stops listening for hotkeys. If a recording is in flight, transcribes and inserts it
-    /// so the user's last utterance isn't dropped, and waits for every earlier take to land.
+    /// so the user's last utterance isn't dropped. With `waitingForTakes`, it also waits for every earlier take to land;
+    /// without it, they finish on their own, so a stuck take never holds up the next coordinator.
     /// Use ``abortMonitoring()`` for "give up" semantics that discard pending audio.
-    public func stopMonitoring() async {
+    public func stopMonitoring(waitingForTakes: Bool = true) async {
         shutDown = true
         generation &+= 1
         await teardownMonitor()
@@ -175,7 +176,7 @@ public actor DictationCoordinator {
         } else {
             resting = .idle
         }
-        await drain()
+        if waitingForTakes { await drain() }
         await publishState()
     }
 
@@ -219,9 +220,37 @@ public actor DictationCoordinator {
 
     private func finishEnding() async {
         endInFlight = false
-        guard let pressedAt = deferredPress else { return }
-        deferredPress = nil
-        await handle(.press, capturedAt: pressedAt)
+        let replay = deferredEvents
+        deferredEvents = []
+        for (event, at) in replay { await handle(event, capturedAt: at) }
+    }
+
+    /// A release or a second tap that comes while its press is still held back cancels that press, so the mic never opens for a tap already over.
+    private func deferEvent(_ event: HotkeyEvent, at capturedAt: Date) {
+        let pendingPress: Bool = { if case .press? = deferredEvents.last?.event { true } else { false } }()
+        switch (mode, event) {
+        case (.pushToTalk, .press):
+            deferredEvents.append((event, capturedAt))
+        case (.pushToTalk, .release):
+            if pendingPress { deferredEvents.removeLast() }
+        case (.toggle, .press):
+            if pendingPress { deferredEvents.removeLast() } else { deferredEvents.append((event, capturedAt)) }
+        case (.toggle, .release):
+            break
+        case (.hybrid, .press):
+            if deferredEvents.count == 2, case .release = deferredEvents[1].event {
+                deferredEvents = []
+            } else if !pendingPress {
+                deferredEvents.append((event, capturedAt))
+            }
+        case (.hybrid, .release):
+            guard pendingPress, let pressedAt = deferredEvents.last?.at else { return }
+            if capturedAt.timeIntervalSince(pressedAt) >= Self.hybridHoldThreshold {
+                deferredEvents.removeLast()
+            } else {
+                deferredEvents.append((event, capturedAt))
+            }
+        }
     }
 
     private func teardownMonitor() async {
@@ -252,7 +281,7 @@ public actor DictationCoordinator {
     }
 
     /// Gives up on the take being processed now, the oldest one: its late text is never inserted and queued takes still run.
-    /// Returns false when none is running. The recorder can stay busy, so the caller replaces this coordinator afterwards.
+    /// Returns false when none is running.
     @discardableResult
     public func abandonTranscription() async -> Bool {
         guard case .transcribing = state, let oldest = jobs.keys.min() else { return false }
@@ -270,8 +299,7 @@ public actor DictationCoordinator {
     private func abandon(_ id: UInt64) async -> Bool {
         guard case .transcribing = state, jobs[id] != nil else { return false }
         ParolaLog.notice(.dictation, "final transcription abandoned in \(mode)")
-        await dropTakes([id], cancelling: false)
-        resting = .idle
+        await dropTakes([id])
         await publishState()
         return true
     }
@@ -309,7 +337,7 @@ public actor DictationCoordinator {
             return
         }
         if endInFlight {
-            if case .press = event { deferredPress = capturedAt }
+            deferEvent(event, at: capturedAt)
             return
         }
         switch mode {

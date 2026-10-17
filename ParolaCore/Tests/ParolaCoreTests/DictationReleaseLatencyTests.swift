@@ -14,67 +14,70 @@ struct DictationReleaseLatencyTests {
         func fire(_ event: HotkeyEvent) { lock.withLock { handler }?(event) }
     }
 
-    private actor TimedRecorder: DictationRecorder {
-        let decode: Duration
-        private(set) var startTimes: [ContinuousClock.Instant] = []
-        private var starts: AsyncStream<Int>.Continuation?
-        let startSignals: AsyncStream<Int>
+    private actor GatedRecorder: DictationRecorder {
+        let decodeHeld: AsyncStream<Void>
+        private let decodeHeldSignal: AsyncStream<Void>.Continuation
+        private var starts = 0
+        private let startSignal: AsyncStream<Int>.Continuation
+        let startEvents: AsyncStream<Int>
+        private var decodeGate: [CheckedContinuation<Void, Never>] = []
+        private var opened = false
 
-        init(decode: Duration) {
-            self.decode = decode
-            let (stream, continuation) = AsyncStream.makeStream(of: Int.self)
-            startSignals = stream
-            starts = continuation
+        init() {
+            (decodeHeld, decodeHeldSignal) = AsyncStream.makeStream()
+            (startEvents, startSignal) = AsyncStream.makeStream()
         }
 
         func start() async throws {
-            startTimes.append(.now)
-            starts?.yield(startTimes.count)
+            starts += 1
+            startSignal.yield(starts)
         }
 
-        func stopAndTranscribe() async throws -> String {
-            try await Task.sleep(for: decode)
-            return "text"
+        func stopAndTranscribe() async throws -> String { try await stopCapture().finalize() }
+
+        func stopCapture() async throws -> DictationTake {
+            DictationTake(finalize: {
+                await self.holdDecode()
+                return "text"
+            })
+        }
+
+        private func holdDecode() async {
+            decodeHeldSignal.yield()
+            guard !opened else { return }
+            await withCheckedContinuation { decodeGate.append($0) }
+        }
+
+        func openDecode() {
+            opened = true
+            for waiter in decodeGate { waiter.resume() }
+            decodeGate = []
         }
     }
 
-    private struct SlowProcessor: TextPostProcessor {
-        let delay: Duration
-        func process(_ text: String) async -> String {
-            try? await Task.sleep(for: delay)
-            return text
-        }
-    }
-
-    private struct SlowInserter: TextInserter {
-        let delay: Duration
-        func insert(_ text: String) async throws { try? await Task.sleep(for: delay) }
-    }
-
-    @Test("a press right after a release starts capturing well before the previous take is inserted", .timeLimit(.minutes(1)))
-    func nextCaptureStartsEarly() async throws {
-        let pipeline = Duration.milliseconds(900)
+    @Test("a press right after a release starts capturing while the previous take's decode is still held", .timeLimit(.minutes(1)))
+    func nextCaptureStartsDuringTheDecode() async {
         let hotkey = Hotkey()
-        let recorder = TimedRecorder(decode: .milliseconds(300))
-        let coord = DictationCoordinator(
-            hotkey: hotkey, recorder: recorder, inserter: SlowInserter(delay: .milliseconds(200)),
-            postProcessor: SlowProcessor(delay: .milliseconds(400)), features: .all
-        )
+        let recorder = GatedRecorder()
+        let coord = DictationCoordinator(hotkey: hotkey, recorder: recorder, inserter: Inserter(), features: .all)
         await coord.startMonitoring()
+        var starts = recorder.startEvents.makeAsyncIterator()
+        var held = recorder.decodeHeld.makeAsyncIterator()
 
         hotkey.fire(.press)
-        var starts = recorder.startSignals.makeAsyncIterator()
         _ = await starts.next()
-        let releasedAt = ContinuousClock.now
         hotkey.fire(.release)
+        _ = await held.next()
         hotkey.fire(.press)
-        _ = await starts.next()
-        let secondStart = await recorder.startTimes[1]
-        let latency = releasedAt.duration(to: secondStart)
-        print("release to next capture: \(latency)")
+        let second = await starts.next()
 
-        #expect(latency < pipeline / 2)
+        #expect(second == 2, "the second capture started before the first decode finished")
+        await recorder.openDecode()
         hotkey.fire(.release)
         await coord.stopMonitoring()
+    }
+
+    private struct Inserter: TextInserter {
+        func insert(_ text: String) async throws {}
     }
 }

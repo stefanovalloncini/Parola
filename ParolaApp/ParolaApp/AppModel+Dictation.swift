@@ -247,9 +247,13 @@ extension AppModel {
     }
 
     /// Unlike a restart's stop, this drops a final still on its way: nothing is pasted once dictation is off.
+    func dictationModelToRelease() -> String {
+        lastDictationModel ?? dictationController.configuration?.pipeline.modelName ?? selectedModel
+    }
+
     func turnOffDictation() {
         let mayBeTranscribing = dictationController.state != .idle
-        let configuredModel = lastDictationModel ?? dictationController.configuration?.pipeline.modelName ?? selectedModel
+        let configuredModel = dictationModelToRelease()
         dictationController.discardAndStop()
         let residency = modelResidency
         let epoch = residency.warmEpoch
@@ -389,7 +393,7 @@ extension AppModel {
         let contextProvider: DictationContextProvider? = contextConfig.isAllDisabled
             ? nil
             : DictationContextProvider(source: MacContextSource())
-        let prompt = PromptDictationProcessor(
+        var prompt = PromptDictationProcessor(
             defaultPrompt: currentDictationCleanupPrompt(),
             overrides: currentDictationOverrides(),
             triggerPrompts: cachedDictationTriggerPrompts,
@@ -398,6 +402,7 @@ extension AppModel {
             language: selectedLanguage,
             cleanupRunner: dictationCleanupRunner()
         )
+        prompt.scopedContext = { DictationContextProvider(source: MacContextSource(targetProcessID: $0)) }
         var before: [any TextPostProcessor] = []
         if dictationStripSelfCorrections {
             before.append(SelfCorrectionCleaner())
@@ -431,12 +436,11 @@ extension AppModel {
             pasteDelayMs: pasteDelay,
             bind: { target in
                 let workflow = target?.bundleID.flatMap { DictationWorkflowMap.select(in: workflows, for: $0, url: target?.url) }
-                let base: any TextInserter = (workflow?.insertion ?? .paste) == .keystroke
-                    ? KeystrokeTextInserter()
-                    : ClipboardPasteInserter(preDelayMs: pasteDelay)
+                let typed = (workflow?.insertion ?? .paste) == .keystroke
+                let base: any TextInserter = typed ? KeystrokeTextInserter() : ClipboardPasteInserter()
                 return DictationTakeBinding(
                     postProcessor: Self.dictationProcessor(for: target, pieces: pieces),
-                    inserter: TargetedTextInserter(base: base, target: target)
+                    inserter: TargetedTextInserter(base: base, target: target, pasteDelayMs: typed ? 0 : pasteDelay)
                 )
             }
         )
