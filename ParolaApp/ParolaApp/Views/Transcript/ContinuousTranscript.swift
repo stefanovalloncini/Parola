@@ -175,6 +175,7 @@ struct ContinuousChunks: View {
     /// than watched on `currentSegmentID`; the chunk holding it exists only once the build lands.
     private func revealPendingSegment() async {
         guard let id = model.pendingRevealSegmentID else { return }
+        // The scroll on the chunk change lands before the new rows are laid out and can miss; this one follows it.
         revealAwaitingChunk = id
         defer { if revealAwaitingChunk == id { revealAwaitingChunk = nil } }
         let deadline = ContinuousClock.now + .seconds(10)
@@ -189,7 +190,6 @@ struct ContinuousChunks: View {
 
     private func scrollToPendingReveal() {
         guard let id = revealAwaitingChunk, let chunkID = chunkIndexBySegment[id] else { return }
-        revealAwaitingChunk = nil
         scrollProxy.scrollTo(chunkID, anchor: .center)
     }
 

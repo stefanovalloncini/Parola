@@ -86,11 +86,16 @@ struct TranscriptRenderBreadthTests {
             defer { hosted.close() }
             let drawn = await waitUntil { probe("SegmentCard", model) > 3 }
             #expect(drawn)
+            BodyProbe.reset(for: model)
             model.currentSegmentID = 1
+            let first = await waitUntil { probe("SegmentCard", model) >= 1 }
+            #expect(first)
             await settle()
 
             BodyProbe.reset(for: model)
             model.currentSegmentID = 2
+            let second = await waitUntil { probe("SegmentCard", model) >= 1 }
+            #expect(second)
             await settle()
             let rerun = probe("SegmentCard", model)
             #expect(rerun >= 1 && rerun <= 2, "\(BodyProbe.counts(for: model))")
